@@ -1,0 +1,11 @@
+# Ignore all files in the repository
+*
+
+# Add gitignore to the repository
+!.gitignore
+
+# Code and configuration files
+!*.py
+!*.yml
+!*.md
+!*.txt

@@ -1,0 +1,32 @@
+name: urp-mapping
+channels:
+  - defaults
+dependencies:
+  - numpy
+  - pandas
+  - pip
+  - python=3.10
+  - scipy
+  - ipykernel
+  - pip:
+    - attrs==25.3.0
+    - beautifulsoup4==4.13.4
+    - bs4==0.0.2
+    - fastjsonschema==2.21.1
+    - fonttools==4.57.0
+    - idna==3.10
+    - jsonschema==4.23.0
+    - jsonschema-specifications==2024.10.1
+    - kiwisolver==1.4.8
+    - matplotlib==3.10.1
+    - narwhals==1.33.0
+    - nbformat==5.10.4
+    - pillow==11.1.0
+    - plotly==6.0.1
+    - referencing==0.36.2
+    - requests==2.32.3
+    - rpds-py==0.24.0
+    - soupsieve==2.7
+    - spiceypy==6.0.0
+    - tqdm==4.67.1
+    - urllib3==2.4.0
