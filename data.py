@@ -4,13 +4,14 @@ import logging
 import requests
 from pathlib import Path
 from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-class FluxDataManager:
+class DataManager:
     """
-    Manage downloading and organizing PDS flux data files by scraping directory indexes.
+    Manage downloading and organizing data files by scraping directory indexes.
 
     Features:
     - List remote directories and files
@@ -32,7 +33,7 @@ class FluxDataManager:
         Return a list of subdirectory names under base_url/remote_path/.
         """
         url = f"{self.base_url}/{remote_path.rstrip('/')}/"
-        logger.info(f"Listing remote directories at {url}")
+        logger.debug(f"Listing remote directories at {url}")
         resp = requests.get(url)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'html.parser')
@@ -52,7 +53,7 @@ class FluxDataManager:
         Return filenames under base_url/remote_path/ matching ext.
         """
         url = f"{self.base_url}/{remote_path.rstrip('/')}/"
-        logger.info(f"Listing remote files at {url}")
+        logger.debug(f"Listing remote files at {url}")
         resp = requests.get(url)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'html.parser')
@@ -65,20 +66,25 @@ class FluxDataManager:
         Stream-download a file if not already present.
         """
         dest = Path(dest)
+        temp_dest = dest.with_suffix(dest.suffix + '.part')
+
         if dest.exists():
-            # logger.info(f"Skipping existing file: {dest}")
-            tqdm.write(f"Skipping existing file: {dest}")
+            logger.debug(f"Skipping existing file: {dest}")
             return dest
-        # logger.info(f"Downloading {url} -> {dest}")
-        tqdm.write(f"Downloading {url} -> {dest}")
+        
+        if temp_dest.exists():
+            logger.debug(f"Partial download found, resuming...")
+        else:
+            logger.debug(f"Starting download: {url} -> {temp_dest}")
+
         resp = requests.get(url, stream=True)
         resp.raise_for_status()
-        with open(dest, 'wb') as f:
+        with open(temp_dest, 'wb') as f:
             for chunk in resp.iter_content(chunk_size):
                 if chunk:
                     f.write(chunk)
-        # logger.info(f"Downloaded {dest}")
-        tqdm.write(f"Downloaded {dest}")
+        temp_dest.rename(dest)
+        logger.debug(f"Downloaded: {dest}")
         return dest
 
     def fetch_directory(self, remote_path: str, ext: str = '.TAB') -> list[Path]:
@@ -87,25 +93,64 @@ class FluxDataManager:
         """
         files = self.list_remote_files(remote_path, ext)
         local_dir = self.ensure_dir(*remote_path.split('/'))
-        paths = []
-        for fname in files:
-            url = f"{self.base_url}/{remote_path}/{fname}"
-            dest = local_dir / fname
-            paths.append(self.download_file(url, dest))
-        return paths
+
+        urls_and_dests = [
+            (f"{self.base_url}/{remote_path}/{fname}", local_dir / fname)
+            for fname in files
+        ]
+        self.download_files_in_parallel(urls_and_dests, folder_desc=f"Downloading {remote_path}")
+        return [dest for url, dest in urls_and_dests]
+    
+    def download_files_in_parallel(self, urls_and_dests: list[tuple[str, Path]], max_workers: int = 10, folder_desc: str = "Downloading files") -> None:
+        """
+        Download multiple (url, dest) pairs in parallel.
+        """
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            with tqdm(total=len(urls_and_dests), desc=folder_desc, leave=False) as pbar:
+                futures = [
+                    executor.submit(self.download_file, url, dest)
+                    for url, dest in urls_and_dests
+                ]
+                for future in tqdm(as_completed(futures), total=len(futures), desc="Downloading files", unit="file"):
+                    future.result()
+                    pbar.update(1)
+
+
 
 if __name__ == '__main__':
-    base_url = 'https://pds-ppi.igpp.ucla.edu/data/lp-er-calibrated/data-3deleflux/'
+    spice_mgr = DataManager(base_dir='spice_kernels', base_url='https://naif.jpl.nasa.gov/pub/naif/LPM/kernels/spk/')
+    generic_mgr = DataManager(base_dir='spice_kernels', base_url='https://naif.jpl.nasa.gov/pub/naif/generic_kernels/')
+    lpephemu_mgr = DataManager(base_dir='spice_kernels', base_url='https://pds-geosciences.wustl.edu/missions/lunarp/spice/')
+    attitude_mgr = DataManager(base_dir='data', base_url='https://pds-geosciences.wustl.edu/lunar/prospectorcd/lp_0019/geometry/')
+    data_mgr = DataManager(base_dir='data', base_url='https://pds-ppi.igpp.ucla.edu/data/lp-er-calibrated/data-3deleflux/')
 
-    mgr = FluxDataManager(base_dir='data', base_url=base_url)
+    # download specific spice kernels
+    for fname in [
+        'lp_ask_980111-980531.bsp',
+        'lp_ask_980601-981031.bsp',
+        'lp_ask_981101-990331.bsp',
+        'lp_ask_990401-990730.bsp',]:
 
-    years = mgr.list_remote_dirs()
+        spice_mgr.download_file(spice_mgr.base_url + fname, spice_mgr.base_dir / fname)
+
+    # download generic kernels
+    for fname in [
+        'lsk/latest_leapseconds.tls',
+        'pck/pck00011.tpc',]:
+
+        generic_mgr.download_file(generic_mgr.base_url + fname, spice_mgr.base_dir / Path(fname).name)
+
+    # download lpephemu
+    lpephemu_mgr.download_file(lpephemu_mgr.base_url + 'lpephemu.bsp', spice_mgr.base_dir / 'lpephemu.bsp')
+
+    # download attitude table
+    attitude_mgr.download_file(attitude_mgr.base_url + 'attitude.tab', data_mgr.base_dir / 'attitude.tab')
+
+
+    years = data_mgr.list_remote_dirs()
     for year in tqdm(years, desc="Years"):
         # list all julian-date subdirectories in that year
-        julian_dirs = mgr.list_remote_dirs(year)
+        julian_dirs = data_mgr.list_remote_dirs(year)
         for julian in tqdm(julian_dirs, desc=f"Julian days ({year})", leave=False):
             remote_path = f"{year}/{julian}"
-            downloaded_files = mgr.fetch_directory(remote_path)
-            for f in downloaded_files:
-                # print(f"Downloaded: {f}")
-                tqdm.write(f"Downloaded: {f}")
+            downloaded_files = data_mgr.fetch_directory(remote_path)
