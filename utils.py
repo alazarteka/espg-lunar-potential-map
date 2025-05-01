@@ -6,6 +6,8 @@ import numpy as np
 import spiceypy as spice
 import pandas as pd
 
+import config
+
 LP = "-25"
 MOON = "301"
 SUN = "10"
@@ -189,7 +191,7 @@ def build_scd_to_j2000(spin_vecs, sun_vecs):
 
 
 
-def get_intersection_or_none(pos, direction, radius=1737.4):
+def get_intersection_or_none(pos, direction, radius=config.LUNAR_RADIUS_M):
     # normalize direction just in case
     v = direction / np.linalg.norm(direction)
     p = pos
