@@ -7,6 +7,7 @@ from scipy.optimize import minimize, Bounds
 from scipy.stats.qmc import LatinHypercube, scale
 
 from model import synth_losscone
+import config
 
 class FluxData:
     def __init__(self, er_data_file: str, thetas: str):
@@ -99,7 +100,7 @@ class FluxData:
         self.pitch_angles = pitch_angles
         self.electron_flux = self.data[self.flux_cols].to_numpy(dtype=np.float64)
         self.energy_bins = self.data["energy"].to_numpy(dtype=np.float64)
-        self.chunks = len(self.data) // 15
+        self.chunks = len(self.data) // config.SWEEP_ROWS
 
     def get_normalized_flux(self, energy_bin: int, measurement_chunk: int) -> np.ndarray:
         """
@@ -116,7 +117,7 @@ class FluxData:
         assert self.data is not None, "Data not loaded. Please load the data first."
 
         # Get the electron flux for the specified energy bin and measurement chunk
-        index = measurement_chunk * 15 + energy_bin
+        index = measurement_chunk * config.SWEEP_ROWS + energy_bin
         electron_flux = self.electron_flux[index]
         angles = self.pitch_angles[index]
         incident_mask = angles < 90
@@ -147,7 +148,7 @@ class FluxData:
 
         norm2d = np.vstack([
             self.get_normalized_flux(energy_bin, measurement_chunk)
-            for energy_bin in range(15)
+            for energy_bin in range(config.SWEEP_ROWS)
         ])
 
         return norm2d
@@ -168,7 +169,7 @@ class FluxData:
         # --- prepare data for the chunk -------------------------------------------------
         eps        = 1e-6
         norm2d     = self.build_norm2d(measurement_chunk)
-        s, e       = measurement_chunk * 15, (measurement_chunk + 1) * 15
+        s, e       = measurement_chunk * config.SWEEP_ROWS, (measurement_chunk + 1) * config.SWEEP_ROWS
         energies   = self.energy_bins[s:e]
         pitches    = self.pitch_angles[s:e]
 

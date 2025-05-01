@@ -6,6 +6,8 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import config
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -61,7 +63,7 @@ class DataManager:
                  if a['href'].upper().endswith(ext.upper())]
         return files
 
-    def download_file(self, url: str, dest: Path, chunk_size: int = 4 * 1024 * 1024) -> Path:
+    def download_file(self, url: str, dest: Path, chunk_size: int = config.CHUNK_SIZE_BYTES) -> Path:
         """
         Stream-download a file if not already present.
         """
@@ -101,7 +103,7 @@ class DataManager:
         self.download_files_in_parallel(urls_and_dests, folder_desc=f"Downloading {remote_path}")
         return [dest for url, dest in urls_and_dests]
     
-    def download_files_in_parallel(self, urls_and_dests: list[tuple[str, Path]], max_workers: int = 10, folder_desc: str = "Downloading files") -> None:
+    def download_files_in_parallel(self, urls_and_dests: list[tuple[str, Path]], max_workers: int = config.MAX_DOWNLOAD_WORKERS, folder_desc: str = "Downloading files") -> None:
         """
         Download multiple (url, dest) pairs in parallel.
         """
