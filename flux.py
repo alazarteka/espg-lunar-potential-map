@@ -227,9 +227,10 @@ class FluxData:
         assert self.data is not None, "Data not loaded."
 
         # Fit for each chunk
-        results = np.zeros((self.chunks, 3))
+        results = np.zeros((self.chunks, 4))
         for i in range(self.chunks):
-            results[i] = self._fit_surface_potential(i)
+            delta_U, bs_over_bm, chi2 = self._fit_surface_potential(i)
+            results[i] = [delta_U, bs_over_bm, chi2, i]
 
         return results
 
