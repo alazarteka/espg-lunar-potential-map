@@ -191,7 +191,7 @@ def build_scd_to_j2000(spin_vecs, sun_vecs):
 
 
 
-def get_intersection_or_none(pos, direction, radius=config.LUNAR_RADIUS_M):
+def get_intersection_or_none(pos, direction, radius=config.LUNAR_RADIUS_KM):
     # normalize direction just in case
     v = direction / np.linalg.norm(direction)
     p = pos
