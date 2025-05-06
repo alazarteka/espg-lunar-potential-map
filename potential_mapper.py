@@ -104,7 +104,7 @@ def main():
 
             monthly_flux_data.extend(files)
         
-        for selected_file_path in monthly_flux_data[0:1]:
+        for selected_file_path in monthly_flux_data[74:75]: # 103:104
             logging.info(f"Selected file: {selected_file_path}")
 
             flux = FluxData(selected_file_path, theta_file)
@@ -160,6 +160,10 @@ def main():
             logging.info("Calculating surface potential...")
             potential = flux.fit_surface_potential()
 
+            # logging.info(f"Potentials computed: {len(potential)}")
+            # for V in potential:
+            #     corresponding_time = flux.data["UTC"][V[-1] * config.SWEEP_ROWS]
+            #     logging.info(f"Potential {V[0]} V at time {corresponding_time}.")
 
             for i, (position, projected_magnetic_field, moon_vector_to_sun) in enumerate(zip(lp_position_array, projected_magnetic_field, moon_vector_to_sun_array)):
                 intersection = get_intersection_or_none(position, projected_magnetic_field)
@@ -173,7 +177,7 @@ def main():
                     potentials.append(potential[chunk_index][0])
                     intersection_cartesian_pos.append(intersection)
                 else:
-                    logging.warning(f"Intersection not found for index {i}.")
+                    logging.debug(f"Intersection not found for index {i}.")
  
 
         potentials = np.array(potentials)
@@ -203,7 +207,8 @@ def main():
         
         lp_lat = np.rad2deg(np.arcsin(lp_position_array[:, 2] / np.linalg.norm(lp_position_array, axis=1)))
         lp_long = np.rad2deg(np.arctan2(lp_position_array[:, 1], lp_position_array[:, 0]))
-        lp_path_plot = plt.plot(lp_long, lp_lat, 'r-', label='LP Path', linewidth=2)
+        step = 15
+        lp_path_plot = plt.plot(lp_long[::step], lp_lat[::step], 'r-', label='LP Path', linewidth=0.5)
 
 
         moon_map_path = os.path.join(current_directory, 'data/moon_map.tif')
