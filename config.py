@@ -23,3 +23,11 @@ REQUESTS_PER_SECOND = 5        # rate-limit threshold
 
 # ========== Numerical tolerances ==========  
 EPS = 1e-6                     # small epsilon to avoid division by zero
+
+# ========== Column names ==========
+MISC_COLS = ["UTC", "time", "energy", "spec_no", "mag_x", "mag_y", "mag_z"]
+FLUX_COLS = [f"ele_flux_{i}" for i in range(88)]
+PHI_COLS = [f"dist_phi_{i}" for i in range(88)]
+ALL_COLS = MISC_COLS + FLUX_COLS + PHI_COLS
+MAG_COLS = ["mag_x", "mag_y", "mag_z"]
+

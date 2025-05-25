@@ -38,7 +38,7 @@ def synth_losscone(energy_grid: np.ndarray,
         else:
             ac = math.degrees(math.asin(math.sqrt(x)))
 
-        mask = pitch_grid[i] >= ac
+        mask = pitch_grid[i] <= 180 - ac
         model[i, mask] = 1.0
 
     # Optional narrow beam

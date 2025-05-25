@@ -5,6 +5,7 @@ from typing import Tuple
 import numpy as np
 import spiceypy as spice
 import pandas as pd
+from bisect import bisect_right
 
 import config
 
@@ -91,41 +92,6 @@ def get_j2000_iau_moon_transform_matrix(time: float) -> np.ndarray:
     
     return mat
     
-
-        
-
-def bisect_right(a, x, lo=0, hi=None, *, key=None):
-    """Return the index where to insert item x in list a, assuming a is sorted.
-
-    The return value i is such that all e in a[:i] have e <= x, and all e in
-    a[i:] have e > x.  So if x already appears in the list, a.insert(i, x) will
-    insert just after the rightmost x already there.
-
-    Optional args lo (default 0) and hi (default len(a)) bound the
-    slice of a to be searched.
-    """
-
-    if lo < 0:
-        raise ValueError('lo must be non-negative')
-    if hi is None:
-        hi = len(a)
-    # Note, the comparison uses "<" to match the
-    # __lt__() logic in list.sort() and in heapq.
-    if key is None:
-        while lo < hi:
-            mid = (lo + hi) // 2
-            if x < a[mid]:
-                hi = mid
-            else:
-                lo = mid + 1
-    else:
-        while lo < hi:
-            mid = (lo + hi) // 2
-            if x < key(a[mid]):
-                hi = mid
-            else:
-                lo = mid + 1
-    return lo if lo < len(a) else len(a) - 1 # return the last index if lo is out of bounds
 
 def load_attitude_data(path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """

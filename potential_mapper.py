@@ -153,17 +153,17 @@ def main():
             )
 
             logging.info("Projecting magnetic field...")
-            magnetic_field = flux.data[["mag_x", "mag_y", "mag_z"]].to_numpy(dtype=np.float64)
+            magnetic_field = flux.data[config.MAG_COLS].to_numpy(dtype=np.float64)
             unit_magnetic_field = magnetic_field / np.linalg.norm(magnetic_field, axis=1, keepdims=True)           
             projected_magnetic_field = np.einsum("nij,nj->ni", scd_to_iau_moon_mats, unit_magnetic_field)
 
             logging.info("Calculating surface potential...")
             potential = flux.fit_surface_potential()
 
-            # logging.info(f"Potentials computed: {len(potential)}")
-            # for V in potential:
-            #     corresponding_time = flux.data["UTC"][V[-1] * config.SWEEP_ROWS]
-            #     logging.info(f"Potential {V[0]} V at time {corresponding_time}.")
+            logging.info(f"Potentials computed: {len(potential)}")
+            for V in potential:
+                corresponding_time = flux.data["UTC"][V[-1] * config.SWEEP_ROWS]
+                logging.info(f"Potential {V[0]} V at time {corresponding_time}.")
 
             for i, (position, projected_magnetic_field, moon_vector_to_sun) in enumerate(zip(lp_position_array, projected_magnetic_field, moon_vector_to_sun_array)):
                 intersection = get_intersection_or_none(position, projected_magnetic_field)
