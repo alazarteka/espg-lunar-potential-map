@@ -9,6 +9,7 @@ import spiceypy as spice
 import matplotlib.pyplot as plt
 import glob
 import logging
+import config
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,7 +22,7 @@ def load_spice_files(spice_directory: str) -> None:
     spice_files =   glob.glob(os.path.join(spice_directory, '*.bsp')) + \
                     glob.glob(os.path.join(spice_directory, '*.tpc')) + \
                     glob.glob(os.path.join(spice_directory, '*.tls'))
-    
+
     if len(spice_files) == 0:
         logging.error(f"No SPICE files found in {spice_directory}")
         return
@@ -40,7 +41,7 @@ def load_attitude(data_directory: str) -> Tuple[np.ndarray, np.ndarray, np.ndarr
     if not os.path.exists(attitude_file):
         logging.error(f"Attitude file {attitude_file} not found.")
         return
-    
+
     logging.info(f"Loading attitude data from {attitude_file}")
     return load_attitude_data(attitude_file)
 
@@ -50,13 +51,13 @@ def load_theta_file(data_directory: str) -> str:
     if not os.path.exists(theta_file):
         logging.error(f"Theta file {theta_file} not found.")
         return
-    
+
     return theta_file
 
 def main():
     logging.info("Starting the potential mapper...")
     current_directory = os.getcwd()
-    
+
     # Load SPICE files
     spice_directory = os.path.join(current_directory, 'spice_kernels')
     load_spice_files(spice_directory)
@@ -70,18 +71,18 @@ def main():
     if attitude is None or theta_file is None:
         logging.error("Failed to load attitude or theta file.")
         return
-    
+
     et_spin, ra_vals, dec_vals = attitude
 
     years = sorted(list_folder_files(data_directory))
     if len(years) == 0:
         logging.error("No year directories found in the data directory.")
         return
-    
+
     if not all([year.isdigit() for year in years]):
         logging.error("Year directories should only contain digits.")
         return
-    
+
     # Loop through each year and month
     for year in years:
         logging.info(f"Processing year: {year}")
@@ -103,7 +104,7 @@ def main():
             files = sorted(glob.glob(os.path.join(month_directory, '*.TAB')))
 
             monthly_flux_data.extend(files)
-        
+
         for selected_file_path in monthly_flux_data[74:75]: # 103:104
             logging.info(f"Selected file: {selected_file_path}")
 
@@ -119,12 +120,12 @@ def main():
             logging.info("Calculating positions and vectors...")
             for i, UTC_time in enumerate(flux.data['UTC']):
                 time = spice.str2et(UTC_time)
-                
+
                 lp_position = get_lp_position_wrt_moon(time)
                 lp_vector_to_sun = get_lp_vector_to_sun_in_lunar_frame(time)
                 ra, dec = get_current_ra_dec(time, et_spin, ra_vals, dec_vals)
 
-                
+
                 if ra is None or dec is None:
                     logging.error("RA/Dec could not be determined.")
                     continue
@@ -154,7 +155,7 @@ def main():
 
             logging.info("Projecting magnetic field...")
             magnetic_field = flux.data[config.MAG_COLS].to_numpy(dtype=np.float64)
-            unit_magnetic_field = magnetic_field / np.linalg.norm(magnetic_field, axis=1, keepdims=True)           
+            unit_magnetic_field = magnetic_field / np.linalg.norm(magnetic_field, axis=1, keepdims=True)
             projected_magnetic_field = np.einsum("nij,nj->ni", scd_to_iau_moon_mats, unit_magnetic_field)
 
             logging.info("Calculating surface potential...")
@@ -178,16 +179,16 @@ def main():
                     intersection_cartesian_pos.append(intersection)
                 else:
                     logging.debug(f"Intersection not found for index {i}.")
- 
+
 
         potentials = np.array(potentials)
         latitudes = np.array(latitudes)
         longitudes = np.array(longitudes)
-        
+
         facing_sun = np.array(facing_sun)
         facing_sun = facing_sun / np.linalg.norm(facing_sun, axis=1, keepdims=True)
-        
-        
+
+
         intersection_cartesian_pos = np.array(intersection_cartesian_pos)
         if len(intersection_cartesian_pos) == 0:
             logging.warning("No valid surface intersections this cycle; skipping plot.")
@@ -204,7 +205,7 @@ def main():
         plt.figure(figsize=(12, 6))  # Adjusted for a realistic map aspect ratio
         sc = plt.scatter(longitudes_finite, latitudes_finite, c=potentials_finite, cmap='viridis', marker='o', norm=norm, s=1)
 
-        
+
         lp_lat = np.rad2deg(np.arcsin(lp_position_array[:, 2] / np.linalg.norm(lp_position_array, axis=1)))
         lp_long = np.rad2deg(np.arctan2(lp_position_array[:, 1], lp_position_array[:, 0]))
         step = 15
@@ -221,10 +222,10 @@ def main():
         plt.colorbar(sc, label='Potential')
         plt.show()
 
-        
 
-        
 
-        
+
+
+
 if __name__ == "__main__":
     main()

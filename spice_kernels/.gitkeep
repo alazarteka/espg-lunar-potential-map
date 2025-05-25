@@ -1,0 +1,3 @@
+# Keep this directory in git
+# SPICE kernel files will be downloaded here by data.py
+# This directory should remain empty in the repository
