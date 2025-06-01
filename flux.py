@@ -193,7 +193,7 @@ class LossConeFitter:
         """
         # Generate a Latin Hypercube sample
         bounds: np.ndarray = np.array([[-1000.0,  0.1],   # lower
-                                       [ 1000.0, 10.0]])
+                                       [ 1000.0, 1.0]])
         sampler = LatinHypercube(d=2, scramble=False)
         lhs: np.ndarray = sampler.random(n=400)            # 400 points
 
