@@ -31,6 +31,7 @@ class ERData:
         # Read the data file
         try:
             self.data = pd.read_csv(self.er_data_file, sep=r"\s+", engine="python", header=None, names=config.ALL_COLS)
+            self._clean_sweep_data()
         except FileNotFoundError:
             logger.error(f"Error: The file {self.er_data_file} was not found.")
             self.data = None
@@ -40,6 +41,39 @@ class ERData:
         except Exception as e:
             logger.error(f"An unexpected error occurred: {e}")
             self.data = None
+
+    def _clean_sweep_data(self) -> None:
+        """
+        Remove entire sweeps that contain any invalid rows.
+
+        Identifies sweeps with invalid timestamps or magnetic field data,
+        then removes all rows belonging to those spec_no values.
+        """
+        if self.data is None:
+            return
+
+        original_rows = len(self.data)
+
+        # Identify invalid rows
+        magnetic_field = self.data[config.MAG_COLS].to_numpy(dtype=np.float64)
+        magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1)
+
+        invalid_mag_mask = (magnetic_field_magnitude <= 1e-9) | (magnetic_field_magnitude >= 1e3)
+        invalid_time_mask = self.data['time'] == '1970-01-01T00:00:00'
+        invalid_rows_mask = invalid_mag_mask | invalid_time_mask
+
+        # Get spec_no values for invalid rows
+        invalid_spec_nos = set(self.data.loc[invalid_rows_mask, 'spec_no'].values)
+
+        if invalid_spec_nos:
+            logger.info(f"Removing {len(invalid_spec_nos)} sweeps with invalid data")
+
+            # Remove all rows belonging to invalid spec_nos
+            valid_mask = ~self.data['spec_no'].isin(list(invalid_spec_nos))
+            self.data = self.data[valid_mask].reset_index(drop=True)
+
+            removed_rows = original_rows - len(self.data)
+            logger.info(f"Removed {removed_rows} rows ({removed_rows/original_rows*100:.1f}%) from {len(invalid_spec_nos)} invalid sweeps")
 
 class PitchAngle:
     """
@@ -120,17 +154,10 @@ class PitchAngle:
         magnetic_field: np.ndarray = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
         magnetic_field_magnitude: np.ndarray = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
 
-        # Identify valid and invalid magnetic field data based on magnitude range
-        mask: np.ndarray = (magnetic_field_magnitude > 1e-9) & (magnetic_field_magnitude < 1e3)
-        self.valid_mask: np.ndarray = mask.flatten()
-        valid_idx: np.ndarray = np.where(mask.flatten())[0]
-        invalid_idx: np.ndarray = np.where(~mask.flatten())[0]
-
-
-        # Normalize valid magnetic field vectors and assign NaN to invalid entries
-        unit_magnetic_field: np.ndarray = np.zeros_like(magnetic_field)
-        unit_magnetic_field[valid_idx] = magnetic_field[valid_idx] / magnetic_field_magnitude[valid_idx]
-        unit_magnetic_field[invalid_idx] = np.nan
+        # Since data is pre-cleaned at sweep level, all remaining rows should be valid
+        # Just normalize the magnetic field vectors directly
+        unit_magnetic_field: np.ndarray = magnetic_field / magnetic_field_magnitude
+        self.valid_mask: np.ndarray = np.ones(len(magnetic_field), dtype=bool)
 
         # Tile the unit magnetic field vectors for pitch angle calculation
         unit_magnetic_field: np.ndarray = np.tile(unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1))
@@ -217,10 +244,8 @@ class LossConeFitter:
         # Get the electron flux for the specified energy bin and measurement chunk
         index = measurement_chunk * config.SWEEP_ROWS + energy_bin
 
-        # Check if the index is one of the discarded data
-        if (self.pitch_angle.valid_mask is None or
-            index >= len(self.pitch_angle.valid_mask) or
-            not self.pitch_angle.valid_mask[index]):
+        # Data is pre-cleaned, so just check bounds
+        if index >= len(self.er_data.data):
             return np.full(config.CHANNELS, np.nan)
 
 
@@ -237,13 +262,14 @@ class LossConeFitter:
 
         # Get the angles and fluxes for the incident and reflected regions
         incident_flux: float = float(max(config.EPS, np.mean(electron_flux[incident_mask])))
-        normalized_flux: np.ndarray = electron_flux[reflected_mask] / incident_flux
+        normalized_flux: np.ndarray = electron_flux / incident_flux
 
+        # It's weird to normalize only the reflected flux
         # Combine the incident and reflected fluxes
-        combined_flux: np.ndarray = np.zeros_like(electron_flux)
-        combined_flux[incident_mask] = electron_flux[incident_mask]
-        combined_flux[reflected_mask] = normalized_flux
-        return combined_flux
+        # combined_flux: np.ndarray = np.zeros_like(electron_flux)
+        # combined_flux[incident_mask] = electron_flux[incident_mask]
+        # combined_flux[reflected_mask] = normalized_flux
+        return normalized_flux
 
 
     def build_norm2d(self, measurement_chunk: int) -> np.ndarray:
@@ -301,7 +327,7 @@ class LossConeFitter:
         # Ensure pitch angles exist for this range
         if self.pitch_angle.pitch_angles is None or s >= len(self.pitch_angle.pitch_angles):
             return np.nan, np.nan, np.nan
-        pitches: np.ndarray = self.pitch_angle.pitch_angles[s:min(e, len(self.pitch_angle.pitch_angles))]
+        pitches: np.ndarray = self.pitch_angle.pitch_angles[s:e]
 
         # Adjust norm2d size if needed
         actual_rows = e - s
