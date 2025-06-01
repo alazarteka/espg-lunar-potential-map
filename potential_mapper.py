@@ -164,7 +164,7 @@ def main():
             logging.info(f"Potentials computed: {len(potential)}")
             for V in potential:
                 corresponding_time = flux.data["UTC"][V[-1] * config.SWEEP_ROWS]
-                logging.info(f"Potential {V[0]} V at time {corresponding_time}.")
+                logging.info(f"Potential {V[0]:.5f} V at time {corresponding_time}.") # potential to 5 s.d.
 
             for i, (position, projected_magnetic_field, moon_vector_to_sun) in enumerate(zip(lp_position_array, projected_magnetic_field, moon_vector_to_sun_array)):
                 intersection = get_intersection_or_none(position, projected_magnetic_field)
