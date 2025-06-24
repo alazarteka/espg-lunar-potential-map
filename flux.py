@@ -17,7 +17,7 @@ class ERData:
         Initialize the ERData class with the path to the ER data file.
         """
         self.er_data_file = er_data_file
-        self.data = None
+        self.data: pd.DataFrame = pd.DataFrame()
 
         self._load_data()
 
@@ -34,13 +34,13 @@ class ERData:
             self._clean_sweep_data()
         except FileNotFoundError:
             logger.error(f"Error: The file {self.er_data_file} was not found.")
-            self.data = None
+            self.data = pd.DataFrame()
         except pd.errors.ParserError:
             logger.error(f"Error: The file {self.er_data_file} could not be parsed. Please check the file format.")
-            self.data = None
+            self.data = pd.DataFrame()
         except Exception as e:
             logger.error(f"An unexpected error occurred: {e}")
-            self.data = None
+            self.data = pd.DataFrame()
 
     def _clean_sweep_data(self) -> None:
         """
@@ -49,7 +49,7 @@ class ERData:
         Identifies sweeps with invalid timestamps or magnetic field data,
         then removes all rows belonging to those spec_no values.
         """
-        if self.data is None:
+        if self.data.empty:
             return
 
         original_rows = len(self.data)
@@ -140,7 +140,7 @@ class PitchAngle:
             None
         """
         # Check if data is loaded
-        assert self.er_data.data is not None, "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
         assert len(self.thetas) == config.CHANNELS, f"Theta values must match the number of channels {config.CHANNELS}."
 
         # Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z)
@@ -178,7 +178,7 @@ class PitchAngle:
             None
         """
         # Check if data is loaded
-        assert self.er_data.data is not None, "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
 
         # Calculate the pitch angles
         # The dot product between the unit magnetic field vector and the radial direction vector
@@ -239,7 +239,7 @@ class LossConeFitter:
             np.ndarray: The normalized flux for the specified energy bin and measurement chunk.
         """
         # Check if data is loaded
-        assert self.er_data.data is not None, "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
 
         # Get the electron flux for the specified energy bin and measurement chunk
         index = measurement_chunk * config.SWEEP_ROWS + energy_bin
@@ -283,7 +283,7 @@ class LossConeFitter:
             np.ndarray: The 2D normalized flux distribution for the specified measurement chunk.
         """
         # Check if data is loaded
-        assert self.er_data.data is not None, "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
 
         norm2d: np.ndarray = np.vstack([
             self._get_normalized_flux(energy_bin, measurement_chunk)
@@ -303,7 +303,7 @@ class LossConeFitter:
         bs_over_bm: best-fit B_s/B_m ratio
         chi2      : final χ² value
         """
-        assert self.er_data.data is not None, "Data not loaded."
+        assert not self.er_data.data.empty, "Data not loaded."
 
         # --- prepare data for the chunk -------------------------------------------------
         eps: float = 1e-6
@@ -375,7 +375,7 @@ class LossConeFitter:
         bs_over_bm: best-fit B_s/B_m ratio
         chi2      : final χ² value
         """
-        assert self.er_data.data is not None, "Data not loaded."
+        assert not self.er_data.data.empty, "Data not loaded."
 
         # Fit for each chunk
         n_chunks: int = len(self.er_data.data) // config.SWEEP_ROWS
