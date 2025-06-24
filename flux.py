@@ -99,11 +99,11 @@ class PitchAngle:
             thetas (str): The path to the theta values file.
         """
         self.er_data = er_data
-        self.thetas = np.loadtxt(thetas, dtype=np.float64) # Expects theta values in degrees
-        self.cartesian_coords: Union[np.ndarray, None] = None
-        self.pitch_angles: Union[np.ndarray, None] = None
-        self.unit_magnetic_field: Union[np.ndarray, None] = None
-        self.valid_mask: Union[np.ndarray, None] = None
+        self.thetas = np.loadtxt(thetas, dtype=np.float64)  # Expects theta values in degrees
+        self.cartesian_coords = np.array([])
+        self.pitch_angles = np.array([])
+        self.unit_magnetic_field = np.array([])
+        self.valid_mask = np.array([])
 
         self._process_data()
 
@@ -118,10 +118,10 @@ class PitchAngle:
         Returns:
             np.ndarray: The Cartesian coordinates (X, Y, Z).
         """
-        X: np.ndarray = np.cos(phis) * np.cos(thetas)
-        Y: np.ndarray = np.sin(phis) * np.cos(thetas)
-        z_base: np.ndarray = np.sin(thetas)
-        Z: np.ndarray = np.broadcast_to(z_base, X.shape)
+        X = np.cos(phis) * np.cos(thetas)
+        Y = np.sin(phis) * np.cos(thetas)
+        z_base = np.sin(thetas)
+        Z = np.broadcast_to(z_base, X.shape)
         return np.stack((X, Y, Z), axis=-1)
 
     def _process_data(self):
@@ -132,36 +132,30 @@ class PitchAngle:
         This function performs data validation and transformation from spherical
         to Cartesian coordinates. It also normalizes the magnetic field vectors
         and stores indices of valid and invalid data points.
-
-        Args:
-            None
-
-        Returns:
-            None
         """
         # Check if data is loaded
         assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
         assert len(self.thetas) == config.CHANNELS, f"Theta values must match the number of channels {config.CHANNELS}."
 
         # Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z)
-        phis: np.ndarray = np.deg2rad(self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64))
-        thetas: np.ndarray = np.deg2rad(self.thetas)
+        phis = np.deg2rad(self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64))
+        thetas = np.deg2rad(self.thetas)
 
         # Calculate Cartesian coordinates
-        self.cartesian_coords: np.ndarray = self._get_cartesian_coords(phis, thetas)
+        self.cartesian_coords = self._get_cartesian_coords(phis, thetas)
 
         # Extract magnetic field vectors and calculate their magnitudes
-        magnetic_field: np.ndarray = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
-        magnetic_field_magnitude: np.ndarray = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
+        magnetic_field = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
+        magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
 
         # Since data is pre-cleaned at sweep level, all remaining rows should be valid
         # Just normalize the magnetic field vectors directly
-        unit_magnetic_field: np.ndarray = magnetic_field / magnetic_field_magnitude
-        self.valid_mask: np.ndarray = np.ones(len(magnetic_field), dtype=bool)
+        unit_magnetic_field = magnetic_field / magnetic_field_magnitude
+        self.valid_mask = np.ones(len(magnetic_field), dtype=bool)
 
         # Tile the unit magnetic field vectors for pitch angle calculation
-        unit_magnetic_field: np.ndarray = np.tile(unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1))
-        self.unit_magnetic_field: np.ndarray = unit_magnetic_field
+        unit_magnetic_field = np.tile(unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1))
+        self.unit_magnetic_field = unit_magnetic_field
 
         # Calculate the pitch angles
         self.calculate_pitch_angles()
@@ -173,9 +167,6 @@ class PitchAngle:
         The pitch angle is the angle between the magnetic field line and the radial direction.
         It is calculated as the arccosine of the dot product between the unit magnetic field
         vector and the radial direction vector.
-
-        Returns:
-            None
         """
         # Check if data is loaded
         assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
@@ -189,7 +180,7 @@ class PitchAngle:
         dot_product = np.clip(dot_product, -1, 1)
 
         # Calculate the pitch angles using the arccosine function
-        pitch_angles: np.ndarray = np.arccos(dot_product)
+        pitch_angles = np.arccos(dot_product)
         # Convert the pitch angles to degrees
         pitch_angles = np.rad2deg(pitch_angles)
 
@@ -205,11 +196,11 @@ class LossConeFitter:
             er_data (ERData): The ER data object.
             thetas (str): The path to the theta values file.
         """
-        self.er_data: ERData = er_data
-        self.thetas: np.ndarray = np.loadtxt(thetas, dtype=np.float64)
-        self.pitch_angle: PitchAngle = PitchAngle(er_data, thetas)
+        self.er_data = er_data
+        self.thetas = np.loadtxt(thetas, dtype=np.float64)
+        self.pitch_angle = PitchAngle(er_data, thetas)
 
-        self.lhs: np.ndarray = self._generate_latin_hypercube()
+        self.lhs = self._generate_latin_hypercube()
 
     def _generate_latin_hypercube(self) -> np.ndarray:
         """
@@ -219,10 +210,10 @@ class LossConeFitter:
             np.ndarray: The Latin Hypercube sample.
         """
         # Generate a Latin Hypercube sample
-        bounds: np.ndarray = np.array([[-1000.0,  0.1],   # lower
-                                       [ 1000.0, 1.0]])
+        bounds = np.array([[-1000.0,  0.1],   # lower
+                           [ 1000.0, 1.0]])   # upper
         sampler = LatinHypercube(d=2, scramble=False)
-        lhs: np.ndarray = sampler.random(n=400)            # 400 points
+        lhs = sampler.random(n=400)            # 400 points
 
         return scale(lhs, bounds[0], bounds[1])
 
@@ -249,20 +240,20 @@ class LossConeFitter:
             return np.full(config.CHANNELS, np.nan)
 
 
-        electron_flux: np.ndarray = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[index]
-        if self.pitch_angle.pitch_angles is None:
+        electron_flux = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[index]
+        if len(self.pitch_angle.pitch_angles) == 0:
             return np.full(config.CHANNELS, np.nan)
-        angles: np.ndarray = self.pitch_angle.pitch_angles[index]
-        incident_mask: np.ndarray = angles < 90
-        reflected_mask: np.ndarray = ~incident_mask
+        angles = self.pitch_angle.pitch_angles[index]
+        incident_mask = angles < 90
+        reflected_mask = ~incident_mask
 
         # Check if the electron flux is valid
         if not incident_mask.any():
             return np.full_like(electron_flux, np.nan)
 
         # Get the angles and fluxes for the incident and reflected regions
-        incident_flux: float = float(max(config.EPS, np.mean(electron_flux[incident_mask])))
-        normalized_flux: np.ndarray = electron_flux / incident_flux
+        incident_flux = float(max(config.EPS, float(np.mean(electron_flux[incident_mask]))))
+        normalized_flux = electron_flux / incident_flux
 
         # It's weird to normalize only the reflected flux
         # Combine the incident and reflected fluxes
@@ -285,36 +276,39 @@ class LossConeFitter:
         # Check if data is loaded
         assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
 
-        norm2d: np.ndarray = np.vstack([
+        norm2d = np.vstack([
             self._get_normalized_flux(energy_bin, measurement_chunk)
             for energy_bin in range(config.SWEEP_ROWS)
         ])
 
         return norm2d
 
-    def _fit_surface_potential(self, measurement_chunk: int) -> Tuple[float, float, float]:
+    def _fit_surface_potential(self, measurement_chunk: int) -> tuple[float, float, float]:
         """
         Fit surface potential (ΔU) and B_s/B_m for one 15-row measurement chunk
         using χ² minimisation with scipy.optimize.minimize.
 
-        Returns
-        -------
-        delta_U   : best-fit surface potential in volts
-        bs_over_bm: best-fit B_s/B_m ratio
-        chi2      : final χ² value
+        Args:
+            measurement_chunk (int): The index of the measurement chunk.
+
+        Returns:
+            tuple[float, float, float]: 
+                - delta_U: best-fit surface potential in volts
+                - bs_over_bm: best-fit B_s/B_m ratio  
+                - chi2: final χ² value
         """
         assert not self.er_data.data.empty, "Data not loaded."
 
-        # --- prepare data for the chunk -------------------------------------------------
-        eps: float = 1e-6
-        norm2d: np.ndarray = self.build_norm2d(measurement_chunk)
+        # Prepare data for the chunk
+        eps = 1e-6
+        norm2d = self.build_norm2d(measurement_chunk)
 
         # Check if we have valid data
         if np.isnan(norm2d).all():
             return np.nan, np.nan, np.nan
 
-        s: int = measurement_chunk * config.SWEEP_ROWS
-        e: int = (measurement_chunk + 1) * config.SWEEP_ROWS
+        s = measurement_chunk * config.SWEEP_ROWS
+        e = (measurement_chunk + 1) * config.SWEEP_ROWS
 
         # Ensure indices are within bounds
         max_rows = len(self.er_data.data)
@@ -322,12 +316,12 @@ class LossConeFitter:
             return np.nan, np.nan, np.nan
         e = min(e, max_rows)
 
-        energies: np.ndarray = self.er_data.data["energy"].to_numpy(dtype=np.float64)[s:e]
+        energies = self.er_data.data["energy"].to_numpy(dtype=np.float64)[s:e]
 
         # Ensure pitch angles exist for this range
         if self.pitch_angle.pitch_angles is None or s >= len(self.pitch_angle.pitch_angles):
             return np.nan, np.nan, np.nan
-        pitches: np.ndarray = self.pitch_angle.pitch_angles[s:e]
+        pitches = self.pitch_angle.pitch_angles[s:e]
 
         # Adjust norm2d size if needed
         actual_rows = e - s
@@ -340,19 +334,16 @@ class LossConeFitter:
             model = synth_losscone(energies, pitches, delta_U, bs_over_bm)
 
             if not np.all(np.isfinite(model)) or (model <= 0).all():
-                return 1e30 # big penalty
+                return 1e30  # big penalty
 
             diff = np.log(norm2d + eps) - np.log(model + eps)
             return np.sum(diff * diff)
-        # -------------------------------------------------------------------------------
         # 1) Latin-hypercube global scan (20×20 ≈ 400 evaluations)
-        # -------------------------------------------------------------------------------
-        chi2_vals: np.ndarray = np.apply_along_axis(chi2, 1, self.lhs)
-        best_idx: int = int(np.argmin(chi2_vals))
-        x0: np.ndarray = self.lhs[best_idx]               # ΔU, Bₛ/Bₘ for local start
-        # -------------------------------------------------------------------------------
+        chi2_vals = np.apply_along_axis(chi2, 1, self.lhs)
+        best_idx = int(np.argmin(chi2_vals))
+        x0 = self.lhs[best_idx]               # ΔU, Bₛ/Bₘ for local start
+        
         # 2) Local Nelder–Mead refinement
-        # -------------------------------------------------------------------------------
         result = minimize(
             chi2, x0,
             method="Nelder-Mead",
@@ -360,8 +351,8 @@ class LossConeFitter:
         )
         if not result.success:
             raise RuntimeError(f"Optimisation failed: {result.message}")
-        delta_U: float = result.x[0]
-        bs_over_bm: float = result.x[1]
+        delta_U = result.x[0]
+        bs_over_bm = result.x[1]
         return float(delta_U), float(bs_over_bm), float(result.fun)
 
     def fit_surface_potential(self) -> np.ndarray:
@@ -369,17 +360,18 @@ class LossConeFitter:
         Fit surface potential (ΔU) and B_s/B_m for all 15-row measurement chunks
         using χ² minimisation with scipy.optimize.minimize.
 
-        Returns
-        -------
-        delta_U   : best-fit surface potential in volts
-        bs_over_bm: best-fit B_s/B_m ratio
-        chi2      : final χ² value
+        Returns:
+            np.ndarray: Array with columns [delta_U, bs_over_bm, chi2, chunk_index]
+                - delta_U: best-fit surface potential in volts
+                - bs_over_bm: best-fit B_s/B_m ratio
+                - chi2: final χ² value
+                - chunk_index: measurement chunk index
         """
         assert not self.er_data.data.empty, "Data not loaded."
 
         # Fit for each chunk
-        n_chunks: int = len(self.er_data.data) // config.SWEEP_ROWS
-        results: np.ndarray = np.zeros((n_chunks, 4))
+        n_chunks = len(self.er_data.data) // config.SWEEP_ROWS
+        results = np.zeros((n_chunks, 4))
         for i in range(n_chunks):
             delta_U, bs_over_bm, chi2 = self._fit_surface_potential(i)
             results[i] = [delta_U, bs_over_bm, chi2, i]
