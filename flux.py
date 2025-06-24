@@ -3,7 +3,7 @@ import pandas as pd
 import logging
 from scipy.optimize import minimize
 from scipy.stats.qmc import LatinHypercube, scale
-from typing import Tuple, Union
+
 
 from model import synth_losscone
 import config
