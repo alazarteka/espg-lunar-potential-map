@@ -124,7 +124,7 @@ class PitchAngle:
         Z = np.broadcast_to(z_base, X.shape)
         return np.stack((X, Y, Z), axis=-1)
 
-    def _process_data(self):
+    def _process_data(self) -> None:
         """
         Process the ER data to calculate the Cartesian coordinates and prepare
         the unit magnetic field vectors for pitch angle calculation.
