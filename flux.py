@@ -63,7 +63,7 @@ class ERData:
         invalid_rows_mask = invalid_mag_mask | invalid_time_mask
 
         # Get spec_no values for invalid rows
-        invalid_spec_nos = set(self.data.loc[invalid_rows_mask, 'spec_no'].values)
+        invalid_spec_nos = set(self.data['spec_no'][invalid_rows_mask].unique())
 
         if invalid_spec_nos:
             logger.info(f"Removing {len(invalid_spec_nos)} sweeps with invalid data")
@@ -175,7 +175,7 @@ class PitchAngle:
         # The dot product between the unit magnetic field vector and the radial direction vector
         # is the cosine of the pitch angle.
         # Negative sign is used because the radial direction vector is meant to point towards the sensor.
-        dot_product: np.ndarray = -np.einsum('ijk,ijk->ij', self.unit_magnetic_field, self.cartesian_coords)
+        dot_product = np.einsum('ijk,ijk->ij', self.unit_magnetic_field, self.cartesian_coords)
         # Clip the dot product to ensure it is in the range [-1, 1]
         dot_product = np.clip(dot_product, -1, 1)
 
@@ -188,17 +188,18 @@ class PitchAngle:
         self.pitch_angles = pitch_angles
 
 class LossConeFitter:
-    def __init__(self, er_data: ERData, thetas: str):
+    def __init__(self, er_data: ERData, thetas: str, pitch_angle: PitchAngle | None = None):
         """
         Initialize the LossConeFitter class with the ER data and theta values.
 
         Args:
             er_data (ERData): The ER data object.
             thetas (str): The path to the theta values file.
+            pitch_angle (PitchAngle, optional): Pre-computed pitch angle object. If None, creates a new one.
         """
         self.er_data = er_data
         self.thetas = np.loadtxt(thetas, dtype=np.float64)
-        self.pitch_angle = PitchAngle(er_data, thetas)
+        self.pitch_angle = pitch_angle if pitch_angle is not None else PitchAngle(er_data, thetas)
 
         self.lhs = self._generate_latin_hypercube()
 
@@ -390,7 +391,7 @@ class FluxData:
         # Use the new class structure
         self.er_data = ERData(er_data_file)
         self.pitch_angle = PitchAngle(self.er_data, thetas)
-        self.loss_cone_fitter = LossConeFitter(self.er_data, thetas)
+        self.loss_cone_fitter = LossConeFitter(self.er_data, thetas, self.pitch_angle)
 
         # Expose data for backward compatibility
         self.data = self.er_data.data
