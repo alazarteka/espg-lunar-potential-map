@@ -21,6 +21,23 @@ class ERData:
 
         self._load_data()
 
+    @classmethod
+    def from_dataframe(cls, data: pd.DataFrame, er_data_file: str):
+        """
+        Create an ERData instance from existing DataFrame data.
+        
+        Args:
+            data: The pandas DataFrame containing the ER data
+            er_data_file: The original file path for reference
+            
+        Returns:
+            ERData instance with the provided data
+        """
+        instance = cls.__new__(cls)
+        instance.er_data_file = er_data_file
+        instance.data = data
+        return instance
+
     def _load_data(self) -> None:
         """
         Load the ER data from the specified file.
@@ -151,7 +168,6 @@ class PitchAngle:
         # Since data is pre-cleaned at sweep level, all remaining rows should be valid
         # Just normalize the magnetic field vectors directly
         unit_magnetic_field = magnetic_field / magnetic_field_magnitude
-        self.valid_mask = np.ones(len(magnetic_field), dtype=bool)
 
         # Tile the unit magnetic field vectors for pitch angle calculation
         unit_magnetic_field = np.tile(unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1))
