@@ -2,6 +2,8 @@
 Central configuration constants for the Lunar Prospector Plasma Analysis pipeline.
 '''  
 
+import scipy.constants
+
 # ========== Data and chunk settings ==========  
 SWEEP_ROWS = 15                 # rows per spacecraft sweep of energy spectrum  
 CHANNELS = 88                  # number of ER electron flux channels  
@@ -9,6 +11,9 @@ CHANNELS = 88                  # number of ER electron flux channels
 # ========== Physical parameters ==========  
 LUNAR_RADIUS_KM = 1737.4       # mean lunar radius in kilometers  
 LUNAR_RADIUS_M = LUNAR_RADIUS_KM * 1e3  # mean lunar radius in meters  
+
+ELECTRON_MASS_KG = scipy.constants.electron_mass  # electron
+ELECTRON_CHARGE_C = scipy.constants.e  # elementary charge in Coulombs
 
 # ========== File extensions ==========  
 EXT_TAB = '.TAB'               # ER data file extension  
@@ -31,3 +36,5 @@ PHI_COLS = [f"dist_phi_{i}" for i in range(88)]
 ALL_COLS = MISC_COLS + FLUX_COLS + PHI_COLS
 MAG_COLS = ["mag_x", "mag_y", "mag_z"]
 
+# ========== Directory paths ==========
+DATA_DIR = 'data'              # main data directory
