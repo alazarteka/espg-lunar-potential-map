@@ -10,6 +10,8 @@ from potential_mapper import DataLoader
 from scipy.integrate import simpson
 from scipy.special import gamma
 from scipy.optimize import minimize
+from scipy.stats import qmc
+
 
 @dataclass
 class KappaParams:
@@ -193,41 +195,61 @@ class KappaFitter:
         model_flux = self.omnidirectional_flux_integral(params, self.energy_windows)
         return self._chi_squared_difference(model_flux)
 
-    def fit(self) -> KappaFitResult | None:
+    def fit(self, n_starts: int = 50) -> KappaFitResult | None:
         """
-        Runs the fitting process.
+        Runs the fitting process using a multi-start optimization strategy.
         """
         if not self.is_data_valid:
             logging.error("Cannot run fit, data is not valid.")
             return None
 
-        res = minimize(
-            self._objective_function,
-            x0=self.DEFAULT_X0.to_tuple(),
-            args=(),
-            bounds=self.DEFAULT_BOUNDS,
-            method='L-BFGS-B',
-            options={'maxiter': 300, 'ftol': 1e-10, 'disp': True}
-        )
-        sigma = None
+        # --- Multi-start optimization using Latin Hypercube Sampling ---
+        # 1. Set up the sampler
+        sampler = qmc.LatinHypercube(d=len(self.DEFAULT_BOUNDS))
+        samples = sampler.random(n=n_starts)
+        scaled_samples = qmc.scale(samples, 
+                                   [b[0] for b in self.DEFAULT_BOUNDS], 
+                                   [b[1] for b in self.DEFAULT_BOUNDS])
 
-        if res.success and hasattr(res, 'hess_inv'):
+        best_res = None
+
+        # 2. Run minimization for each starting point
+        for i, x0 in enumerate(scaled_samples):
+            logging.info(f"Running optimization start {i+1}/{n_starts}...")
+            res = minimize(
+                self._objective_function,
+                x0=x0,
+                args=(),
+                bounds=self.DEFAULT_BOUNDS,
+                method='L-BFGS-B',
+                options={'maxiter': 300, 'ftol': 1e-10, 'disp': False}
+            )
+            if best_res is None or (res.success and res.fun < best_res.fun):
+                best_res = res
+
+        if best_res is None:
+            logging.error("All optimization runs failed.")
+            return None
+
+        # 3. Calculate final parameters and uncertainties from the best result
+        sigma = None
+        if best_res.success and hasattr(best_res, 'hess_inv'):
             try:
-                cov = res.hess_inv.todense()
+                cov = best_res.hess_inv.todense()
                 errs = np.sqrt(np.diag(cov))
-                sigma = KappaParams(*errs)
+                sigma = params_from_vec(errs)
             except Exception as e:
                 logging.warning(f"Failed to compute parameter uncertainties: {e}")
         
         return KappaFitResult(
-            params  = KappaParams(*res.x),
-            chi2    = res.fun,
-            success = res.success,
-            message = res.message,
+            params  = params_from_vec(best_res.x),
+            chi2    = best_res.fun,
+            success = best_res.success,
+            message = best_res.message,
             sigma   = sigma
         )
 
-def run_test_case():
+def run_test_case(n_starts: int = 50):
     """
     Runs a self-contained test case to verify the fitting procedure.
     It generates synthetic data from a known kappa distribution and then
@@ -252,18 +274,46 @@ def run_test_case():
         log_model = np.log(model_flux + config.EPS)
         return np.sum((log_measured - log_model)**2)
 
-    # Run the minimization
-    fit_result = minimize(
-        test_objective,
-        x0=KappaFitter.DEFAULT_X0.to_tuple(),
-        args=(windows, Fnoisy),
-        bounds=KappaFitter.DEFAULT_BOUNDS,
-        method='L-BFGS-B'
-    )
+    # --- Multi-start optimization using Latin Hypercube Sampling ---
+    # 1. Set up the sampler
+    sampler = qmc.LatinHypercube(d=len(KappaFitter.DEFAULT_BOUNDS))
+    samples = sampler.random(n=n_starts)
+    scaled_samples = qmc.scale(samples, 
+                               [b[0] for b in KappaFitter.DEFAULT_BOUNDS], 
+                               [b[1] for b in KappaFitter.DEFAULT_BOUNDS])
+
+    best_fit_result = None
+
+    # 2. Run minimization for each starting point
+    for i, x0 in enumerate(scaled_samples):
+        print(f"Running test optimization start {i+1}/{n_starts}...")
+        fit_result = minimize(
+            test_objective,
+            x0=x0,
+            args=(windows, Fnoisy),
+            bounds=KappaFitter.DEFAULT_BOUNDS,
+            method='L-BFGS-B'
+        )
+        if best_fit_result is None or (fit_result.success and fit_result.fun < best_fit_result.fun):
+            best_fit_result = fit_result
+
+    if best_fit_result is None:
+        print("All test optimization runs failed.")
+        return
 
     print(f"True Parameters: {true_params}")
-    print(f"Fitted Parameters: {KappaParams(*fit_result.x)}")
-    print(f"Success: {fit_result.success}")
+    print(f"""Fitted Parameters: {params_from_vec(best_fit_result.x)}""")
+    print(f"Success: {best_fit_result.success}")
+
+    # --- Format and print the covariance matrix ---
+    cov_matrix = "N/A"
+    if hasattr(best_fit_result, 'hess_inv'):
+        # The L-BFGS-B optimizer returns an approximation of the inverse Hessian.
+        # To get the dense matrix, we can multiply it by the identity matrix.
+        hess_inv = best_fit_result.hess_inv
+        cov_matrix = hess_inv.dot(np.identity(len(best_fit_result.x)))
+    
+    print(f"Covariance Matrix (approx):\n{cov_matrix}")
     print("--- Test Case Finished ---")
 
 
