@@ -174,7 +174,7 @@ class KappaFitter:
         """
         assert n_samples % 2 == 1, "n_samples must be odd for Simpson's rule"
 
-        energy_grid = np.linspace(energy_bounds[:, 0], energy_bounds[:, 1], num=n_samples, axis=1)
+        energy_grid = np.geomspace(energy_bounds[:, 0], energy_bounds[:, 1], num=n_samples, axis=1)
         flux_values = KappaFitter.omnidirectional_flux(params, energy_grid)
         return simpson(flux_values, x=energy_grid, axis=1)
 
