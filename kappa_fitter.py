@@ -30,6 +30,23 @@ class KappaFitResult:
     message: str
     sigma: KappaParams | None = None
 
+
+def vec_from_params(params: KappaParams) -> np.ndarray:
+    """
+    Converts KappaParams to a numpy array for optimization.
+    """
+    return np.array([np.log(params.density), params.kappa, np.log(params.theta)])
+
+def params_from_vec(vec: np.ndarray) -> KappaParams:
+    """
+    Converts a numpy array back to KappaParams.
+    """
+    return KappaParams(
+        density=np.exp(vec[0]),
+        kappa=vec[1],
+        theta=np.exp(vec[2])
+    )
+
 class KappaFitter:
     """
     Fits a kappa distribution to measured electron flux data.
@@ -39,13 +56,17 @@ class KappaFitter:
     2. Defining the physical model (kappa distribution).
     3. Running the optimization to find the best-fit parameters.
     """
-    # Default bounds for the optimization parameters
-    DEFAULT_BOUNDS = [(1e4, 1e9),       # density n in m⁻³
-                      (1.5001, 10.0),   # kappa
-                      (50.0, 2.0e5)]    # theta
+    # Default bounds for the optimization parameters    
+    DEFAULT_BOUNDS = [(np.log(1e4), np.log(1e9)),  # log density n in m⁻³
+                      (1.5001, 10.0),          # kappa
+                      (np.log(50.0), np.log(5.0e5))]  # log theta in m s⁻¹
 
     # Default initial guess for the optimization
-    DEFAULT_X0 = KappaParams(density=1e6, kappa=3.5, theta=1000.0)
+    DEFAULT_X0 = vec_from_params(KappaParams(
+        density=1e5,  # initial guess for density n in m⁻³
+        kappa=3.0,   # initial guess for kappa
+        theta=100.0  # initial guess for theta in m s⁻¹
+    ))
 
     def __init__(self, er_data: ERData, spec_no: int):
         """
@@ -164,11 +185,11 @@ class KappaFitter:
         diff = log_measured - log_model
         return np.sum(diff**2)
 
-    def _objective_function(self, param_tuple: tuple[float, float, float]) -> float:
+    def _objective_function(self, vec: np.ndarray) -> float:
         """
         Objective function for the scipy optimizer.
         """
-        params = KappaParams(*param_tuple)
+        params = params_from_vec(vec)
         model_flux = self.omnidirectional_flux_integral(params, self.energy_windows)
         return self._chi_squared_difference(model_flux)
 
@@ -224,8 +245,8 @@ def run_test_case():
     Fnoisy = Ftrue * rng.lognormal(0, 0.05, size=Ftrue.size)
 
     # Create a dummy objective function for the test case
-    def test_objective(param_tuple: tuple[float, float, float], energy_windows, measured_flux) -> float:
-        params = KappaParams(*param_tuple)
+    def test_objective(param_vec: np.ndarray, energy_windows, measured_flux) -> float:
+        params = params_from_vec(param_vec)
         model_flux = KappaFitter.omnidirectional_flux_integral(params, energy_windows)
         log_measured = np.log(measured_flux + config.EPS)
         log_model = np.log(model_flux + config.EPS)
