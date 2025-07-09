@@ -3,6 +3,7 @@ Central configuration constants for the Lunar Prospector Plasma Analysis pipelin
 '''  
 
 import scipy.constants
+from pathlib import Path
 
 # ========== Data and chunk settings ==========  
 SWEEP_ROWS = 15                 # rows per spacecraft sweep of energy spectrum  
@@ -37,8 +38,9 @@ ALL_COLS = MISC_COLS + FLUX_COLS + PHI_COLS
 MAG_COLS = ["mag_x", "mag_y", "mag_z"]
 
 # ========== Directory paths ==========
-DATA_DIR = '../data'              # main data directory
-KERNELS_DIR = '../spice_kernels'  # SPICE kernels directory
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # project root directory
+DATA_DIR = PROJECT_ROOT / 'data'              # main data directory
+KERNELS_DIR = PROJECT_ROOT / 'data' / 'spice_kernels'
 
 # ========== File names ==========
 THETA_FILE = 'theta.tab'
