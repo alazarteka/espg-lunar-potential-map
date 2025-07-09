@@ -1,5 +1,5 @@
 import numpy as np
-import config
+from .. import config
 
 
 def get_intersection_or_none(pos: np.ndarray, direction: np.ndarray, radius: float = config.LUNAR_RADIUS_KM) -> np.ndarray | None:

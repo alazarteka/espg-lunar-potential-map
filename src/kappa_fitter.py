@@ -3,9 +3,9 @@ import pandas as pd
 import logging
 from dataclasses import dataclass
 
-import config
-from flux import ERData, PitchAngle
-from potential_mapper import DataLoader
+from . import config
+from .flux import ERData, PitchAngle
+from .potential_mapper import DataLoader
 
 from scipy.integrate import simpson
 from scipy.special import gamma
@@ -59,16 +59,9 @@ class KappaFitter:
     3. Running the optimization to find the best-fit parameters.
     """
     # Default bounds for the optimization parameters    
-    DEFAULT_BOUNDS = [(np.log(1e4), np.log(1e9)),  # log density n in m⁻³
-                      (1.5001, 10.0),          # kappa
-                      (np.log(50.0), np.log(5.0e5))]  # log theta in m s⁻¹
-
-    # Default initial guess for the optimization
-    DEFAULT_X0 = vec_from_params(KappaParams(
-        density=1e5,  # initial guess for density n in m⁻³
-        kappa=3.0,   # initial guess for kappa
-        theta=100.0  # initial guess for theta in m s⁻¹
-    ))
+    DEFAULT_BOUNDS = [(9.2, 18.4),  # log density n in m⁻³
+                      (2.0, 6.0),          # kappa
+                      (5.7, 8.8)]  # log theta in m s⁻¹
 
     def __init__(self, er_data: ERData, spec_no: int):
         """
@@ -165,7 +158,7 @@ class KappaFitter:
         """
         velocity = np.sqrt(2 * config.ELECTRON_CHARGE_C * energy / config.ELECTRON_MASS_KG)  # m/s
         pdf_values = KappaFitter.pdf_kappa(params, velocity)
-        return 4 * np.pi * config.ELECTRON_CHARGE_C / config.ELECTRON_MASS_KG * velocity**2 * pdf_values
+        return 4 * np.pi * config.ELECTRON_CHARGE_C / config.ELECTRON_MASS_KG * velocity * pdf_values
 
     @staticmethod
     def omnidirectional_flux_integral(params: KappaParams, energy_bounds: np.ndarray, n_samples: int = 101) -> np.ndarray:
@@ -215,7 +208,7 @@ class KappaFitter:
 
         # 2. Run minimization for each starting point
         for i, x0 in enumerate(scaled_samples):
-            logging.info(f"Running optimization start {i+1}/{n_starts}...")
+            logging.debug(f"Running optimization start {i+1}/{n_starts}...")
             res = minimize(
                 self._objective_function,
                 x0=x0,
@@ -320,4 +313,4 @@ def run_test_case(n_starts: int = 50):
 if __name__ == '__main__':
     # This block allows the script to be used as a library or run directly.
     # When run directly, it executes the test case.
-    run_test_case()
+    run_test_case(200)

@@ -16,9 +16,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import spiceypy as spice
 
-from flux import FluxData
-from utils import *
-import config
+from .flux import FluxData
+from .utils import *
+from . import config
 
 
 # Configure logging
@@ -302,6 +302,16 @@ class PotentialMapper:
             corresponding_time = flux_data.data["UTC"].iloc[chunk_index * config.SWEEP_ROWS]
             logging.info(f"Potential {potential_result[0]:.5f} V at time {corresponding_time}")
         
+        # Compute kappa parameters
+        from kappa_fitter import KappaFitter  # Import here to avoid circular dependency
+        logging.info("Calculating kappa parameters...")
+        er_data = flux_data.er_data
+        for spec_no in er_data.data['spec_no'].unique():
+            fitter = KappaFitter(er_data, spec_no)
+            kappa_params = fitter.fit()
+            logging.info(f"Kappa parameters for spec {spec_no}: {kappa_params}")
+
+
         # Find surface intersections
         results = SurfaceIntersectionFinder.find_intersections(coord_arrays, projected_magnetic_field, potentials)
         
@@ -349,13 +359,13 @@ class PotentialMapper:
                         cmap='viridis', marker='o', norm=norm, s=1)
         
         # Add LP trajectory
-        lp_lat = np.rad2deg(np.arcsin(all_lp_positions[:, 2] / np.linalg.norm(all_lp_positions, axis=1)))
-        lp_long = np.rad2deg(np.arctan2(all_lp_positions[:, 1], all_lp_positions[:, 0]))
-        step = 15
-        plt.plot(lp_long[::step], lp_lat[::step], 'r-', label='LP Path', linewidth=0.5)
+        # lp_lat = np.rad2deg(np.arcsin(all_lp_positions[:, 2] / np.linalg.norm(all_lp_positions, axis=1)))
+        # lp_long = np.rad2deg(np.arctan2(all_lp_positions[:, 1], all_lp_positions[:, 0]))
+        # step = 15
+        # plt.plot(lp_long[::step], lp_lat[::step], 'r-', label='LP Path', linewidth=0.5)
         
         # Add moon map background
-        moon_map_path = self.data_dir / 'moon_map.tif'
+        moon_map_path = self.data_dir / config.MOON_MAP_FILE
         if moon_map_path.exists():
             img = plt.imread(str(moon_map_path))
             plt.imshow(img, extent=(-180, 180, -90, 90), aspect='equal', zorder=-1)

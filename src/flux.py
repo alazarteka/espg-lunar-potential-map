@@ -5,8 +5,8 @@ from scipy.optimize import minimize
 from scipy.stats.qmc import LatinHypercube, scale
 
 
-from model import synth_losscone
-import config
+from .model import synth_losscone
+from . import config
 
 logger = logging.getLogger(__name__)
 

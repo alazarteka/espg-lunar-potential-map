@@ -6,7 +6,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import config
+from . import config
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
