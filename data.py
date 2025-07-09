@@ -120,11 +120,11 @@ class DataManager:
 
 
 if __name__ == '__main__':
-    spice_mgr = DataManager(base_dir='spice_kernels', base_url='https://naif.jpl.nasa.gov/pub/naif/LPM/kernels/spk/')
-    generic_mgr = DataManager(base_dir='spice_kernels', base_url='https://naif.jpl.nasa.gov/pub/naif/generic_kernels/')
-    lpephemu_mgr = DataManager(base_dir='spice_kernels', base_url='https://pds-geosciences.wustl.edu/missions/lunarp/spice/')
-    attitude_mgr = DataManager(base_dir='data', base_url='https://pds-geosciences.wustl.edu/lunar/prospectorcd/lp_0019/geometry/')
-    data_mgr = DataManager(base_dir='data', base_url='https://pds-ppi.igpp.ucla.edu/data/lp-er-calibrated/data-3deleflux/')
+    spice_mgr = DataManager(base_dir=config.KERNELS_DIR, base_url='https://naif.jpl.nasa.gov/pub/naif/LPM/kernels/spk/')
+    generic_mgr = DataManager(base_dir=config.KERNELS_DIR, base_url='https://naif.jpl.nasa.gov/pub/naif/generic_kernels/')
+    lpephemu_mgr = DataManager(base_dir=config.KERNELS_DIR, base_url='https://pds-geosciences.wustl.edu/missions/lunarp/spice/')
+    attitude_mgr = DataManager(base_dir=config.DATA_DIR, base_url='https://pds-geosciences.wustl.edu/lunar/prospectorcd/lp_0019/geometry/')
+    data_mgr = DataManager(base_dir=config.DATA_DIR, base_url='https://pds-ppi.igpp.ucla.edu/data/lp-er-calibrated/data-3deleflux/')
 
     # download specific spice kernels
     for fname in [

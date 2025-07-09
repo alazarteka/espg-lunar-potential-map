@@ -76,7 +76,15 @@ class SpiceManager:
 
 class DataLoader:
     """Handles data file discovery and loading."""
-    
+
+    MONTH_TO_NUM = {
+        'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
+        'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08',
+        'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+    }
+
+    NUM_TO_MONTH = {v: k for k, v in MONTH_TO_NUM.items()}
+
     @staticmethod
     def discover_flux_files(data_directory: Union[str, Path], 
                            years: Optional[List[str]] = None,
@@ -99,7 +107,8 @@ class DataLoader:
             # Get month directories
             month_dirs = [d for d in year_dir.iterdir() if d.is_dir()]
             if months:
-                month_dirs = [d for d in month_dirs if d.name in months]
+                months = [DataLoader.NUM_TO_MONTH[m] for m in months]
+                month_dirs = [d for d in month_dirs if d.name[-3:] in months]
             
             for month_dir in sorted(month_dirs):
                 logging.info(f"Scanning month: {month_dir.name}")
@@ -112,8 +121,8 @@ class DataLoader:
     def load_attitude_files(data_directory: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Load attitude data from the data directory."""
         data_dir = Path(data_directory)
-        attitude_file = data_dir / 'attitude.tab'
-        
+        attitude_file = data_dir / config.ATTITUDE_FILE
+
         if not attitude_file.exists():
             raise FileNotFoundError(f"Attitude file {attitude_file} not found")
         
@@ -124,7 +133,7 @@ class DataLoader:
     def get_theta_file(data_directory: Union[str, Path]) -> str:
         """Get the theta file path."""
         data_dir = Path(data_directory)
-        theta_file = data_dir / 'theta.tab'
+        theta_file = data_dir / config.THETA_FILE
         
         if not theta_file.exists():
             raise FileNotFoundError(f"Theta file {theta_file} not found")
@@ -389,15 +398,15 @@ Examples:
     parser.add_argument(
         '--data-dir', 
         type=str, 
-        default='data',
-        help='Path to data directory (default: data)'
+        default=config.DATA_DIR,
+        help='Path to data directory (default: ../data)'
     )
     
     parser.add_argument(
         '--spice-dir', 
         type=str, 
-        default='spice_kernels',
-        help='Path to SPICE kernels directory (default: spice_kernels)'
+        default=config.KERNELS_DIR,
+        help='Path to SPICE kernels directory (default: ../spice_kernels)'
     )
     
     parser.add_argument(
