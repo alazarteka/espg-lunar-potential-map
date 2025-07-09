@@ -11,11 +11,6 @@ Currently in active development—major revisions ongoing.
 ```
 .
 ├── README.md               # This file
-├── data.py                 # Handles data and SPICE kernel acquisition
-├── flux.py                 # Flux and potential calculation logic
-├── model.py                # Core modeling components
-├── potential_mapper.py     # Potential mapping logic
-├── utils.py                # Utility functions
 ├── environment-base.yml    # Conda environment definition
 ├── .gitignore              # Git ignore file
 ├── data/                   # Processed data (created/populated by src/data.py)
