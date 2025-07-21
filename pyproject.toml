@@ -1,0 +1,77 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "espg-lunar-potential-map"
+version = "0.1.0"
+description = "Lunar Prospector Surface Potential Mapping Analysis"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Alazar Teka Gemechu", email = "alazargemechu@kaist.ac.kr"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.2.0",
+    "pandas>=2.2.0",
+    "scipy>=1.15.0",
+    "matplotlib>=3.10.0",
+    "spiceypy>=6.0.0",
+    "plotly>=6.0.0",
+    "beautifulsoup4>=4.13.0",
+    "requests>=2.32.0",
+    "tqdm>=4.67.0",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.29.0",
+    "ipython>=8.34.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/alazarteka/espg-lunar-potential-map"
+Repository = "https://github.com/alazarteka/espg-lunar-potential-map"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
