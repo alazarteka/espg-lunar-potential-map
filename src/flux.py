@@ -1,12 +1,12 @@
+import logging
+
 import numpy as np
 import pandas as pd
-import logging
 from scipy.optimize import minimize
 from scipy.stats.qmc import LatinHypercube, scale
 
-
-from .model import synth_losscone
 from . import config
+from .model import synth_losscone
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +25,11 @@ class ERData:
     def from_dataframe(cls, data: pd.DataFrame, er_data_file: str):
         """
         Create an ERData instance from existing DataFrame data.
-        
+
         Args:
             data: The pandas DataFrame containing the ER data
             er_data_file: The original file path for reference
-            
+
         Returns:
             ERData instance with the provided data
         """
@@ -47,13 +47,21 @@ class ERData:
         """
         # Read the data file
         try:
-            self.data = pd.read_csv(self.er_data_file, sep=r"\s+", engine="python", header=None, names=config.ALL_COLS)
+            self.data = pd.read_csv(
+                self.er_data_file,
+                sep=r"\s+",
+                engine="python",
+                header=None,
+                names=config.ALL_COLS,
+            )
             self._clean_sweep_data()
         except FileNotFoundError:
             logger.error(f"Error: The file {self.er_data_file} was not found.")
             self.data = pd.DataFrame()
         except pd.errors.ParserError:
-            logger.error(f"Error: The file {self.er_data_file} could not be parsed. Please check the file format.")
+            logger.error(
+                f"Error: The file {self.er_data_file} could not be parsed. Please check the file format."
+            )
             self.data = pd.DataFrame()
         except Exception as e:
             logger.error(f"An unexpected error occurred: {e}")
@@ -75,22 +83,27 @@ class ERData:
         magnetic_field = self.data[config.MAG_COLS].to_numpy(dtype=np.float64)
         magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1)
 
-        invalid_mag_mask = (magnetic_field_magnitude <= 1e-9) | (magnetic_field_magnitude >= 1e3)
-        invalid_time_mask = self.data['time'] == '1970-01-01T00:00:00'
+        invalid_mag_mask = (magnetic_field_magnitude <= 1e-9) | (
+            magnetic_field_magnitude >= 1e3
+        )
+        invalid_time_mask = self.data["time"] == "1970-01-01T00:00:00"
         invalid_rows_mask = invalid_mag_mask | invalid_time_mask
 
         # Get spec_no values for invalid rows
-        invalid_spec_nos = set(self.data['spec_no'][invalid_rows_mask].unique())
+        invalid_spec_nos = set(self.data["spec_no"][invalid_rows_mask].unique())
 
         if invalid_spec_nos:
             logger.info(f"Removing {len(invalid_spec_nos)} sweeps with invalid data")
 
             # Remove all rows belonging to invalid spec_nos
-            valid_mask = ~self.data['spec_no'].isin(list(invalid_spec_nos))
+            valid_mask = ~self.data["spec_no"].isin(list(invalid_spec_nos))
             self.data = self.data[valid_mask].reset_index(drop=True)
 
             removed_rows = original_rows - len(self.data)
-            logger.info(f"Removed {removed_rows} rows ({removed_rows/original_rows*100:.1f}%) from {len(invalid_spec_nos)} invalid sweeps")
+            logger.info(
+                f"Removed {removed_rows} rows ({removed_rows/original_rows*100:.1f}%) from {len(invalid_spec_nos)} invalid sweeps"
+            )
+
 
 class PitchAngle:
     """
@@ -116,7 +129,9 @@ class PitchAngle:
             thetas (str): The path to the theta values file.
         """
         self.er_data = er_data
-        self.thetas = np.loadtxt(thetas, dtype=np.float64)  # Expects theta values in degrees
+        self.thetas = np.loadtxt(
+            thetas, dtype=np.float64
+        )  # Expects theta values in degrees
         self.cartesian_coords = np.array([])
         self.pitch_angles = np.array([])
         self.unit_magnetic_field = np.array([])
@@ -151,8 +166,12 @@ class PitchAngle:
         and stores indices of valid and invalid data points.
         """
         # Check if data is loaded
-        assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
-        assert len(self.thetas) == config.CHANNELS, f"Theta values must match the number of channels {config.CHANNELS}."
+        assert (
+            not self.er_data.data.empty
+        ), "Data not loaded. Please load the data first."
+        assert (
+            len(self.thetas) == config.CHANNELS
+        ), f"Theta values must match the number of channels {config.CHANNELS}."
 
         # Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z)
         phis = np.deg2rad(self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64))
@@ -170,7 +189,9 @@ class PitchAngle:
         unit_magnetic_field = magnetic_field / magnetic_field_magnitude
 
         # Tile the unit magnetic field vectors for pitch angle calculation
-        unit_magnetic_field = np.tile(unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1))
+        unit_magnetic_field = np.tile(
+            unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1)
+        )
         self.unit_magnetic_field = unit_magnetic_field
 
         # Calculate the pitch angles
@@ -185,13 +206,17 @@ class PitchAngle:
         vector and the radial direction vector.
         """
         # Check if data is loaded
-        assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
+        assert (
+            not self.er_data.data.empty
+        ), "Data not loaded. Please load the data first."
 
         # Calculate the pitch angles
         # The dot product between the unit magnetic field vector and the radial direction vector
         # is the cosine of the pitch angle.
         # Negative sign is used because the radial direction vector is meant to point towards the sensor.
-        dot_product = np.einsum('ijk,ijk->ij', self.unit_magnetic_field, self.cartesian_coords)
+        dot_product = np.einsum(
+            "ijk,ijk->ij", self.unit_magnetic_field, self.cartesian_coords
+        )
         # Clip the dot product to ensure it is in the range [-1, 1]
         dot_product = np.clip(dot_product, -1, 1)
 
@@ -203,8 +228,11 @@ class PitchAngle:
         # Store the pitch angles in the class attribute
         self.pitch_angles = pitch_angles
 
+
 class LossConeFitter:
-    def __init__(self, er_data: ERData, thetas: str, pitch_angle: PitchAngle | None = None):
+    def __init__(
+        self, er_data: ERData, thetas: str, pitch_angle: PitchAngle | None = None
+    ):
         """
         Initialize the LossConeFitter class with the ER data and theta values.
 
@@ -215,7 +243,9 @@ class LossConeFitter:
         """
         self.er_data = er_data
         self.thetas = np.loadtxt(thetas, dtype=np.float64)
-        self.pitch_angle = pitch_angle if pitch_angle is not None else PitchAngle(er_data, thetas)
+        self.pitch_angle = (
+            pitch_angle if pitch_angle is not None else PitchAngle(er_data, thetas)
+        )
 
         self.lhs = self._generate_latin_hypercube()
 
@@ -227,15 +257,15 @@ class LossConeFitter:
             np.ndarray: The Latin Hypercube sample.
         """
         # Generate a Latin Hypercube sample
-        bounds = np.array([[-1000.0,  0.1],   # lower
-                           [ 1000.0, 1.0]])   # upper
+        bounds = np.array([[-1000.0, 0.1], [1000.0, 1.0]])  # lower  # upper
         sampler = LatinHypercube(d=2, scramble=False)
-        lhs = sampler.random(n=400)            # 400 points
+        lhs = sampler.random(n=400)  # 400 points
 
         return scale(lhs, bounds[0], bounds[1])
 
-
-    def _get_normalized_flux(self, energy_bin: int, measurement_chunk: int) -> np.ndarray:
+    def _get_normalized_flux(
+        self, energy_bin: int, measurement_chunk: int
+    ) -> np.ndarray:
         """
         Get the normalized flux for a specific energy bin and measurement chunk.
 
@@ -247,7 +277,9 @@ class LossConeFitter:
             np.ndarray: The normalized flux for the specified energy bin and measurement chunk.
         """
         # Check if data is loaded
-        assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
+        assert (
+            not self.er_data.data.empty
+        ), "Data not loaded. Please load the data first."
 
         # Get the electron flux for the specified energy bin and measurement chunk
         index = measurement_chunk * config.SWEEP_ROWS + energy_bin
@@ -256,8 +288,9 @@ class LossConeFitter:
         if index >= len(self.er_data.data):
             return np.full(config.CHANNELS, np.nan)
 
-
-        electron_flux = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[index]
+        electron_flux = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[
+            index
+        ]
         if len(self.pitch_angle.pitch_angles) == 0:
             return np.full(config.CHANNELS, np.nan)
         angles = self.pitch_angle.pitch_angles[index]
@@ -269,7 +302,9 @@ class LossConeFitter:
             return np.full_like(electron_flux, np.nan)
 
         # Get the angles and fluxes for the incident and reflected regions
-        incident_flux = float(max(config.EPS, float(np.mean(electron_flux[incident_mask]))))
+        incident_flux = float(
+            max(config.EPS, float(np.mean(electron_flux[incident_mask])))
+        )
         normalized_flux = electron_flux / incident_flux
 
         # It's weird to normalize only the reflected flux
@@ -278,7 +313,6 @@ class LossConeFitter:
         # combined_flux[incident_mask] = electron_flux[incident_mask]
         # combined_flux[reflected_mask] = normalized_flux
         return normalized_flux
-
 
     def build_norm2d(self, measurement_chunk: int) -> np.ndarray:
         """
@@ -291,16 +325,22 @@ class LossConeFitter:
             np.ndarray: The 2D normalized flux distribution for the specified measurement chunk.
         """
         # Check if data is loaded
-        assert not self.er_data.data.empty, "Data not loaded. Please load the data first."
+        assert (
+            not self.er_data.data.empty
+        ), "Data not loaded. Please load the data first."
 
-        norm2d = np.vstack([
-            self._get_normalized_flux(energy_bin, measurement_chunk)
-            for energy_bin in range(config.SWEEP_ROWS)
-        ])
+        norm2d = np.vstack(
+            [
+                self._get_normalized_flux(energy_bin, measurement_chunk)
+                for energy_bin in range(config.SWEEP_ROWS)
+            ]
+        )
 
         return norm2d
 
-    def _fit_surface_potential(self, measurement_chunk: int) -> tuple[float, float, float]:
+    def _fit_surface_potential(
+        self, measurement_chunk: int
+    ) -> tuple[float, float, float]:
         """
         Fit surface potential (ΔU) and B_s/B_m for one 15-row measurement chunk
         using χ² minimisation with scipy.optimize.minimize.
@@ -309,9 +349,9 @@ class LossConeFitter:
             measurement_chunk (int): The index of the measurement chunk.
 
         Returns:
-            tuple[float, float, float]: 
+            tuple[float, float, float]:
                 - delta_U: best-fit surface potential in volts
-                - bs_over_bm: best-fit B_s/B_m ratio  
+                - bs_over_bm: best-fit B_s/B_m ratio
                 - chi2: final χ² value
         """
         assert not self.er_data.data.empty, "Data not loaded."
@@ -336,7 +376,9 @@ class LossConeFitter:
         energies = self.er_data.data["energy"].to_numpy(dtype=np.float64)[s:e]
 
         # Ensure pitch angles exist for this range
-        if self.pitch_angle.pitch_angles is None or s >= len(self.pitch_angle.pitch_angles):
+        if self.pitch_angle.pitch_angles is None or s >= len(
+            self.pitch_angle.pitch_angles
+        ):
             return np.nan, np.nan, np.nan
         pitches = self.pitch_angle.pitch_angles[s:e]
 
@@ -355,16 +397,18 @@ class LossConeFitter:
 
             diff = np.log(norm2d + eps) - np.log(model + eps)
             return np.sum(diff * diff)
+
         # 1) Latin-hypercube global scan (20×20 ≈ 400 evaluations)
         chi2_vals = np.apply_along_axis(chi2, 1, self.lhs)
         best_idx = int(np.argmin(chi2_vals))
-        x0 = self.lhs[best_idx]               # ΔU, Bₛ/Bₘ for local start
-        
+        x0 = self.lhs[best_idx]  # ΔU, Bₛ/Bₘ for local start
+
         # 2) Local Nelder–Mead refinement
         result = minimize(
-            chi2, x0,
+            chi2,
+            x0,
             method="Nelder-Mead",
-            options=dict(maxiter=1000, xatol=1e-4, fatol=1e-4)
+            options=dict(maxiter=1000, xatol=1e-4, fatol=1e-4),
         )
         if not result.success:
             raise RuntimeError(f"Optimisation failed: {result.message}")
@@ -395,6 +439,7 @@ class LossConeFitter:
 
         return results
 
+
 class FluxData:
     def __init__(self, er_data_file: str, thetas: str):
         """
@@ -412,7 +457,6 @@ class FluxData:
         # Expose data for backward compatibility
         self.data = self.er_data.data
 
-
     def load_data(self):
         """
         Load the ER data from the specified file.
@@ -427,7 +471,9 @@ class FluxData:
         """
         pass
 
-    def get_normalized_flux(self, energy_bin: int, measurement_chunk: int) -> np.ndarray:
+    def get_normalized_flux(
+        self, energy_bin: int, measurement_chunk: int
+    ) -> np.ndarray:
         """
         Get the normalized flux for a specific energy bin and measurement chunk.
         Delegates to LossConeFitter.
