@@ -1,7 +1,8 @@
 import logging
+from typing import Union
+
 import numpy as np
 import spiceypy as spice
-from typing import Union
 
 # SPICE object codes
 LP = "-25"
@@ -12,10 +13,10 @@ SUN = "10"
 def get_lp_position_wrt_moon(time: float) -> Union[np.ndarray, None]:
     """
     Get the position of the Lunar Prospector at a given time with respect to the Moon.
-    
+
     Args:
         time: Ephemeris time (seconds past J2000)
-        
+
     Returns:
         Position vector in IAU_MOON frame (km), or None if error
     """
@@ -32,10 +33,10 @@ def get_lp_position_wrt_moon(time: float) -> Union[np.ndarray, None]:
 def get_lp_vector_to_sun_in_lunar_frame(time: float) -> Union[np.ndarray, None]:
     """
     Get the vector from Lunar Prospector to the Sun in lunar frame.
-    
+
     Args:
         time: Ephemeris time (seconds past J2000)
-        
+
     Returns:
         Vector from LP to Sun in IAU_MOON frame (km), or None if error
     """
@@ -52,10 +53,10 @@ def get_lp_vector_to_sun_in_lunar_frame(time: float) -> Union[np.ndarray, None]:
 def get_sun_vector_wrt_moon(time: float) -> Union[np.ndarray, None]:
     """
     Get the position vector of the Sun with respect to the Moon.
-    
+
     Args:
         time: Ephemeris time (seconds past J2000)
-        
+
     Returns:
         Vector from Moon to Sun in IAU_MOON frame (km), or None if error
     """
@@ -72,10 +73,10 @@ def get_sun_vector_wrt_moon(time: float) -> Union[np.ndarray, None]:
 def get_j2000_iau_moon_transform_matrix(time: float) -> np.ndarray:
     """
     Get the transformation matrix from J2000 to IAU_MOON frame.
-    
+
     Args:
         time: Ephemeris time (seconds past J2000)
-        
+
     Returns:
         3x3 transformation matrix, or NaN matrix if error
     """
