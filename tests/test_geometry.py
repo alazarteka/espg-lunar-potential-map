@@ -1,20 +1,20 @@
 # Tests for src/utils/geometry.py
 
+import numpy as np
 import pytest
 
-import numpy as np
-from src.utils.geometry import *
 from src import config
+from src.utils.geometry import get_intersection_or_none
+
 
 @pytest.mark.parametrize(
-        "pos,direction,radius,expected",
-
-        [
-            (np.array([0, 0, 0]), np.array([1, 0, 0]), 1, np.array([1, 0, 0])),  
-            (np.array([1, 0, 0]), np.array([1, 0, 0]), 1, None),
-            (np.array([2, 0, 0]), np.array([1, 0, 0]), 1, None),
-            (np.array([2, 0, 0]), np.array([-1, 0, 0]), 1, np.array([1, 0, 0])),
-        ]
+    "pos,direction,radius,expected",
+    [
+        (np.array([0, 0, 0]), np.array([1, 0, 0]), 1, np.array([1, 0, 0])),
+        (np.array([1, 0, 0]), np.array([1, 0, 0]), 1, None),
+        (np.array([2, 0, 0]), np.array([1, 0, 0]), 1, None),
+        (np.array([2, 0, 0]), np.array([-1, 0, 0]), 1, np.array([1, 0, 0])),
+    ],
 )
 def test_get_intersection_or_none(pos, direction, radius, expected):
     """
