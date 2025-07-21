@@ -33,6 +33,7 @@ dependencies = [
     "jupyter>=1.0.0",
     "ipykernel>=6.29.0",
     "ipython>=8.34.0",
+    "pint>=0.24.4",
 ]
 
 [project.optional-dependencies]
