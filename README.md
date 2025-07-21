@@ -6,12 +6,25 @@ This project analyzes data from the Lunar Prospector mission to model plasma flu
 
 Currently in active development—major revisions ongoing.
 
+## Dependencies
+
+This project uses modern Python scientific computing libraries:
+
+- **Core Scientific:** `numpy`, `pandas`, `scipy`, `matplotlib`
+- **Space Science:** `spiceypy` (NASA SPICE toolkit)
+- **Data Processing:** `requests`, `beautifulsoup4`, `tqdm`
+- **Interactive Analysis:** `jupyter`, `plotly`, `ipython`
+- **Development:** `pytest`, `black`, `ruff`, `mypy`
+
+All dependencies are managed through UV and specified in `pyproject.toml`.
+
 ## Project Structure
 
 ```
 .
 ├── README.md               # This file
-├── environment-base.yml    # Conda environment definition
+├── pyproject.toml          # UV project configuration and dependencies
+├── uv.lock                 # Dependency lock file
 ├── .gitignore              # Git ignore file
 ├── data/                   # Processed data (created/populated by src/data_acquisition.py)
 │   └── spice_kernels/      # SPICE kernel files
@@ -34,17 +47,30 @@ Currently in active development—major revisions ongoing.
 
 ## Installation
 
-1.  **Set up the environment:**
-    Ensure you have Anaconda installed.
+### Prerequisites
+- Python 3.12 or later
+- [UV package manager](https://docs.astral.sh/uv/)
+
+### Setup
+
+1.  **Install UV** (if not already installed):
     ```bash
-    conda env create -f environment-base.yml
-    conda activate urp-mapping
+    curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
 
-2.  **Download necessary data:**
-    *   With the conda environment active, run the data acquisition script:
+2.  **Set up the project environment:**
     ```bash
-    python -m src.data_acquisition
+    # Clone the repository (if not already done)
+    git clone <repository-url>
+    cd espg-lunar-potential-map
+    
+    # Install dependencies and create virtual environment
+    uv sync
+    ```
+
+3.  **Download necessary data:**
+    ```bash
+    uv run python -m src.data_acquisition
     ```
 
 
@@ -57,7 +83,34 @@ Currently in active development—major revisions ongoing.
 
 ## Usage
 
-After setting up and downloading data, run the desired module. For example:
+After setting up and downloading data, run the desired module using UV. For example:
+
 ```bash
-python -m src.potential_mapper
+# Run the potential mapper
+uv run python -m src.potential_mapper
+
+# Start Jupyter Lab for interactive analysis
+uv run jupyter lab
+
+# Start Jupyter Notebook
+uv run jupyter notebook
+
+# Run tests (if available)
+uv run pytest
+```
+
+### Development
+
+```bash
+# Add new dependencies
+uv add package-name
+
+# Add development dependencies
+uv add --dev pytest black ruff
+
+# Update dependencies
+uv sync --upgrade
+
+# Run with specific Python version
+uv run --python 3.12 python script.py
 ```
