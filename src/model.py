@@ -1,22 +1,23 @@
-import numpy as np
-import pandas as pd
-import spiceypy as spice
 import math
+
+import numpy as np
 
 ###########
 # Constants
 ###########
 
 
-
 e_0 = 1.602e-19  # Elementary charge in Coulombs
 
-def synth_losscone(energy_grid: np.ndarray,
-                   pitch_grid: np.ndarray,
-                   delta_U: float,
-                   bs_over_bm: float,
-                   beam_width_eV: float = 0.0,
-                   beam_amp: float = 0.0) -> np.ndarray:
+
+def synth_losscone(
+    energy_grid: np.ndarray,
+    pitch_grid: np.ndarray,
+    delta_U: float,
+    bs_over_bm: float,
+    beam_width_eV: float = 0.0,
+    beam_amp: float = 0.0,
+) -> np.ndarray:
     """
     Build a loss-cone model that never returns NaN/Inf.
     """
@@ -28,13 +29,13 @@ def synth_losscone(energy_grid: np.ndarray,
         if E <= 0:
             continue
 
-        x = bs_over_bm * (1.0 + delta_U / E)   # dimensionless
+        x = bs_over_bm * (1.0 + delta_U / E)  # dimensionless
 
         # Map illegal values onto physically plausible limits
         if x <= 0.0:
-            ac = 0.0           # full loss cone (no mirroring)
+            ac = 0.0  # full loss cone (no mirroring)
         elif x >= 1.0:
-            ac = 90.0          # mirror point at 90°, loss cone closed
+            ac = 90.0  # mirror point at 90°, loss cone closed
         else:
             ac = math.degrees(math.asin(math.sqrt(x)))
 
@@ -48,13 +49,14 @@ def synth_losscone(energy_grid: np.ndarray,
 
     return model
 
+
 def _chi2(params, energies, pitches, data, eps):
     delta_U, bs_over_bm = params
     model = synth_losscone(energies, pitches, delta_U, bs_over_bm)
 
     # Bail-out if the model went pathological
     if not np.all(np.isfinite(model)) or (model <= 0).all():
-        return 1e30          # huge penalty
+        return 1e30  # huge penalty
 
     diff = np.log(data + eps) - np.log(model + eps)
     return np.sum(diff * diff)
