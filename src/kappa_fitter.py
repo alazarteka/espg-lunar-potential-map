@@ -136,7 +136,7 @@ class KappaFitter:
         """
         velocity = np.sqrt(2 * config.ELECTRON_CHARGE_C * energy / config.ELECTRON_MASS_KG)  # m/s
         pdf_values = KappaFitter.pdf_kappa(params, velocity)
-        return 4 * np.pi * config.ELECTRON_CHARGE_C / config.ELECTRON_MASS_KG * velocity * pdf_values
+        return 4 * np.pi * config.ELECTRON_CHARGE_C / config.ELECTRON_MASS_KG * pdf_values * velocity**2
 
     @staticmethod
     def omnidirectional_flux_integral(params: KappaParams, energy_bounds: np.ndarray, n_samples: int = 101) -> np.ndarray:
