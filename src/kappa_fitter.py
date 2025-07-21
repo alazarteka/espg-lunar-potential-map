@@ -116,28 +116,6 @@ class KappaFitter:
 
         self.is_data_valid = True
 
-    def _gradient(self, params: tuple[float, float, float]) -> np.ndarray:
-        """
-        Computes the gradient of the objective function for optimization.
-
-        TODO: Decide if this is needed or we can remove it. If needed, implement  the dJ_dtheta and dJ_dkappa methods.
-        """
-        kappa_params = KappaParams(*params)
-        model_flux = self.omnidirectional_flux_integral(kappa_params, self.energy_windows)
-        log_measured = np.log(self.sum_flux + config.EPS)
-        log_model = np.log(model_flux + config.EPS)
-        diff = log_measured - log_model
-
-        dJ_dn = model_flux / params[0]
-        dJ_dkappa = self._dJ_dkappa(params)
-        dJ_dtheta = self._dJ_dtheta(params)
-
-        grad_n = 2*np.sum(diff / model_flux * dJ_dn)
-        grad_kappa = 2*np.sum(diff / model_flux * dJ_dkappa)
-        grad_theta = 2*np.sum(diff / model_flux * dJ_dtheta)
-
-        return np.array([grad_n, grad_kappa, grad_theta])
-
     @staticmethod
     def pdf_kappa(params: KappaParams, velocity: np.ndarray) -> np.ndarray:
         """
