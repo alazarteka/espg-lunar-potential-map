@@ -1,18 +1,18 @@
 import numpy as np
 
 from src import config
+from src.utils.units import ureg, Length
 
 
 def get_intersection_or_none(
-    pos: np.ndarray, direction: np.ndarray, radius: float = config.LUNAR_RADIUS_KM
-) -> np.ndarray | None:
+    pos: np.ndarray, direction: np.ndarray, radius: Length) -> np.ndarray | None:
     """
     Find the intersection of a ray with a sphere (e.g., lunar surface).
 
     Args:
         pos: Starting position of the ray (3D vector)
         direction: Direction vector of the ray (3D vector)
-        radius: Radius of the sphere to intersect with (default: lunar radius)
+        radius: Radius of the sphere to intersect with (unit: kilometers)
 
     Returns:
         Intersection point as 3D vector, or None if no intersection
@@ -24,7 +24,7 @@ def get_intersection_or_none(
     # Solve quadratic equation: |p + t*v|² = radius²
     a = np.dot(v, v)
     b = 2 * np.dot(p, v)
-    c = np.dot(p, p) - radius**2
+    c = np.dot(p, p) - radius.to(ureg.kilometer).magnitude**2
 
     discriminant = b**2 - 4 * a * c
 
