@@ -17,7 +17,7 @@ Time = Annotated[Quantity, ureg.second]
 Voltage = Annotated[Quantity, ureg.volt]
 Angle = Annotated[Quantity, ureg.degree]
 Flux = Annotated[Quantity, ureg.particle / (ureg.centimeter ** 2 * ureg.second * ureg.steradian * ureg.electron_volt)]
-PhaseSpaceDensity = Annotated[Quantity, 1 / (ureg.meter ** 3 * (ureg.meter / ureg.second) ** 3)]
+PhaseSpaceDensity = Annotated[Quantity, ureg.particle / (ureg.meter ** 3 * (ureg.meter / ureg.second) ** 3)]
 
 
 __all__ = [
