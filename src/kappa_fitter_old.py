@@ -273,12 +273,23 @@ def run_test_case(n_starts: int = 50):
 
     print(f"FNoisy.shape: {Fnoisy.shape}, FTrue.shape: {Ftrue.shape}")
 
-    # Density estimate
-    density = np.sum(
-        Fnoisy
-        * window_widths
-        * np.sqrt(config.ELECTRON_MASS_KG / (2 * config.ELECTRON_CHARGE_C * Ecent))
+    # --- Correctly calculate density from the noisy flux data ---
+    # This is the integral of (flux / (e * velocity)) over energy, which gives number density.
+    # J_N(E) = J_Q(E) / e  (number flux from charge flux)
+    # n = integral( f(v) d^3v ) = integral( J_N(E) / v(E) dE )
+    # v(E) = sqrt(2 * E_joules / m_e)
+    # E_joules = E_eV * e
+    # So, v(E) = sqrt(2 * E_eV * e / m_e)
+    # n = integral( (J_Q(E) / e) / sqrt(2 * E_eV * e / m_e) dE )
+    # n = (1/e) * sqrt(m_e / (2*e)) * integral( J_Q(E) / sqrt(E_eV) dE_eV )
+    # We approximate the integral as a sum over the energy windows.
+    integrand = Fnoisy / np.sqrt(Ecent)
+    integral_val = np.sum(integrand * window_widths)
+
+    prefactor = (1 / config.ELECTRON_CHARGE_C) * np.sqrt(
+        config.ELECTRON_MASS_KG / (2 * config.ELECTRON_CHARGE_C)
     )
+    density = prefactor * integral_val
 
     print(f"Estimated Density: {density:.2e} m⁻³")
 
