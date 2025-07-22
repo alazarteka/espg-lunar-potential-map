@@ -6,16 +6,17 @@ from pathlib import Path
 
 import scipy.constants
 
+from .utils.units import (ureg, Length, Mass, Charge)
+
 # ========== Data and chunk settings ==========
 SWEEP_ROWS = 15  # rows per spacecraft sweep of energy spectrum
 CHANNELS = 88  # number of ER electron flux channels
 
 # ========== Physical parameters ==========
-LUNAR_RADIUS_KM = 1737.4  # mean lunar radius in kilometers
-LUNAR_RADIUS_M = LUNAR_RADIUS_KM * 1e3  # mean lunar radius in meters
-
-ELECTRON_MASS_KG = scipy.constants.electron_mass  # electron
-ELECTRON_CHARGE_C = scipy.constants.e  # elementary charge in Coulombs
+LUNAR_RADIUS_KM = 1737.400  # average radius of the Moon in kilometers
+LUNAR_RADIUS: Length = 1737.400 * ureg.kilometer  # average radius of the Moon
+ELECTRON_MASS: Mass = scipy.constants.electron_mass * ureg.kilogram  # electron
+ELECTRON_CHARGE: Charge = scipy.constants.e * ureg.coulomb  # elementary charge in Coulombs
 
 # ========== File extensions ==========
 EXT_TAB = ".TAB"  # ER data file extension
