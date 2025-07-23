@@ -6,7 +6,7 @@ import pytest
 import pint
 from pint import Quantity
 
-from src.kappa import Kappa, KappaParams, KappaFitResult
+from src.physics.kappa import KappaParams, kappa_distribution, directional_flux, omnidirectional_flux
 from src.utils.units import *
 
 def test_kappa_params_to_tuple():
@@ -57,8 +57,8 @@ def test_kappa_distribution_basic():
     params = KappaParams(density=density, kappa=kappa, theta=theta)
     
     velocity = 500 * ureg.meter / ureg.second
-    result = Kappa.kappa_distribution(params, velocity)
-    
+    result = kappa_distribution(params, velocity)
+
     assert isinstance(result, Quantity)
     assert result.magnitude > 0
     assert result.units == ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second) ** 3)
@@ -71,7 +71,7 @@ def test_kappa_distribution_invalid_velocity():
     params = KappaParams(density=density, kappa=kappa, theta=theta)
     
     with pytest.raises(TypeError, match="velocity must be a pint Quantity"):
-        Kappa.kappa_distribution(params, 500)
+        kappa_distribution(params, 500)
 
 @pytest.mark.parametrize(
     "velocity_magnitude_range, theta, kappa",
@@ -95,7 +95,7 @@ def test_kappa_distribution_velocity_dependence(
     params = KappaParams(density=density, kappa=kappa, theta=theta)
 
     velocities = np.linspace(*velocity_magnitude_range, num=10)
-    results = Kappa.kappa_distribution(params, velocities)
+    results = kappa_distribution(params, velocities)
     
     assert isinstance(results, Quantity)
     assert np.all(results.magnitude >= 0)
@@ -123,7 +123,7 @@ def test_kappa_directional_flux_basic():
     params = KappaParams(density=density, kappa=kappa, theta=theta)
     
     energy = 1e6 * ureg.electron_volt
-    result = Kappa.directional_flux(params, energy)
+    result = directional_flux(params, energy)
     
     assert isinstance(result, Quantity)
     assert result.magnitude > 0
@@ -137,7 +137,7 @@ def test_kappa_omnidirectional_flux_basic():
     params = KappaParams(density=density, kappa=kappa, theta=theta)
     
     energy = 1e6 * ureg.electron_volt
-    result = Kappa.omnidirectional_flux(params, energy)
+    result = omnidirectional_flux(params, energy)
     
     assert isinstance(result, Quantity)
     assert result.magnitude > 0
