@@ -78,7 +78,12 @@ class Kappa:
         self._prepare_data()
     
     def _prepare_data(self):
-        """Prepare the data for fitting."""
+        """
+        Prepare the data for fitting.
+
+        This method extracts the relevant data for the specified `spec_no` from the `ERData` object,
+        calculates the sum of the electron flux over valid pitch angles, and sets the energy windows.
+        """
         if self.spec_no not in self.er_data.data["spec_no"].values:
             logging.warning(f"Spec no {self.spec_no} not found in ERData.")
             return
@@ -102,6 +107,8 @@ class Kappa:
             logging.warning("No valid pitch angles found for the specified spec_no.")
             return
         
+        # Strictly speaking, this should be scaled by the steradian of each pitch angle bin
+        # TODO: Implement proper scaling by pitch angle bin size
         electron_flux = spec_er_data.data[config.FLUX_COLS].to_numpy(
             dtype=np.float64
         ) * (ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)) # shape (Energy Bins, Pitch Angles)
@@ -134,7 +141,7 @@ class Kappa:
             velocity (Speed): Speed at which to evaluate the distribution.
 
         Returns:
-            phase-space density (PhaseSpaceDensity): The kappa distribution evaluated at the given velocity.
+            PhaseSpaceDensity: The kappa distribution evaluated at the given velocity.
         """
 
         if not isinstance(velocity, Quantity):
@@ -144,11 +151,46 @@ class Kappa:
         kappa = parameters.kappa
         theta = parameters.theta
 
-        v = velocity.to(ureg.meter / ureg.second)
-
         prefactor = gamma(kappa + 1) / (
             np.power(np.pi * kappa, 1.5) * gamma(kappa - 0.5)
         )
         core = density / theta**3
-        tail = (1 + (v / theta) ** 2 / kappa) ** (-kappa - 1)
-        return prefactor * core * tail
+        tail = (1 + (velocity / theta) ** 2 / kappa) ** (-kappa - 1)
+        return (prefactor * core * tail).to(ureg.particle / (ureg.meter ** 3 * (ureg.meter / ureg.second) ** 3))
+
+    @staticmethod
+    def directional_flux(
+        parameters: KappaParams,
+        energy: Energy
+    ) -> Flux:
+        """
+        Calculate the directional flux for a kappa distribution.
+
+        Args:
+            parameters (KappaParams): Kappa distribution parameters.
+            energy (Energy): Energy at which to evaluate the flux.
+
+        Returns:
+            Flux: The directional flux evaluated at the given energy.
+        """
+
+        if not isinstance(energy, Quantity):
+            raise TypeError("energy must be a pint Quantity")
+
+        velocity = np.sqrt((2 * energy / config.ELECTRON_MASS)).to(ureg.meter / ureg.second)
+
+        distribution = Kappa.kappa_distribution(
+            parameters, velocity
+        )
+        return (distribution * velocity**2 / config.ELECTRON_MASS).to(ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt))
+
+    @staticmethod
+    def omnidirectional_flux(
+        parameters: KappaParams,
+        energy: Energy
+    ):
+        return (4 * np.pi * ureg.steradian) * Kappa.directional_flux(parameters, energy)
+    
+    
+
+    

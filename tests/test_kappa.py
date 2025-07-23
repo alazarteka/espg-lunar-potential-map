@@ -61,6 +61,7 @@ def test_kappa_distribution_basic():
     
     assert isinstance(result, Quantity)
     assert result.magnitude > 0
+    assert result.units == ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second) ** 3)
 
 def test_kappa_distribution_invalid_velocity():
     """Test kappa distribution with invalid velocity type."""
@@ -113,6 +114,34 @@ def test_kappa_distribution_velocity_dependence(
                 rtol=1e-2
             ), f"Failed for velocities {v_i} and {v_j}"
 
+
+def test_kappa_directional_flux_basic():
+    """Test basic isotropic kappa distribution directional flux calculation."""
+    density = 1e6 * ureg.particle / ureg.meter**3
+    kappa = 5.0
+    theta = 1e3 * ureg.meter / ureg.second
+    params = KappaParams(density=density, kappa=kappa, theta=theta)
+    
+    energy = 1e6 * ureg.electron_volt
+    result = Kappa.directional_flux(params, energy)
+    
+    assert isinstance(result, Quantity)
+    assert result.magnitude > 0
+    assert result.units == ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
+
+def test_kappa_omnidirectional_flux_basic():
+    """Test basic isotropic kappa distribution omnidirectional flux calculation."""
+    density = 1e6 * ureg.particle / ureg.meter**3
+    kappa = 5.0
+    theta = 1e3 * ureg.meter / ureg.second
+    params = KappaParams(density=density, kappa=kappa, theta=theta)
+    
+    energy = 1e6 * ureg.electron_volt
+    result = Kappa.omnidirectional_flux(params, energy)
+    
+    assert isinstance(result, Quantity)
+    assert result.magnitude > 0
+    assert result.units == ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
 
 # def test_kappa_fit_result_initialization():
 #     """Test KappaFitResult initialization."""
