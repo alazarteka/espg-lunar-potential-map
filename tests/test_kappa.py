@@ -5,22 +5,60 @@ import pytest
 
 import pint
 from pint import Quantity
+from scipy.integrate import simpson
 
 from src.physics.kappa import KappaParams, kappa_distribution, directional_flux, omnidirectional_flux, omnidirectional_flux_integrated
 from src.utils.units import *
 
-def test_kappa_params_to_tuple():
-    """Test conversion of KappaParams to tuple."""
+@pytest.fixture
+def base_kappa_params():
+    """Fixture to provide a base set of KappaParams."""
     density = 1e6 * ureg.particle / ureg.meter**3
     kappa = 5.0
     theta = 1e3 * ureg.meter / ureg.second
-    expected_result = (1e6, 5.0, 1e3)
+    return KappaParams(density=density, kappa=kappa, theta=theta)
 
+@pytest.fixture(params=[
+    (
+        1e6 * ureg.particle / ureg.meter**3,
+        5.0,
+        1e3 * ureg.meter / ureg.second,
+        (1e6, 5.0, 1e3)
+    ),
+    (
+        2e6 * ureg.particle / ureg.liter,
+        3.5,
+        36.0 * ureg.kilometer / ureg.hour,
+        (2e9, 3.5, 10.0)
+    ),
+    (
+        1e9 * ureg.particle / ureg.centimeter**3,
+        4.0,
+        500 * ureg.meter / ureg.second,
+        (1e15, 4.0, 500)
+    ),
+])
+def kappa_params_set(request):
+    """Fixture to provide different sets of KappaParams and their expected tuple representation."""
+    density, kappa, theta, expected_tuple = request.param
     params = KappaParams(density=density, kappa=kappa, theta=theta)
-    result = params.to_tuple()
+    return params, expected_tuple
+
+def test_kappa_params_conversion(kappa_params_set):
+    """Test conversion of KappaParams to tuple and unit conversion."""
+    params, expected_result = kappa_params_set
     
+    # Test to_tuple()
+    result = params.to_tuple()    
     assert isinstance(result, tuple)
     np.testing.assert_allclose(result, expected_result, rtol=1e-10)
+
+    # Test unit conversion
+    assert params.density.units == ureg.particle / ureg.meter**3
+    assert params.theta.units == ureg.meter / ureg.second
+    np.testing.assert_allclose(params.density.magnitude, expected_result[0], rtol=1e-10)
+    np.testing.assert_allclose(params.kappa, expected_result[1], rtol=1e-10)
+    np.testing.assert_allclose(params.theta.magnitude, expected_result[2], rtol=1e-10)
 
 def test_kappa_params_invalid_types():
     """Test KappaParams with invalid types."""
@@ -33,45 +71,21 @@ def test_kappa_params_invalid_types():
     with pytest.raises(TypeError, match="theta must be a pint Quantity"):
         KappaParams(density=1e6 * ureg.particle / ureg.meter**3, kappa=5.0, theta=1e3)
 
-def test_kappa_params_unit_conversion():
-    """Test that KappaParams correctly converts units."""
-    density = 2e6 * ureg.particle / ureg.liter
-    kappa = 3.5
-    theta = 36.0 * ureg.kilometer / ureg.hour
-    
-    params = KappaParams(density=density, kappa=kappa, theta=theta)
-    
-    # Check that units are converted to base units
-    assert params.density.units == ureg.particle / ureg.meter**3
-    assert params.theta.units == ureg.meter / ureg.second
-    
-    # Check magnitudes after conversion
-    np.testing.assert_allclose(params.density.magnitude, 2e9, rtol=1e-10)
-    np.testing.assert_allclose(params.theta.magnitude, 10.0, rtol=1e-10)
-
-def test_kappa_distribution_basic():
+def test_kappa_distribution_basic(base_kappa_params):
     """Test basic kappa distribution calculation."""
-    density = 1e6 * ureg.particle / ureg.meter**3
-    kappa = 5.0
-    theta = 1e3 * ureg.meter / ureg.second
-    params = KappaParams(density=density, kappa=kappa, theta=theta)
-    
+
     velocity = 500 * ureg.meter / ureg.second
-    result = kappa_distribution(params, velocity)
+    result = kappa_distribution(base_kappa_params, velocity)
 
     assert isinstance(result, Quantity)
     assert result.magnitude > 0
     assert result.units == ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second) ** 3)
 
-def test_kappa_distribution_invalid_velocity():
+def test_kappa_distribution_invalid_velocity(base_kappa_params):
     """Test kappa distribution with invalid velocity type."""
-    density = 1e6 * ureg.particle / ureg.meter**3
-    kappa = 5.0
-    theta = 1e3 * ureg.meter / ureg.second
-    params = KappaParams(density=density, kappa=kappa, theta=theta)
-    
+
     with pytest.raises(TypeError, match="velocity must be a pint Quantity"):
-        kappa_distribution(params, 500)
+        kappa_distribution(base_kappa_params, 500)
 
 @pytest.mark.parametrize(
     "velocity_magnitude_range, theta, kappa",
@@ -114,88 +128,52 @@ def test_kappa_distribution_velocity_dependence(
                 rtol=1e-2
             ), f"Failed for velocities {v_i} and {v_j}"
 
+def test_kappa_distribution_density_dependence(kappa_params_set):
+    """Test that the integral of the velocity distribution over all velocities equals the density."""
+    params, _ = kappa_params_set
 
-def test_kappa_directional_flux_basic():
+    velocities = np.geomspace(1e-2, 1e50, num=1001) * ureg.meter / ureg.second
+    distribution = kappa_distribution(params, velocities)
+
+    fv2 = velocities ** 2 * distribution
+
+    integral = simpson(
+        fv2.to(ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second))).magnitude,
+        velocities.to(ureg.meter / ureg.second).magnitude,
+    ) * (ureg.particle / ureg.meter ** 3)
+    expected_density = 4 * np.pi * integral
+    assert np.isclose(expected_density.magnitude, params.density.magnitude, rtol=1e-2), \
+        f"Expected density {params.density.magnitude}, got {expected_density.magnitude}"
+
+
+def test_kappa_directional_flux_basic(base_kappa_params):
     """Test basic isotropic kappa distribution directional flux calculation."""
-    density = 1e6 * ureg.particle / ureg.meter**3
-    kappa = 5.0
-    theta = 1e3 * ureg.meter / ureg.second
-    params = KappaParams(density=density, kappa=kappa, theta=theta)
-    
+
     energy = 1e6 * ureg.electron_volt
-    result = directional_flux(params, energy)
-    
+    result = directional_flux(base_kappa_params, energy)
+
     assert isinstance(result, Quantity)
     assert result.magnitude > 0
     assert result.units == ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
 
-def test_kappa_omnidirectional_flux_basic():
+def test_kappa_omnidirectional_flux_basic(base_kappa_params):
     """Test basic isotropic kappa distribution omnidirectional flux calculation."""
-    density = 1e6 * ureg.particle / ureg.meter**3
-    kappa = 5.0
-    theta = 1e3 * ureg.meter / ureg.second
-    params = KappaParams(density=density, kappa=kappa, theta=theta)
-    
+
     energy = 1e6 * ureg.electron_volt
-    result = omnidirectional_flux(params, energy)
-    
+    result = omnidirectional_flux(base_kappa_params, energy)
+
     assert isinstance(result, Quantity)
     assert result.magnitude > 0
     assert result.units == ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
 
-def test_omnidirectional_flux_integrated_basic():
-    density = 1e6 * ureg.particle / ureg.meter**3
-    kappa = 5.0
-    theta = 1e3 * ureg.meter / ureg.second
-    params = KappaParams(density=density, kappa=kappa, theta=theta)
+def test_omnidirectional_flux_integrated_basic(base_kappa_params):
 
     energy_centers = np.linspace(1e1, 1e4, num=16) * ureg.electron_volt
     energy_bounds = np.column_stack([0.75 * energy_centers, 1.25 * energy_centers])
 
-    result = omnidirectional_flux_integrated(params, energy_bounds)
+    result = omnidirectional_flux_integrated(base_kappa_params, energy_bounds)
 
     assert isinstance(result, Quantity)
     assert np.all(result.magnitude >= 0)
     assert result.units == ureg.particle / (ureg.centimeter**2 * ureg.second)
 
-# def test_kappa_fit_result_initialization():
-#     """Test KappaFitResult initialization."""
-#     density = 1e6 * ureg.particle / ureg.meter**3
-#     kappa = 5.0
-#     theta = 1e3 * ureg.meter / ureg.second
-#     params = KappaParams(density=density, kappa=kappa, theta=theta)
-    
-#     result = KappaFitResult(
-#         params=params,
-#         chi2=1.5,
-#         success=True,
-#         message="Optimization successful"
-#     )
-    
-#     assert result.params == params
-#     assert result.chi2 == 1.5
-#     assert result.success is True
-#     assert result.message == "Optimization successful"
-#     assert result.sigma is None
-
-# def test_kappa_fit_result_with_sigma():
-#     """Test KappaFitResult with sigma parameter."""
-#     density = 1e6 * ureg.particle / ureg.meter**3
-#     kappa = 5.0
-#     theta = 1e3 * ureg.meter / ureg.second
-#     params = KappaParams(density=density, kappa=kappa, theta=theta)
-    
-#     sigma_density = 1e5 * ureg.particle / ureg.meter**3
-#     sigma_kappa = 0.5
-#     sigma_theta = 1e2 * ureg.meter / ureg.second
-#     sigma = KappaParams(density=sigma_density, kappa=sigma_kappa, theta=sigma_theta)
-    
-#     result = KappaFitResult(
-#         params=params,
-#         chi2=1.5,
-#         success=True,
-#         message="Optimization successful",
-#         sigma=sigma
-#     )
-    
-#     assert result.sigma == sigma
