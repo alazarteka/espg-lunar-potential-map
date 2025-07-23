@@ -47,55 +47,55 @@ def kappa_distribution(
         parameters: KappaParams,
         velocity: Speed
     ) -> PhaseSpaceDensity:
-        """
-        Calculate the kappa **phase-space distribution function** *f(v)*.
+    """
+    Calculate the kappa **phase-space distribution function** *f(v)*.
 
-        Args:
-            parameters (KappaParams): Kappa distribution parameters.
-            velocity (Speed): Speed at which to evaluate the distribution.
+    Args:
+        parameters (KappaParams): Kappa distribution parameters.
+        velocity (Speed): Speed at which to evaluate the distribution.
 
-        Returns:
-            PhaseSpaceDensity: The kappa distribution evaluated at the given velocity.
-        """
+    Returns:
+        PhaseSpaceDensity: The kappa distribution evaluated at the given velocity.
+    """
 
-        if not isinstance(velocity, Quantity):
-            raise TypeError("velocity must be a pint Quantity")
+    if not isinstance(velocity, Quantity):
+        raise TypeError("velocity must be a pint Quantity")
 
-        density = parameters.density
-        kappa = parameters.kappa
-        theta = parameters.theta
+    density = parameters.density
+    kappa = parameters.kappa
+    theta = parameters.theta
 
-        prefactor = gamma(kappa + 1) / (
-            np.power(np.pi * kappa, 1.5) * gamma(kappa - 0.5)
-        )
-        core = density / theta**3
-        tail = (1 + (velocity / theta) ** 2 / kappa) ** (-kappa - 1)
-        return (prefactor * core * tail).to(ureg.particle / (ureg.meter ** 3 * (ureg.meter / ureg.second) ** 3))
+    prefactor = gamma(kappa + 1) / (
+        np.power(np.pi * kappa, 1.5) * gamma(kappa - 0.5)
+    )
+    core = density / theta**3
+    tail = (1 + (velocity / theta) ** 2 / kappa) ** (-kappa - 1)
+    return (prefactor * core * tail).to(ureg.particle / (ureg.meter ** 3 * (ureg.meter / ureg.second) ** 3))
 
 def directional_flux(
         parameters: KappaParams,
         energy: Energy
     ) -> Flux:
-        """
-        Calculate the directional flux for a kappa distribution.
+    """
+    Calculate the directional flux for a kappa distribution.
 
-        Args:
-            parameters (KappaParams): Kappa distribution parameters.
-            energy (Energy): Energy at which to evaluate the flux.
+    Args:
+        parameters (KappaParams): Kappa distribution parameters.
+        energy (Energy): Energy at which to evaluate the flux.
 
-        Returns:
-            Flux: The directional flux evaluated at the given energy.
-        """
+    Returns:
+        Flux: The directional flux evaluated at the given energy.
+    """
 
-        if not isinstance(energy, Quantity):
-            raise TypeError("energy must be a pint Quantity")
+    if not isinstance(energy, Quantity):
+        raise TypeError("energy must be a pint Quantity")
 
-        velocity = np.sqrt((2 * energy / config.ELECTRON_MASS)).to(ureg.meter / ureg.second)
+    velocity = np.sqrt((2 * energy / config.ELECTRON_MASS)).to(ureg.meter / ureg.second)
 
-        distribution = kappa_distribution(
-            parameters, velocity
-        )
-        return (distribution * velocity**2 / config.ELECTRON_MASS).to(ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt))
+    distribution = kappa_distribution(
+        parameters, velocity
+    )
+    return (distribution * velocity**2 / config.ELECTRON_MASS).to(ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt))
 
 def omnidirectional_flux(
         parameters: KappaParams,
