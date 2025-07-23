@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from pint import Quantity
+from scipy.integrate import simpson
 from scipy.special import gamma
 
 from src import config
@@ -101,4 +102,26 @@ def omnidirectional_flux(
         parameters: KappaParams,
         energy: Energy
     ):
-        return (4 * np.pi * ureg.steradian) * directional_flux(parameters, energy)
+    return (4 * np.pi * ureg.steradian) * directional_flux(parameters, energy)
+
+def omnidirectional_flux_integrated(
+        parameters: KappaParams,
+        energy_bounds: Energy,
+        n_samples: int = 101
+    ):
+    assert n_samples > 0 and n_samples % 2 == 1, "n_samples must be an odd positive integer"
+
+    energy_grid = np.geomspace(
+        energy_bounds[:, 0].to(ureg.electron_volt).magnitude, 
+        energy_bounds[:, 1].to(ureg.electron_volt).magnitude, 
+        num=n_samples, 
+        axis=1
+    ) * ureg.electron_volt
+    flux_values = omnidirectional_flux(parameters, energy_grid)
+    integrated_flux =  simpson(
+        flux_values.to(ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)).magnitude,
+        energy_grid.to(ureg.electron_volt).magnitude,
+        axis=1
+    ) * ureg.particle / (ureg.centimeter**2 * ureg.second)
+
+    return integrated_flux

@@ -6,7 +6,7 @@ import pytest
 import pint
 from pint import Quantity
 
-from src.physics.kappa import KappaParams, kappa_distribution, directional_flux, omnidirectional_flux
+from src.physics.kappa import KappaParams, kappa_distribution, directional_flux, omnidirectional_flux, omnidirectional_flux_integrated
 from src.utils.units import *
 
 def test_kappa_params_to_tuple():
@@ -142,6 +142,21 @@ def test_kappa_omnidirectional_flux_basic():
     assert isinstance(result, Quantity)
     assert result.magnitude > 0
     assert result.units == ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
+
+def test_omnidirectional_flux_integrated_basic():
+    density = 1e6 * ureg.particle / ureg.meter**3
+    kappa = 5.0
+    theta = 1e3 * ureg.meter / ureg.second
+    params = KappaParams(density=density, kappa=kappa, theta=theta)
+
+    energy_centers = np.linspace(1e1, 1e4, num=16) * ureg.electron_volt
+    energy_bounds = np.column_stack([0.75 * energy_centers, 1.25 * energy_centers])
+
+    result = omnidirectional_flux_integrated(params, energy_bounds)
+
+    assert isinstance(result, Quantity)
+    assert np.all(result.magnitude >= 0)
+    assert result.units == ureg.particle / (ureg.centimeter**2 * ureg.second)
 
 # def test_kappa_fit_result_initialization():
 #     """Test KappaFitResult initialization."""
