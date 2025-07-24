@@ -46,5 +46,6 @@ KERNELS_DIR = PROJECT_ROOT / "data" / "spice_kernels"
 
 # ========== File names ==========
 THETA_FILE = "theta.tab"
+SOLID_ANGLES_FILE = "solid_angles.tab"
 ATTITUDE_FILE = "attitude.tab"
 MOON_MAP_FILE = "moon_map.tif"
