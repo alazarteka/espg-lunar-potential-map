@@ -1,7 +1,9 @@
 import logging
+import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+import numpy as np
 import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
@@ -9,7 +11,33 @@ from tqdm import tqdm
 from . import config
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+
+def solid_angle_from_thetas(base_dir: Path) -> None:
+    """
+    Save the solid angle for a given latitude in degrees.
+
+    Args:
+        base_dir (Path): Path to the directory where the solid angles will be saved.
+
+    We could not find a file in the PDS that contains this information in a
+    format we can use, so we hardcode the values for the four latitudes.
+
+    Source: https://pds-ppi.igpp.ucla.edu/data/lp-er-calibrated/document/data-3deleflux-desc.txt
+    The values can be found in the "Parameters" section.
+
+    The formatting is identical to the one used in the thetas.tab file.
+    """
+
+    latitude_to_area = {
+        78.75: 0.11957,
+        56.25: 0.170253,
+        33.75: 0.127401,
+        11.25: 0.150279
+    }
+
+    thetas = np.loadtxt(base_dir / config.THETA_FILE, dtype=float)
+    solid_angles = list(map(lambda x: latitude_to_area[abs(x)], thetas))
+    np.savetxt(base_dir / config.SOLID_ANGLES_FILE, solid_angles, fmt="%.6f", delimiter=" ")
 
 
 class DataManager:
@@ -136,8 +164,21 @@ class DataManager:
                     future.result()
                     pbar.update(1)
 
-
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Download Lunar Prospector data files.")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Increase output verbosity to DEBUG."
+    )
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
     spice_mgr = DataManager(
         base_dir=config.KERNELS_DIR,
         base_url="https://naif.jpl.nasa.gov/pub/naif/LPM/kernels/spk/",
@@ -158,8 +199,13 @@ if __name__ == "__main__":
         base_dir=config.DATA_DIR,
         base_url="https://pds-ppi.igpp.ucla.edu/data/lp-er-calibrated/data-3deleflux/",
     )
+    theta_mgr = DataManager(
+        base_dir=config.DATA_DIR,
+        base_url="https://pds-ppi.igpp.ucla.edu/data/lp-er-calibrated/data-3deleflux-anc/theta/",
+    )
 
     # download specific spice kernels
+    logger.info("Downloading specific SPICE kernels...")
     for fname in [
         "lp_ask_980111-980531.bsp",
         "lp_ask_980601-981031.bsp",
@@ -167,28 +213,40 @@ if __name__ == "__main__":
         "lp_ask_990401-990730.bsp",
     ]:
 
-        spice_mgr.download_file(spice_mgr.base_url + fname, spice_mgr.base_dir / fname)
+        spice_mgr.download_file(f"{spice_mgr.base_url}/{fname}", spice_mgr.base_dir / fname)
 
     # download generic kernels
+    logger.info("Downloading generic kernels...")
     for fname in [
         "lsk/latest_leapseconds.tls",
         "pck/pck00011.tpc",
     ]:
 
         generic_mgr.download_file(
-            generic_mgr.base_url + fname, spice_mgr.base_dir / Path(fname).name
+            f"{generic_mgr.base_url}/{fname}", spice_mgr.base_dir / Path(fname).name
         )
 
     # download lpephemu
+    logger.info("Downloading lpephemu kernel...")
     lpephemu_mgr.download_file(
-        lpephemu_mgr.base_url + "lpephemu.bsp", spice_mgr.base_dir / "lpephemu.bsp"
+        f"{lpephemu_mgr.base_url}/lpephemu.bsp", spice_mgr.base_dir / "lpephemu.bsp"
     )
 
     # download attitude table
+    logger.info("Downloading attitude table...")
     attitude_mgr.download_file(
-        attitude_mgr.base_url + "attitude.tab", data_mgr.base_dir / "attitude.tab"
+        f"{attitude_mgr.base_url}/{config.ATTITUDE_FILE}", data_mgr.base_dir / config.ATTITUDE_FILE
     )
 
+    # download theta files
+    logger.info("Downloading theta file and saving solid angles...")
+    theta_mgr.download_file(
+        f"{theta_mgr.base_url}/{config.THETA_FILE}", data_mgr.base_dir / config.THETA_FILE
+    )
+    solid_angle_from_thetas(data_mgr.base_dir)
+
+    # download data files
+    logger.info("Downloading 3D electron flux data files...")
     years = data_mgr.list_remote_dirs()
     for year in tqdm(years, desc="Years"):
         # list all julian-date subdirectories in that year
@@ -196,3 +254,5 @@ if __name__ == "__main__":
         for julian in tqdm(julian_dirs, desc=f"Julian days ({year})", leave=False):
             remote_path = f"{year}/{julian}"
             downloaded_files = data_mgr.fetch_directory(remote_path)
+
+    logger.info("All downloads completed.")
