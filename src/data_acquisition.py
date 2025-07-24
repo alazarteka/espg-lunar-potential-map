@@ -1,5 +1,5 @@
-import logging
 import argparse
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -11,6 +11,7 @@ from tqdm import tqdm
 from . import config
 
 logger = logging.getLogger(__name__)
+
 
 def solid_angle_from_thetas(base_dir: Path) -> None:
     """
@@ -32,12 +33,14 @@ def solid_angle_from_thetas(base_dir: Path) -> None:
         78.75: 0.11957,
         56.25: 0.170253,
         33.75: 0.127401,
-        11.25: 0.150279
+        11.25: 0.150279,
     }
 
     thetas = np.loadtxt(base_dir / config.THETA_FILE, dtype=float)
     solid_angles = list(map(lambda x: latitude_to_area[abs(x)], thetas))
-    np.savetxt(base_dir / config.SOLID_ANGLES_FILE, solid_angles, fmt="%.6f", delimiter=" ")
+    np.savetxt(
+        base_dir / config.SOLID_ANGLES_FILE, solid_angles, fmt="%.6f", delimiter=" "
+    )
 
 
 class DataManager:
@@ -164,13 +167,16 @@ class DataManager:
                     future.result()
                     pbar.update(1)
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Download Lunar Prospector data files.")
+    parser = argparse.ArgumentParser(
+        description="Download Lunar Prospector data files."
+    )
     parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
-        help="Increase output verbosity to DEBUG."
+        help="Increase output verbosity to DEBUG.",
     )
     args = parser.parse_args()
 
@@ -213,7 +219,9 @@ if __name__ == "__main__":
         "lp_ask_990401-990730.bsp",
     ]:
 
-        spice_mgr.download_file(f"{spice_mgr.base_url}/{fname}", spice_mgr.base_dir / fname)
+        spice_mgr.download_file(
+            f"{spice_mgr.base_url}/{fname}", spice_mgr.base_dir / fname
+        )
 
     # download generic kernels
     logger.info("Downloading generic kernels...")
@@ -235,13 +243,15 @@ if __name__ == "__main__":
     # download attitude table
     logger.info("Downloading attitude table...")
     attitude_mgr.download_file(
-        f"{attitude_mgr.base_url}/{config.ATTITUDE_FILE}", data_mgr.base_dir / config.ATTITUDE_FILE
+        f"{attitude_mgr.base_url}/{config.ATTITUDE_FILE}",
+        data_mgr.base_dir / config.ATTITUDE_FILE,
     )
 
     # download theta files
     logger.info("Downloading theta file and saving solid angles...")
     theta_mgr.download_file(
-        f"{theta_mgr.base_url}/{config.THETA_FILE}", data_mgr.base_dir / config.THETA_FILE
+        f"{theta_mgr.base_url}/{config.THETA_FILE}",
+        data_mgr.base_dir / config.THETA_FILE,
     )
     solid_angle_from_thetas(data_mgr.base_dir)
 

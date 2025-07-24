@@ -5,16 +5,26 @@ import pytest
 
 from src import config
 from src.utils.geometry import get_intersection_or_none
-from src.utils.units import ureg, Length
+from src.utils.units import ureg
 
 
 @pytest.mark.parametrize(
     "pos,direction,radius,expected",
     [
-        (np.array([0, 0, 0]), np.array([1, 0, 0]), 1 * ureg.kilometer, np.array([1, 0, 0])),
+        (
+            np.array([0, 0, 0]),
+            np.array([1, 0, 0]),
+            1 * ureg.kilometer,
+            np.array([1, 0, 0]),
+        ),
         (np.array([1, 0, 0]), np.array([1, 0, 0]), 1 * ureg.kilometer, None),
         (np.array([2, 0, 0]), np.array([1, 0, 0]), 1 * ureg.kilometer, None),
-        (np.array([2, 0, 0]), np.array([-1, 0, 0]), 1 * ureg.kilometer, np.array([1, 0, 0])),
+        (
+            np.array([2, 0, 0]),
+            np.array([-1, 0, 0]),
+            1 * ureg.kilometer,
+            np.array([1, 0, 0]),
+        ),
     ],
 )
 def test_get_intersection_or_none(pos, direction, radius, expected):

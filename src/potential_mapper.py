@@ -254,7 +254,8 @@ class SurfaceIntersectionFinder:
             zip(
                 coord_arrays.lp_positions,
                 projected_magnetic_field,
-                coord_arrays.moon_vectors_to_sun, strict=False,
+                coord_arrays.moon_vectors_to_sun,
+                strict=False,
             )
         ):
             intersection = get_intersection_or_none(position, mag_field)
