@@ -43,6 +43,35 @@ class KappaParams:
         """
         return self.density.magnitude, self.kappa, self.theta.magnitude
 
+def velocity_from_energy(energy: Energy) -> Speed:
+    """
+    Convert energy to speed.
+
+    Args:
+        energy (Energy): Energy in electron volts.
+
+    Returns:
+        Speed: Speed in m/s.
+    """
+    if not isinstance(energy, Quantity):
+        raise TypeError("energy must be a pint Quantity")
+    
+    return np.sqrt(2 * energy / config.ELECTRON_MASS).to(ureg.meter / ureg.second)
+
+def energy_from_velocity(velocity: Speed) -> Energy:
+    """
+    Convert speed to energy.
+
+    Args:
+        velocity (Speed): Speed in m/s.
+
+    Returns:
+        Energy: Energy in electron volts.
+    """
+    if not isinstance(velocity, Quantity):
+        raise TypeError("velocity must be a pint Quantity")
+    
+    return 0.5 * config.ELECTRON_MASS * velocity**2 * ureg.joule.to(ureg.electron_volt)
 
 def kappa_distribution(
         parameters: KappaParams,
