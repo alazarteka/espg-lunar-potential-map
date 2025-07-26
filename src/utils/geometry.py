@@ -1,10 +1,10 @@
 import numpy as np
 
-from src.utils.units import Length, ureg
+from src.utils.units import LengthType, ureg
 
 
 def get_intersection_or_none(
-    pos: np.ndarray, direction: np.ndarray, radius: Length
+    pos: np.ndarray, direction: np.ndarray, radius: LengthType
 ) -> np.ndarray | None:
     """
     Find the intersection of a ray with a sphere (e.g., lunar surface).

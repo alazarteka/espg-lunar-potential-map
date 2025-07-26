@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 
 import numpy as np
+from pint import Quantity
 from scipy.optimize import minimize
 from scipy.stats import qmc
 
@@ -14,9 +15,9 @@ from src.physics.kappa import (
 )
 from src.potential_mapper import DataLoader
 from src.utils.units import (
-    Energy,
-    Flux,
-    NumberDensity,
+    EnergyType,
+    FluxType,
+    NumberDensityType,
     ureg,
 )
 
@@ -35,7 +36,7 @@ class KappaFitResult:
 class Kappa:
     """Class for handling kappa distribution fitting and evaluation."""
 
-    DEFAULT_BOUNDS = [(2.5, 6.0), (100, 10000000)]  # kappa  # theta in m/s
+    DEFAULT_BOUNDS = [(2.5, 6.0), (2, 8)]  # kappa  # theta in log m/s
 
     def __init__(self, er_data: ERData, spec_no: int):
 
@@ -51,12 +52,38 @@ class Kappa:
             * ureg.steradian
         )
 
-        self.omnidirectional_differential_particle_flux: Flux | None = None
-        self.energy_centers: Energy | None = None
-        self.energy_windows: Energy | None = None
+        self.omnidirectional_differential_particle_flux: FluxType | None = None
+        self.energy_centers: EnergyType | None = None
+        self.energy_windows: EnergyType | None = None
 
         self._prepare_data()
-        self.density_estimate: NumberDensity = self._get_density_estimate()
+        self.density_estimate: NumberDensityType = self._get_density_estimate()
+
+        if __debug__:
+            if not isinstance(
+                self.omnidirectional_differential_particle_flux, Quantity
+            ) or not self.omnidirectional_differential_particle_flux.is_compatible_with(
+                ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
+            ):
+                raise TypeError(
+                    "omnidirectional_differential_particle_flux must be a pint Quantity (OmnidirectionalFlux)"
+                )
+            if not isinstance(
+                self.energy_centers, Quantity
+            ) or not self.energy_centers.is_compatible_with(ureg.electron_volt):
+                raise TypeError("energy_centers must be a pint Quantity (Energy)")
+            if not isinstance(
+                self.energy_windows, Quantity
+            ) or not self.energy_windows.is_compatible_with(ureg.electron_volt):
+                raise TypeError("energy_windows must be a pint Quantity (Energy)")
+            if not isinstance(
+                self.density_estimate, Quantity
+            ) or not self.density_estimate.is_compatible_with(
+                ureg.particle / ureg.meter**3
+            ):
+                raise TypeError(
+                    "density_estimate must be a pint Quantity (NumberDensity)"
+                )
 
     def _prepare_data(self):
         """
@@ -90,11 +117,12 @@ class Kappa:
 
         # Strictly speaking, this should be scaled by the steradian of each pitch angle bin
         # TODO: Implement proper scaling by pitch angle bin size
-        electron_flux = spec_er_data.data[config.FLUX_COLS].to_numpy(
-            dtype=np.float64
-        ) * (
-            ureg.particle
-            / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
+        directional_flux_units = ureg.particle / (
+            ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt
+        )
+        electron_flux = (
+            spec_er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)
+            * directional_flux_units
         )  # shape (Energy Bins, Pitch Angles)
 
         masked_electron_flux = np.where(
@@ -116,11 +144,11 @@ class Kappa:
         self.is_data_valid = True
 
     def _objective_function(self, kappa_theta: np.ndarray) -> float:
-        params = KappaParams(
-            density=self.density_estimate,
-            kappa=kappa_theta[0],
-            theta=kappa_theta[1] * ureg.meter / ureg.second,
-        )
+        density = self.density_estimate
+        kappa = kappa_theta[0]
+        theta = 10 ** kappa_theta[1] * ureg.meter / ureg.second
+
+        params = KappaParams(density, kappa, theta)
 
         # TODO: Decide whether to use average flux or flux at energy centers
         # model_differential_flux = omnidirectional_flux_integrated(
@@ -128,20 +156,40 @@ class Kappa:
         # ) / self.energy_centers
         model_differential_flux = omnidirectional_flux(params, self.energy_centers)
 
+        omnidirectional_flux_units = ureg.particle / (
+            ureg.centimeter**2 * ureg.second * ureg.electron_volt
+        )
+        if __debug__:
+            if not isinstance(
+                model_differential_flux, Quantity
+            ) or not model_differential_flux.is_compatible_with(
+                omnidirectional_flux_units
+            ):
+                raise TypeError(
+                    "model_differential_flux must be a pint Quantity (OmnidirectionalFlux)"
+                )
+            if not isinstance(
+                self.omnidirectional_differential_particle_flux, Quantity
+            ) or not self.omnidirectional_differential_particle_flux.is_compatible_with(
+                omnidirectional_flux_units
+            ):
+                raise TypeError(
+                    "omnidirectional_differential_particle_flux must be a pint Quantity (OmnidirectionalFlux)"
+                )
+
         log_model_differential_flux = np.log(
-            model_differential_flux.to(
-                ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
-            ).magnitude
+            model_differential_flux.to(omnidirectional_flux_units).magnitude
         )
         log_data_flux = np.log(
             self.omnidirectional_differential_particle_flux.to(
-                ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
+                omnidirectional_flux_units
             ).magnitude
         )
+
         chi2 = np.sum((log_model_differential_flux - log_data_flux) ** 2)
         return chi2
 
-    def _get_density_estimate(self) -> NumberDensity:
+    def _get_density_estimate(self) -> NumberDensityType:
         """
         Estimate the density based on the sum of the flux and the energy windows.
 
@@ -155,6 +203,24 @@ class Kappa:
         ):
             raise ValueError("Data not prepared. Call _prepare_data() first.")
 
+        if __debug__:
+            if not isinstance(
+                self.omnidirectional_differential_particle_flux, Quantity
+            ) or not self.omnidirectional_differential_particle_flux.is_compatible_with(
+                ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
+            ):
+                raise TypeError(
+                    "omnidirectional_differential_particle_flux must be a pint Quantity (OmnidirectionalFlux)"
+                )
+            if not isinstance(
+                self.energy_centers, Quantity
+            ) or not self.energy_centers.is_compatible_with(ureg.electron_volt):
+                raise TypeError("energy_centers must be a pint Quantity (Energy)")
+            if not isinstance(
+                self.energy_windows, Quantity
+            ) or not self.energy_windows.is_compatible_with(ureg.electron_volt):
+                raise TypeError("energy_windows must be a pint Quantity (Energy)")
+
         velocities = velocity_from_energy(self.energy_centers)  # shape (Energy Bins,)
         delta_energy = (
             self.energy_windows[:, 1] - self.energy_windows[:, 0]
@@ -166,7 +232,7 @@ class Kappa:
 
         density_estimate = np.sum(integrand * delta_energy)
 
-        return density_estimate
+        return density_estimate.to(ureg.particle / ureg.meter**3)
 
     def fit(self, n_starts: int = 50):
         if not self.is_data_valid:
@@ -201,23 +267,24 @@ class Kappa:
             logging.warning("No valid optimization result found.")
             return None
 
-        sigma = None
-        if best_result.success and hasattr(best_result, "hess_inv"):
-            try:
-                sigma = np.sqrt(np.diag(best_result.hess_inv.todense()))
-                sigma = KappaParams(
-                    density=0
-                    * ureg.particle
-                    / ureg.meter
-                    ** 3,  # Placeholder, density is not estimated from Hessian
-                    kappa=sigma[0],
-                    theta=sigma[1] * ureg.meter / ureg.second,
-                )
-            except Exception as e:
-                logging.warning(f"Failed to compute sigma: {e}")
+        # TODO: Think harder about how to handle uncertainty calculation
+        # sigma = None
+        # if best_result.success and hasattr(best_result, "hess_inv"):
+        #     try:
+        #         sigma = np.sqrt(np.diag(best_result.hess_inv.todense()))
+        #         sigma = KappaParams(
+        #             density=0
+        #             * ureg.particle
+        #             / ureg.meter
+        #             ** 3,  # Placeholder, density is not estimated from Hessian
+        #             kappa=sigma[0],
+        #             theta=sigma[1] * ureg.meter / ureg.second,
+        #         )
+        #     except Exception as e:
+        #         logging.warning(f"Failed to compute sigma: {e}")
 
         return KappaParams(
             density=self.density_estimate,
             kappa=best_result.x[0],
-            theta=best_result.x[1] * ureg.meter / ureg.second,
+            theta=10 ** best_result.x[1] * ureg.meter / ureg.second,
         )

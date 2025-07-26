@@ -6,38 +6,47 @@ from pint import Quantity
 ureg = pint.UnitRegistry()
 # ureg.enable_contexts("numpy")
 
-Length = Annotated[Quantity, ureg.meter]
-Speed = Annotated[Quantity, ureg.meter / ureg.second]
-Mass = Annotated[Quantity, ureg.kilogram]
-Energy = Annotated[Quantity, ureg.joule]
-NumberDensity = Annotated[Quantity, ureg.particle / (ureg.meter**3)]
-Dimensionless = Annotated[Quantity, ureg.dimensionless]
-Charge = Annotated[Quantity, ureg.coulomb]
-Time = Annotated[Quantity, ureg.second]
-Voltage = Annotated[Quantity, ureg.volt]
-Angle = Annotated[Quantity, ureg.degree]
-Flux = Annotated[
+LengthType = Annotated[Quantity, ureg.meter]
+SpeedType = Annotated[Quantity, ureg.meter / ureg.second]
+MassType = Annotated[Quantity, ureg.kilogram]
+EnergyType = Annotated[Quantity, ureg.joule]
+NumberDensityType = Annotated[Quantity, ureg.particle / (ureg.meter**3)]
+DimensionlessType = Annotated[Quantity, ureg.dimensionless]
+ChargeType = Annotated[Quantity, ureg.coulomb]
+TimeType = Annotated[Quantity, ureg.second]
+VoltageType = Annotated[Quantity, ureg.volt]
+AngleType = Annotated[Quantity, ureg.degree]
+FluxType = Annotated[
     Quantity,
     ureg.particle
     / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt),
 ]
-PhaseSpaceDensity = Annotated[
+OmnidirectionalFluxType = Annotated[
+    Quantity,
+    ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt),
+]
+IntegratedFluxType = Annotated[
+    Quantity, ureg.particle / (ureg.centimeter**2 * ureg.second)
+]
+PhaseSpaceDensityType = Annotated[
     Quantity, ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second) ** 3)
 ]
 
 
 __all__ = [
     "ureg",
-    "Length",
-    "Speed",
-    "Mass",
-    "Energy",
-    "NumberDensity",
-    "Dimensionless",
-    "Charge",
-    "Time",
-    "Voltage",
-    "Angle",
-    "Flux",
-    "PhaseSpaceDensity",
+    "LengthType",
+    "SpeedType",
+    "MassType",
+    "EnergyType",
+    "NumberDensityType",
+    "DimensionlessType",
+    "ChargeType",
+    "TimeType",
+    "VoltageType",
+    "AngleType",
+    "FluxType",
+    "OmnidirectionalFluxType",
+    "IntegratedFluxType",
+    "PhaseSpaceDensityType",
 ]

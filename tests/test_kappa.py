@@ -1,4 +1,4 @@
-# Tests for src/kappa.py
+# Tests for src/physics/kappa.py
 
 import numpy as np
 import pytest
@@ -8,9 +8,11 @@ from scipy.integrate import simpson
 from src.physics.kappa import (
     KappaParams,
     directional_flux,
+    energy_from_velocity,
     kappa_distribution,
     omnidirectional_flux,
     omnidirectional_flux_integrated,
+    velocity_from_energy,
 )
 from src.utils.units import *
 
@@ -51,6 +53,20 @@ def kappa_params_set(request):
     density, kappa, theta, expected_tuple = request.param
     params = KappaParams(density=density, kappa=kappa, theta=theta)
     return params, expected_tuple
+
+
+def test_velocity_energy_conversion():
+    """Test conversion of velocity to energy and back."""
+    velocity = 100 * ureg.meter / ureg.second
+    energy = 4.55469186e-27 * ureg.joule
+
+    # Convert velocity to energy
+    converted_energy = energy_from_velocity(velocity).to(ureg.joule)
+    np.testing.assert_allclose(converted_energy, energy, rtol=1e-8)
+
+    # Convert energy back to velocity
+    converted_velocity = velocity_from_energy(energy).to(ureg.meter / ureg.second)
+    np.testing.assert_allclose(converted_velocity, velocity, rtol=1e-8)
 
 
 def test_kappa_params_conversion(kappa_params_set):
@@ -115,8 +131,8 @@ def test_kappa_distribution_invalid_velocity(base_kappa_params):
     ],
 )
 def test_kappa_distribution_velocity_dependence(
-    velocity_magnitude_range: tuple[Speed, Speed],
-    theta: Speed,
+    velocity_magnitude_range: tuple[SpeedType, SpeedType],
+    theta: SpeedType,
     kappa: float,
 ):
     """
@@ -186,11 +202,22 @@ def test_kappa_omnidirectional_flux_basic(base_kappa_params):
     energy = 1e6 * ureg.electron_volt
     result = omnidirectional_flux(base_kappa_params, energy)
 
+    result_joule = omnidirectional_flux(base_kappa_params, energy.to(ureg.joule))
+
     assert isinstance(result, Quantity)
     assert result.magnitude > 0
     assert result.units == ureg.particle / (
         ureg.centimeter**2 * ureg.second * ureg.electron_volt
     )
+    assert np.isclose(
+        result.to(
+            ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.joule)
+        ).magnitude,
+        result_joule.to(
+            ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.joule)
+        ).magnitude,
+        rtol=1e-8,
+    ), "Omnidirectional flux in eV and J should match."
 
 
 def test_omnidirectional_flux_integrated_basic(base_kappa_params):
