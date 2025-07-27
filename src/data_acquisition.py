@@ -30,7 +30,7 @@ def solid_angle_from_thetas(base_dir: Path) -> None:
     """
 
     latitude_to_area = {
-        78.75: 0.11957,
+        78.75: 0.119570,
         56.25: 0.170253,
         33.75: 0.127401,
         11.25: 0.150279,
