@@ -138,6 +138,49 @@ def test_density_estimate(kappa_params_set):
         rtol=1e-2,
     ), f"Expected density {params.density.magnitude / 2.0}, got {kappa_fitter.density_estimate.magnitude}"
 
+def test_fitter_objectives(kappa_params_set):
+    """Test the Kappa fitter with different optimizers."""
+    params, _ = kappa_params_set
+    synthetic_er = prepare_synthetic_er(
+        density=params.density.to(ureg.particle / ureg.meter**3).magnitude,
+        kappa=params.kappa,
+        theta=params.theta.to(ureg.meter / ureg.second).magnitude,
+    )
+    
+    # Create a kappa-logtheta
+    kappa = np.linspace(2.0, 10.0, 20)
+    logtheta = np.linspace(4, 8, 20)
+    kappa_logtheta = np.column_stack((kappa, logtheta))
+    kappa_fitter = Kappa(synthetic_er, 1)
+
+    _standard_objective = np.array([kappa_fitter._objective_function(params) for params in kappa_logtheta])
+    _fast_objective = np.array([kappa_fitter._objective_function_fast(params) for params in kappa_logtheta])
+
+    assert np.allclose(
+        _standard_objective, _fast_objective, rtol=1e-2
+    ), "Standard and fast objective functions should match within tolerance."
+
+def test_fitters(kappa_params_set):
+    """Test the Kappa fitter with different optimizers."""
+    params, _ = kappa_params_set
+    synthetic_er = prepare_synthetic_er(
+        density=params.density.to(ureg.particle / ureg.meter**3).magnitude,
+        kappa=params.kappa,
+        theta=params.theta.to(ureg.meter / ureg.second).magnitude,
+    )
+    
+    kappa_fitter = Kappa(synthetic_er, 1)
+    _standard_fit = kappa_fitter.fit(use_fast=False)
+    _fast_fit = kappa_fitter.fit(use_fast=True)
+
+    assert np.isclose(
+        _standard_fit.kappa, _fast_fit.kappa, rtol=1e-2
+    ), "Kappa values from standard and fast fitters should match within tolerance."
+    assert np.isclose(
+        _standard_fit.theta.to(ureg.meter / ureg.second).magnitude,
+        _fast_fit.theta.to(ureg.meter / ureg.second).magnitude,
+        rtol=1e-2,
+    ), "Theta values from standard and fast fitters should match within tolerance."
 
 def test_kappa_fitter(kappa_params_set):
     """Test the Kappa distribution fitting functionality."""

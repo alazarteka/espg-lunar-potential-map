@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 
 import numpy as np
@@ -11,6 +12,8 @@ from src.flux import ERData, PitchAngle
 from src.physics.kappa import (
     KappaParams,
     omnidirectional_flux,
+    omnidirectional_flux_fast,
+    omnidirectional_flux_magnitude,
     velocity_from_energy,
 )
 from src.potential_mapper import DataLoader
@@ -20,17 +23,6 @@ from src.utils.units import (
     NumberDensityType,
     ureg,
 )
-
-
-@dataclass
-class KappaFitResult:
-    """Represents the result of a kappa distribution fit."""
-
-    params: KappaParams
-    chi2: float
-    success: bool
-    message: str
-    sigma: KappaParams | None = None
 
 
 class Kappa:
@@ -53,7 +45,9 @@ class Kappa:
         )
 
         self.omnidirectional_differential_particle_flux: FluxType | None = None
+        self.omnidirectional_differential_particle_flux_mag: np.ndarray | None = None
         self.energy_centers: EnergyType | None = None
+        self.energy_centers_mag: np.ndarray | None = None
         self.energy_windows: EnergyType | None = None
 
         self._prepare_data()
@@ -131,12 +125,14 @@ class Kappa:
         self.omnidirectional_differential_particle_flux = np.sum(
             masked_electron_flux * self.solid_angles, axis=1
         )  # shape (Energy Bins,)
+        self.omnidirectional_differential_particle_flux_mag = self.omnidirectional_differential_particle_flux.magnitude
 
         energies = (
             spec_er_data.data["energy"].to_numpy(dtype=np.float64)
         ) * ureg.electron_volt  # shape (Energy Bins,)
 
         self.energy_centers = energies
+        self.energy_centers_mag = energies.to(ureg.electron_volt).magnitude
         self.energy_windows = np.column_stack(
             [0.75 * energies, 1.25 * energies]
         )  # shape (Energy Bins, 2)
@@ -154,7 +150,7 @@ class Kappa:
         # model_differential_flux = omnidirectional_flux_integrated(
         #     params, self.energy_windows
         # ) / self.energy_centers
-        model_differential_flux = omnidirectional_flux(params, self.energy_centers)
+        model_differential_flux = omnidirectional_flux_fast(params, self.energy_centers)
 
         omnidirectional_flux_units = ureg.particle / (
             ureg.centimeter**2 * ureg.second * ureg.electron_volt
@@ -188,7 +184,24 @@ class Kappa:
 
         chi2 = np.sum((log_model_differential_flux - log_data_flux) ** 2)
         return chi2
+    
+    def _objective_function_fast(self, kappa_theta: np.ndarray) -> float:
+        """
+        Objective function for optimization using fast omnidirectional flux calculation.
+        """
+        density_mag = self.density_estimate.magnitude
+        kappa = kappa_theta[0]
+        theta_mag = 10 ** kappa_theta[1]
 
+        model_flux_magnitudes = omnidirectional_flux_magnitude(
+            density_mag, kappa, theta_mag, self.energy_centers_mag
+        )
+
+        log_model = np.log(model_flux_magnitudes)
+        log_data = np.log(self.omnidirectional_differential_particle_flux_mag)
+        chi2 = np.sum((log_model - log_data) ** 2)
+        return chi2
+    
     def _get_density_estimate(self) -> NumberDensityType:
         """
         Estimate the density based on the sum of the flux and the energy windows.
@@ -233,8 +246,8 @@ class Kappa:
         density_estimate = np.sum(integrand * delta_energy)
 
         return density_estimate.to(ureg.particle / ureg.meter**3)
-
-    def fit(self, n_starts: int = 50):
+    
+    def fit(self, n_starts: int = 50, use_fast: bool = True):
         if not self.is_data_valid:
             raise ValueError(
                 "Data is not valid. Ensure that the data has been prepared."
@@ -248,12 +261,13 @@ class Kappa:
             [b[1] for b in self.DEFAULT_BOUNDS],
         )
 
+        objective_func = self._objective_function_fast if use_fast else self._objective_function
         best_result = None
 
         for i, x0 in enumerate(scaled_samples):
             logging.debug(f"Running optimization for sample {i + 1}/{n_starts}")
             result = minimize(
-                self._objective_function,
+                objective_func,
                 x0,
                 args=(),
                 bounds=self.DEFAULT_BOUNDS,

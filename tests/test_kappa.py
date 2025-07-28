@@ -11,6 +11,7 @@ from src.physics.kappa import (
     energy_from_velocity,
     kappa_distribution,
     omnidirectional_flux,
+    omnidirectional_flux_fast,
     omnidirectional_flux_integrated,
     velocity_from_energy,
 )
@@ -219,6 +220,19 @@ def test_kappa_omnidirectional_flux_basic(base_kappa_params):
         rtol=1e-8,
     ), "Omnidirectional flux in eV and J should match."
 
+def test_kappa_omnidirectional_flux_fast(kappa_params_set):
+    """Test omnidirectional flux fast calculation."""
+    params, _ = kappa_params_set
+
+    energies = np.geomspace(1e-2, 1e20, num=1001) * ureg.electron_volt
+    standard_flux = omnidirectional_flux(params, energies)
+    fast_flux = omnidirectional_flux_fast(params, energies)
+
+    assert isinstance(fast_flux, Quantity)
+    assert np.all(fast_flux.magnitude >= 0)
+    assert fast_flux.units == ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
+    assert np.allclose(fast_flux.magnitude, standard_flux.magnitude, rtol=1e-2), \
+        "Fast omnidirectional flux should match standard calculation within tolerance."
 
 def test_omnidirectional_flux_integrated_basic(base_kappa_params):
 

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from functools import lru_cache
 import numpy as np
 from pint import Quantity
 from scipy.integrate import simpson
@@ -290,3 +291,56 @@ def omnidirectional_flux_integrated(
             raise TypeError("integrated_flux must be a pint Quantity (IntegratedFlux)")
 
     return integrated_flux
+
+@lru_cache(maxsize=128)
+def _gamma_ratio_cached(kappa: float) -> float:
+    """Cache expensive gamma function calculations."""
+    return gamma(kappa + 1) / np.power(np.pi * kappa, 1.5) / gamma(kappa - 0.5)
+
+def omnidirectional_flux_magnitude(
+        density_mag: float,
+        kappa: float,
+        theta_mag: float,
+        energy_mag: np.ndarray,
+):
+    """
+    Calculate the omnidirectional flux using magnitudes of the parameters.
+
+    Args:
+        density_mag (float): Density in particles/m^3.
+        kappa (float): Kappa parameter.
+        theta_mag (float): Theta in m/s.
+        energy_mag (np.ndarray): Energy magnitudes in eV.
+
+    Returns:
+        Omnidirectional flux magnitude (np.ndarray): Magnitude in particles/(cm^2 s eV).
+    """
+
+    ELECTORN_MASS_EV_S2_M2 = 5.685630e-12
+
+    velocity_mag = np.sqrt(2 * energy_mag / ELECTORN_MASS_EV_S2_M2)
+
+    prefactor = _gamma_ratio_cached(kappa)
+    core = density_mag / theta_mag**3
+    tail = (1 + (velocity_mag / theta_mag) ** 2 / kappa) ** (-kappa - 1)
+
+    distribution_mag = prefactor * core * tail
+
+    directional_flux_mag = distribution_mag * velocity_mag**2 / ELECTORN_MASS_EV_S2_M2
+    return 4 * np.pi * 1e-4 * directional_flux_mag  # Convert to particles/(cm^2 s eV)
+
+def omnidirectional_flux_fast(
+        parameters: KappaParams,
+        energy: EnergyType,
+) -> OmnidirectionalFluxType:
+    """Fast version of omnidirectional_flux using magnitude calculation."""
+    density_mag, kappa, theta_mag = parameters.to_tuple()
+    energy_mag = energy.to(ureg.electron_volt).magnitude
+
+    result_mag = omnidirectional_flux_magnitude(
+        density_mag,
+        kappa,
+        theta_mag,
+        energy_mag,
+    )
+    return (result_mag * ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt))
