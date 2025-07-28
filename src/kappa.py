@@ -284,11 +284,16 @@ class Kappa:
                 x0,
                 args=(),
                 bounds=self.DEFAULT_BOUNDS,
-                method="Nelder-Mead",
-                options={"maxiter": 1000, "disp": False},
+                method="L-BFGS-B",
+                options={"maxiter": 1000},
             )
             if best_result is None or (result.success and result.fun < best_result.fun):
                 best_result = result
+
+            if best_result and best_result.fun < 1e-3:
+                logging.debug(
+                    f"Early stopping at sample {i + 1} with chi2={best_result.fun:.4f}"
+                )
 
         if best_result is None:
             logging.warning("No valid optimization result found.")
