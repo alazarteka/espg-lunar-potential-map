@@ -1,9 +1,8 @@
+import math
 from dataclasses import dataclass
 
-from functools import lru_cache
-import math
 import numpy as np
-from numba import jit, vectorize
+from numba import jit
 from pint import Quantity
 from scipy.integrate import simpson
 from scipy.special import gamma
@@ -294,51 +293,55 @@ def omnidirectional_flux_integrated(
 
     return integrated_flux
 
+
 @jit(nopython=True, cache=True)
 def _gamma_ratio(kappa: float) -> float:
     """Numba-optimized gamma ratio calculation."""
 
-    return (math.gamma(kappa + 1) / 
-            (math.pow(math.pi * kappa, 1.5) * math.gamma(kappa - 0.5)))
+    return math.gamma(kappa + 1) / (
+        math.pow(math.pi * kappa, 1.5) * math.gamma(kappa - 0.5)
+    )
+
 
 @jit(nopython=True, cache=True, fastmath=True)
 def omnidirectional_flux_magnitude(
     density_mag: float,
-    kappa: float, 
+    kappa: float,
     theta_mag: float,
     energy_mag: np.ndarray,
 ) -> np.ndarray:
     """
     Numba-JIT compiled version of omnidirectional_flux_magnitude.
-    
+
     Args:
         density_mag: Density in particles/m^3
-        kappa: Kappa parameter  
+        kappa: Kappa parameter
         theta_mag: Theta in m/s
         energy_mag: Energy magnitudes in eV
-        
+
     Returns:
         Omnidirectional flux magnitude in particles/(cm^2 s eV)
     """
     ELECTRON_MASS_EV_S2_M2 = 5.685630e-12
-    
+
     velocity_mag = np.sqrt(2.0 * energy_mag / ELECTRON_MASS_EV_S2_M2)
 
     prefactor = _gamma_ratio(kappa)
     core = density_mag / (theta_mag * theta_mag * theta_mag)  # More efficient than **3
     velocity_ratio_sq = (velocity_mag / theta_mag) * (velocity_mag / theta_mag)
     tail = np.power(1.0 + velocity_ratio_sq / kappa, -kappa - 1.0)
-    
+
     distribution_mag = prefactor * core * tail
-    
+
     velocity_sq = velocity_mag * velocity_mag
     directional_flux_mag = distribution_mag * velocity_sq / ELECTRON_MASS_EV_S2_M2
-    
+
     return 4.0 * math.pi * 1e-4 * directional_flux_mag
 
+
 def omnidirectional_flux_fast(
-        parameters: KappaParams,
-        energy: EnergyType,
+    parameters: KappaParams,
+    energy: EnergyType,
 ) -> OmnidirectionalFluxType:
     """Fast version of omnidirectional_flux using magnitude calculation."""
     density_mag, kappa, theta_mag = parameters.to_tuple()
@@ -350,4 +353,8 @@ def omnidirectional_flux_fast(
         theta_mag,
         energy_mag,
     )
-    return (result_mag * ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt))
+    return (
+        result_mag
+        * ureg.particle
+        / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
+    )

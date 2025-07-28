@@ -1,6 +1,4 @@
 import logging
-from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
 
 import numpy as np
 from numba import jit
@@ -12,7 +10,6 @@ from src import config
 from src.flux import ERData, PitchAngle
 from src.physics.kappa import (
     KappaParams,
-    omnidirectional_flux,
     omnidirectional_flux_fast,
     omnidirectional_flux_magnitude,
     velocity_from_energy,
@@ -53,7 +50,9 @@ class Kappa:
 
         self._prepare_data()
         self.density_estimate: NumberDensityType = self._get_density_estimate()
-        self.density_estimate_mag = self.density_estimate.to(ureg.particle / ureg.meter**3).magnitude
+        self.density_estimate_mag = self.density_estimate.to(
+            ureg.particle / ureg.meter**3
+        ).magnitude
 
         if __debug__:
             if not isinstance(
@@ -127,7 +126,9 @@ class Kappa:
         self.omnidirectional_differential_particle_flux = np.sum(
             masked_electron_flux * self.solid_angles, axis=1
         )  # shape (Energy Bins,)
-        self.omnidirectional_differential_particle_flux_mag = self.omnidirectional_differential_particle_flux.magnitude
+        self.omnidirectional_differential_particle_flux_mag = (
+            self.omnidirectional_differential_particle_flux.magnitude
+        )
 
         energies = (
             spec_er_data.data["energy"].to_numpy(dtype=np.float64)
@@ -186,7 +187,7 @@ class Kappa:
 
         chi2 = np.sum((log_model_differential_flux - log_data_flux) ** 2)
         return chi2
-    
+
     @staticmethod
     @jit(nopython=True, cache=True)
     def _compute_chi2_numba(model_flux_mag, measured_flux_mag):
@@ -211,7 +212,7 @@ class Kappa:
         return self._compute_chi2_numba(
             model_flux_magnitudes, self.omnidirectional_differential_particle_flux_mag
         )
-    
+
     def _get_density_estimate(self) -> NumberDensityType:
         """
         Estimate the density based on the sum of the flux and the energy windows.
@@ -256,7 +257,7 @@ class Kappa:
         density_estimate = np.sum(integrand * delta_energy)
 
         return density_estimate.to(ureg.particle / ureg.meter**3)
-    
+
     def fit(self, n_starts: int = 50, use_fast: bool = True):
         if not self.is_data_valid:
             raise ValueError(
@@ -271,7 +272,9 @@ class Kappa:
             [b[1] for b in self.DEFAULT_BOUNDS],
         )
 
-        objective_func = self._objective_function_fast if use_fast else self._objective_function
+        objective_func = (
+            self._objective_function_fast if use_fast else self._objective_function
+        )
         best_result = None
 
         for i, x0 in enumerate(scaled_samples):
