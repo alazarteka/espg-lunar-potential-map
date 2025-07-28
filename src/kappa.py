@@ -36,7 +36,7 @@ class KappaFitResult:
 class Kappa:
     """Class for handling kappa distribution fitting and evaluation."""
 
-    DEFAULT_BOUNDS = [(2.5, 6.0), (2, 8)]  # kappa  # theta in log m/s
+    DEFAULT_BOUNDS = [(2.5, 6.0), (6, 8)]  # kappa  # theta in log m/s
 
     def __init__(self, er_data: ERData, spec_no: int):
 
