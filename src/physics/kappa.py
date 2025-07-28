@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 
 from functools import lru_cache
+import math
 import numpy as np
+from numba import jit, vectorize
 from pint import Quantity
 from scipy.integrate import simpson
 from scipy.special import gamma
@@ -292,42 +294,47 @@ def omnidirectional_flux_integrated(
 
     return integrated_flux
 
-@lru_cache(maxsize=128)
-def _gamma_ratio_cached(kappa: float) -> float:
-    """Cache expensive gamma function calculations."""
-    return gamma(kappa + 1) / np.power(np.pi * kappa, 1.5) / gamma(kappa - 0.5)
+@jit(nopython=True, cache=True)
+def _gamma_ratio(kappa: float) -> float:
+    """Numba-optimized gamma ratio calculation."""
 
+    return (math.gamma(kappa + 1) / 
+            (math.pow(math.pi * kappa, 1.5) * math.gamma(kappa - 0.5)))
+
+@jit(nopython=True, cache=True, fastmath=True)
 def omnidirectional_flux_magnitude(
-        density_mag: float,
-        kappa: float,
-        theta_mag: float,
-        energy_mag: np.ndarray,
-):
+    density_mag: float,
+    kappa: float, 
+    theta_mag: float,
+    energy_mag: np.ndarray,
+) -> np.ndarray:
     """
-    Calculate the omnidirectional flux using magnitudes of the parameters.
-
+    Numba-JIT compiled version of omnidirectional_flux_magnitude.
+    
     Args:
-        density_mag (float): Density in particles/m^3.
-        kappa (float): Kappa parameter.
-        theta_mag (float): Theta in m/s.
-        energy_mag (np.ndarray): Energy magnitudes in eV.
-
+        density_mag: Density in particles/m^3
+        kappa: Kappa parameter  
+        theta_mag: Theta in m/s
+        energy_mag: Energy magnitudes in eV
+        
     Returns:
-        Omnidirectional flux magnitude (np.ndarray): Magnitude in particles/(cm^2 s eV).
+        Omnidirectional flux magnitude in particles/(cm^2 s eV)
     """
+    ELECTRON_MASS_EV_S2_M2 = 5.685630e-12
+    
+    velocity_mag = np.sqrt(2.0 * energy_mag / ELECTRON_MASS_EV_S2_M2)
 
-    ELECTORN_MASS_EV_S2_M2 = 5.685630e-12
-
-    velocity_mag = np.sqrt(2 * energy_mag / ELECTORN_MASS_EV_S2_M2)
-
-    prefactor = _gamma_ratio_cached(kappa)
-    core = density_mag / theta_mag**3
-    tail = (1 + (velocity_mag / theta_mag) ** 2 / kappa) ** (-kappa - 1)
-
+    prefactor = _gamma_ratio(kappa)
+    core = density_mag / (theta_mag * theta_mag * theta_mag)  # More efficient than **3
+    velocity_ratio_sq = (velocity_mag / theta_mag) * (velocity_mag / theta_mag)
+    tail = np.power(1.0 + velocity_ratio_sq / kappa, -kappa - 1.0)
+    
     distribution_mag = prefactor * core * tail
-
-    directional_flux_mag = distribution_mag * velocity_mag**2 / ELECTORN_MASS_EV_S2_M2
-    return 4 * np.pi * 1e-4 * directional_flux_mag  # Convert to particles/(cm^2 s eV)
+    
+    velocity_sq = velocity_mag * velocity_mag
+    directional_flux_mag = distribution_mag * velocity_sq / ELECTRON_MASS_EV_S2_M2
+    
+    return 4.0 * math.pi * 1e-4 * directional_flux_mag
 
 def omnidirectional_flux_fast(
         parameters: KappaParams,

@@ -3,6 +3,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 
 import numpy as np
+from numba import jit
 from pint import Quantity
 from scipy.optimize import minimize
 from scipy.stats import qmc
@@ -52,6 +53,7 @@ class Kappa:
 
         self._prepare_data()
         self.density_estimate: NumberDensityType = self._get_density_estimate()
+        self.density_estimate_mag = self.density_estimate.to(ureg.particle / ureg.meter**3).magnitude
 
         if __debug__:
             if not isinstance(
@@ -185,6 +187,15 @@ class Kappa:
         chi2 = np.sum((log_model_differential_flux - log_data_flux) ** 2)
         return chi2
     
+    @staticmethod
+    @jit(nopython=True, cache=True)
+    def _compute_chi2_numba(model_flux_mag, measured_flux_mag):
+        log_model = np.log(model_flux_mag)
+        log_data = np.log(measured_flux_mag)
+        diff = log_model - log_data
+        chi2 = np.sum(diff * diff)
+        return chi2
+
     def _objective_function_fast(self, kappa_theta: np.ndarray) -> float:
         """
         Objective function for optimization using fast omnidirectional flux calculation.
@@ -197,10 +208,9 @@ class Kappa:
             density_mag, kappa, theta_mag, self.energy_centers_mag
         )
 
-        log_model = np.log(model_flux_magnitudes)
-        log_data = np.log(self.omnidirectional_differential_particle_flux_mag)
-        chi2 = np.sum((log_model - log_data) ** 2)
-        return chi2
+        return self._compute_chi2_numba(
+            model_flux_magnitudes, self.omnidirectional_differential_particle_flux_mag
+        )
     
     def _get_density_estimate(self) -> NumberDensityType:
         """
