@@ -27,9 +27,10 @@ EXT_TLS = ".tls"  # SPICE leap seconds kernel
 EXT_TPC = ".tpc"  # SPICE planetary constants kernel
 
 # ========== Download manager settings ==========
-MAX_DOWNLOAD_WORKERS = 10  # default threads for parallel downloads
-CHUNK_SIZE_BYTES = 4 * 1024 * 1024  # chunk size for streaming downloads
-REQUESTS_PER_SECOND = 5  # rate-limit threshold
+MAX_DOWNLOAD_WORKERS = 20  # threads for parallel downloads
+CHUNK_SIZE_BYTES = 16 * 1024 * 1024  # chunk size for streaming downloads
+REQUESTS_PER_SECOND = 10  # rate-limit threshold
+CONNECTION_POOL_SIZE = 50  # connection pool size for reuse
 
 # ========== Numerical tolerances ==========
 EPS = 1e-6  # small epsilon to avoid division by zero

@@ -12,6 +12,16 @@ from . import config
 
 logger = logging.getLogger(__name__)
 
+# Create a session for connection reuse
+session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(
+    pool_connections=config.CONNECTION_POOL_SIZE,
+    pool_maxsize=config.CONNECTION_POOL_SIZE,
+    max_retries=3
+)
+session.mount('http://', adapter)
+session.mount('https://', adapter)
+
 
 def solid_angle_from_thetas(base_dir: Path) -> None:
     """
@@ -69,7 +79,7 @@ class DataManager:
         """
         url = f"{self.base_url}/{remote_path.rstrip('/')}/"
         logger.debug(f"Listing remote directories at {url}")
-        resp = requests.get(url)
+        resp = session.get(url, timeout=30)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         dirs = []
@@ -89,7 +99,7 @@ class DataManager:
         """
         url = f"{self.base_url}/{remote_path.rstrip('/')}/"
         logger.debug(f"Listing remote files at {url}")
-        resp = requests.get(url)
+        resp = session.get(url, timeout=30)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         files = [
@@ -117,15 +127,20 @@ class DataManager:
         else:
             logger.debug(f"Starting download: {url} -> {temp_dest}")
 
-        resp = requests.get(url, stream=True)
-        resp.raise_for_status()
-        with open(temp_dest, "wb") as f:
-            for chunk in resp.iter_content(chunk_size):
-                if chunk:
-                    f.write(chunk)
-        temp_dest.rename(dest)
-        logger.debug(f"Downloaded: {dest}")
-        return dest
+        try:
+            resp = session.get(url, stream=True, timeout=60)
+            resp.raise_for_status()
+            with open(temp_dest, "wb") as f:
+                for chunk in resp.iter_content(chunk_size):
+                    if chunk:
+                        f.write(chunk)
+            temp_dest.rename(dest)
+            logger.debug(f"Downloaded: {dest}")
+            return dest
+        except Exception as e:
+            if temp_dest.exists():
+                temp_dest.unlink()
+            raise e
 
     def fetch_directory(self, remote_path: str, ext: str = ".TAB") -> list[Path]:
         """
@@ -143,6 +158,32 @@ class DataManager:
         )
         return [dest for url, dest in urls_and_dests]
 
+    def collect_all_download_tasks(self, years: list[str], ext: str = ".TAB") -> list[tuple[str, Path]]:
+        """
+        Collect all download tasks across all years and julian days without downloading.
+        This allows for better parallelization.
+        """
+        all_tasks = []
+        
+        for year in tqdm(years, desc="Collecting download tasks"):
+            julian_dirs = self.list_remote_dirs(year)
+            for julian in julian_dirs:
+                remote_path = f"{year}/{julian}"
+                try:
+                    files = self.list_remote_files(remote_path, ext)
+                    local_dir = self.ensure_dir(*remote_path.split("/"))
+                    
+                    year_julian_tasks = [
+                        (f"{self.base_url}/{remote_path}/{fname}", local_dir / fname)
+                        for fname in files
+                    ]
+                    all_tasks.extend(year_julian_tasks)
+                except Exception as e:
+                    logger.warning(f"Failed to list files in {remote_path}: {e}")
+                    continue
+        
+        return all_tasks
+
     def download_files_in_parallel(
         self,
         urls_and_dests: list[tuple[str, Path]],
@@ -152,20 +193,31 @@ class DataManager:
         """
         Download multiple (url, dest) pairs in parallel.
         """
+        # Filter out already existing files
+        remaining_tasks = [
+            (url, dest) for url, dest in urls_and_dests 
+            if not dest.exists()
+        ]
+        
+        if not remaining_tasks:
+            logger.info("All files already exist, skipping downloads")
+            return
+            
+        logger.info(f"Downloading {len(remaining_tasks)} files ({len(urls_and_dests) - len(remaining_tasks)} already exist)")
+        
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            with tqdm(total=len(urls_and_dests), desc=folder_desc, leave=False) as pbar:
+            with tqdm(total=len(remaining_tasks), desc=folder_desc, unit="file") as pbar:
                 futures = [
                     executor.submit(self.download_file, url, dest)
-                    for url, dest in urls_and_dests
+                    for url, dest in remaining_tasks
                 ]
-                for future in tqdm(
-                    as_completed(futures),
-                    total=len(futures),
-                    desc="Downloading files",
-                    unit="file",
-                ):
-                    future.result()
-                    pbar.update(1)
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as e:
+                        logger.error(f"Download failed: {e}")
+                    finally:
+                        pbar.update(1)
 
 
 if __name__ == "__main__":
@@ -212,57 +264,68 @@ if __name__ == "__main__":
 
     # download specific spice kernels
     logger.info("Downloading specific SPICE kernels...")
-    for fname in [
+    spice_files = [
         "lp_ask_980111-980531.bsp",
         "lp_ask_980601-981031.bsp",
         "lp_ask_981101-990331.bsp",
         "lp_ask_990401-990730.bsp",
-    ]:
-
-        spice_mgr.download_file(
-            f"{spice_mgr.base_url}/{fname}", spice_mgr.base_dir / fname
-        )
-
+    ]
+    spice_tasks = [
+        (f"{spice_mgr.base_url}/{fname}", spice_mgr.base_dir / fname)
+        for fname in spice_files
+    ]
+    
     # download generic kernels
     logger.info("Downloading generic kernels...")
-    for fname in [
+    generic_files = [
         "lsk/latest_leapseconds.tls",
         "pck/pck00011.tpc",
-    ]:
-
-        generic_mgr.download_file(
-            f"{generic_mgr.base_url}/{fname}", spice_mgr.base_dir / Path(fname).name
-        )
-
+    ]
+    generic_tasks = [
+        (f"{generic_mgr.base_url}/{fname}", spice_mgr.base_dir / Path(fname).name)
+        for fname in generic_files
+    ]
+    
     # download lpephemu
     logger.info("Downloading lpephemu kernel...")
-    lpephemu_mgr.download_file(
-        f"{lpephemu_mgr.base_url}/lpephemu.bsp", spice_mgr.base_dir / "lpephemu.bsp"
-    )
-
+    lpephemu_tasks = [
+        (f"{lpephemu_mgr.base_url}/lpephemu.bsp", spice_mgr.base_dir / "lpephemu.bsp")
+    ]
+    
     # download attitude table
     logger.info("Downloading attitude table...")
-    attitude_mgr.download_file(
-        f"{attitude_mgr.base_url}/{config.ATTITUDE_FILE}",
-        data_mgr.base_dir / config.ATTITUDE_FILE,
-    )
-
+    attitude_tasks = [
+        (f"{attitude_mgr.base_url}/{config.ATTITUDE_FILE}", data_mgr.base_dir / config.ATTITUDE_FILE)
+    ]
+    
     # download theta files
-    logger.info("Downloading theta file and saving solid angles...")
-    theta_mgr.download_file(
-        f"{theta_mgr.base_url}/{config.THETA_FILE}",
-        data_mgr.base_dir / config.THETA_FILE,
-    )
+    logger.info("Downloading theta file...")
+    theta_tasks = [
+        (f"{theta_mgr.base_url}/{config.THETA_FILE}", data_mgr.base_dir / config.THETA_FILE)
+    ]
+    
+    # Combine all initial downloads and run in parallel
+    initial_tasks = spice_tasks + generic_tasks + lpephemu_tasks + attitude_tasks + theta_tasks
+    spice_mgr.download_files_in_parallel(initial_tasks, folder_desc="Downloading initial files")
+    
+    # Generate solid angles after theta file is downloaded
+    logger.info("Generating solid angles...")
     solid_angle_from_thetas(data_mgr.base_dir)
 
     # download data files
-    logger.info("Downloading 3D electron flux data files...")
+    logger.info("Collecting all 3D electron flux data download tasks...")
     years = data_mgr.list_remote_dirs()
-    for year in tqdm(years, desc="Years"):
-        # list all julian-date subdirectories in that year
-        julian_dirs = data_mgr.list_remote_dirs(year)
-        for julian in tqdm(julian_dirs, desc=f"Julian days ({year})", leave=False):
-            remote_path = f"{year}/{julian}"
-            downloaded_files = data_mgr.fetch_directory(remote_path)
+    logger.info(f"Found {len(years)} years of data")
+    
+    # Collect all download tasks first
+    all_download_tasks = data_mgr.collect_all_download_tasks(years)
+    logger.info(f"Found {len(all_download_tasks)} total files to potentially download")
+    
+    # Download all files in parallel across all years/julian days
+    data_mgr.download_files_in_parallel(
+        all_download_tasks, 
+        max_workers=config.MAX_DOWNLOAD_WORKERS,
+        folder_desc="Downloading all 3D electron flux data"
+    )
 
     logger.info("All downloads completed.")
