@@ -93,14 +93,14 @@ class ERData:
         invalid_spec_nos = set(self.data["spec_no"][invalid_rows_mask].unique())
 
         if invalid_spec_nos:
-            logger.info(f"Removing {len(invalid_spec_nos)} sweeps with invalid data")
+            logger.debug(f"Removing {len(invalid_spec_nos)} sweeps with invalid data")
 
             # Remove all rows belonging to invalid spec_nos
             valid_mask = ~self.data["spec_no"].isin(list(invalid_spec_nos))
             self.data = self.data[valid_mask].reset_index(drop=True)
 
             removed_rows = original_rows - len(self.data)
-            logger.info(
+            logger.debug(
                 f"Removed {removed_rows} rows ({removed_rows/original_rows*100:.1f}%) from {len(invalid_spec_nos)} invalid sweeps"
             )
 

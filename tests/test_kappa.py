@@ -16,9 +16,8 @@ from src.physics.kappa import (
     velocity_from_energy,
 )
 from src.utils.units import (
-    ureg,
     SpeedType,
-
+    ureg,
 )
 
 
