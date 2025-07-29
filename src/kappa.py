@@ -149,10 +149,6 @@ class Kappa:
 
         params = KappaParams(density, kappa, theta)
 
-        # TODO: Decide whether to use average flux or flux at energy centers
-        # model_differential_flux = omnidirectional_flux_integrated(
-        #     params, self.energy_windows
-        # ) / self.energy_centers
         model_differential_flux = omnidirectional_flux_fast(params, self.energy_centers)
 
         omnidirectional_flux_units = ureg.particle / (
@@ -178,12 +174,12 @@ class Kappa:
 
         log_model_differential_flux = np.log(
             model_differential_flux.to(omnidirectional_flux_units).magnitude
-        )
+        ) + config.EPS
         log_data_flux = np.log(
             self.omnidirectional_differential_particle_flux.to(
                 omnidirectional_flux_units
             ).magnitude
-        )
+        ) + config.EPS
 
         chi2 = np.sum((log_model_differential_flux - log_data_flux) ** 2)
         return chi2
@@ -210,7 +206,7 @@ class Kappa:
         )
 
         return self._compute_chi2_numba(
-            model_flux_magnitudes, self.omnidirectional_differential_particle_flux_mag
+            model_flux_magnitudes + config.EPS, self.omnidirectional_differential_particle_flux_mag + config.EPS
         )
 
     def _get_density_estimate(self) -> NumberDensityType:
