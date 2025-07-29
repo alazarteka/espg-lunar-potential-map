@@ -24,7 +24,7 @@ def profile_kappa_fitting():
     kappas = []
     thetas = []
 
-    spec_numbers = er_data.data["spec_no"].unique()[] 
+    spec_numbers = er_data.data["spec_no"].unique()
 
     for i in spec_numbers:
         try:
@@ -32,24 +32,18 @@ def profile_kappa_fitting():
             density = kappa.density_estimate.to(ureg.particle / ureg.m**3).magnitude
             densities.append(density)
             
-            print(f"Processing spectrum {i}, density: {density}")
-            
-            # Check for invalid values
             if not kappa.is_data_valid:
-                print(f"Spectrum {i}: Invalid data, skipping")
                 continue
                 
             params = kappa.fit(n_starts=10)
             if params is None:
-                print(f"Spectrum {i}: Fit failed, skipping")
                 continue
                 
             kappas.append(params.kappa)
             thetas.append(params.theta.to(ureg.meter / ureg.second).magnitude)
-            print(f"Spectrum {i}: Successfully fitted kappa={params.kappa}, theta={params.theta}")
             
         except Exception as e:
-            print(f"Error processing spectrum {i}: {e}")
+            pass
 
     end_time = time.time()
 
