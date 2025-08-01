@@ -163,7 +163,7 @@ class Kappa:
 
         Args:
             kappa_theta (np.ndarray): Array containing kappa and log10(theta).
-        
+
         Returns:
             float: The chi-squared value representing the difference.
         """
@@ -198,22 +198,26 @@ class Kappa:
 
         log_model_differential_flux = np.log(
             model_differential_flux.to(omnidirectional_flux_units).magnitude
-        + config.EPS)
+            + config.EPS
+        )
         log_data_flux = np.log(
             self.omnidirectional_differential_particle_flux.to(
                 omnidirectional_flux_units
             ).magnitude
-        + config.EPS)
+            + config.EPS
+        )
 
         chi2 = np.sum((log_model_differential_flux - log_data_flux) ** 2)
         return chi2
 
     @staticmethod
     @jit(nopython=True, cache=True)
-    def _compute_chi2_numba(model_flux_mag: np.ndarray, measured_flux_mag: np.ndarray) -> float:
+    def _compute_chi2_numba(
+        model_flux_mag: np.ndarray, measured_flux_mag: np.ndarray
+    ) -> float:
         """
         Compute the squared difference of the logarithm of model and measured fluxes.
-        
+
         This function is optimized for performance using Numba.
 
         Args:
@@ -246,7 +250,8 @@ class Kappa:
         )
 
         return self._compute_chi2_numba(
-            model_flux_magnitudes + config.EPS, self.omnidirectional_differential_particle_flux_mag + config.EPS
+            model_flux_magnitudes + config.EPS,
+            self.omnidirectional_differential_particle_flux_mag + config.EPS,
         )
 
     def _get_density_estimate(self) -> NumberDensityType:
@@ -294,14 +299,16 @@ class Kappa:
 
         return density_estimate.to(ureg.particle / ureg.meter**3)
 
-    def fit(self, n_starts: int = 50, use_fast: bool = True) -> tuple[KappaParams, float]:
+    def fit(
+        self, n_starts: int = 50, use_fast: bool = True
+    ) -> tuple[KappaParams, float]:
         """
         Fit the kappa distribution parameters (kappa and theta) to the data.
 
         Args:
             n_starts (int): Number of random starts for the optimization.
             use_fast (bool): Whether to use the fast objective function.
-        
+
         Returns:
             tuple[KappaParams, float]: The fitted KappaParams and the best error value.
         """
@@ -361,8 +368,11 @@ class Kappa:
         #     except Exception as e:
         #         logging.warning(f"Failed to compute sigma: {e}")
 
-        return KappaParams(
-            density=self.density_estimate,
-            kappa=best_result.x[0],
-            theta=10 ** best_result.x[1] * ureg.meter / ureg.second,
-        ), best_result.fun
+        return (
+            KappaParams(
+                density=self.density_estimate,
+                kappa=best_result.x[0],
+                theta=10 ** best_result.x[1] * ureg.meter / ureg.second,
+            ),
+            best_result.fun,
+        )

@@ -31,18 +31,18 @@ def profile_kappa_fitting():
             kappa = Kappa(er_data, spec_no=i)
             density = kappa.density_estimate.to(ureg.particle / ureg.m**3).magnitude
             densities.append(density)
-            
+
             if not kappa.is_data_valid:
                 continue
-                
+
             params = kappa.fit(n_starts=10)
             if params is None:
                 continue
-                
+
             kappas.append(params.kappa)
             thetas.append(params.theta.to(ureg.meter / ureg.second).magnitude)
-            
-        except Exception as e:
+
+        except Exception:
             pass
 
     end_time = time.time()
@@ -53,7 +53,6 @@ def profile_kappa_fitting():
     s = StringIO()
     ps = pstats.Stats(pr, stream=s).strip_dirs().sort_stats("cumulative")
     ps.print_stats(30)
-
 
     print(f"Processing time: {end_time - start_time:.2f} seconds")
     print(f"Processed {len(spec_numbers)} spectra")
