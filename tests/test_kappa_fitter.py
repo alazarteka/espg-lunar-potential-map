@@ -141,8 +141,8 @@ def test_density_estimate(kappa_params_set):
     ), f"Expected density {params.density.magnitude / 2.0}, got {kappa_fitter.density_estimate.magnitude}"
 
 @pytest.mark.skip_ci
-def test_fitter_objectives(kappa_params_set):
-    """Test the Kappa fitter with different optimizers."""
+def test_objective_functions(kappa_params_set):
+    """Test the standard and fast objective functions."""
     params, _ = kappa_params_set
     synthetic_er = prepare_synthetic_er(
         density=params.density.to(ureg.particle / ureg.meter**3).magnitude,
@@ -168,8 +168,8 @@ def test_fitter_objectives(kappa_params_set):
     ), "Standard and fast objective functions should match within tolerance."
 
 @pytest.mark.skip_ci
-def test_fitters(kappa_params_set):
-    """Test the Kappa fitter with different optimizers."""
+def test_objective_functions_in_fitter(kappa_params_set):
+    """Test the Kappa fitter performance with the standard and fast objective functions."""
     params, _ = kappa_params_set
     synthetic_er = prepare_synthetic_er(
         density=params.density.to(ureg.particle / ureg.meter**3).magnitude,
@@ -178,22 +178,22 @@ def test_fitters(kappa_params_set):
     )
 
     kappa_fitter = Kappa(synthetic_er, 1)
-    _standard_fit = kappa_fitter.fit(use_fast=False)
-    _fast_fit = kappa_fitter.fit(use_fast=True)
+    standard_fit, _ = kappa_fitter.fit(use_fast=False)
+    fast_fit, _ = kappa_fitter.fit(use_fast=True)
 
     assert np.isclose(
-        _standard_fit.kappa, _fast_fit.kappa, rtol=1e-2
+        standard_fit.kappa, fast_fit.kappa, rtol=1e-2
     ), "Kappa values from standard and fast fitters should match within tolerance."
     assert np.isclose(
-        _standard_fit.theta.to(ureg.meter / ureg.second).magnitude,
-        _fast_fit.theta.to(ureg.meter / ureg.second).magnitude,
+        standard_fit.theta.to(ureg.meter / ureg.second).magnitude,
+        fast_fit.theta.to(ureg.meter / ureg.second).magnitude,
         rtol=1e-2,
     ), "Theta values from standard and fast fitters should match within tolerance."
 
 @pytest.mark.skip_ci
 def test_kappa_fitter(kappa_params_set):
     """Test the Kappa distribution fitting functionality."""
-    # Create a KappaParams instance
+
     params, _ = kappa_params_set
     synthetic_er = prepare_synthetic_er(
         density=params.density.to(ureg.particle / ureg.meter**3).magnitude,
@@ -201,8 +201,8 @@ def test_kappa_fitter(kappa_params_set):
         theta=params.theta.to(ureg.meter / ureg.second).magnitude,
     )
     kappa_fitter = Kappa(synthetic_er, 1)
+    fitted_params, _ = kappa_fitter.fit()
 
-    fitted_params = kappa_fitter.fit()
     assert isinstance(
         fitted_params, KappaParams
     ), "Fitted parameters should be an instance of KappaParams"

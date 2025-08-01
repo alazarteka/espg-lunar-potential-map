@@ -24,11 +24,23 @@ from src.utils.units import (
 
 
 class Kappa:
-    """Class for handling kappa distribution fitting and evaluation."""
+    """
+    Class for handling kappa distribution fitting and evaluation.
+
+    This class prepares the data for fitting, estimates the density, and provides methods
+    to fit the kappa distribution parameters (kappa and theta) to the data.
+    """
 
     DEFAULT_BOUNDS = [(2.5, 6.0), (6, 8)]  # kappa  # theta in log m/s
 
-    def __init__(self, er_data: ERData, spec_no: int):
+    def __init__(self, er_data: ERData, spec_no: int) -> None:
+        """
+        Initialize the Kappa class with ERData and specification number.
+
+        Args:
+            er_data (ERData): The ERData object containing the electron flux data.
+            spec_no (int): The specification number to filter the data.
+        """
 
         self.er_data = er_data
         self.spec_no = spec_no
@@ -80,7 +92,7 @@ class Kappa:
                     "density_estimate must be a pint Quantity (NumberDensity)"
                 )
 
-    def _prepare_data(self):
+    def _prepare_data(self) -> None:
         """
         Prepare the data for fitting.
 
@@ -143,6 +155,18 @@ class Kappa:
         self.is_data_valid = True
 
     def _objective_function(self, kappa_theta: np.ndarray) -> float:
+        """
+        Original objective function for optimization.
+
+        This function computes the squared difference between the log of the model differential flux
+        and the log of the measured flux.
+
+        Args:
+            kappa_theta (np.ndarray): Array containing kappa and log10(theta).
+        
+        Returns:
+            float: The chi-squared value representing the difference.
+        """
         density = self.density_estimate
         kappa = kappa_theta[0]
         theta = 10 ** kappa_theta[1] * ureg.meter / ureg.second
@@ -186,7 +210,17 @@ class Kappa:
 
     @staticmethod
     @jit(nopython=True, cache=True)
-    def _compute_chi2_numba(model_flux_mag, measured_flux_mag):
+    def _compute_chi2_numba(model_flux_mag: np.ndarray, measured_flux_mag: np.ndarray) -> float:
+        """
+        Compute the squared difference of the logarithm of model and measured fluxes.
+        
+        This function is optimized for performance using Numba.
+
+        Args:
+            model_flux_mag (np.ndarray): Magnitudes of the model flux.
+            measured_flux_mag (np.ndarray): Magnitudes of the measured flux.
+        """
+
         log_model = np.log(model_flux_mag)
         log_data = np.log(measured_flux_mag)
         diff = log_model - log_data
@@ -195,7 +229,13 @@ class Kappa:
 
     def _objective_function_fast(self, kappa_theta: np.ndarray) -> float:
         """
-        Objective function for optimization using fast omnidirectional flux calculation.
+        Fast Objective function for optimization using fast omnidirectional flux calculation.
+
+        Args:
+            kappa_theta (np.ndarray): Array containing kappa and log10(theta).
+
+        Returns:
+            float: The chi-squared value representing the difference.
         """
         density_mag = self.density_estimate.magnitude
         kappa = kappa_theta[0]
@@ -254,7 +294,17 @@ class Kappa:
 
         return density_estimate.to(ureg.particle / ureg.meter**3)
 
-    def fit(self, n_starts: int = 50, use_fast: bool = True):
+    def fit(self, n_starts: int = 50, use_fast: bool = True) -> tuple[KappaParams, float]:
+        """
+        Fit the kappa distribution parameters (kappa and theta) to the data.
+
+        Args:
+            n_starts (int): Number of random starts for the optimization.
+            use_fast (bool): Whether to use the fast objective function.
+        
+        Returns:
+            tuple[KappaParams, float]: The fitted KappaParams and the best error value.
+        """
         if not self.is_data_valid:
             raise ValueError(
                 "Data is not valid. Ensure that the data has been prepared."
@@ -315,4 +365,4 @@ class Kappa:
             density=self.density_estimate,
             kappa=best_result.x[0],
             theta=10 ** best_result.x[1] * ureg.meter / ureg.second,
-        )
+        ), best_result.fun
