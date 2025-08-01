@@ -174,12 +174,12 @@ class Kappa:
 
         log_model_differential_flux = np.log(
             model_differential_flux.to(omnidirectional_flux_units).magnitude
-        ) + config.EPS
+        + config.EPS)
         log_data_flux = np.log(
             self.omnidirectional_differential_particle_flux.to(
                 omnidirectional_flux_units
             ).magnitude
-        ) + config.EPS
+        + config.EPS)
 
         chi2 = np.sum((log_model_differential_flux - log_data_flux) ** 2)
         return chi2
