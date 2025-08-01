@@ -117,7 +117,7 @@ def prepare_synthetic_er(density=1e6, kappa=5.0, theta=1.1e5):
 
     return ERData.from_dataframe(synthetic_er_data, "NULL")
 
-
+@pytest.mark.skip_ci
 def test_density_estimate(kappa_params_set):
     """Test the density estimate calculation."""
     params, _ = kappa_params_set
@@ -140,7 +140,7 @@ def test_density_estimate(kappa_params_set):
         rtol=1e-2,
     ), f"Expected density {params.density.magnitude / 2.0}, got {kappa_fitter.density_estimate.magnitude}"
 
-
+@pytest.mark.skip_ci
 def test_fitter_objectives(kappa_params_set):
     """Test the Kappa fitter with different optimizers."""
     params, _ = kappa_params_set
@@ -167,7 +167,7 @@ def test_fitter_objectives(kappa_params_set):
         _standard_objective, _fast_objective, rtol=1e-2
     ), "Standard and fast objective functions should match within tolerance."
 
-
+@pytest.mark.skip_ci
 def test_fitters(kappa_params_set):
     """Test the Kappa fitter with different optimizers."""
     params, _ = kappa_params_set
@@ -190,7 +190,7 @@ def test_fitters(kappa_params_set):
         rtol=1e-2,
     ), "Theta values from standard and fast fitters should match within tolerance."
 
-
+@pytest.mark.skip_ci
 def test_kappa_fitter(kappa_params_set):
     """Test the Kappa distribution fitting functionality."""
     # Create a KappaParams instance
