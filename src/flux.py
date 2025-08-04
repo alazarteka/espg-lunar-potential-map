@@ -7,6 +7,7 @@ from scipy.stats.qmc import LatinHypercube, scale
 
 from src import config
 from src.model import synth_losscone
+from src.utils.units import ureg
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class ERData:
         self.data: pd.DataFrame = pd.DataFrame()
 
         self._load_data()
+        self._add_count_columns()
 
     @classmethod
     def from_dataframe(cls, data: pd.DataFrame, er_data_file: str):
@@ -36,6 +38,8 @@ class ERData:
         instance = cls.__new__(cls)
         instance.er_data_file = er_data_file
         instance.data = data
+        instance._clean_sweep_data()
+        instance._add_count_columns()
         return instance
 
     def _load_data(self) -> None:
@@ -45,7 +49,6 @@ class ERData:
         Reads the specified file into a pandas DataFrame, using the column names defined in ALL_COLS.
         If the file is not found, or if there is an error parsing the file, the data attribute is set to None.
         """
-        # Read the data file
         try:
             self.data = pd.read_csv(
                 self.er_data_file,
@@ -104,6 +107,43 @@ class ERData:
                 f"Removed {removed_rows} rows ({removed_rows/original_rows*100:.1f}%) from {len(invalid_spec_nos)} invalid sweeps"
             )
 
+    def _add_count_columns(self) -> None:
+        """
+        Reconstruct integer electron counts from the flux columns.
+
+        Adds two new DataFrame blocks:
+            - `count`: Integer electron counts for each energy bin.
+            - `count_err`: Estimated error in the electron counts.
+        """
+        thetas = np.loadtxt(config.DATA_DIR / config.THETA_FILE, dtype=np.float64)
+
+        if self.data.empty:
+            return
+
+        F = self.data[config.FLUX_COLS].to_numpy(dtype=np.float64) * (
+            ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
+        )
+
+        negative_flux_mask = F.magnitude < 0
+        if np.any(negative_flux_mask):
+            n_negative = np.sum(negative_flux_mask)
+            total_values = negative_flux_mask.size
+            logger.debug(f"Found {n_negative} negative flux values ({n_negative/total_values*100:.2f}%) - clamping to zero")
+            
+            F = np.maximum(F, 0 * F.units)
+
+        energies = self.data["energy"].to_numpy(dtype=np.float64)
+        energies = energies[:, None] * ureg.electron_volt  # Reshape for broadcasting
+        integration_time = np.array(list(map(lambda x: 1 / config.BINS_BY_LATITUDE[x], thetas))) * config.ACCUMULATION_TIME
+        integration_time = integration_time[None, :]  # Reshape for broadcasting
+        count_estimate = F * config.GEOMETRIC_FACTOR * energies * integration_time
+        count_estimate = np.rint(count_estimate.to(ureg.particle).magnitude).astype(int)
+        
+        count_estimate_sum = count_estimate.sum(axis=1)        
+        count_err = np.sqrt(count_estimate_sum)
+
+        self.data[config.COUNT_COLS[0]] = count_estimate_sum
+        self.data[config.COUNT_COLS[1]] = count_err
 
 class PitchAngle:
     """
@@ -165,7 +205,7 @@ class PitchAngle:
         to Cartesian coordinates. It also normalizes the magnetic field vectors
         and stores indices of valid and invalid data points.
         """
-        # Check if data is loaded
+
         assert (
             not self.er_data.data.empty
         ), "Data not loaded. Please load the data first."
@@ -176,25 +216,16 @@ class PitchAngle:
         # Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z)
         phis = np.deg2rad(self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64))
         thetas = np.deg2rad(self.thetas)
-
-        # Calculate Cartesian coordinates
         self.cartesian_coords = self._get_cartesian_coords(phis, thetas)
 
-        # Extract magnetic field vectors and calculate their magnitudes
         magnetic_field = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
         magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
-
-        # Since data is pre-cleaned at sweep level, all remaining rows should be valid
-        # Just normalize the magnetic field vectors directly
         unit_magnetic_field = magnetic_field / magnetic_field_magnitude
-
-        # Tile the unit magnetic field vectors for pitch angle calculation
         unit_magnetic_field = np.tile(
             unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1)
         )
         self.unit_magnetic_field = unit_magnetic_field
 
-        # Calculate the pitch angles
         self.calculate_pitch_angles()
 
     def calculate_pitch_angles(self) -> None:
@@ -210,22 +241,12 @@ class PitchAngle:
             not self.er_data.data.empty
         ), "Data not loaded. Please load the data first."
 
-        # Calculate the pitch angles
-        # The dot product between the unit magnetic field vector and the radial direction vector
-        # is the cosine of the pitch angle.
-        # Negative sign is used because the radial direction vector is meant to point towards the sensor.
         dot_product = np.einsum(
             "ijk,ijk->ij", self.unit_magnetic_field, self.cartesian_coords
-        )
-        # Clip the dot product to ensure it is in the range [-1, 1]
-        dot_product = np.clip(dot_product, -1, 1)
-
-        # Calculate the pitch angles using the arccosine function
+        ).clip(-1, 1)
         pitch_angles = np.arccos(dot_product)
-        # Convert the pitch angles to degrees
         pitch_angles = np.rad2deg(pitch_angles)
 
-        # Store the pitch angles in the class attribute
         self.pitch_angles = pitch_angles
 
 
@@ -276,15 +297,12 @@ class LossConeFitter:
         Returns:
             np.ndarray: The normalized flux for the specified energy bin and measurement chunk.
         """
-        # Check if data is loaded
         assert (
             not self.er_data.data.empty
         ), "Data not loaded. Please load the data first."
 
-        # Get the electron flux for the specified energy bin and measurement chunk
         index = measurement_chunk * config.SWEEP_ROWS + energy_bin
 
-        # Data is pre-cleaned, so just check bounds
         if index >= len(self.er_data.data):
             return np.full(config.CHANNELS, np.nan)
 
