@@ -12,6 +12,20 @@ from .utils.units import ChargeType, LengthType, MassType, ureg
 SWEEP_ROWS = 15  # rows per spacecraft sweep of energy spectrum
 CHANNELS = 88  # number of ER electron flux channels
 
+ACCUMULATION_TIME = 2.5 * ureg.second # accumulation time for electron flux data
+GEOMETRIC_FACTOR = 0.02 * ureg.centimeter**2 * ureg.steradian # geometric factor for electron flux
+BINS_BY_LATITUDE = {
+        78.75: 4,
+        56.25: 8,
+        33.75: 16,
+        11.25: 16,
+        -11.25: 16,
+        -33.75: 16,
+        -56.25: 8,
+        -78.75: 4,
+    }
+
+
 # ========== Physical parameters ==========
 LUNAR_RADIUS_KM = 1737.400  # average radius of the Moon in kilometers
 LUNAR_RADIUS: LengthType = 1737.400 * ureg.kilometer  # average radius of the Moon
@@ -36,11 +50,12 @@ CONNECTION_POOL_SIZE = 50  # connection pool size for reuse
 EPS = 1e-6  # small epsilon to avoid division by zero
 
 # ========== Data Column names ==========
-MISC_COLS = ["UTC", "time", "energy", "spec_no", "mag_x", "mag_y", "mag_z"]
+MISC_COLS = ["UTC", "time", "energy", "spec_no"]
 FLUX_COLS = [f"ele_flux_{i}" for i in range(88)]
 PHI_COLS = [f"dist_phi_{i}" for i in range(88)]
-ALL_COLS = MISC_COLS + FLUX_COLS + PHI_COLS
+COUNT_COLS = ["count", "count_err"]
 MAG_COLS = ["mag_x", "mag_y", "mag_z"]
+ALL_COLS = MISC_COLS + FLUX_COLS + PHI_COLS + MAG_COLS + COUNT_COLS
 
 # ========== Directory paths ==========
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # project root directory
