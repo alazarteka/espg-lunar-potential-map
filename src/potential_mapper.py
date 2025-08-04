@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import spiceypy as spice
 
-from . import config
-from .flux import FluxData
-from .utils import *
+from src import config
+from src.flux import FluxData
+from src.utils import *
 
 # Configure logging
 logging.basicConfig(
