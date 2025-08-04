@@ -56,6 +56,10 @@ class Kappa:
 
         self.omnidirectional_differential_particle_flux: FluxType | None = None
         self.omnidirectional_differential_particle_flux_mag: np.ndarray | None = None
+        self.omnidirectional_count: np.ndarray | None = None
+        self.sigma_omnidirectional_count: np.ndarray | None = None
+        self.sigma_flux_mag: np.ndarray | None = None
+        self.sigma_log_flux: np.ndarray | None = None
         self.energy_centers: EnergyType | None = None
         self.energy_centers_mag: np.ndarray | None = None
         self.energy_windows: EnergyType | None = None
@@ -141,6 +145,16 @@ class Kappa:
         self.omnidirectional_differential_particle_flux_mag = (
             self.omnidirectional_differential_particle_flux.magnitude
         )
+        count_sigma_count = spec_er_data.data[config.COUNT_COLS].to_numpy(dtype=np.float64)
+        self.omnidirectional_count = count_sigma_count[:, 0]  # shape (Energy Bins,)
+        self.sigma_omnidirectional_count = count_sigma_count[:, 1]  # shape (Energy Bins,)
+
+        self.sigma_flux_mag = (
+            self.sigma_omnidirectional_count / self.omnidirectional_count
+        ) * self.omnidirectional_differential_particle_flux_mag
+        self.sigma_log_flux = self.sigma_flux_mag / (
+            self.omnidirectional_differential_particle_flux_mag + config.EPS
+        ) + config.EPS  # shape (Energy Bins,)
 
         energies = (
             spec_er_data.data["energy"].to_numpy(dtype=np.float64)
@@ -154,7 +168,7 @@ class Kappa:
 
         self.is_data_valid = True
 
-    def _objective_function(self, kappa_theta: np.ndarray) -> float:
+    def _objective_function(self, kappa_theta: np.ndarray, weights: np.ndarray, use_weights: bool) -> float:
         """
         Original objective function for optimization.
 
@@ -207,13 +221,15 @@ class Kappa:
             + config.EPS
         )
 
-        chi2 = np.sum((log_model_differential_flux - log_data_flux) ** 2)
+        weights = weights if use_weights else np.ones_like(log_model_differential_flux)
+
+        chi2 = np.sum(((log_model_differential_flux - log_data_flux) * weights) ** 2)
         return chi2
 
     @staticmethod
     @jit(nopython=True, cache=True)
     def _compute_chi2_numba(
-        model_flux_mag: np.ndarray, measured_flux_mag: np.ndarray
+        model_flux_mag: np.ndarray, measured_flux_mag: np.ndarray, weights: np.ndarray
     ) -> float:
         """
         Compute the squared difference of the logarithm of model and measured fluxes.
@@ -227,11 +243,11 @@ class Kappa:
 
         log_model = np.log(model_flux_mag)
         log_data = np.log(measured_flux_mag)
-        diff = log_model - log_data
+        diff = (log_model - log_data) * weights
         chi2 = np.sum(diff * diff)
         return chi2
 
-    def _objective_function_fast(self, kappa_theta: np.ndarray) -> float:
+    def _objective_function_fast(self, kappa_theta: np.ndarray, use_weights: bool) -> float:
         """
         Fast Objective function for optimization using fast omnidirectional flux calculation.
 
@@ -248,10 +264,12 @@ class Kappa:
         model_flux_magnitudes = omnidirectional_flux_magnitude(
             density_mag, kappa, theta_mag, self.energy_centers_mag
         )
+        weights = (1 / self.sigma_log_flux) if use_weights else np.ones_like(self.omnidirectional_count)
 
         return self._compute_chi2_numba(
             model_flux_magnitudes + config.EPS,
             self.omnidirectional_differential_particle_flux_mag + config.EPS,
+            weights
         )
 
     def _get_density_estimate(self) -> NumberDensityType:
@@ -300,7 +318,7 @@ class Kappa:
         return density_estimate.to(ureg.particle / ureg.meter**3)
 
     def fit(
-        self, n_starts: int = 50, use_fast: bool = True
+        self, n_starts: int = 50, use_fast: bool = True, use_weights: bool = True
     ) -> tuple[KappaParams, float]:
         """
         Fit the kappa distribution parameters (kappa and theta) to the data.
@@ -335,7 +353,7 @@ class Kappa:
             result = minimize(
                 objective_func,
                 x0,
-                args=(),
+                args=(use_weights),
                 bounds=self.DEFAULT_BOUNDS,
                 method="L-BFGS-B",
                 options={"maxiter": 1000},
