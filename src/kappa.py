@@ -126,8 +126,6 @@ class Kappa:
             logging.warning("No valid pitch angles found for the specified spec_no.")
             return
 
-        # Strictly speaking, this should be scaled by the steradian of each pitch angle bin
-        # TODO: Implement proper scaling by pitch angle bin size
         directional_flux_units = ureg.particle / (
             ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt
         )
@@ -150,7 +148,7 @@ class Kappa:
         self.sigma_omnidirectional_count = count_sigma_count[:, 1]  # shape (Energy Bins,)
 
         self.sigma_flux_mag = (
-            self.sigma_omnidirectional_count / self.omnidirectional_count
+            self.sigma_omnidirectional_count / (self.omnidirectional_count + config.EPS)
         ) * self.omnidirectional_differential_particle_flux_mag
         self.sigma_log_flux = self.sigma_flux_mag / (
             self.omnidirectional_differential_particle_flux_mag + config.EPS
@@ -264,7 +262,7 @@ class Kappa:
         model_flux_magnitudes = omnidirectional_flux_magnitude(
             density_mag, kappa, theta_mag, self.energy_centers_mag
         )
-        weights = (1 / self.sigma_log_flux) if use_weights else np.ones_like(self.omnidirectional_count)
+        weights = (1 / (self.sigma_log_flux + config.EPS)) if use_weights else np.ones_like(self.omnidirectional_count)
 
         return self._compute_chi2_numba(
             model_flux_magnitudes + config.EPS,
