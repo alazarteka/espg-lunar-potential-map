@@ -315,6 +315,25 @@ class Kappa:
 
         return density_estimate.to(ureg.particle / ureg.meter**3)
 
+    def _convolve_response(self, flux_mag: np.ndarray) -> np.ndarray:
+        """
+        Convolve the flux with a Gaussian kernel based on the logarithm of energy centers.
+
+        Args:
+            flux_mag (np.ndarray): Magnitudes of the flux to be convolved.
+        
+        Returns:
+            np.ndarray: Convolved flux magnitudes.
+        """
+
+        logE = np.log(self.energy_centers_mag)
+        sigma = 0.212
+        kernel = np.exp(
+            -0.5 * ((logE[:, None] - logE[None, :]) / sigma) ** 2
+        )
+        kernel /= np.sum(kernel, axis=1, keepdims=True)
+        return kernel @ flux_mag
+
     def fit(
         self, n_starts: int = 50, use_fast: bool = True, use_weights: bool = True
     ) -> tuple[KappaParams, float]:
