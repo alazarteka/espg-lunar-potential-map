@@ -33,18 +33,41 @@ for data_file in data_files:
 # Plot the histogram of fitting errors
 plt.figure(figsize=(10, 6))
 plt.hist(fitting_errors, bins=100, log=True)
-plt.title("Distribution of Fitting Errors (Chi-Squared)")
+plt.title("Distribution of Fitting Errors (Chi-Squared) - Raw Data")
 plt.xlabel("Chi-Squared")
 plt.ylabel("Frequency (log scale)")
 plt.grid(True)
-plt.savefig("temp/error_distribution.png")
+plt.savefig("temp/error_distribution_raw.png")
+
+# Filter out extreme outliers
+outlier_threshold = 1_000_000
+filtered_errors = [e for e in fitting_errors if e < outlier_threshold]
+
+# Plot the histogram of filtered fitting errors
+plt.figure(figsize=(10, 6))
+plt.hist(filtered_errors, bins=100, log=True)
+plt.title("Distribution of Fitting Errors (Chi-Squared) - Filtered")
+plt.xlabel("Chi-Squared")
+plt.ylabel("Frequency (log scale)")
+plt.grid(True)
+plt.savefig("temp/error_distribution_filtered.png")
+
 
 # Print some statistics
 fitting_errors = np.array(fitting_errors)
-print("\n--- Error Distribution Statistics ---")
+filtered_errors = np.array(filtered_errors)
+
+print("\n--- Raw Error Distribution Statistics ---")
 print(f"Number of successful fits: {len(fitting_errors)}")
 print(f"Mean error: {np.mean(fitting_errors):.2f}")
 print(f"Median error: {np.median(fitting_errors):.2f}")
 print(f"95th percentile: {np.percentile(fitting_errors, 95):.2f}")
 print(f"99th percentile: {np.percentile(fitting_errors, 99):.2f}")
+
+print("\n--- Filtered Error Distribution Statistics ---")
+print(f"Number of filtered fits: {len(filtered_errors)}")
+print(f"Mean error: {np.mean(filtered_errors):.2f}")
+print(f"Median error: {np.median(filtered_errors):.2f}")
+print(f"95th percentile: {np.percentile(filtered_errors, 95):.2f}")
+print(f"99th percentile: {np.percentile(filtered_errors, 99):.2f}")
 
