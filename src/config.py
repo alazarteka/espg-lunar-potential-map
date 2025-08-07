@@ -48,6 +48,10 @@ CONNECTION_POOL_SIZE = 50  # connection pool size for reuse
 
 # ========== Numerical tolerances ==========
 EPS = 1e-6  # small epsilon to avoid division by zero
+E_GAIN = 0.05  # typical gain uncertainty
+E_G = 0.10  # typical geometric factor uncertainty
+N_BG = 0.0  # background noise
+
 
 # ========== Data Column names ==========
 MISC_COLS = ["UTC", "time", "energy", "spec_no"]

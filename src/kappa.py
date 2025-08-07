@@ -145,7 +145,12 @@ class Kappa:
         )
         count_sigma_count = spec_er_data.data[config.COUNT_COLS].to_numpy(dtype=np.float64)
         self.omnidirectional_count = count_sigma_count[:, 0]  # shape (Energy Bins,)
-        self.sigma_omnidirectional_count = count_sigma_count[:, 1]  # shape (Energy Bins,)
+        self.sigma_omnidirectional_count = np.sqrt(
+            self.omnidirectional_count
+            + (config.E_GAIN * self.omnidirectional_count) ** 2
+            + (config.E_G * self.omnidirectional_count) ** 2
+            + config.N_BG
+        ) # shape (Energy Bins,)
 
         self.sigma_flux_mag = (
             self.sigma_omnidirectional_count / (self.omnidirectional_count + config.EPS)
