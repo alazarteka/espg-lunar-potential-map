@@ -322,7 +322,7 @@ class Kappa:
 
     def fit(
         self, n_starts: int = 50, use_fast: bool = True, use_weights: bool = True
-    ) -> tuple[KappaParams, float]:
+    ) -> tuple[KappaParams, float, bool]:
         """
         Fit the kappa distribution parameters (kappa and theta) to the data.
 
@@ -331,7 +331,8 @@ class Kappa:
             use_fast (bool): Whether to use the fast objective function.
 
         Returns:
-            tuple[KappaParams, float]: The fitted KappaParams and the best error value.
+            tuple[KappaParams, float, bool]: The fitted KappaParams, the best error value,
+            and a boolean indicating if the fit is considered good.
         """
         if not self.is_data_valid:
             raise ValueError(
@@ -389,6 +390,8 @@ class Kappa:
         #     except Exception as e:
         #         logging.warning(f"Failed to compute sigma: {e}")
 
+        is_good_fit = best_result.fun < config.FIT_ERROR_THRESHOLD
+
         return (
             KappaParams(
                 density=self.density_estimate,
@@ -396,4 +399,5 @@ class Kappa:
                 theta=10 ** best_result.x[1] * ureg.meter / ureg.second,
             ),
             best_result.fun,
+            is_good_fit,
         )

@@ -52,6 +52,10 @@ E_GAIN = 0.05  # typical gain uncertainty
 E_G = 0.10  # typical geometric factor uncertainty
 N_BG = 0.0  # background noise
 
+# ========== Fitting parameters ==========
+FIT_ERROR_THRESHOLD = 215000  # chi-squared threshold for a good fit
+
+
 
 # ========== Data Column names ==========
 MISC_COLS = ["UTC", "time", "energy", "spec_no"]
