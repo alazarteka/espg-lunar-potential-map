@@ -159,10 +159,10 @@ def test_objective_functions(kappa_params_set):
     kappa_fitter = Kappa(synthetic_er, 1)
 
     _standard_objective = np.array(
-        [kappa_fitter._objective_function(params) for params in kappa_logtheta]
+        [kappa_fitter._objective_function(params, use_weights=False) for params in kappa_logtheta]
     )
     _fast_objective = np.array(
-        [kappa_fitter._objective_function_fast(params) for params in kappa_logtheta]
+        [kappa_fitter._objective_function_fast(params, use_weights=False) for params in kappa_logtheta]
     )
 
     assert np.allclose(
@@ -181,8 +181,8 @@ def test_objective_functions_in_fitter(kappa_params_set):
     )
 
     kappa_fitter = Kappa(synthetic_er, 1)
-    standard_fit, _ = kappa_fitter.fit(use_fast=False)
-    fast_fit, _ = kappa_fitter.fit(use_fast=True)
+    standard_fit, _, _ = kappa_fitter.fit(use_fast=False)
+    fast_fit, _, _ = kappa_fitter.fit(use_fast=True)
 
     assert np.isclose(
         standard_fit.kappa, fast_fit.kappa, rtol=1e-2
@@ -205,7 +205,7 @@ def test_kappa_fitter(kappa_params_set):
         theta=params.theta.to(ureg.meter / ureg.second).magnitude,
     )
     kappa_fitter = Kappa(synthetic_er, 1)
-    fitted_params, _ = kappa_fitter.fit()
+    fitted_params, _, _ = kappa_fitter.fit()
 
     assert isinstance(
         fitted_params, KappaParams

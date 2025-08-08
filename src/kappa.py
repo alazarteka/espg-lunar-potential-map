@@ -171,7 +171,7 @@ class Kappa:
 
         self.is_data_valid = True
 
-    def _objective_function(self, kappa_theta: np.ndarray, weights: np.ndarray, use_weights: bool) -> float:
+    def _objective_function(self, kappa_theta: np.ndarray, use_weights: bool) -> float:
         """
         Original objective function for optimization.
 
@@ -180,6 +180,7 @@ class Kappa:
 
         Args:
             kappa_theta (np.ndarray): Array containing kappa and log10(theta).
+            use_weights (bool): Whether to use weights in the calculation.
 
         Returns:
             float: The chi-squared value representing the difference.
@@ -224,7 +225,7 @@ class Kappa:
             + config.EPS
         )
 
-        weights = weights if use_weights else np.ones_like(log_model_differential_flux)
+        weights = (1 / (self.sigma_log_flux + config.EPS)) if use_weights else np.ones_like(self.omnidirectional_count)
 
         chi2 = np.sum(((log_model_differential_flux - log_data_flux) * weights) ** 2)
         return chi2
@@ -357,7 +358,7 @@ class Kappa:
             result = minimize(
                 objective_func,
                 x0,
-                args=(use_weights),
+                args=(use_weights,),
                 bounds=self.DEFAULT_BOUNDS,
                 method="L-BFGS-B",
                 options={"maxiter": 1000},
