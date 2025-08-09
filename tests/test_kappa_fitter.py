@@ -181,15 +181,15 @@ def test_objective_functions_in_fitter(kappa_params_set):
     )
 
     kappa_fitter = Kappa(synthetic_er, 1)
-    standard_fit, _, _ = kappa_fitter.fit(use_fast=False)
-    fast_fit, _, _ = kappa_fitter.fit(use_fast=True)
+    standard_results = kappa_fitter.fit(use_fast=False)
+    fast_results = kappa_fitter.fit(use_fast=True)
 
     assert np.isclose(
-        standard_fit.kappa, fast_fit.kappa, rtol=1e-2
+        standard_results.params.kappa, fast_results.params.kappa, rtol=1e-2
     ), "Kappa values from standard and fast fitters should match within tolerance."
     assert np.isclose(
-        standard_fit.theta.to(ureg.meter / ureg.second).magnitude,
-        fast_fit.theta.to(ureg.meter / ureg.second).magnitude,
+        standard_results.params.theta.to(ureg.meter / ureg.second).magnitude,
+        fast_results.params.theta.to(ureg.meter / ureg.second).magnitude,
         rtol=1e-2,
     ), "Theta values from standard and fast fitters should match within tolerance."
 
@@ -205,18 +205,18 @@ def test_kappa_fitter(kappa_params_set):
         theta=params.theta.to(ureg.meter / ureg.second).magnitude,
     )
     kappa_fitter = Kappa(synthetic_er, 1)
-    fitted_params, _, _ = kappa_fitter.fit()
+    fit_results = kappa_fitter.fit()
 
     assert isinstance(
-        fitted_params, KappaParams
+        fit_results.params, KappaParams
     ), "Fitted parameters should be an instance of KappaParams"
-    assert fitted_params.kappa > 1.5, "Fitted kappa should be greater than 1.5"
-    assert fitted_params.theta.magnitude > 0, "Fitted theta should be positive."
+    assert fit_results.params.kappa > 1.5, "Fitted kappa should be greater than 1.5"
+    assert fit_results.params.theta.magnitude > 0, "Fitted theta should be positive."
     assert np.isclose(
-        fitted_params.kappa, params.kappa, rtol=1e-2
-    ), f"Expected kappa {params.kappa}, got {fitted_params.kappa}"
+        fit_results.params.kappa, params.kappa, rtol=1e-2
+    ), f"Expected kappa {params.kappa}, got {fit_results.params.kappa}"
     assert np.isclose(
-        fitted_params.theta.magnitude,
+        fit_results.params.theta.magnitude,
         params.theta.to(ureg.meter / ureg.second).magnitude,
         rtol=1e-2,
-    ), f"Expected theta {params.theta.to(ureg.meter / ureg.second).magnitude}, got {fitted_params.theta.magnitude}"
+    ), f"Expected theta {params.theta.to(ureg.meter / ureg.second).magnitude}, got {fit_results.params.theta.magnitude}"

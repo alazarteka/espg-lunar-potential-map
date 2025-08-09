@@ -35,12 +35,12 @@ def profile_kappa_fitting():
             if not kappa.is_data_valid:
                 continue
 
-            params = kappa.fit(n_starts=10)
-            if params is None:
+            fit_results = kappa.fit(n_starts=10)
+            if fit_results is None:
                 continue
 
-            kappas.append(params.kappa)
-            thetas.append(params.theta.to(ureg.meter / ureg.second).magnitude)
+            kappas.append(fit_results.params.kappa)
+            thetas.append(fit_results.params.theta.to(ureg.meter / ureg.second).magnitude)
 
         except Exception:
             pass

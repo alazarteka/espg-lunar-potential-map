@@ -22,9 +22,9 @@ for data_file in data_files:
             try:
                 kappa = Kappa(er_data, spec_no=spec_no)
                 if kappa.is_data_valid:
-                    fitted, error = kappa.fit(n_starts=10, use_fast=True, use_weights=True)
-                    if error is not None:
-                        fitting_errors.append(error)
+                    fit_results = kappa.fit(n_starts=10, use_fast=True, use_weights=True)
+                    if fit_results is not None:
+                        fitting_errors.append(fit_results.error)
             except Exception as e:
                 print(f"  Error processing spectrum {spec_no}: {e}")
     except Exception as e:

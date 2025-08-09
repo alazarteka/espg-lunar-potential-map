@@ -1,4 +1,6 @@
 import logging
+from dataclasses import dataclass
+
 
 import numpy as np
 from numba import jit
@@ -21,6 +23,23 @@ from src.utils.units import (
     NumberDensityType,
     ureg,
 )
+
+
+@dataclass
+class FitResults:
+    """
+    Represents the results of a kappa distribution fit.
+
+    Attributes:
+        params (KappaParams): The best-fit parameters.
+        params_uncertainty (KappaParams): The 1-sigma uncertainties of the fit parameters.
+        error (float): The final chi-squared error of the fit.
+        is_good_fit (bool): A flag indicating if the fit is considered reliable.
+    """
+    params: KappaParams
+    params_uncertainty: KappaParams
+    error: float
+    is_good_fit: bool
 
 
 class Kappa:
@@ -323,7 +342,7 @@ class Kappa:
 
     def fit(
         self, n_starts: int = 50, use_fast: bool = True, use_weights: bool = True
-    ) -> tuple[KappaParams, float, bool]:
+    ) -> FitResults | None:
         """
         Fit the kappa distribution parameters (kappa and theta) to the data.
 
@@ -332,8 +351,7 @@ class Kappa:
             use_fast (bool): Whether to use the fast objective function.
 
         Returns:
-            tuple[KappaParams, float, bool]: The fitted KappaParams, the best error value,
-            and a boolean indicating if the fit is considered good.
+            FitResults | None: An object containing the fit results, or None if the fit fails.
         """
         if not self.is_data_valid:
             raise ValueError(
@@ -375,30 +393,37 @@ class Kappa:
             logging.warning("No valid optimization result found.")
             return None
 
-        # TODO: Think harder about how to handle uncertainty calculation
-        # sigma = None
-        # if best_result.success and hasattr(best_result, "hess_inv"):
-        #     try:
-        #         sigma = np.sqrt(np.diag(best_result.hess_inv.todense()))
-        #         sigma = KappaParams(
-        #             density=0
-        #             * ureg.particle
-        #             / ureg.meter
-        #             ** 3,  # Placeholder, density is not estimated from Hessian
-        #             kappa=sigma[0],
-        #             theta=sigma[1] * ureg.meter / ureg.second,
-        #         )
-        #     except Exception as e:
-        #         logging.warning(f"Failed to compute sigma: {e}")
+        # Calculate uncertainties from the inverse Hessian matrix
+        sigma_kappa, sigma_log_theta = 0.0, 0.0
+        if best_result.success and hasattr(best_result, "hess_inv"):
+            try:
+                # The inverse Hessian is the covariance matrix
+                covariance_matrix = best_result.hess_inv.todense()
+                # The sqrt of the diagonal elements are the 1-sigma uncertainties
+                uncertainties = np.sqrt(np.diag(covariance_matrix))
+                sigma_kappa = uncertainties[0]
+                sigma_log_theta = uncertainties[1]
+            except Exception as e:
+                logging.warning(f"Failed to compute uncertainties: {e}")
+
+        # Create the results object
+        fitted_params = KappaParams(
+            density=self.density_estimate,
+            kappa=best_result.x[0],
+            theta=10 ** best_result.x[1] * ureg.meter / ureg.second,
+        )
+
+        params_uncertainty = KappaParams(
+            density=0 * ureg.particle / ureg.meter**3,  # Density is not a fitted parameter
+            kappa=sigma_kappa,
+            theta=sigma_log_theta * ureg.meter / ureg.second, # This is uncertainty in log(theta)
+        )
 
         is_good_fit = best_result.fun < config.FIT_ERROR_THRESHOLD
 
-        return (
-            KappaParams(
-                density=self.density_estimate,
-                kappa=best_result.x[0],
-                theta=10 ** best_result.x[1] * ureg.meter / ureg.second,
-            ),
-            best_result.fun,
-            is_good_fit,
+        return FitResults(
+            params=fitted_params,
+            params_uncertainty=params_uncertainty,
+            error=best_result.fun,
+            is_good_fit=is_good_fit,
         )
