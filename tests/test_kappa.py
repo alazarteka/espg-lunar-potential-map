@@ -225,7 +225,7 @@ def test_kappa_omnidirectional_flux_basic(base_kappa_params):
 
 
 def test_kappa_omnidirectional_flux_fast(kappa_params_set):
-    """Test omnidirectional flux fast calculation."""
+    """Test that the fast omnidirectional flux calculation matches the standard one."""
     params, _ = kappa_params_set
 
     energies = np.geomspace(1e-2, 1e20, num=1001) * ureg.electron_volt
@@ -243,6 +243,7 @@ def test_kappa_omnidirectional_flux_fast(kappa_params_set):
 
 
 def test_omnidirectional_flux_integrated_basic(base_kappa_params):
+    """Test basic integrated omnidirectional flux calculation."""
 
     energy_centers = np.linspace(1e1, 1e4, num=16) * ureg.electron_volt
     energy_bounds = np.column_stack([0.75 * energy_centers, 1.25 * energy_centers])

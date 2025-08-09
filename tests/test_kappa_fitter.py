@@ -34,6 +34,17 @@ def kappa_params_set(request):
 
 
 def prepare_phis():
+    """Prepare mock instrument viewing angles and solid angles.
+
+    This function generates a synthetic but realistic set of phi and theta
+    angles for the 88 instrument channels, based on the known latitude
+    bins of the Lunar Prospector instrument. It also returns the
+    corresponding solid angles.
+
+    Returns:
+        tuple[list[float], np.ndarray]: A tuple containing the list of phi
+                                        angles and the array of solid angles.
+    """
     phis = []
     phis_by_latitude = {
         78.75: ([], 4, 0.119570),
@@ -71,6 +82,20 @@ def prepare_phis():
 
 
 def prepare_flux(density=1e6, kappa=5.0, theta=1.1e5):
+    """Prepare a theoretical omnidirectional particle flux.
+
+    Calculates the expected omnidirectional flux for a given set of plasma
+    parameters (density, kappa, theta) over a standard range of energy centers.
+
+    Args:
+        density (float, optional): Electron number density in cm^-3. Defaults to 1e6.
+        kappa (float, optional): Kappa parameter. Defaults to 5.0.
+        theta (float, optional): Theta parameter in m/s. Defaults to 1.1e5.
+
+    Returns:
+        tuple[Quantity, Quantity]: A tuple containing the omnidirectional
+                                   particle flux and the energy centers.
+    """
 
     params = KappaParams(
         density=density * ureg.particle / ureg.m**3,
@@ -88,6 +113,22 @@ def prepare_flux(density=1e6, kappa=5.0, theta=1.1e5):
 
 
 def prepare_synthetic_er(density=1e6, kappa=5.0, theta=1.1e5):
+    """Prepare a synthetic ERData object for testing.
+
+    This function constructs a complete, synthetic `ERData` object. It uses
+    the `prepare_phis` and `prepare_flux` helpers to generate realistic
+    instrument data based on a known set of input plasma parameters. This
+    provides a controlled dataset for testing the fitter's ability to
+    recover the original parameters.
+
+    Args:
+        density (float, optional): Electron number density in cm^-3. Defaults to 1e6.
+        kappa (float, optional): Kappa parameter. Defaults to 5.0.
+        theta (float, optional): Theta parameter in m/s. Defaults to 1.1e5.
+
+    Returns:
+        ERData: A synthetic ERData object.
+    """
     phis, solid_angles = prepare_phis()
     omnidirectional_particle_flux, energy_centers = prepare_flux(
         density=density, kappa=kappa, theta=theta
@@ -144,7 +185,7 @@ def test_density_estimate(kappa_params_set):
 
 @pytest.mark.skip_ci
 def test_objective_functions(kappa_params_set):
-    """Test the standard and fast objective functions."""
+    """Test that the standard and fast objective functions produce consistent results."""
     params, _ = kappa_params_set
     synthetic_er = prepare_synthetic_er(
         density=params.density.to(ureg.particle / ureg.meter**3).magnitude,
@@ -196,7 +237,12 @@ def test_objective_functions_in_fitter(kappa_params_set):
 
 @pytest.mark.skip_ci
 def test_kappa_fitter(kappa_params_set):
-    """Test the Kappa distribution fitting functionality."""
+    """Test the end-to-end Kappa distribution fitting functionality.
+
+    This test uses synthetic data generated from known parameters and asserts
+    that the fitter can recover those original parameters within a reasonable
+    tolerance.
+    """
 
     params, _ = kappa_params_set
     synthetic_er = prepare_synthetic_er(
@@ -205,7 +251,8 @@ def test_kappa_fitter(kappa_params_set):
         theta=params.theta.to(ureg.meter / ureg.second).magnitude,
     )
     kappa_fitter = Kappa(synthetic_er, 1)
-    fit_results = kappa_fitter.fit()
+    # The synthetic data is generated without energy convolution, so we disable it in the fit
+    fit_results = kappa_fitter.fit(use_convolution=False)
 
     assert isinstance(
         fit_results.params, KappaParams

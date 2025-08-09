@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+import math
 
 
 import numpy as np
@@ -190,7 +191,11 @@ class Kappa:
 
         self.is_data_valid = True
 
-    def _objective_function(self, kappa_theta: np.ndarray, use_weights: bool) -> float:
+    def _objective_function(self, 
+                            kappa_theta: np.ndarray, 
+                            use_weights: bool,
+                            use_convolution: bool = True
+        ) -> float:
         """
         Original objective function for optimization.
 
@@ -209,8 +214,11 @@ class Kappa:
         theta = 10 ** kappa_theta[1] * ureg.meter / ureg.second
 
         params = KappaParams(density, kappa, theta)
-
-        model_differential_flux = omnidirectional_flux_fast(params, self.energy_centers)
+        W = self.build_log_energy_response_matrix(
+            self.energy_centers_mag,
+            energy_window_width_relative=config.ENERGY_WINDOW_WIDTH_RELATIVE,
+        ) if use_convolution else np.eye(len(self.energy_centers_mag))
+        model_differential_flux = W @ omnidirectional_flux_fast(params, self.energy_centers)
 
         omnidirectional_flux_units = ureg.particle / (
             ureg.centimeter**2 * ureg.second * ureg.electron_volt
@@ -269,8 +277,41 @@ class Kappa:
         diff = (log_model - log_data) * weights
         chi2 = np.sum(diff * diff)
         return chi2
+    
+    @staticmethod
+    @jit(nopython=True, cache=True)
+    def build_log_energy_response_matrix(
+        energy_centers: np.ndarray,
+        energy_window_width_relative: float = 0.5,
+    ) -> np.ndarray:
+        """
+        Build a log-energy response matrix for instrumental energy resolution effects.
+        
+        Args:
+            energy_centers: Central energy values for each energy bin
+            energy_window_width_relative: Relative energy resolution (FWHM/E), 
+                                        e.g., 0.5 means 50% energy resolution
+        
+        Returns:
+            Response matrix W where W[i,j] represents the fraction of flux 
+            from true energy j that appears in measured energy bin i
+        """
+        ln_energy_centers = np.log(energy_centers)
+        
+        # Convert relative width to Gaussian sigma in log-energy space
+        # The asinh transformation helps handle the conversion from relative to log space
+        s = math.asinh(0.5 * energy_window_width_relative) / math.sqrt(2.0 * math.log(2.0))
 
-    def _objective_function_fast(self, kappa_theta: np.ndarray, use_weights: bool) -> float:
+        W = np.exp(-0.5 * ((ln_energy_centers[:, None] - ln_energy_centers[None, :]) / s) ** 2)
+        W /= np.sum(W, axis=1).reshape(-1, 1)
+        return W
+
+    def _objective_function_fast(self, 
+                                 kappa_theta: np.ndarray, 
+                                 use_weights: bool,
+                                 use_convolution: bool = True
+
+        ) -> float:
         """
         Fast Objective function for optimization using fast omnidirectional flux calculation.
 
@@ -284,7 +325,12 @@ class Kappa:
         kappa = kappa_theta[0]
         theta_mag = 10 ** kappa_theta[1]
 
-        model_flux_magnitudes = omnidirectional_flux_magnitude(
+        W = self.build_log_energy_response_matrix(
+            self.energy_centers_mag,
+            energy_window_width_relative=config.ENERGY_WINDOW_WIDTH_RELATIVE,
+        ) if use_convolution else np.eye(len(self.energy_centers_mag))
+
+        model_flux_magnitudes = W @ omnidirectional_flux_magnitude(
             density_mag, kappa, theta_mag, self.energy_centers_mag
         )
         weights = (1 / (self.sigma_log_flux + config.EPS)) if use_weights else np.ones_like(self.omnidirectional_count)
@@ -341,7 +387,7 @@ class Kappa:
         return density_estimate.to(ureg.particle / ureg.meter**3)
 
     def fit(
-        self, n_starts: int = 50, use_fast: bool = True, use_weights: bool = True
+        self, n_starts: int = 50, use_fast: bool = True, use_weights: bool = True, use_convolution: bool = True
     ) -> FitResults | None:
         """
         Fit the kappa distribution parameters (kappa and theta) to the data.
@@ -376,7 +422,7 @@ class Kappa:
             result = minimize(
                 objective_func,
                 x0,
-                args=(use_weights,),
+                args=(use_weights, use_convolution),
                 bounds=self.DEFAULT_BOUNDS,
                 method="L-BFGS-B",
                 options={"maxiter": 1000},

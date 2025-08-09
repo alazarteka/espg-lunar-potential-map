@@ -51,6 +51,7 @@ EPS = 1e-6  # small epsilon to avoid division by zero
 E_GAIN = 0.05  # typical gain uncertainty
 E_G = 0.10  # typical geometric factor uncertainty
 N_BG = 0.0  # background noise
+ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 
 # ========== Fitting parameters ==========
 FIT_ERROR_THRESHOLD = 215000  # chi-squared threshold for a good fit
