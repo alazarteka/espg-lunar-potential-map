@@ -1,7 +1,6 @@
 import logging
-from dataclasses import dataclass
 import math
-
+from dataclasses import dataclass
 
 import numpy as np
 from numba import jit
@@ -37,6 +36,7 @@ class FitResults:
         error (float): The final chi-squared error of the fit.
         is_good_fit (bool): A flag indicating if the fit is considered reliable.
     """
+
     params: KappaParams
     params_uncertainty: KappaParams
     error: float
@@ -163,21 +163,25 @@ class Kappa:
         self.omnidirectional_differential_particle_flux_mag = (
             self.omnidirectional_differential_particle_flux.magnitude
         )
-        count_sigma_count = spec_er_data.data[config.COUNT_COLS].to_numpy(dtype=np.float64)
+        count_sigma_count = spec_er_data.data[config.COUNT_COLS].to_numpy(
+            dtype=np.float64
+        )
         self.omnidirectional_count = count_sigma_count[:, 0]  # shape (Energy Bins,)
         self.sigma_omnidirectional_count = np.sqrt(
             self.omnidirectional_count
             + (config.E_GAIN * self.omnidirectional_count) ** 2
             + (config.E_G * self.omnidirectional_count) ** 2
             + config.N_BG
-        ) # shape (Energy Bins,)
+        )  # shape (Energy Bins,)
 
         self.sigma_flux_mag = (
             self.sigma_omnidirectional_count / (self.omnidirectional_count + config.EPS)
         ) * self.omnidirectional_differential_particle_flux_mag
-        self.sigma_log_flux = self.sigma_flux_mag / (
-            self.omnidirectional_differential_particle_flux_mag + config.EPS
-        ) + config.EPS  # shape (Energy Bins,)
+        self.sigma_log_flux = (
+            self.sigma_flux_mag
+            / (self.omnidirectional_differential_particle_flux_mag + config.EPS)
+            + config.EPS
+        )  # shape (Energy Bins,)
 
         energies = (
             spec_er_data.data["energy"].to_numpy(dtype=np.float64)
@@ -191,11 +195,9 @@ class Kappa:
 
         self.is_data_valid = True
 
-    def _objective_function(self, 
-                            kappa_theta: np.ndarray, 
-                            use_weights: bool,
-                            use_convolution: bool = True
-        ) -> float:
+    def _objective_function(
+        self, kappa_theta: np.ndarray, use_weights: bool, use_convolution: bool = True
+    ) -> float:
         """
         Original objective function for optimization.
 
@@ -214,11 +216,17 @@ class Kappa:
         theta = 10 ** kappa_theta[1] * ureg.meter / ureg.second
 
         params = KappaParams(density, kappa, theta)
-        W = self.build_log_energy_response_matrix(
-            self.energy_centers_mag,
-            energy_window_width_relative=config.ENERGY_WINDOW_WIDTH_RELATIVE,
-        ) if use_convolution else np.eye(len(self.energy_centers_mag))
-        model_differential_flux = W @ omnidirectional_flux_fast(params, self.energy_centers)
+        W = (
+            self.build_log_energy_response_matrix(
+                self.energy_centers_mag,
+                energy_window_width_relative=config.ENERGY_WINDOW_WIDTH_RELATIVE,
+            )
+            if use_convolution
+            else np.eye(len(self.energy_centers_mag))
+        )
+        model_differential_flux = W @ omnidirectional_flux_fast(
+            params, self.energy_centers
+        )
 
         omnidirectional_flux_units = ureg.particle / (
             ureg.centimeter**2 * ureg.second * ureg.electron_volt
@@ -252,7 +260,11 @@ class Kappa:
             + config.EPS
         )
 
-        weights = (1 / (self.sigma_log_flux + config.EPS)) if use_weights else np.ones_like(self.omnidirectional_count)
+        weights = (
+            (1 / (self.sigma_log_flux + config.EPS))
+            if use_weights
+            else np.ones_like(self.omnidirectional_count)
+        )
 
         chi2 = np.sum(((log_model_differential_flux - log_data_flux) * weights) ** 2)
         return chi2
@@ -277,7 +289,7 @@ class Kappa:
         diff = (log_model - log_data) * weights
         chi2 = np.sum(diff * diff)
         return chi2
-    
+
     @staticmethod
     @jit(nopython=True, cache=True)
     def build_log_energy_response_matrix(
@@ -286,32 +298,33 @@ class Kappa:
     ) -> np.ndarray:
         """
         Build a log-energy response matrix for instrumental energy resolution effects.
-        
+
         Args:
             energy_centers: Central energy values for each energy bin
-            energy_window_width_relative: Relative energy resolution (FWHM/E), 
+            energy_window_width_relative: Relative energy resolution (FWHM/E),
                                         e.g., 0.5 means 50% energy resolution
-        
+
         Returns:
-            Response matrix W where W[i,j] represents the fraction of flux 
+            Response matrix W where W[i,j] represents the fraction of flux
             from true energy j that appears in measured energy bin i
         """
         ln_energy_centers = np.log(energy_centers)
-        
+
         # Convert relative width to Gaussian sigma in log-energy space
         # The asinh transformation helps handle the conversion from relative to log space
-        s = math.asinh(0.5 * energy_window_width_relative) / math.sqrt(2.0 * math.log(2.0))
+        s = math.asinh(0.5 * energy_window_width_relative) / math.sqrt(
+            2.0 * math.log(2.0)
+        )
 
-        W = np.exp(-0.5 * ((ln_energy_centers[:, None] - ln_energy_centers[None, :]) / s) ** 2)
+        W = np.exp(
+            -0.5 * ((ln_energy_centers[:, None] - ln_energy_centers[None, :]) / s) ** 2
+        )
         W /= np.sum(W, axis=1).reshape(-1, 1)
         return W
 
-    def _objective_function_fast(self, 
-                                 kappa_theta: np.ndarray, 
-                                 use_weights: bool,
-                                 use_convolution: bool = True
-
-        ) -> float:
+    def _objective_function_fast(
+        self, kappa_theta: np.ndarray, use_weights: bool, use_convolution: bool = True
+    ) -> float:
         """
         Fast Objective function for optimization using fast omnidirectional flux calculation.
 
@@ -325,20 +338,28 @@ class Kappa:
         kappa = kappa_theta[0]
         theta_mag = 10 ** kappa_theta[1]
 
-        W = self.build_log_energy_response_matrix(
-            self.energy_centers_mag,
-            energy_window_width_relative=config.ENERGY_WINDOW_WIDTH_RELATIVE,
-        ) if use_convolution else np.eye(len(self.energy_centers_mag))
+        W = (
+            self.build_log_energy_response_matrix(
+                self.energy_centers_mag,
+                energy_window_width_relative=config.ENERGY_WINDOW_WIDTH_RELATIVE,
+            )
+            if use_convolution
+            else np.eye(len(self.energy_centers_mag))
+        )
 
         model_flux_magnitudes = W @ omnidirectional_flux_magnitude(
             density_mag, kappa, theta_mag, self.energy_centers_mag
         )
-        weights = (1 / (self.sigma_log_flux + config.EPS)) if use_weights else np.ones_like(self.omnidirectional_count)
+        weights = (
+            (1 / (self.sigma_log_flux + config.EPS))
+            if use_weights
+            else np.ones_like(self.omnidirectional_count)
+        )
 
         return self._compute_chi2_numba(
             model_flux_magnitudes + config.EPS,
             self.omnidirectional_differential_particle_flux_mag + config.EPS,
-            weights
+            weights,
         )
 
     def _get_density_estimate(self) -> NumberDensityType:
@@ -387,7 +408,11 @@ class Kappa:
         return density_estimate.to(ureg.particle / ureg.meter**3)
 
     def fit(
-        self, n_starts: int = 50, use_fast: bool = True, use_weights: bool = True, use_convolution: bool = True
+        self,
+        n_starts: int = 50,
+        use_fast: bool = True,
+        use_weights: bool = True,
+        use_convolution: bool = True,
     ) -> FitResults | None:
         """
         Fit the kappa distribution parameters (kappa and theta) to the data.
@@ -460,9 +485,13 @@ class Kappa:
         )
 
         params_uncertainty = KappaParams(
-            density=0 * ureg.particle / ureg.meter**3,  # Density is not a fitted parameter
+            density=0
+            * ureg.particle
+            / ureg.meter**3,  # Density is not a fitted parameter
             kappa=sigma_kappa,
-            theta=sigma_log_theta * ureg.meter / ureg.second, # This is uncertainty in log(theta)
+            theta=sigma_log_theta
+            * ureg.meter
+            / ureg.second,  # This is uncertainty in log(theta)
         )
 
         is_good_fit = best_result.fun < config.FIT_ERROR_THRESHOLD

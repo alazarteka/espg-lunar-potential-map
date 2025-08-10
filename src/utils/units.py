@@ -49,5 +49,5 @@ __all__ = [
     "OmnidirectionalFluxType",
     "IntegratedFluxType",
     "PhaseSpaceDensityType",
-    "CurrentDensityType"
+    "CurrentDensityType",
 ]

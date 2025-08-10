@@ -12,18 +12,20 @@ from .utils.units import ChargeType, LengthType, MassType, ureg
 SWEEP_ROWS = 15  # rows per spacecraft sweep of energy spectrum
 CHANNELS = 88  # number of ER electron flux channels
 
-ACCUMULATION_TIME = 2.5 * ureg.second # accumulation time for electron flux data
-GEOMETRIC_FACTOR = 0.02 * ureg.centimeter**2 * ureg.steradian # geometric factor for electron flux
+ACCUMULATION_TIME = 2.5 * ureg.second  # accumulation time for electron flux data
+GEOMETRIC_FACTOR = (
+    0.02 * ureg.centimeter**2 * ureg.steradian
+)  # geometric factor for electron flux
 BINS_BY_LATITUDE = {
-        78.75: 4,
-        56.25: 8,
-        33.75: 16,
-        11.25: 16,
-        -11.25: 16,
-        -33.75: 16,
-        -56.25: 8,
-        -78.75: 4,
-    }
+    78.75: 4,
+    56.25: 8,
+    33.75: 16,
+    11.25: 16,
+    -11.25: 16,
+    -33.75: 16,
+    -56.25: 8,
+    -78.75: 4,
+}
 
 
 # ========== Physical parameters ==========
@@ -33,7 +35,9 @@ ELECTRON_MASS: MassType = scipy.constants.electron_mass * ureg.kilogram  # elect
 ELECTRON_CHARGE: ChargeType = (
     scipy.constants.e * ureg.coulomb
 )  # elementary charge in Coulombs
-ELECTRON_CHARGE_MAGNITUDE = ELECTRON_CHARGE.magnitude  # Charge of an electron in Coulombs
+ELECTRON_CHARGE_MAGNITUDE = (
+    ELECTRON_CHARGE.magnitude
+)  # Charge of an electron in Coulombs
 
 # ========== File extensions ==========
 EXT_TAB = ".TAB"  # ER data file extension
@@ -56,7 +60,6 @@ ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 
 # ========== Fitting parameters ==========
 FIT_ERROR_THRESHOLD = 215000  # chi-squared threshold for a good fit
-
 
 
 # ========== Data Column names ==========

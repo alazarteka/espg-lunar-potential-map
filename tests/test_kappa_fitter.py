@@ -200,10 +200,16 @@ def test_objective_functions(kappa_params_set):
     kappa_fitter = Kappa(synthetic_er, 1)
 
     _standard_objective = np.array(
-        [kappa_fitter._objective_function(params, use_weights=False) for params in kappa_logtheta]
+        [
+            kappa_fitter._objective_function(params, use_weights=False)
+            for params in kappa_logtheta
+        ]
     )
     _fast_objective = np.array(
-        [kappa_fitter._objective_function_fast(params, use_weights=False) for params in kappa_logtheta]
+        [
+            kappa_fitter._objective_function_fast(params, use_weights=False)
+            for params in kappa_logtheta
+        ]
     )
 
     assert np.allclose(

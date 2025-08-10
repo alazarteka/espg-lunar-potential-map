@@ -1,8 +1,5 @@
-
 import glob
-from pathlib import Path
-import matplotlib.pyplot as plt
-import numpy as np
+
 import src.config as config
 from src.flux import ERData
 from src.kappa import Kappa
@@ -24,7 +21,11 @@ fit_results = kappa.fit(n_starts=10, use_fast=True, use_weights=True)
 # Print the results
 print(f"Results for spectrum {spec_no} in file {sample_data_path}:")
 print(f"  - Density: {density:.4e} particles/m^3")
-print(f"  - Kappa: {fit_results.params.kappa:.4f} (+/- {fit_results.params_uncertainty.kappa:.4f})")
-print(f"  - Theta: {fit_results.params.theta.to(ureg.meter / ureg.second).magnitude:.4e} m/s (+/- {fit_results.params_uncertainty.theta.to(ureg.meter / ureg.second).magnitude:.4e} m/s)")
+print(
+    f"  - Kappa: {fit_results.params.kappa:.4f} (+/- {fit_results.params_uncertainty.kappa:.4f})"
+)
+print(
+    f"  - Theta: {fit_results.params.theta.to(ureg.meter / ureg.second).magnitude:.4e} m/s (+/- {fit_results.params_uncertainty.theta.to(ureg.meter / ureg.second).magnitude:.4e} m/s)"
+)
 print(f"  - Fitting Error (chi-squared): {fit_results.error:.4f}")
 print(f"  - Is Good Fit: {fit_results.is_good_fit}")

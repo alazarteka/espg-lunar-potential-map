@@ -1,8 +1,8 @@
-
-
 import glob
+
 import matplotlib.pyplot as plt
 import numpy as np
+
 import src.config as config
 from src.flux import ERData
 from src.kappa import Kappa
@@ -22,7 +22,9 @@ for data_file in data_files:
             try:
                 kappa = Kappa(er_data, spec_no=spec_no)
                 if kappa.is_data_valid:
-                    fit_results = kappa.fit(n_starts=10, use_fast=True, use_weights=True)
+                    fit_results = kappa.fit(
+                        n_starts=10, use_fast=True, use_weights=True
+                    )
                     if fit_results is not None:
                         fitting_errors.append(fit_results.error)
             except Exception as e:
@@ -70,4 +72,3 @@ print(f"Mean error: {np.mean(filtered_errors):.2f}")
 print(f"Median error: {np.median(filtered_errors):.2f}")
 print(f"95th percentile: {np.percentile(filtered_errors, 95):.2f}")
 print(f"99th percentile: {np.percentile(filtered_errors, 99):.2f}")
-

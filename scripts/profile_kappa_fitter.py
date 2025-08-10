@@ -40,7 +40,9 @@ def profile_kappa_fitting():
                 continue
 
             kappas.append(fit_results.params.kappa)
-            thetas.append(fit_results.params.theta.to(ureg.meter / ureg.second).magnitude)
+            thetas.append(
+                fit_results.params.theta.to(ureg.meter / ureg.second).magnitude
+            )
 
         except Exception:
             pass

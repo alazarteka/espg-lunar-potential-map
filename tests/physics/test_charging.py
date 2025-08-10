@@ -1,11 +1,12 @@
 import numpy as np
 import pytest
+
+import src.config as cfg
 from src.physics.charging import (
     electron_current_density,
     electron_current_density_magnitude,
 )
 from src.physics.kappa import KappaParams
-import src.config as cfg
 
 
 @pytest.fixture

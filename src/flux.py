@@ -121,29 +121,36 @@ class ERData:
             return
 
         F = self.data[config.FLUX_COLS].to_numpy(dtype=np.float64) * (
-            ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
+            ureg.particle
+            / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
         )
 
         negative_flux_mask = F.magnitude < 0
         if np.any(negative_flux_mask):
             n_negative = np.sum(negative_flux_mask)
             total_values = negative_flux_mask.size
-            logger.debug(f"Found {n_negative} negative flux values ({n_negative/total_values*100:.2f}%) - clamping to zero")
-            
+            logger.debug(
+                f"Found {n_negative} negative flux values ({n_negative/total_values*100:.2f}%) - clamping to zero"
+            )
+
             F = np.maximum(F, 0 * F.units)
 
         energies = self.data["energy"].to_numpy(dtype=np.float64)
         energies = energies[:, None] * ureg.electron_volt  # Reshape for broadcasting
-        integration_time = np.array(list(map(lambda x: 1 / config.BINS_BY_LATITUDE[x], thetas))) * config.ACCUMULATION_TIME
+        integration_time = (
+            np.array(list(map(lambda x: 1 / config.BINS_BY_LATITUDE[x], thetas)))
+            * config.ACCUMULATION_TIME
+        )
         integration_time = integration_time[None, :]  # Reshape for broadcasting
         count_estimate = F * config.GEOMETRIC_FACTOR * energies * integration_time
         count_estimate = np.rint(count_estimate.to(ureg.particle).magnitude).astype(int)
-        
-        count_estimate_sum = count_estimate.sum(axis=1)        
+
+        count_estimate_sum = count_estimate.sum(axis=1)
         count_err = np.sqrt(count_estimate_sum)
 
         self.data[config.COUNT_COLS[0]] = count_estimate_sum
         self.data[config.COUNT_COLS[1]] = count_err
+
 
 class PitchAngle:
     """

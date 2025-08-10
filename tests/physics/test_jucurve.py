@@ -1,6 +1,8 @@
 import math
+
 import pytest
-from src.physics.jucurve import J_of_U, U_from_J, JUCoefficients
+
+from src.physics.jucurve import J_of_U, JUCoefficients, U_from_J
 
 
 def test_J_of_U_default():
