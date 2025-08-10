@@ -31,7 +31,7 @@ IntegratedFluxType = Annotated[
 PhaseSpaceDensityType = Annotated[
     Quantity, ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second) ** 3)
 ]
-
+CurrentDensityType = Annotated[Quantity, ureg.ampere / ureg.meter**2]
 
 __all__ = [
     "ureg",
@@ -49,4 +49,5 @@ __all__ = [
     "OmnidirectionalFluxType",
     "IntegratedFluxType",
     "PhaseSpaceDensityType",
+    "CurrentDensityType"
 ]

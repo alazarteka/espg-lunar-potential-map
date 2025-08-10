@@ -33,6 +33,7 @@ ELECTRON_MASS: MassType = scipy.constants.electron_mass * ureg.kilogram  # elect
 ELECTRON_CHARGE: ChargeType = (
     scipy.constants.e * ureg.coulomb
 )  # elementary charge in Coulombs
+ELECTRON_CHARGE_MAGNITUDE = ELECTRON_CHARGE.magnitude  # Charge of an electron in Coulombs
 
 # ========== File extensions ==========
 EXT_TAB = ".TAB"  # ER data file extension
