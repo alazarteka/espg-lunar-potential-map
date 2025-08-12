@@ -10,6 +10,8 @@ from scipy.stats import qmc
 
 from src import config
 from src.flux import ERData, PitchAngle
+from src.physics.charging import electron_current_density_magnitude
+from src.physics.jucurve import U_from_J
 from src.physics.kappa import (
     KappaParams,
     omnidirectional_flux_fast,
@@ -135,6 +137,7 @@ class Kappa:
         spec_er_data = self.er_data.__class__.from_dataframe(
             spec_dataframe, self.er_data.er_data_file
         )
+        self.er_data = spec_er_data
 
         spec_pitch_angle = PitchAngle(
             spec_er_data, DataLoader.get_theta_file(config.DATA_DIR)
@@ -502,3 +505,78 @@ class Kappa:
             error=best_result.fun,
             is_good_fit=is_good_fit,
         )
+
+    def corrected_fit(
+        self,
+        n_starts: int = 50,
+        use_fast: bool = True,
+        use_weights: bool = True,
+        use_convolution: bool = True,
+    ) -> tuple[FitResults, float] | tuple[None, None]:
+        """
+        Fit parameters, estimate spacecraft potential in sunlight, then optionally refit with
+        energy corrected by that potential.
+
+        Returns:
+            (FitResults, float) | (None, None): Best-fit parameters and estimated sunlight
+            spacecraft potential (in volts), or (None, None) if fitting fails.
+        """
+        if not self.is_data_valid:
+            raise ValueError(
+                "Data is not valid. Ensure that the data has been prepared."
+            )
+
+        original_fit = self.fit(
+            n_starts=n_starts,
+            use_fast=use_fast,
+            use_weights=use_weights,
+            use_convolution=use_convolution,
+        )
+
+        if original_fit and original_fit.is_good_fit:
+            original_fit_params = original_fit.params
+            original_spacecraft_current_density = electron_current_density_magnitude(
+                *original_fit_params.to_tuple(), E_min=1e1, E_max=2e4, n_steps=100
+            )
+            original_spacecraft_potential = U_from_J(
+                J_target=original_spacecraft_current_density, U_min=0.0, U_max=15000.0
+            )
+
+            # Apply first-order energy correction and refit
+            corrected_energy_centers = (
+                self.energy_centers_mag - original_spacecraft_potential
+            )
+
+            self.er_data.data["energy"] = corrected_energy_centers
+            self.is_data_valid = False
+            self._prepare_data()
+            self.density_estimate = self._get_density_estimate()
+            corrected_fit = self.fit(
+                n_starts=n_starts,
+                use_fast=use_fast,
+                use_weights=use_weights,
+                use_convolution=use_convolution,
+            )
+
+            if corrected_fit and corrected_fit.is_good_fit:
+                corrected_fit_params = corrected_fit.params
+                corrected_spacecraft_current_density = (
+                    electron_current_density_magnitude(
+                        *corrected_fit_params.to_tuple(),
+                        E_min=1e1,
+                        E_max=2e4,
+                        n_steps=100,
+                    )
+                )
+                corrected_spacecraft_potential = U_from_J(
+                    J_target=corrected_spacecraft_current_density,
+                    U_min=0.0,
+                    U_max=15000.0,
+                )
+
+                return corrected_fit, corrected_spacecraft_potential
+
+            # If refit is not good, return original fit and potential
+            return original_fit, original_spacecraft_potential
+
+        return None, None
