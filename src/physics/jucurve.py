@@ -13,9 +13,9 @@ class JUCoefficients:
     See https://doi.org/10.1029/2008JA013194 for more details. Equation and values described in paragraph 23 (page 4).
     """
 
-    A: float = 1.07e-3  # A/m^2
+    A: float = 1.07e-6  # A/m^2
     B: float = 5.0  # V
-    C: float = 1.6e-5  # A/m^2
+    C: float = 1.6e-9  # A/m^2
     D: float = 60.0  # V
 
 
@@ -41,7 +41,7 @@ def U_from_J(
     coefficients=JUCoefficients(),
     U_min: float = 0.0,
     U_max: float = 150.0,
-):
+) -> float:
     """
     Invert the J-U curve to find the electric potential U for a given current density J.
 
