@@ -55,5 +55,7 @@ def U_from_J(
         float: The electric potential U in volts.
     """
 
-    f = lambda U: J_of_U(U, coefficients) - J_target
+    def f(U):
+        return J_of_U(U, coefficients) - J_target
+
     return brentq(f, U_min, U_max)

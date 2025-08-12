@@ -104,7 +104,7 @@ class ERData:
 
             removed_rows = original_rows - len(self.data)
             logger.debug(
-                f"Removed {removed_rows} rows ({removed_rows/original_rows*100:.1f}%) from {len(invalid_spec_nos)} invalid sweeps"
+                f"Removed {removed_rows} rows ({removed_rows / original_rows * 100:.1f}%) from {len(invalid_spec_nos)} invalid sweeps"
             )
 
     def _add_count_columns(self) -> None:
@@ -130,7 +130,7 @@ class ERData:
             n_negative = np.sum(negative_flux_mask)
             total_values = negative_flux_mask.size
             logger.debug(
-                f"Found {n_negative} negative flux values ({n_negative/total_values*100:.2f}%) - clamping to zero"
+                f"Found {n_negative} negative flux values ({n_negative / total_values * 100:.2f}%) - clamping to zero"
             )
 
             F = np.maximum(F, 0 * F.units)
@@ -213,12 +213,12 @@ class PitchAngle:
         and stores indices of valid and invalid data points.
         """
 
-        assert (
-            not self.er_data.data.empty
-        ), "Data not loaded. Please load the data first."
-        assert (
-            len(self.thetas) == config.CHANNELS
-        ), f"Theta values must match the number of channels {config.CHANNELS}."
+        assert not self.er_data.data.empty, (
+            "Data not loaded. Please load the data first."
+        )
+        assert len(self.thetas) == config.CHANNELS, (
+            f"Theta values must match the number of channels {config.CHANNELS}."
+        )
 
         # Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z)
         phis = np.deg2rad(self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64))
@@ -244,9 +244,9 @@ class PitchAngle:
         vector and the radial direction vector.
         """
         # Check if data is loaded
-        assert (
-            not self.er_data.data.empty
-        ), "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, (
+            "Data not loaded. Please load the data first."
+        )
 
         dot_product = np.einsum(
             "ijk,ijk->ij", self.unit_magnetic_field, self.cartesian_coords
@@ -304,9 +304,9 @@ class LossConeFitter:
         Returns:
             np.ndarray: The normalized flux for the specified energy bin and measurement chunk.
         """
-        assert (
-            not self.er_data.data.empty
-        ), "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, (
+            "Data not loaded. Please load the data first."
+        )
 
         index = measurement_chunk * config.SWEEP_ROWS + energy_bin
 
@@ -350,9 +350,9 @@ class LossConeFitter:
             np.ndarray: The 2D normalized flux distribution for the specified measurement chunk.
         """
         # Check if data is loaded
-        assert (
-            not self.er_data.data.empty
-        ), "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, (
+            "Data not loaded. Please load the data first."
+        )
 
         norm2d = np.vstack(
             [
