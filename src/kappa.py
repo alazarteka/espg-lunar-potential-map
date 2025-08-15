@@ -140,7 +140,7 @@ class Kappa:
         self.er_data = spec_er_data
 
         spec_pitch_angle = PitchAngle(
-            spec_er_data, DataLoader.get_theta_file(config.DATA_DIR)
+            spec_er_data, str(config.DATA_DIR / config.THETA_FILE)
         )
 
         pitch_angles = spec_pitch_angle.pitch_angles
