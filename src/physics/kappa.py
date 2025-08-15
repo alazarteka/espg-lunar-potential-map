@@ -55,7 +55,10 @@ class KappaParams:
         Convert the parameters to a tuple.
 
         Returns:
-            tuple: A tuple containing the density (in m^-3), kappa, and theta (in m/s) without units.
+            tuple: A tuple containing (density_mag, kappa, theta_mag) where:
+                - density_mag: density in particles/m^3 (unitless)
+                - kappa: kappa parameter (unitless)
+                - theta_mag: thermal speed in m/s (unitless)
         """
         return self.density.magnitude, self.kappa, self.theta.magnitude
 
