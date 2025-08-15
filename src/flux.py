@@ -89,17 +89,19 @@ class ERData:
         invalid_mag_mask = (magnetic_field_magnitude <= 1e-9) | (
             magnetic_field_magnitude >= 1e3
         )
-        invalid_time_mask = self.data["time"] == "1970-01-01T00:00:00"
+        invalid_time_mask = self.data[config.TIME_COLUMN] == "1970-01-01T00:00:00"
         invalid_rows_mask = invalid_mag_mask | invalid_time_mask
 
         # Get spec_no values for invalid rows
-        invalid_spec_nos = set(self.data["spec_no"][invalid_rows_mask].unique())
+        invalid_spec_nos = set(
+            self.data[config.SPEC_NO_COLUMN][invalid_rows_mask].unique()
+        )
 
         if invalid_spec_nos:
             logger.debug(f"Removing {len(invalid_spec_nos)} sweeps with invalid data")
 
             # Remove all rows belonging to invalid spec_nos
-            valid_mask = ~self.data["spec_no"].isin(list(invalid_spec_nos))
+            valid_mask = ~self.data[config.SPEC_NO_COLUMN].isin(list(invalid_spec_nos))
             self.data = self.data[valid_mask].reset_index(drop=True)
 
             removed_rows = original_rows - len(self.data)
@@ -135,7 +137,7 @@ class ERData:
 
             F = np.maximum(F, 0 * F.units)
 
-        energies = self.data["energy"].to_numpy(dtype=np.float64)
+        energies = self.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)
         energies = energies[:, None] * ureg.electron_volt  # Reshape for broadcasting
         integration_time = (
             np.array(list(map(lambda x: 1 / config.BINS_BY_LATITUDE[x], thetas)))
@@ -213,12 +215,12 @@ class PitchAngle:
         and stores indices of valid and invalid data points.
         """
 
-        assert not self.er_data.data.empty, (
-            "Data not loaded. Please load the data first."
-        )
-        assert len(self.thetas) == config.CHANNELS, (
-            f"Theta values must match the number of channels {config.CHANNELS}."
-        )
+        assert (
+            not self.er_data.data.empty
+        ), "Data not loaded. Please load the data first."
+        assert (
+            len(self.thetas) == config.CHANNELS
+        ), f"Theta values must match the number of channels {config.CHANNELS}."
 
         # Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z)
         phis = np.deg2rad(self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64))
@@ -244,9 +246,9 @@ class PitchAngle:
         vector and the radial direction vector.
         """
         # Check if data is loaded
-        assert not self.er_data.data.empty, (
-            "Data not loaded. Please load the data first."
-        )
+        assert (
+            not self.er_data.data.empty
+        ), "Data not loaded. Please load the data first."
 
         dot_product = np.einsum(
             "ijk,ijk->ij", self.unit_magnetic_field, self.cartesian_coords
@@ -304,9 +306,9 @@ class LossConeFitter:
         Returns:
             np.ndarray: The normalized flux for the specified energy bin and measurement chunk.
         """
-        assert not self.er_data.data.empty, (
-            "Data not loaded. Please load the data first."
-        )
+        assert (
+            not self.er_data.data.empty
+        ), "Data not loaded. Please load the data first."
 
         index = measurement_chunk * config.SWEEP_ROWS + energy_bin
 
@@ -350,9 +352,9 @@ class LossConeFitter:
             np.ndarray: The 2D normalized flux distribution for the specified measurement chunk.
         """
         # Check if data is loaded
-        assert not self.er_data.data.empty, (
-            "Data not loaded. Please load the data first."
-        )
+        assert (
+            not self.er_data.data.empty
+        ), "Data not loaded. Please load the data first."
 
         norm2d = np.vstack(
             [
@@ -398,7 +400,9 @@ class LossConeFitter:
             return np.nan, np.nan, np.nan
         e = min(e, max_rows)
 
-        energies = self.er_data.data["energy"].to_numpy(dtype=np.float64)[s:e]
+        energies = self.er_data.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[
+            s:e
+        ]
 
         # Ensure pitch angles exist for this range
         if self.pitch_angle.pitch_angles is None or s >= len(

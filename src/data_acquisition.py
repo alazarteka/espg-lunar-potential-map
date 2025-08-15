@@ -93,7 +93,9 @@ class DataManager:
             dirs = dirs[1:]
         return dirs
 
-    def list_remote_files(self, remote_path: str, ext: str = ".TAB") -> list[str]:
+    def list_remote_files(
+        self, remote_path: str, ext: str = config.EXT_TAB
+    ) -> list[str]:
         """
         Return filenames under base_url/remote_path/ matching ext.
         """
@@ -142,7 +144,9 @@ class DataManager:
                 temp_dest.unlink()
             raise e
 
-    def fetch_directory(self, remote_path: str, ext: str = ".TAB") -> list[Path]:
+    def fetch_directory(
+        self, remote_path: str, ext: str = config.EXT_TAB
+    ) -> list[Path]:
         """
         Download all files with the given extension in base_url/remote_path/.
         """
@@ -159,7 +163,7 @@ class DataManager:
         return [dest for url, dest in urls_and_dests]
 
     def collect_all_download_tasks(
-        self, years: list[str], ext: str = ".TAB"
+        self, years: list[str], ext: str = config.EXT_TAB
     ) -> list[tuple[str, Path]]:
         """
         Collect all download tasks across all years and julian days without downloading.

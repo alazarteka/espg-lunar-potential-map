@@ -147,11 +147,13 @@ def prepare_synthetic_er(density=1e6, kappa=5.0, theta=1.1e5):
 
     synthetic_er_data[config.PHI_COLS] = phis
     synthetic_er_data["UTC"] = "2025-07-25T12:30:00"
-    synthetic_er_data["time"] = (
+    synthetic_er_data[config.TIME_COLUMN] = (
         pd.to_datetime(synthetic_er_data["UTC"]).astype(np.int64) // 10**9
     )
-    synthetic_er_data["energy"] = energy_centers.to(ureg.electron_volt).magnitude
-    synthetic_er_data["spec_no"] = 1
+    synthetic_er_data[config.ENERGY_COLUMN] = energy_centers.to(
+        ureg.electron_volt
+    ).magnitude
+    synthetic_er_data[config.SPEC_NO_COLUMN] = 1
 
     np.random.seed(42)
     synthetic_er_data[config.MAG_COLS] = np.random.rand(3)
@@ -170,19 +172,17 @@ def test_density_estimate(kappa_params_set):
     )
     kappa_fitter = Kappa(synthetic_er, 1)
 
-    assert kappa_fitter.density_estimate.magnitude > 0, (
-        "Density estimate should be positive."
-    )
-    assert kappa_fitter.density_estimate.units == ureg.particle / ureg.meter**3, (
-        "Density estimate should have correct units."
-    )
+    assert (
+        kappa_fitter.density_estimate.magnitude > 0
+    ), "Density estimate should be positive."
+    assert (
+        kappa_fitter.density_estimate.units == ureg.particle / ureg.meter**3
+    ), "Density estimate should have correct units."
     assert np.isclose(
         kappa_fitter.density_estimate.magnitude,
         params.density.magnitude / 2.0,
         rtol=1e-2,
-    ), (
-        f"Expected density {params.density.magnitude / 2.0}, got {kappa_fitter.density_estimate.magnitude}"
-    )
+    ), f"Expected density {params.density.magnitude / 2.0}, got {kappa_fitter.density_estimate.magnitude}"
 
 
 @pytest.mark.skip_ci
@@ -214,9 +214,9 @@ def test_objective_functions(kappa_params_set):
         ]
     )
 
-    assert np.allclose(_standard_objective, _fast_objective, rtol=1e-2), (
-        "Standard and fast objective functions should match within tolerance."
-    )
+    assert np.allclose(
+        _standard_objective, _fast_objective, rtol=1e-2
+    ), "Standard and fast objective functions should match within tolerance."
 
 
 @pytest.mark.skip_ci
@@ -262,18 +262,16 @@ def test_kappa_fitter(kappa_params_set):
     # The synthetic data is generated without energy convolution, so we disable it in the fit
     fit_results = kappa_fitter.fit(use_convolution=False)
 
-    assert isinstance(fit_results.params, KappaParams), (
-        "Fitted parameters should be an instance of KappaParams"
-    )
+    assert isinstance(
+        fit_results.params, KappaParams
+    ), "Fitted parameters should be an instance of KappaParams"
     assert fit_results.params.kappa > 1.5, "Fitted kappa should be greater than 1.5"
     assert fit_results.params.theta.magnitude > 0, "Fitted theta should be positive."
-    assert np.isclose(fit_results.params.kappa, params.kappa, rtol=1e-2), (
-        f"Expected kappa {params.kappa}, got {fit_results.params.kappa}"
-    )
+    assert np.isclose(
+        fit_results.params.kappa, params.kappa, rtol=1e-2
+    ), f"Expected kappa {params.kappa}, got {fit_results.params.kappa}"
     assert np.isclose(
         fit_results.params.theta.magnitude,
         params.theta.to(ureg.meter / ureg.second).magnitude,
         rtol=1e-2,
-    ), (
-        f"Expected theta {params.theta.to(ureg.meter / ureg.second).magnitude}, got {fit_results.params.theta.magnitude}"
-    )
+    ), f"Expected theta {params.theta.to(ureg.meter / ureg.second).magnitude}, got {fit_results.params.theta.magnitude}"

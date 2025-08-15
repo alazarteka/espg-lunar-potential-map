@@ -123,12 +123,12 @@ def kappa_distribution(
             raise TypeError("velocity must be a pint Quantity (Speed)")
         if not isinstance(parameters, KappaParams):
             raise TypeError("parameters must be an instance of KappaParams")
-    assert parameters.kappa > 1.5, (
-        "kappa must be greater than 1.5 for a valid kappa distribution"
-    )
-    assert parameters.theta.magnitude > 0, (
-        "theta must be greater than 0 for a valid kappa distribution"
-    )
+    assert (
+        parameters.kappa > 1.5
+    ), "kappa must be greater than 1.5 for a valid kappa distribution"
+    assert (
+        parameters.theta.magnitude > 0
+    ), "theta must be greater than 0 for a valid kappa distribution"
 
     density = parameters.density
     kappa = parameters.kappa
@@ -247,9 +247,9 @@ def omnidirectional_flux_integrated(
         if not isinstance(n_samples, int):
             raise TypeError("n_samples must be an integer")
 
-    assert n_samples > 0 and n_samples % 2 == 1, (
-        "n_samples must be an odd positive integer"
-    )
+    assert (
+        n_samples > 0 and n_samples % 2 == 1
+    ), "n_samples must be an odd positive integer"
 
     energy_grid = (
         np.geomspace(

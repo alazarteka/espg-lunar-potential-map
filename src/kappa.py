@@ -18,7 +18,6 @@ from src.physics.kappa import (
     omnidirectional_flux_magnitude,
     velocity_from_energy,
 )
-from src.potential_mapper import DataLoader
 from src.utils.units import (
     EnergyType,
     FluxType,
@@ -125,12 +124,12 @@ class Kappa:
         This method extracts the relevant data for the specified `spec_no` from the `ERData` object,
         calculates the sum of the electron flux over valid pitch angles, and sets the energy windows.
         """
-        if self.spec_no not in self.er_data.data["spec_no"].values:
+        if self.spec_no not in self.er_data.data[config.SPEC_NO_COLUMN].values:
             logging.warning(f"Spec no {self.spec_no} not found in ERData.")
             return
 
         spec_dataframe = self.er_data.data[
-            self.er_data.data["spec_no"] == self.spec_no
+            self.er_data.data[config.SPEC_NO_COLUMN] == self.spec_no
         ].copy()
         spec_dataframe.reset_index(drop=True, inplace=True)
 
@@ -187,7 +186,7 @@ class Kappa:
         )  # shape (Energy Bins,)
 
         energies = (
-            spec_er_data.data["energy"].to_numpy(dtype=np.float64)
+            spec_er_data.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)
         ) * ureg.electron_volt  # shape (Energy Bins,)
 
         self.energy_centers = energies

@@ -52,7 +52,11 @@ class SpiceManager:
         if not spice_dir.exists():
             raise FileNotFoundError(f"SPICE directory {spice_dir} not found")
 
-        patterns = ["*.bsp", "*.tpc", "*.tls"]
+        patterns = [
+            f"*{config.EXT_BSP}",
+            f"*{config.EXT_TPC}",
+            f"*{config.EXT_TLS}",
+        ]
         spice_files = []
         for pattern in patterns:
             spice_files.extend(spice_dir.glob(pattern))
@@ -118,7 +122,7 @@ class DataLoader:
 
             for month_dir in sorted(month_dirs):
                 logging.info(f"Scanning month: {month_dir.name}")
-                tab_files = list(month_dir.glob("*.TAB"))
+                tab_files = list(month_dir.glob(f"*{config.EXT_TAB}"))
                 flux_files.extend(tab_files)
 
         return sorted(flux_files)

@@ -237,9 +237,9 @@ def test_kappa_omnidirectional_flux_fast(kappa_params_set):
     assert fast_flux.units == ureg.particle / (
         ureg.centimeter**2 * ureg.second * ureg.electron_volt
     )
-    assert np.allclose(fast_flux.magnitude, standard_flux.magnitude, rtol=1e-2), (
-        "Fast omnidirectional flux should match standard calculation within tolerance."
-    )
+    assert np.allclose(
+        fast_flux.magnitude, standard_flux.magnitude, rtol=1e-2
+    ), "Fast omnidirectional flux should match standard calculation within tolerance."
 
 
 def test_omnidirectional_flux_integrated_basic(base_kappa_params):

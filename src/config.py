@@ -29,15 +29,18 @@ BINS_BY_LATITUDE = {
 
 
 # ========== Physical parameters ==========
-LUNAR_RADIUS_KM = 1737.400  # average radius of the Moon in kilometers
+LUNAR_RADIUS_KM: float = 1737.400  # average radius of the Moon in kilometers
 LUNAR_RADIUS: LengthType = 1737.400 * ureg.kilometer  # average radius of the Moon
 ELECTRON_MASS: MassType = scipy.constants.electron_mass * ureg.kilogram  # electron
+ELECTRON_MASS_MAGNITUDE: float = ELECTRON_MASS.magnitude  # electron mass in kg
 ELECTRON_CHARGE: ChargeType = (
     scipy.constants.e * ureg.coulomb
 )  # elementary charge in Coulombs
 ELECTRON_CHARGE_MAGNITUDE = (
     ELECTRON_CHARGE.magnitude
 )  # Charge of an electron in Coulombs
+BOLTZMANN_CONSTANT_MAGNITUDE: float = scipy.constants.Boltzmann  # Unit J/K
+PROTON_MASS_MAGNITUDE: float = scipy.constants.proton_mass  # Unit kg
 
 # ========== File extensions ==========
 EXT_TAB = ".TAB"  # ER data file extension
@@ -63,7 +66,12 @@ FIT_ERROR_THRESHOLD = 215000  # chi-squared threshold for a good fit
 
 
 # ========== Data Column names ==========
-MISC_COLS = ["UTC", "time", "energy", "spec_no"]
+UTC_COLUMN = "UTC"  # column name for UTC time in dataframes
+TIME_COLUMN = "time"  # column name for time in dataframes
+ENERGY_COLUMN = "energy"  # column name for energy in dataframes
+SPEC_NO_COLUMN = "spec_no"  # column name for spectrum number in dataframes
+
+MISC_COLS = [UTC_COLUMN, TIME_COLUMN, ENERGY_COLUMN, SPEC_NO_COLUMN]
 FLUX_COLS = [f"ele_flux_{i}" for i in range(88)]
 PHI_COLS = [f"dist_phi_{i}" for i in range(88)]
 COUNT_COLS = ["count", "count_err"]
