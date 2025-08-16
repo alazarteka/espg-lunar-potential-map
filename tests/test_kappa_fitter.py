@@ -88,7 +88,7 @@ def prepare_flux(density=1e6, kappa=5.0, theta=1.1e5):
     parameters (density, kappa, theta) over a standard range of energy centers.
 
     Args:
-        density (float, optional): Electron number density in cm^-3. Defaults to 1e6.
+        density (float, optional): Electron number density in m^-3. Defaults to 1e6.
         kappa (float, optional): Kappa parameter. Defaults to 5.0.
         theta (float, optional): Theta parameter in m/s. Defaults to 1.1e5.
 
@@ -122,7 +122,7 @@ def prepare_synthetic_er(density=1e6, kappa=5.0, theta=1.1e5):
     recover the original parameters.
 
     Args:
-        density (float, optional): Electron number density in cm^-3. Defaults to 1e6.
+        density (float, optional): Electron number density in m^-3. Defaults to 1e6.
         kappa (float, optional): Kappa parameter. Defaults to 5.0.
         theta (float, optional): Theta parameter in m/s. Defaults to 1.1e5.
 
