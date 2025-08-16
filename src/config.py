@@ -32,12 +32,12 @@ BINS_BY_LATITUDE = {
 LUNAR_RADIUS_KM: float = 1737.400  # average radius of the Moon in kilometers
 LUNAR_RADIUS: LengthType = 1737.400 * ureg.kilometer  # average radius of the Moon
 ELECTRON_MASS: MassType = scipy.constants.electron_mass * ureg.kilogram  # electron
-ELECTRON_MASS_MAGNITUDE: float = ELECTRON_MASS.magnitude  # electron mass in kg
+ELECTRON_MASS_MAGNITUDE: float = scipy.constants.electron_mass  # electron mass in kg
 ELECTRON_CHARGE: ChargeType = (
     scipy.constants.e * ureg.coulomb
 )  # elementary charge in Coulombs
-ELECTRON_CHARGE_MAGNITUDE = (
-    ELECTRON_CHARGE.magnitude
+ELECTRON_CHARGE_MAGNITUDE: float = (
+    scipy.constants.e
 )  # Charge of an electron in Coulombs
 BOLTZMANN_CONSTANT_MAGNITUDE: float = scipy.constants.Boltzmann  # Unit J/K
 PROTON_MASS_MAGNITUDE: float = scipy.constants.proton_mass  # Unit kg
