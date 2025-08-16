@@ -81,7 +81,7 @@ ALL_COLS = MISC_COLS + FLUX_COLS + PHI_COLS + MAG_COLS + COUNT_COLS
 # ========== Directory paths ==========
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # project root directory
 DATA_DIR = PROJECT_ROOT / "data"  # main data directory
-KERNELS_DIR = PROJECT_ROOT / "data" / "spice_kernels"
+SPICE_KERNELS_DIR = PROJECT_ROOT / "data" / "spice_kernels"
 
 # ========== File names ==========
 THETA_FILE = "theta.tab"

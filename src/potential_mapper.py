@@ -468,7 +468,7 @@ Examples:
     parser.add_argument(
         "--spice-dir",
         type=str,
-        default=config.KERNELS_DIR,
+        default=config.SPICE_KERNELS_DIR,
         help="Path to SPICE kernels directory (default: ../spice_kernels)",
     )
 
