@@ -1,7 +1,7 @@
 # Spacecraft Potential Calculator: Design & Analysis Summary
 
 **Date:** 2025‑08‑16
-**Module:** `src/potential_calculator.py`
+**Module:** `src/spacecraft_potential.py`
 **Scope:** Day–night (sunlit vs. shaded) spacecraft charging for Lunar Prospector ER spectra
 
 ---
@@ -320,7 +320,7 @@ Default is a **no‑flow**, thick‑sheath **OML‑like** enhancement:
 
 ```python
 from src.flux import ERData
-from src.potential_calculator import calculate_potential
+from src.spacecraft_potential import calculate_potential
 
 er = ERData.from_file("lp_er_spectrum.parquet")  # includes time + flux columns
 spec_no = 123456

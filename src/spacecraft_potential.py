@@ -164,13 +164,13 @@ def calculate_shaded_currents(
     flux_to_spacecraft = 0.25 * omnidirectional_flux * CM2_TO_M2_FACTOR
 
     mask = energy_grid >= abs(spacecraft_potential)
-    Je = config.ELECTRON_CHARGE_MAGNITUDE * np.trapz(
+    Je = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
         flux_to_spacecraft[mask], energy_grid[mask]
     )
 
     # Calculating Jsee
     Eimp = energy_grid[mask] - abs(spacecraft_potential)
-    Jsee = config.ELECTRON_CHARGE_MAGNITUDE * np.trapz(
+    Jsee = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
         sternglass_secondary_yield(Eimp, E_m=sey_E_m, delta_m=sey_delta_m)
         * flux_to_spacecraft[mask],
         energy_grid[mask],
