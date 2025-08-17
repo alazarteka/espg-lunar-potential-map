@@ -6,8 +6,8 @@ import numpy as np
 
 import src.config as config
 from src.flux import (
-    ERData,
-    PitchAngle,
+    ERData, 
+    PitchAngle, 
     LossConeFitter
 )
 from src.utils.attitude import load_attitude_data
@@ -22,7 +22,12 @@ from src.potential_mapper import plot as plot_mod
 from src.potential_mapper.results import PotentialResults
 
 class DataLoader:
-    """Handles data file discovery and loading."""
+    """Discover ER files and load auxiliary attitude/theta data.
+
+    File discovery is layout-agnostic by default (recursive glob of *EXT_TAB)
+    and excludes known support tables. Optional year/month/day filters are
+    applied via best-effort token matching in paths.
+    """
 
     MONTH_TO_NUM = {
         "JAN": "01", "FEB": "02",
@@ -41,13 +46,13 @@ class DataLoader:
         month: int | None = None,
         day: int | None = None,
     ) -> list[Path]:
-        """Discover ER flux files below DATA_DIR.
+        """
+        Discover ER flux files below DATA_DIR.
 
         Strategy:
         - Recursively glob for `*{EXT_TAB}` under `DATA_DIR`.
         - Exclude known support tables (attitude/solid_angles/theta/areas).
-        - Optionally filter by year/month/day by parsing tokens in the path string
-          if present; otherwise warn and return unfiltered.
+        - Optionally filter by year/month/day via token matching if present.
         """
         data_dir = config.DATA_DIR
         if not data_dir.exists():
@@ -90,7 +95,13 @@ class DataLoader:
 
 
 def process_lp_file(file_path: Path) -> PotentialResults:
-    """Process a Lunar Prospector file and extract potential mapping results."""
+    """
+    Process a single ER file into PotentialResults.
+
+    Steps: load ER + attitude; build coordinate arrays; project B; find surface
+    intersections; compute lat/lon and day/night flags; fit ΔU per 15-row chunk
+    and map to rows.
+    """
     logging.debug(f"Processing LP file: {file_path}")
 
     # Load ER data and attitude
@@ -150,9 +161,30 @@ def process_lp_file(file_path: Path) -> PotentialResults:
         proj_in_sun_masked = dots > 0
         proj_in_sun[mask] = proj_in_sun_masked
 
-    # Potentials remain placeholders until fitter integration
+    # Fit surface potential ΔU per 15-row chunk and map to rows
+    try:
+        fitter = LossConeFitter(er_data, str(config.DATA_DIR / config.THETA_FILE))
+        fit_mat = fitter.fit_surface_potential()  # shape (n_chunks, 4)
+        # Columns: [delta_U, bs_over_bm, chi2, chunk_index]
+        proj_potential = np.full(n, np.nan)
+        if fit_mat.size > 0:
+            for delta_U, _bs, chi2, chunk_idx in fit_mat:
+                i = int(chunk_idx)
+                if not np.isfinite(delta_U) or not np.isfinite(chi2):
+                    continue
+                if chi2 > config.FIT_ERROR_THRESHOLD:
+                    continue
+                s = i * config.SWEEP_ROWS
+                e = min((i + 1) * config.SWEEP_ROWS, n)
+                if s >= n:
+                    break
+                proj_potential[s:e] = float(delta_U)
+    except Exception as e:
+        logging.exception(f"LossCone fitting failed for {file_path}: {e}")
+        proj_potential = np.full(n, np.nan)
+
+    # Spacecraft potential placeholder (requires separate computation if needed)
     sc_potential = np.full(n, np.nan)
-    proj_potential = np.full(n, np.nan)
 
     return PotentialResults(
         spacecraft_latitude=spacecraft_lat,
@@ -164,6 +196,23 @@ def process_lp_file(file_path: Path) -> PotentialResults:
         spacecraft_in_sun=sc_in_sun,
         projection_in_sun=proj_in_sun,
     )
+
+def _concat_results(results: list[PotentialResults]) -> PotentialResults:
+    """Concatenate fields from multiple PotentialResults objects (row-wise)."""
+    def cat(attr: str):
+        return np.concatenate([getattr(r, attr) for r in results])
+
+    return PotentialResults(
+        spacecraft_latitude=cat("spacecraft_latitude"),
+        spacecraft_longitude=cat("spacecraft_longitude"),
+        projection_latitude=cat("projection_latitude"),
+        projection_longitude=cat("projection_longitude"),
+        spacecraft_potential=cat("spacecraft_potential"),
+        projected_potential=cat("projected_potential"),
+        spacecraft_in_sun=cat("spacecraft_in_sun"),
+        projection_in_sun=cat("projection_in_sun"),
+    )
+
 
 def run(args: argparse.Namespace) -> int:
     """Entry point for CLI to orchestrate processing and optional plotting."""
@@ -190,11 +239,11 @@ def run(args: argparse.Namespace) -> int:
         logging.warning("All files failed to process; nothing to plot or save.")
         return 1
 
-    # Simple aggregation placeholder: choose the first result
-    agg = results[0]
+    # Aggregate results across files
+    agg = _concat_results(results) if len(results) > 1 else results[0]
 
     if args.output or args.display:
-        fig, ax = plot_mod.plot_map(agg)
+        fig, ax = plot_mod.plot_map(agg, illumination=args.illumination)
         if args.output:
             out_path = Path(args.output)
             out_path.parent.mkdir(parents=True, exist_ok=True)

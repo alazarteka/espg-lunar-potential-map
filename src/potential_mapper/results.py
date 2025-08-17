@@ -5,19 +5,15 @@ import numpy as np
 @dataclass()
 class PotentialResults:
     """
-    Holds the results of the potential mapping.
+    Row-aligned outputs from processing ER data into a potential map.
 
-    Attributes:
-        - spacecraft_latitude: Latitude of the spacecraft.
-        - spacecraft_longitude: Longitude of the spacecraft.
-        - projection_latitude: Latitude of the projection.
-        - projection_longitude: Longitude of the projection.
-        - spacecraft_potential: Electric potential of the spacecraft.
-        - projected_potential: Electric potential measured at the projection point.
-        - spacecraft_in_sun: Boolean array indicating if the spacecraft is in sunlight.
-        - projection_in_sun: Boolean array indicating if the projection point is in
-        sunlight.
-
+    Arrays share the same length N (number of ER rows after any filtering):
+    - spacecraft_latitude/longitude: Spacecraft geodetic in degrees (IAU_MOON frame).
+    - projection_latitude/longitude: Surface intersection geodetic in degrees.
+    - spacecraft_potential: Reserved for LP potential (NaN unless computed).
+    - projected_potential: Surface potential ΔU (V) per row; NaN when not fit.
+    - spacecraft_in_sun: True if LP→Sun line-of-sight does not intersect Moon.
+    - projection_in_sun: True if surface normal · Moon→Sun > 0 at intersection.
     """
     spacecraft_latitude: np.ndarray
     spacecraft_longitude: np.ndarray

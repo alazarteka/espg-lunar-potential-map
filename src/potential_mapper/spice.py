@@ -7,7 +7,10 @@ import src.config as config
 
 def load_spice_files() -> None:
     """
-    Load SPICE files.
+    Load SPICE kernels from `config.SPICE_KERNELS_DIR` (bsp/tpc/tls patterns).
+
+    Safe to call multiple times in a process; relies on SPICE to deduplicate
+    loaded kernels. Raises FileNotFoundError if directory or files are missing.
     """
     spice_dir = config.SPICE_KERNELS_DIR
     if not spice_dir.exists():

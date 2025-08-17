@@ -7,7 +7,10 @@ from src.potential_mapper.pipeline import run
 
 def parse_arguments() -> argparse.Namespace:
     """
-    Parse command-line arguments.
+    Parse command-line arguments for the potential mapping CLI.
+
+    Flags cover basic date filters (single year/month/day), plotting output,
+    verbosity, and an optional illumination filter (day/night) for display.
     """
     parser = argparse.ArgumentParser(
         description="This tool maps the surface potential of the Moon using data from the Lunar Prospector mission.",
@@ -56,6 +59,13 @@ def parse_arguments() -> argparse.Namespace:
         action='store_true',
         default=False,
         help="Show the plot"
+    )
+
+    parser.add_argument(
+        '--illumination',
+        choices=['day', 'night'],
+        default=None,
+        help="Filter plotted points by illumination: 'day', 'night', or omit for all"
     )
 
     return parser.parse_args()

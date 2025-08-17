@@ -18,7 +18,17 @@ from src.utils.geometry import get_intersections_or_none_batch
 
 @dataclass
 class CoordinateArrays:
-    """Container for coordinate transformation arrays."""
+    """
+    Container for per-row geometry and transform arrays in IAU_MOON/J2000 frames.
+
+    Shapes:
+    - lp_positions: (N, 3) LP position in IAU_MOON (km)
+    - lp_vectors_to_sun: (N, 3) LP→Sun vector in IAU_MOON (km)
+    - ra_dec_cartesian: (N, 3) spin axis unit vectors in J2000
+    - moon_vectors_to_sun: (N, 3) Moon→Sun vector in IAU_MOON (km)
+    - j2000_to_iau_moon_mats: (N, 3, 3) rotation matrices
+    - scd_to_iau_moon_mats: (N, 3, 3) rotation matrices (SCD→IAU_MOON)
+    """
 
     lp_positions: np.ndarray
     lp_vectors_to_sun: np.ndarray
@@ -29,7 +39,7 @@ class CoordinateArrays:
 
 class CoordinateCalculator:
     """
-    Handles coordinate transformations between different reference frames.
+    Compute coordinate transformations between spacecraft (SCD), J2000, and IAU_MOON.
     """
 
     def __init__(self, et_spin: np.ndarray, right_ascension: np.ndarray, declination: np.ndarray):
@@ -45,7 +55,13 @@ class CoordinateCalculator:
         self.right_ascension = right_ascension
         self.declination = declination
 
-    def calculate_coordinate_transformation(self, flux_data: FluxData):
+    def calculate_coordinate_transformation(self, flux_data: FluxData) -> CoordinateArrays:
+        """
+        Build all geometry arrays for each row in `flux_data`.
+
+        Returns a CoordinateArrays with per-row positions, Sun vectors, and
+        transformation matrices sufficient to project vectors between frames.
+        """
         n_points = len(flux_data.data)
 
         lp_positions = np.zeros((n_points, 3)) # Lunar frame
@@ -98,6 +114,11 @@ def project_magnetic_fields(
     flux_data: FluxData,
     coordinate_arrays: CoordinateArrays
 ) -> np.ndarray:
+    """
+    Project ER-frame magnetic field vectors into IAU_MOON frame as unit vectors.
+
+    Returns an array of shape (N, 3) in IAU_MOON coordinates.
+    """
     magnetic_field = flux_data.data[config.MAG_COLS].to_numpy()
     unit_magnetic_field = magnetic_field / np.linalg.norm(magnetic_field, axis=1, keepdims=True)
     projected_magnetic_field = np.einsum(
@@ -109,6 +130,11 @@ def find_surface_intersection(
     coordinate_arrays: CoordinateArrays,
     projected_magnetic_field: np.ndarray
 ):
+    """
+    Compute ray–sphere intersections for LP positions along projected B-field.
+
+    Returns (points, mask) from get_intersections_or_none_batch.
+    """
     intersections = get_intersections_or_none_batch(
         pos=coordinate_arrays.lp_positions,
         direction=projected_magnetic_field,
