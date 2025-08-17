@@ -23,6 +23,7 @@ import math
 from typing import Optional
 
 import numpy as np
+import spiceypy as spice
 from scipy.optimize import brentq
 
 from src import config
@@ -252,11 +253,19 @@ def calculate_potential(
     """
     fitter = Kappa(er_data, spec_no)
 
-    # Decide if measurement occurs exposed to sunlight or in shadow
-    lp_position_wrt_moon = get_lp_position_wrt_moon(er_data.data[config.TIME_COLUMN])
-    lp_vector_to_sun = get_lp_vector_to_sun_in_lunar_frame(
-        er_data.data[config.TIME_COLUMN]
-    )
+    # Decide if measurement occurs exposed to sunlight or in shadow using
+    # the timestamp for this spectrum number.
+    rows = er_data.data[er_data.data[config.SPEC_NO_COLUMN] == spec_no]
+    if rows.empty:
+        return None
+    # Prefer UTC column; fall back to TIME if necessary
+    utc_val = rows.iloc[0].get(config.UTC_COLUMN, rows.iloc[0].get(config.TIME_COLUMN))
+    try:
+        et = spice.str2et(str(utc_val))
+    except Exception:
+        return None
+    lp_position_wrt_moon = get_lp_position_wrt_moon(et)
+    lp_vector_to_sun = get_lp_vector_to_sun_in_lunar_frame(et)
 
     intersection = get_intersection_or_none(
         lp_position_wrt_moon, lp_vector_to_sun, config.LUNAR_RADIUS
