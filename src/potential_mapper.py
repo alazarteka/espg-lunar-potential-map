@@ -263,7 +263,9 @@ class SurfaceIntersectionFinder:
                 strict=False,
             )
         ):
-            intersection = get_intersection_or_none(position, mag_field, config.LUNAR_RADIUS)
+            intersection = get_intersection_or_none(
+                position, mag_field, config.LUNAR_RADIUS
+            )
 
             if intersection is not None:
                 chunk_index = i // config.SWEEP_ROWS

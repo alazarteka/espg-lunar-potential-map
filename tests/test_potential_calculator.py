@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 
-import src.config as config
 from src.kappa import Kappa
 from src.spacecraft_potential import (
     calculate_potential,
@@ -10,7 +9,6 @@ from src.spacecraft_potential import (
     theta_to_temperature_ev,
 )
 from src.utils.units import ureg
-
 from tests.test_kappa_fitter import prepare_synthetic_er
 
 
@@ -46,7 +44,9 @@ def test_shade_potential_moves_toward_zero_with_higher_SEE(monkeypatch):
         "src.spacecraft_potential.get_intersection_or_none", lambda *args, **kwargs: 0
     )
     # Stub SPICE-dependent calls to avoid kernel access
-    monkeypatch.setattr("src.spacecraft_potential.get_lp_position_wrt_moon", lambda *_: 0)
+    monkeypatch.setattr(
+        "src.spacecraft_potential.get_lp_position_wrt_moon", lambda *_: 0
+    )
     monkeypatch.setattr(
         "src.spacecraft_potential.get_lp_vector_to_sun_in_lunar_frame", lambda *_: 0
     )
@@ -98,12 +98,15 @@ def test_day_branch_returns_positive_potential(monkeypatch):
     er = prepare_synthetic_er(theta=1e7)
     # Force day: no intersection (None)
     # Stub SPICE-dependent calls to avoid kernel access
-    monkeypatch.setattr("src.spacecraft_potential.get_lp_position_wrt_moon", lambda *_: 0)
+    monkeypatch.setattr(
+        "src.spacecraft_potential.get_lp_position_wrt_moon", lambda *_: 0
+    )
     monkeypatch.setattr(
         "src.spacecraft_potential.get_lp_vector_to_sun_in_lunar_frame", lambda *_: 0
     )
     monkeypatch.setattr(
-        "src.spacecraft_potential.get_intersection_or_none", lambda *args, **kwargs: None
+        "src.spacecraft_potential.get_intersection_or_none",
+        lambda *args, **kwargs: None,
     )
 
     out = calculate_potential(er, 1, n_steps=200)
