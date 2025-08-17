@@ -150,8 +150,12 @@ class ERData:
         count_estimate_sum = count_estimate.sum(axis=1)
         count_err = np.sqrt(count_estimate_sum)
 
-        self.data[config.COUNT_COLS[0]] = count_estimate_sum
-        self.data[config.COUNT_COLS[1]] = count_err
+        count_df = pd.DataFrame({
+            config.COUNT_COLS[0]: count_estimate_sum,
+            config.COUNT_COLS[1]: count_err
+        })
+        
+        self.data = pd.concat([self.data, count_df], axis=1)
 
 
 class PitchAngle:
