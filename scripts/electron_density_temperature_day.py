@@ -51,7 +51,7 @@ def compute_series(er_data: ERData, verbose: bool = False) -> Tuple[np.ndarray, 
         try:
             k = Kappa(er_data, spec_no=int(spec_no))
             # Density estimate is available without a full fit
-            n_m3 = k.density_estimate.to(ureg.particle / (ureg.meter ** 3)).magnitude
+            n_m3 = k.density_estimate.to(ureg.particle / (ureg.centimeter ** 3)).magnitude
             densities.append(float(n_m3))
 
             fit = k.fit()
@@ -76,7 +76,8 @@ def plot_series(dens: np.ndarray, temp_ev: np.ndarray, output: str | None, displ
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True, constrained_layout=True)
 
     ax1.plot(x, dens, lw=1)
-    ax1.set_ylabel("Density (m$^{-3}$)")
+    ax1.set_ylabel("Density (cm$^{-3}$)")
+    ax1.set_yscale('log')
     ax1.grid(True, alpha=0.3)
 
     ax2.plot(x, temp_ev, color="tab:orange", lw=1)
@@ -106,4 +107,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

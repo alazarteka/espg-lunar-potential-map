@@ -276,7 +276,7 @@ def calculate_potential(
     initial_fit = fitter.fit()
 
     if is_day:
-        if not initial_fit or not initial_fit.is_good_fit:
+        if not initial_fit:
             return None  # Place holder for daytime potential calculation
 
         initial_fit_params = initial_fit.params
@@ -303,7 +303,7 @@ def calculate_potential(
 
         corrected_fit = fitter.fit()
 
-        if not corrected_fit or not corrected_fit.is_good_fit:
+        if not corrected_fit:
             return None  # Place holder for daytime potential calculation
 
         corrected_fit_params = corrected_fit.params
@@ -317,7 +317,7 @@ def calculate_potential(
         return corrected_fit_params, corrected_spacecraft_potential * ureg.volt
 
     else:
-        if not initial_fit or not initial_fit.is_good_fit:
+        if not initial_fit:
             return None
 
         # Unpack initial fit parameters
