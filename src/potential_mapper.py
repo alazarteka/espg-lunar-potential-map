@@ -10,6 +10,7 @@ import spiceypy as spice
 
 from src import config
 from src.flux import FluxData
+from src.kappa import Kappa
 from src.utils import *
 
 # Configure logging
@@ -262,7 +263,7 @@ class SurfaceIntersectionFinder:
                 strict=False,
             )
         ):
-            intersection = get_intersection_or_none(position, mag_field)
+            intersection = get_intersection_or_none(position, mag_field, config.LUNAR_RADIUS)
 
             if intersection is not None:
                 chunk_index = i // config.SWEEP_ROWS
@@ -339,13 +340,10 @@ class PotentialMapper:
                 f"Potential {potential_result[0]:.5f} V at time {corresponding_time}"
             )
 
-        # Compute kappa parameters
-        from kappa_fitter import KappaFitter  # Import here to avoid circular dependency
-
         logging.info("Calculating kappa parameters...")
         er_data = flux_data.er_data
         for spec_no in er_data.data["spec_no"].unique():
-            fitter = KappaFitter(er_data, spec_no)
+            fitter = Kappa(er_data, spec_no)
             kappa_params = fitter.fit()
             logging.info(f"Kappa parameters for spec {spec_no}: {kappa_params}")
 

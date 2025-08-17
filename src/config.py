@@ -74,9 +74,10 @@ SPEC_NO_COLUMN = "spec_no"  # column name for spectrum number in dataframes
 MISC_COLS = [UTC_COLUMN, TIME_COLUMN, ENERGY_COLUMN, SPEC_NO_COLUMN]
 FLUX_COLS = [f"ele_flux_{i}" for i in range(88)]
 PHI_COLS = [f"dist_phi_{i}" for i in range(88)]
-COUNT_COLS = ["count", "count_err"]
 MAG_COLS = ["mag_x", "mag_y", "mag_z"]
-ALL_COLS = MISC_COLS + FLUX_COLS + PHI_COLS + MAG_COLS + COUNT_COLS
+ALL_COLS = MISC_COLS + MAG_COLS + FLUX_COLS + PHI_COLS # Do not modify
+
+COUNT_COLS = ["count", "count_err"] # This is count data inferred from the flux data
 
 # ========== Directory paths ==========
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # project root directory
