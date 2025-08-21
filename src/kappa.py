@@ -3,9 +3,10 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
+import spiceypy as spice
 from numba import jit
 from pint import Quantity
-from scipy.optimize import minimize
+from scipy.optimize import brentq, minimize
 from scipy.stats import qmc
 
 from src import config
@@ -17,6 +18,11 @@ from src.physics.kappa import (
     omnidirectional_flux_fast,
     omnidirectional_flux_magnitude,
     velocity_from_energy,
+)
+from src.utils.geometry import get_intersection_or_none
+from src.utils.spice_ops import (
+    get_lp_position_wrt_moon,
+    get_lp_vector_to_sun_in_lunar_frame,
 )
 from src.utils.units import (
     EnergyType,
@@ -159,7 +165,11 @@ class Kappa:
         masked_electron_flux = np.where(
             pitch_angles_mask, electron_flux, 0 * electron_flux.units
         )
-        self.omnidirectional_differential_particle_flux = np.sum(
+        # Integrate directional flux over the incident hemisphere (pitch < 90°)
+        # and scale by 2 to approximate the full 4π omnidirectional flux under
+        # an isotropy assumption. Without this factor the derived density is
+        # biased low by ~2× because only half-space is included.
+        self.omnidirectional_differential_particle_flux = 2 * np.sum(
             masked_electron_flux * self.solid_angles, axis=1
         )  # shape (Energy Bins,)
         self.omnidirectional_differential_particle_flux_mag = (
@@ -513,69 +523,190 @@ class Kappa:
         use_convolution: bool = True,
     ) -> tuple[FitResults, float] | tuple[None, None]:
         """
-        Fit parameters, estimate spacecraft potential in sunlight, then optionally refit with
-        energy corrected by that potential.
+        Fit parameters and estimate spacecraft potential U following
+        the illumination-dependent logic used in spacecraft_potential:
+
+        - Sunlight (dayside):
+            1) Fit κ on unshifted data
+            2) Compute electron current density Je from the fit
+            3) Invert J–U to get U in [0, 150] V
+            4) Shift energies by −U, recompute density, and refit κ
+            5) Recompute Je and U from corrected fit and return (fit, U)
+
+        - Shade (nightside):
+            1) Fit κ on unshifted data
+            2) Solve Je(U) + Ji(U) − Jsee(U) = 0 for U via brentq
+            3) Map κ temperature to ambient at U, build corrected params and return
 
         Returns:
-            (FitResults, float) | (None, None): Best-fit parameters and estimated sunlight
-            spacecraft potential (in volts), or (None, None) if fitting fails.
+            (FitResults, float) | (None, None): Best-fit (possibly corrected) parameters and
+            spacecraft potential U [V], or (None, None) if fitting fails or geometry unavailable.
         """
         if not self.is_data_valid:
             raise ValueError(
                 "Data is not valid. Ensure that the data has been prepared."
             )
 
+        # Determine illumination for this spectrum number
+        rows = self.er_data.data[
+            self.er_data.data[config.SPEC_NO_COLUMN] == self.spec_no
+        ]
+        if rows.empty:
+            return None, None
+        utc_val = rows.iloc[0].get(
+            config.UTC_COLUMN, rows.iloc[0].get(config.TIME_COLUMN)
+        )
+        try:
+            et = spice.str2et(str(utc_val))
+            lp_position_wrt_moon = get_lp_position_wrt_moon(et)
+            lp_vector_to_sun = get_lp_vector_to_sun_in_lunar_frame(et)
+        except Exception as e:
+            logging.warning(f"SPICE time/geometry failed for spec {self.spec_no}: {e}")
+            return None, None
+
+        intersection = get_intersection_or_none(
+            lp_position_wrt_moon, lp_vector_to_sun, config.LUNAR_RADIUS
+        )
+        is_day = intersection is None
+
+        # Initial uncorrected fit
         original_fit = self.fit(
             n_starts=n_starts,
             use_fast=use_fast,
             use_weights=use_weights,
             use_convolution=use_convolution,
         )
+        if not original_fit or not original_fit.is_good_fit:
+            return None, None
 
-        if original_fit and original_fit.is_good_fit:
+        # Daylight branch: JU inversion + energy pre-shift + refit (mirrors spacecraft_potential)
+        if is_day:
             original_fit_params = original_fit.params
-            original_spacecraft_current_density = electron_current_density_magnitude(
+            Je = electron_current_density_magnitude(
                 *original_fit_params.to_tuple(), E_min=1e1, E_max=2e4, n_steps=100
             )
-            original_spacecraft_potential = U_from_J(
-                J_target=original_spacecraft_current_density, U_min=0.0, U_max=15000.0
-            )
+            U = U_from_J(J_target=Je, U_min=0.0, U_max=150.0)
 
-            # Apply first-order energy correction and refit
-            corrected_energy_centers = (
-                self.energy_centers_mag - original_spacecraft_potential
-            )
-
-            self.er_data.data["energy"] = corrected_energy_centers
+            # Apply pre-shift and refit
+            corrected_energy_centers = self.energy_centers_mag - U
+            self.er_data.data[config.ENERGY_COLUMN] = corrected_energy_centers
             self.is_data_valid = False
             self._prepare_data()
             self.density_estimate = self._get_density_estimate()
+            self.density_estimate_mag = self.density_estimate.to(
+                ureg.particle / ureg.meter**3
+            ).magnitude
+
             corrected_fit = self.fit(
                 n_starts=n_starts,
                 use_fast=use_fast,
                 use_weights=use_weights,
                 use_convolution=use_convolution,
             )
-
             if corrected_fit and corrected_fit.is_good_fit:
-                corrected_fit_params = corrected_fit.params
-                corrected_spacecraft_current_density = (
-                    electron_current_density_magnitude(
-                        *corrected_fit_params.to_tuple(),
-                        E_min=1e1,
-                        E_max=2e4,
-                        n_steps=100,
-                    )
+                params = corrected_fit.params
+                Je_c = electron_current_density_magnitude(
+                    *params.to_tuple(), E_min=1e1, E_max=2e4, n_steps=100
                 )
-                corrected_spacecraft_potential = U_from_J(
-                    J_target=corrected_spacecraft_current_density,
-                    U_min=0.0,
-                    U_max=15000.0,
-                )
+                U_c = U_from_J(J_target=Je_c, U_min=0.0, U_max=150.0)
+                return corrected_fit, U_c
+            # Fall back to original if corrected fit degrades
+            return original_fit, U
 
-                return corrected_fit, corrected_spacecraft_potential
+        # Nightside branch: root solve Je(U) + Ji(U) − Jsee(U) = 0
+        density_mag, kappa, theta_uc = original_fit.params.to_tuple()
 
-            # If refit is not good, return original fit and potential
-            return original_fit, original_spacecraft_potential
+        def theta_to_temperature_ev(theta: float, kappa: float) -> float:
+            prefactor = 0.5 * kappa / (kappa - 1.5)
+            return (
+                prefactor
+                * theta
+                * theta
+                * config.ELECTRON_MASS_MAGNITUDE
+                / config.ELECTRON_CHARGE_MAGNITUDE
+            )
 
-        return None, None
+        def temperature_ev_to_theta(temperature_ev: float, kappa: float) -> float:
+            prefactor = 2.0 * (kappa - 1.5) / kappa
+            return math.sqrt(
+                prefactor
+                * config.ELECTRON_CHARGE_MAGNITUDE
+                * temperature_ev
+                / config.ELECTRON_MASS_MAGNITUDE
+            )
+
+        def sternglass_secondary_yield(E_imp: np.ndarray, E_m: float, delta_m: float) -> np.ndarray:
+            out = (
+                7.4
+                * delta_m
+                * (E_imp / E_m)
+                * np.exp(-2.0 * np.sqrt(np.maximum(E_imp, 0.0) / E_m))
+            )
+            out[E_imp <= 0.0] = 0.0
+            return out
+
+        temperature_uc = theta_to_temperature_ev(theta_uc, kappa)
+        E_min_ev, E_max_ev, n_steps = 1.0, 2e4, 401
+        energy_grid = np.geomspace(max(E_min_ev, 0.5), E_max_ev, n_steps)
+
+        CM2_TO_M2 = 1.0e4
+        def calc_currents(U: float, sey_E_m: float, sey_delta_m: float) -> tuple[float, float, float]:
+            T_c = temperature_uc + U / (kappa - 1.5)
+            if T_c <= 0.0:
+                BIG = 1e12
+                return 0.0, 0.0, BIG
+            theta_c = temperature_ev_to_theta(T_c, kappa)
+            omni = omnidirectional_flux_magnitude(
+                density_mag=density_mag, kappa=kappa, theta_mag=theta_c, energy_mag=energy_grid
+            )
+            flux_to_sc = 0.25 * omni * CM2_TO_M2
+            mask = energy_grid >= abs(U)
+            Je = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
+                flux_to_sc[mask], energy_grid[mask]
+            )
+            Eimp = energy_grid[mask] - abs(U)
+            Jsee = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
+                sternglass_secondary_yield(Eimp, E_m=sey_E_m, delta_m=sey_delta_m)
+                * flux_to_sc[mask],
+                energy_grid[mask],
+            )
+            T_i = T_c + config.EPS
+            vth_i = np.sqrt(
+                config.ELECTRON_CHARGE_MAGNITUDE * T_i / (2.0 * np.pi * config.PROTON_MASS_MAGNITUDE)
+            )
+            Ji0 = config.ELECTRON_CHARGE_MAGNITUDE * density_mag * vth_i
+            Ji = Ji0 * np.sqrt(max(0.0, 1.0 - U / T_i))
+            return Je, Jsee, Ji
+
+        def balance(U: float, E_m: float, delta_m: float) -> float:
+            Je, Jsee, Ji = calc_currents(U, E_m, delta_m)
+            return Je + Ji - Jsee
+
+        sey_E_m, sey_delta_m = 500.0, 1.5
+        U_low, U_high = -10.0, 10.0
+        f_low, f_high = balance(U_low, sey_E_m, sey_delta_m), balance(U_high, sey_E_m, sey_delta_m)
+        tries = 0
+        while np.sign(f_low) == np.sign(f_high) and tries < 10:
+            U_low *= 1.5
+            f_low = balance(U_low, sey_E_m, sey_delta_m)
+            tries += 1
+        if np.isnan(f_low) or np.isnan(f_high) or np.sign(f_low) == np.sign(f_high):
+            return None, None
+
+        U_star = float(
+            brentq(balance, U_low, U_high, args=(sey_E_m, sey_delta_m), maxiter=200, xtol=1e-3)
+        )
+        T_c = temperature_uc + U_star / (kappa - 1.5)
+        theta_c = temperature_ev_to_theta(T_c, kappa)
+        corrected_params = KappaParams(
+            density=density_mag * ureg.particle / ureg.meter**3,
+            kappa=kappa,
+            theta=theta_c * ureg.meter / ureg.second,
+        )
+        # Wrap into FitResults with original error/uncertainty since we did not refit
+        return FitResults(
+            params=corrected_params,
+            params_uncertainty=original_fit.params_uncertainty,
+            error=original_fit.error,
+            is_good_fit=original_fit.is_good_fit,
+        ), U_star

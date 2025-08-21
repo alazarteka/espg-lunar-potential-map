@@ -62,7 +62,7 @@ N_BG = 0.0  # background noise
 ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 
 # ========== Fitting parameters ==========
-FIT_ERROR_THRESHOLD = 215000  # chi-squared threshold for a good fit
+FIT_ERROR_THRESHOLD = 21500000000  # chi-squared threshold for a good fit
 
 
 # ========== Data Column names ==========

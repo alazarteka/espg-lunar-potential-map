@@ -7,9 +7,9 @@ name = "espg-lunar-potential-map"
 version = "0.1.0"
 description = "Lunar Prospector Surface Potential Mapping Analysis"
 readme = "README.md"
-license = {text = "MIT"}
+license = { text = "MIT" }
 authors = [
-    {name = "Alazar Teka Gemechu", email = "alazargemechu@kaist.ac.kr"},
+    { name = "Alazar Teka Gemechu", email = "alazargemechu@kaist.ac.kr" },
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -39,16 +39,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
-]
-test = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-]
+dev = ["pytest>=7.0.0", "black>=23.0.0", "ruff>=0.1.0", "mypy>=1.0.0"]
+test = ["pytest>=7.0.0", "pytest-cov>=4.0.0"]
 
 [project.urls]
 Homepage = "https://github.com/alazarteka/espg-lunar-potential-map"

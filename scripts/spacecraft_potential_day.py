@@ -55,6 +55,7 @@ def plot_timeseries(times: np.ndarray, potentials: np.ndarray, output: str | Non
         fig.savefig(out_path, dpi=180)
         print(f"Saved plot to {out_path}")
     if display:
+        print("Displaying plot...")
         plt.show()
 
 
@@ -92,4 +93,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

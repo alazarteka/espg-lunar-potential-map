@@ -180,9 +180,9 @@ def test_density_estimate(kappa_params_set):
     ), "Density estimate should have correct units."
     assert np.isclose(
         kappa_fitter.density_estimate.magnitude,
-        params.density.magnitude / 2.0,
+        params.density.magnitude,
         rtol=1e-2,
-    ), f"Expected density {params.density.magnitude / 2.0}, got {kappa_fitter.density_estimate.magnitude}"
+    ), f"Expected density {params.density.magnitude}, got {kappa_fitter.density_estimate.magnitude}"
 
 
 @pytest.mark.skip_ci

@@ -10,6 +10,7 @@ from src.flux import ERData
 from src.kappa import Kappa
 from src.potential_mapper.pipeline import DataLoader
 from src.spacecraft_potential import theta_to_temperature_ev
+from src.potential_mapper.spice import load_spice_files
 from src.utils.units import ureg
 
 
@@ -42,50 +43,88 @@ def select_day_file(year: int, month: int, day: int) -> Path:
     return files[0]
 
 
-def compute_series(er_data: ERData, verbose: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+def compute_series(
+    er_data: ERData, verbose: bool = False
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     spec_nos = er_data.data[config.SPEC_NO_COLUMN].unique()
-    densities: List[float] = []
-    temperatures_ev: List[float] = []
+    dens_orig: List[float] = []
+    temp_orig_ev: List[float] = []
+    dens_corr: List[float] = []
+    temp_corr_ev: List[float] = []
 
     for spec_no in spec_nos:
         try:
             k = Kappa(er_data, spec_no=int(spec_no))
-            # Density estimate is available without a full fit
-            n_m3 = k.density_estimate.to(ureg.particle / (ureg.centimeter ** 3)).magnitude
-            densities.append(float(n_m3))
+            # Original density (cm^-3)
+            n_cm3 = k.density_estimate.to(ureg.particle / (ureg.centimeter ** 3)).magnitude
+            dens_orig.append(float(n_cm3))
 
+            # Original fit temperature (eV)
             fit = k.fit()
             if fit is None or not fit.is_good_fit:
-                temperatures_ev.append(np.nan)
-                continue
+                temp_orig_ev.append(np.nan)
+            else:
+                density_mag, kappa_val, theta_val = fit.params.to_tuple()
+                Te_ev = theta_to_temperature_ev(theta_val, kappa_val)
+                temp_orig_ev.append(float(Te_ev))
 
-            density_mag, kappa, theta = fit.params.to_tuple()
-            Te_ev = theta_to_temperature_ev(theta, kappa)
-            temperatures_ev.append(float(Te_ev))
+            # Corrected fit (day/night aware)
+            cfit, _U = k.corrected_fit()
+            if cfit is None or not cfit.is_good_fit:
+                dens_corr.append(np.nan)
+                temp_corr_ev.append(np.nan)
+            else:
+                d_mag, kappa_val, theta_val = cfit.params.to_tuple()
+                n_corr_cm3 = (d_mag * ureg.particle / (ureg.meter ** 3)).to(
+                    ureg.particle / (ureg.centimeter ** 3)
+                ).magnitude
+                dens_corr.append(float(n_corr_cm3))
+                Te_corr_ev = theta_to_temperature_ev(theta_val, kappa_val)
+                temp_corr_ev.append(float(Te_corr_ev))
         except Exception as e:
             if verbose:
                 print(f"Spec {spec_no}: {e}")
-            densities.append(np.nan)
-            temperatures_ev.append(np.nan)
+            dens_orig.append(np.nan)
+            temp_orig_ev.append(np.nan)
+            dens_corr.append(np.nan)
+            temp_corr_ev.append(np.nan)
 
-    return np.array(densities), np.array(temperatures_ev)
+    return (
+        np.array(dens_orig),
+        np.array(temp_orig_ev),
+        np.array(dens_corr),
+        np.array(temp_corr_ev),
+    )
 
 
-def plot_series(dens: np.ndarray, temp_ev: np.ndarray, output: str | None, display: bool) -> None:
-    x = np.arange(len(dens))
+def plot_series(
+    dens_orig: np.ndarray,
+    temp_orig_ev: np.ndarray,
+    dens_corr: np.ndarray,
+    temp_corr_ev: np.ndarray,
+    output: str | None,
+    display: bool,
+) -> None:
+    x = np.arange(len(dens_orig))
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True, constrained_layout=True)
 
-    ax1.plot(x, dens, lw=1)
+    # Density
+    ax1.plot(x, dens_orig, lw=1, label="density (orig)")
+    ax1.plot(x, dens_corr, lw=1, label="density (corrected)")
     ax1.set_ylabel("Density (cm$^{-3}$)")
     ax1.set_yscale('log')
     ax1.grid(True, alpha=0.3)
+    ax1.legend(loc="best")
 
-    ax2.plot(x, temp_ev, color="tab:orange", lw=1)
+    # Temperature
+    ax2.plot(x, temp_orig_ev, color="tab:orange", lw=1, label="Te (orig)")
+    ax2.plot(x, temp_corr_ev, color="tab:green", lw=1, label="Te (corrected)")
     ax2.set_ylabel("Temperature (eV)")
     ax2.set_xlabel("Index (spectrum order)")
     ax2.grid(True, alpha=0.3)
+    ax2.legend(loc="best")
 
-    fig.suptitle("Electron density and temperature over one day")
+    fig.suptitle("Electron density and temperature over one day (orig vs corrected)")
 
     if output:
         out_path = Path(output)
@@ -93,16 +132,25 @@ def plot_series(dens: np.ndarray, temp_ev: np.ndarray, output: str | None, displ
         fig.savefig(out_path, dpi=180)
         print(f"Saved plot to {out_path}")
     if display:
+        print("Displaying plot...")
         plt.show()
 
 
 def main() -> None:
     args = parse_args()
+    # Load SPICE kernels for corrected fits (illumination, day/night branching)
+    try:
+        load_spice_files()
+    except Exception as e:
+        if args.verbose:
+            print(f"SPICE load failed: {e}")
     day_file = select_day_file(args.year, args.month, args.day)
     er_data = ERData(str(day_file))
 
-    dens, temp_ev = compute_series(er_data, verbose=args.verbose)
-    plot_series(dens, temp_ev, args.output, args.display)
+    dens_orig, temp_orig_ev, dens_corr, temp_corr_ev = compute_series(
+        er_data, verbose=args.verbose
+    )
+    plot_series(dens_orig, temp_orig_ev, dens_corr, temp_corr_ev, args.output, args.display)
 
 
 if __name__ == "__main__":
