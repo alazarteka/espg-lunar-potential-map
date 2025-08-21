@@ -31,6 +31,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-v", "--verbose", action="store_true", default=False, help="Verbose logs"
     )
+    # Weighted vs unweighted fits
+    parser.add_argument(
+        "--weighted",
+        dest="use_weights",
+        action="store_true",
+        default=True,
+        help="Use count-derived weights during kappa fits (default)",
+    )
+    parser.add_argument(
+        "--unweighted",
+        dest="use_weights",
+        action="store_false",
+        help="Disable weighting; use unweighted least squares in log-space",
+    )
     return parser.parse_args()
 
 
@@ -44,7 +58,7 @@ def select_day_file(year: int, month: int, day: int) -> Path:
 
 
 def compute_series(
-    er_data: ERData, verbose: bool = False
+    er_data: ERData, verbose: bool = False, use_weights: bool = True
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     spec_nos = er_data.data[config.SPEC_NO_COLUMN].unique()
     dens_orig: List[float] = []
@@ -60,7 +74,7 @@ def compute_series(
             dens_orig.append(float(n_cm3))
 
             # Original fit temperature (eV)
-            fit = k.fit()
+            fit = k.fit(use_weights=use_weights)
             if fit is None or not fit.is_good_fit:
                 temp_orig_ev.append(np.nan)
             else:
@@ -69,7 +83,7 @@ def compute_series(
                 temp_orig_ev.append(float(Te_ev))
 
             # Corrected fit (day/night aware)
-            cfit, _U = k.corrected_fit()
+            cfit, _U = k.corrected_fit(use_weights=use_weights)
             if cfit is None or not cfit.is_good_fit:
                 dens_corr.append(np.nan)
                 temp_corr_ev.append(np.nan)
@@ -148,7 +162,7 @@ def main() -> None:
     er_data = ERData(str(day_file))
 
     dens_orig, temp_orig_ev, dens_corr, temp_corr_ev = compute_series(
-        er_data, verbose=args.verbose
+        er_data, verbose=args.verbose, use_weights=args.use_weights
     )
     plot_series(dens_orig, temp_orig_ev, dens_corr, temp_corr_ev, args.output, args.display)
 
