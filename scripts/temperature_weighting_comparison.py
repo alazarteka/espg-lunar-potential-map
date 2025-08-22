@@ -1,9 +1,27 @@
 import glob
 import os
+import sys
+import multiprocessing as mp
+from multiprocessing.queues import Queue as MPQueue
+from multiprocessing import Process
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict
+import time
 
+# Prevent BLAS/OpenMP oversubscription in workers and avoid after-fork hangs
+# Set thread caps before importing numpy/scipy/matplotlib
+_THREAD_VARS = (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+)
+for _v in _THREAD_VARS:
+    os.environ.setdefault(_v, "1")
+
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -11,6 +29,32 @@ import src.config as config
 from src.flux import ERData
 from src.kappa import Kappa, FitResults
 from src.spacecraft_potential import theta_to_temperature_ev
+from concurrent.futures import TimeoutError as FuturesTimeout
+import queue as queue_mod
+
+# Optional: per-task timeout (seconds) to prevent a stuck file from stalling all work
+FILE_TIMEOUT_S = float(os.environ.get("TEMP_WEIGHTING_FILE_TIMEOUT_S", "600"))
+# Hard wall-time budget inside worker for one file (seconds); returns partial results
+FILE_WALLTIME_S = float(os.environ.get("TEMP_WEIGHTING_FILE_WALLTIME_S", "900"))
+# Parent-side kill timeout for a single file task (seconds)
+PARENT_KILL_TIMEOUT_S = float(os.environ.get("TEMP_WEIGHTING_PARENT_KILL_TIMEOUT_S", str(FILE_WALLTIME_S + 300)))
+# Number of random starts per fit (override via env for speed/testing)
+FIT_STARTS = int(os.environ.get("TEMP_WEIGHTING_FIT_STARTS", "10"))
+
+
+def _init_worker() -> None:
+    """Initializer for worker processes to enforce 1 thread for BLAS/OMP libs.
+
+    Called in each spawned worker before executing tasks.
+    """
+    for v in _THREAD_VARS:
+        os.environ.setdefault(v, "1")
+    # Ensure stdout/err are unbuffered for timely logs (if any)
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+        sys.stderr.reconfigure(line_buffering=True)
+    except Exception:
+        pass
 
 
 def extract_temperature_eV(fit: Optional[FitResults]) -> Optional[float]:
@@ -27,15 +71,20 @@ def extract_temperature_eV(fit: Optional[FitResults]) -> Optional[float]:
 def _process_one_file(path: str) -> Tuple[List[float], List[float]]:
     te_w_list: List[float] = []
     te_uw_list: List[float] = []
+    start_t = time.monotonic()
     try:
+        print(f"[worker] start {path}")
         er_data = ERData(path)
         spec_nos = er_data.data[config.SPEC_NO_COLUMN].unique()
         for spec_no in spec_nos:
+            if time.monotonic() - start_t > FILE_WALLTIME_S:
+                print(f"[worker] timeout (wall) {path}; returning partial")
+                break
             try:
                 k = Kappa(er_data, spec_no=int(spec_no))
                 if not k.is_data_valid:
                     continue
-                fit_w = k.fit(n_starts=10, use_fast=True, use_weights=True)
+                fit_w = k.fit(n_starts=FIT_STARTS, use_fast=True, use_weights=True)
                 te_w = extract_temperature_eV(fit_w)
                 if te_w is None or not np.isfinite(te_w) or te_w <= 0:
                     continue
@@ -44,7 +93,7 @@ def _process_one_file(path: str) -> Tuple[List[float], List[float]]:
                 k2 = Kappa(er_data, spec_no=int(spec_no))
                 if not k2.is_data_valid:
                     continue
-                fit_uw = k2.fit(n_starts=10, use_fast=True, use_weights=False)
+                fit_uw = k2.fit(n_starts=FIT_STARTS, use_fast=True, use_weights=False)
                 te_uw = extract_temperature_eV(fit_uw)
                 if te_uw is None or not np.isfinite(te_uw) or te_uw <= 0:
                     continue
@@ -57,7 +106,25 @@ def _process_one_file(path: str) -> Tuple[List[float], List[float]]:
     except Exception:
         # Skip this file on any error
         pass
+    print(f"[worker] done  {path} -> pairs={min(len(te_w_list), len(te_uw_list))}")
     return te_w_list, te_uw_list
+
+
+def _worker_entry(file_path: str, result_q: MPQueue) -> None:
+    """Spawned worker entrypoint for a single file with controlled env."""
+    _init_worker()
+    try:
+        res = _process_one_file(file_path)
+        try:
+            result_q.put((file_path, res[0], res[1]))
+        except Exception:
+            pass
+    except Exception:
+        # Ensure we at least signal completion
+        try:
+            result_q.put((file_path, [], []))
+        except Exception:
+            pass
 
 
 def main() -> None:
@@ -78,15 +145,64 @@ def main() -> None:
 
     from tqdm import tqdm
 
-    with ProcessPoolExecutor(max_workers=n_workers) as ex:
-        futures = {ex.submit(_process_one_file, f): f for f in data_files}
-        with tqdm(total=len(futures), desc="Files", unit="file") as pbar:
-            for fut in as_completed(futures):
-                w, uw = fut.result()
+    # Custom spawn-based pool with per-task kill
+    mp_ctx = mp.get_context("spawn")
+    result_q: MPQueue = mp_ctx.Queue()
+    active: Dict[str, tuple[Process, float]] = {}
+    pending = list(data_files)
+
+    from tqdm import tqdm
+    with tqdm(total=len(data_files), desc="Files", unit="file") as pbar:
+        # Launch initial batch
+        while pending or active:
+            # Start new tasks if capacity
+            while pending and len(active) < n_workers:
+                f = pending.pop(0)
+                p = mp_ctx.Process(target=_worker_entry, args=(f, result_q), daemon=True)
+                p.start()
+                active[f] = (p, time.monotonic())
+
+            # Collect any finished results without blocking too long
+            drained = False
+            while True:
+                try:
+                    fpath, w, uw = result_q.get_nowait()
+                except queue_mod.Empty:
+                    break
+                drained = True
+                if fpath in active:
+                    proc, _ = active.pop(fpath)
+                    proc.join(timeout=0.1)
                 if w and uw:
                     te_weighted.extend(w)
                     te_unweighted.extend(uw)
                 pbar.update(1)
+
+            # Reap processes that exited without posting
+            for f, (proc, start_time) in list(active.items()):
+                if not proc.is_alive():
+                    proc.join(timeout=0.1)
+                    active.pop(f)
+                    # No result posted; count as empty
+                    pbar.update(1)
+
+            # Kill long-runners
+            now = time.monotonic()
+            for f, (proc, start_time) in list(active.items()):
+                if now - start_time > PARENT_KILL_TIMEOUT_S:
+                    print(f"[parent] killing long-running task: {f}")
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    proc.join(timeout=1.0)
+                    active.pop(f, None)
+                    # Count as timeout
+                    pbar.update(1)
+
+            # Sleep a bit to avoid busy spin if nothing drained and no state change
+            if not drained:
+                time.sleep(0.2)
 
     if not te_weighted:
         print("No valid temperature pairs were computed.")
