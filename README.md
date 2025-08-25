@@ -32,10 +32,17 @@ All dependencies are managed through UV and specified in `pyproject.toml`.
 └── src/                    # Source code
     ├── config.py           # Configuration file
     ├── data_acquisition.py # Handles data and SPICE kernel acquisition
-    ├── flux.py             # Flux and potential calculation logic
-    ├── kappa_fitter.py     # Kappa distribution fitting
+    ├── flux.py             # ER flux + loss-cone fitting
+    ├── kappa.py            # Kappa distribution fitting utilities
     ├── model.py            # Core modeling components
-    ├── potential_mapper.py # Potential mapping logic
+    ├── potential_mapper/   # Modular potential mapping package
+    │   ├── __init__.py
+    │   ├── __main__.py     # Enables `python -m src.potential_mapper`
+    │   ├── cli.py          # CLI argument parsing and entrypoint
+    │   ├── pipeline.py     # File discovery, processing, orchestration
+    │   ├── coordinates.py  # Frame transforms, projections, intersections
+    │   ├── plot.py         # Plotting utilities
+    │   └── results.py      # Typed results container
     └── utils/              # Utility functions module
         ├── __init__.py
         ├── attitude.py

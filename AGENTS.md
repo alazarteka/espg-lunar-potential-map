@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-- `src/`: Core Python package (e.g., `config.py`, `data_acquisition.py`, `flux.py`, `kappa.py`, `potential_mapper.py`, plus `physics/` and `utils/`).
+- `src/`: Core Python package (e.g., `config.py`, `data_acquisition.py`, `flux.py`, `kappa.py`, `potential_mapper/`, plus `physics/` and `utils/`).
 - `tests/`: Pytest suite (`test_*.py`, with scopes like `physics/`, `utils/").
 - `data/`: Runtime data; `data/spice_kernels/` populated by acquisition; commit only small metadata (e.g., `kernels.lock").
 - `scripts/`: One-off analysis/profiling helpers.
