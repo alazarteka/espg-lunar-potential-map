@@ -208,8 +208,11 @@ class DataManager:
             logger.info("All files already exist, skipping downloads")
             return
 
+        existing = len(urls_and_dests) - len(remaining_tasks)
         logger.info(
-            f"Downloading {len(remaining_tasks)} files ({len(urls_and_dests) - len(remaining_tasks)} already exist)"
+            "Downloading %d files (%d already exist)",
+            len(remaining_tasks),
+            existing,
         )
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:

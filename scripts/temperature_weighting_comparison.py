@@ -1,13 +1,12 @@
 import glob
+import multiprocessing as mp
 import os
 import sys
-import multiprocessing as mp
-from multiprocessing.queues import Queue as MPQueue
-from multiprocessing import Process
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from pathlib import Path
-from typing import Optional, Tuple, List, Dict
 import time
+from multiprocessing import Process
+from multiprocessing.queues import Queue as MPQueue
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 # Prevent BLAS/OpenMP oversubscription in workers and avoid after-fork hangs
 # Set thread caps before importing numpy/scipy/matplotlib
@@ -21,23 +20,26 @@ for _v in _THREAD_VARS:
     os.environ.setdefault(_v, "1")
 
 import matplotlib
+
 matplotlib.use("Agg")
+import queue as queue_mod
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 import src.config as config
 from src.flux import ERData
-from src.kappa import Kappa, FitResults
+from src.kappa import FitResults, Kappa
 from src.spacecraft_potential import theta_to_temperature_ev
-from concurrent.futures import TimeoutError as FuturesTimeout
-import queue as queue_mod
 
 # Optional: per-task timeout (seconds) to prevent a stuck file from stalling all work
 FILE_TIMEOUT_S = float(os.environ.get("TEMP_WEIGHTING_FILE_TIMEOUT_S", "600"))
 # Hard wall-time budget inside worker for one file (seconds); returns partial results
 FILE_WALLTIME_S = float(os.environ.get("TEMP_WEIGHTING_FILE_WALLTIME_S", "900"))
 # Parent-side kill timeout for a single file task (seconds)
-PARENT_KILL_TIMEOUT_S = float(os.environ.get("TEMP_WEIGHTING_PARENT_KILL_TIMEOUT_S", str(FILE_WALLTIME_S + 300)))
+PARENT_KILL_TIMEOUT_S = float(
+    os.environ.get("TEMP_WEIGHTING_PARENT_KILL_TIMEOUT_S", str(FILE_WALLTIME_S + 300))
+)
 # Number of random starts per fit (override via env for speed/testing)
 FIT_STARTS = int(os.environ.get("TEMP_WEIGHTING_FIT_STARTS", "10"))
 
@@ -151,14 +153,15 @@ def main() -> None:
     active: Dict[str, tuple[Process, float]] = {}
     pending = list(data_files)
 
-    from tqdm import tqdm
     with tqdm(total=len(data_files), desc="Files", unit="file") as pbar:
         # Launch initial batch
         while pending or active:
             # Start new tasks if capacity
             while pending and len(active) < n_workers:
                 f = pending.pop(0)
-                p = mp_ctx.Process(target=_worker_entry, args=(f, result_q), daemon=True)
+                p = mp_ctx.Process(
+                    target=_worker_entry, args=(f, result_q), daemon=True
+                )
                 p.start()
                 active[f] = (p, time.monotonic())
 
@@ -221,12 +224,32 @@ def main() -> None:
     # 1) Overlay histogram of Te (weighted vs unweighted)
     plt.figure(figsize=(10, 6))
     bins = np.geomspace(
-        max(1e-2, np.nanpercentile(np.concatenate([te_weighted_arr, te_unweighted_arr]), 0.5)),
-        max(2.0, np.nanpercentile(np.concatenate([te_weighted_arr, te_unweighted_arr]), 99.5)),
+        max(
+            1e-2,
+            np.nanpercentile(np.concatenate([te_weighted_arr, te_unweighted_arr]), 0.5),
+        ),
+        max(
+            2.0,
+            np.nanpercentile(
+                np.concatenate([te_weighted_arr, te_unweighted_arr]), 99.5
+            ),
+        ),
         80,
     )
-    plt.hist(te_weighted_arr, bins=bins, alpha=0.5, label="Te weighted", histtype="stepfilled")
-    plt.hist(te_unweighted_arr, bins=bins, alpha=0.5, label="Te unweighted", histtype="stepfilled")
+    plt.hist(
+        te_weighted_arr,
+        bins=bins,
+        alpha=0.5,
+        label="Te weighted",
+        histtype="stepfilled",
+    )
+    plt.hist(
+        te_unweighted_arr,
+        bins=bins,
+        alpha=0.5,
+        label="Te unweighted",
+        histtype="stepfilled",
+    )
     plt.xscale("log")
     plt.yscale("log")
     plt.xlabel("Electron temperature Te (eV)")

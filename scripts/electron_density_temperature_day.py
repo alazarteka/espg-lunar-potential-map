@@ -9,8 +9,8 @@ import src.config as config
 from src.flux import ERData
 from src.kappa import Kappa
 from src.potential_mapper.pipeline import DataLoader
-from src.spacecraft_potential import theta_to_temperature_ev
 from src.potential_mapper.spice import load_spice_files
+from src.spacecraft_potential import theta_to_temperature_ev
 from src.utils.units import ureg
 
 
@@ -70,7 +70,9 @@ def compute_series(
         try:
             k = Kappa(er_data, spec_no=int(spec_no))
             # Original density (cm^-3)
-            n_cm3 = k.density_estimate.to(ureg.particle / (ureg.centimeter ** 3)).magnitude
+            n_cm3 = k.density_estimate.to(
+                ureg.particle / (ureg.centimeter**3)
+            ).magnitude
             dens_orig.append(float(n_cm3))
 
             # Original fit temperature (eV)
@@ -89,9 +91,11 @@ def compute_series(
                 temp_corr_ev.append(np.nan)
             else:
                 d_mag, kappa_val, theta_val = cfit.params.to_tuple()
-                n_corr_cm3 = (d_mag * ureg.particle / (ureg.meter ** 3)).to(
-                    ureg.particle / (ureg.centimeter ** 3)
-                ).magnitude
+                n_corr_cm3 = (
+                    (d_mag * ureg.particle / (ureg.meter**3))
+                    .to(ureg.particle / (ureg.centimeter**3))
+                    .magnitude
+                )
                 dens_corr.append(float(n_corr_cm3))
                 Te_corr_ev = theta_to_temperature_ev(theta_val, kappa_val)
                 temp_corr_ev.append(float(Te_corr_ev))
@@ -120,13 +124,15 @@ def plot_series(
     display: bool,
 ) -> None:
     x = np.arange(len(dens_orig))
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True, constrained_layout=True)
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, figsize=(10, 6), sharex=True, constrained_layout=True
+    )
 
     # Density
     ax1.plot(x, dens_orig, lw=1, label="density (orig)")
     ax1.plot(x, dens_corr, lw=1, label="density (corrected)")
     ax1.set_ylabel("Density (cm$^{-3}$)")
-    ax1.set_yscale('log')
+    ax1.set_yscale("log")
     ax1.grid(True, alpha=0.3)
     ax1.legend(loc="best")
 
@@ -164,7 +170,9 @@ def main() -> None:
     dens_orig, temp_orig_ev, dens_corr, temp_corr_ev = compute_series(
         er_data, verbose=args.verbose, use_weights=args.use_weights
     )
-    plot_series(dens_orig, temp_orig_ev, dens_corr, temp_corr_ev, args.output, args.display)
+    plot_series(
+        dens_orig, temp_orig_ev, dens_corr, temp_corr_ev, args.output, args.display
+    )
 
 
 if __name__ == "__main__":

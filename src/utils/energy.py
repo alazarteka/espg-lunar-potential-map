@@ -25,4 +25,3 @@ def make_relative_energy_bounds(
     lower = (1.0 - half) * energy_centers
     upper = (1.0 - (-half)) * energy_centers  # (1 + half) * centers, preserves units
     return np.column_stack([lower, upper])
-

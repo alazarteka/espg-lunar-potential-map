@@ -1,4 +1,3 @@
-import argparse
 import cProfile
 import pstats
 import time
@@ -6,8 +5,8 @@ from io import StringIO
 
 import src.config as config
 from src.potential_mapper.cli import parse_arguments
-from src.potential_mapper.spice import load_spice_files
 from src.potential_mapper.pipeline import run
+from src.potential_mapper.spice import load_spice_files
 
 
 def main() -> None:
@@ -47,4 +46,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -232,10 +232,12 @@ def omnidirectional_flux_integrated(
         parameters (KappaParams): Kappa distribution parameters.
         energy_bounds (Energy): Energy bounds for integration, should be a 2D array-like
             with shape (n, 2) where n is the number of energy ranges.
-        n_samples (int): Number of samples to use for integration. Must be an odd positive integer.
+        n_samples (int): Number of samples to use for integration. Must be an
+            odd positive integer.
 
     Returns:
-        IntegratedFlux: The integrated omnidirectional flux over the specified energy range.
+        IntegratedFlux: The integrated omnidirectional flux over the
+        specified energy range.
     """
     if __debug__:
         if not isinstance(

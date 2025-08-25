@@ -56,7 +56,8 @@ def get_intersections_or_none_batch(
         radius: Sphere radius (kilometers).
 
     Returns:
-        points: Array of intersection points, shape (N, 3) with NaNs where no intersection.
+        points: Array of intersection points, shape (N, 3) with NaNs where no
+            intersection.
         mask: Boolean array (N,) True where a valid forward intersection exists.
     """
     if pos.ndim != 2 or pos.shape[1] != 3:
@@ -99,7 +100,9 @@ def get_intersections_or_none_batch(
     t1_pos = t1 > 0.0
     t2_pos = t2 > 0.0
     t = np.where(
-        t1_pos & t2_pos, np.minimum(t1, t2), np.where(t1_pos, t1, np.where(t2_pos, t2, np.nan))
+        t1_pos & t2_pos,
+        np.minimum(t1, t2),
+        np.where(t1_pos, t1, np.where(t2_pos, t2, np.nan)),
     )
 
     valid = valid_dir & has_real & np.isfinite(t)

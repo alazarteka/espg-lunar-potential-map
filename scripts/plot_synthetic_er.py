@@ -1,5 +1,5 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 from src import config
 from src.flux import PitchAngle
@@ -13,6 +13,7 @@ def compute_pitch_sets(b_hat: np.ndarray, look: np.ndarray) -> dict[str, np.ndar
     - inv_look:  +B and -look ("coming from")
     - inv_B:  -B and +look
     """
+
     def ang(cosv):
         return np.degrees(np.arccos(np.clip(cosv, -1.0, 1.0)))
 
@@ -98,4 +99,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

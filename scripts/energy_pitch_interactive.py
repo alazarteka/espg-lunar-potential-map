@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import plotly.graph_objects as go
@@ -20,8 +20,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--year", type=int, required=True)
     parser.add_argument("--month", type=int, required=True)
     parser.add_argument("--day", type=int, required=True)
-    parser.add_argument("--output", type=str, default=None, help="Save HTML to this path")
-    parser.add_argument("-d", "--display", action="store_true", default=False, help="Open in browser")
+    parser.add_argument(
+        "--output", type=str, default=None, help="Save HTML to this path"
+    )
+    parser.add_argument(
+        "-d", "--display", action="store_true", default=False, help="Open in browser"
+    )
     parser.add_argument(
         "--include-zeros",
         action="store_true",
@@ -100,17 +104,12 @@ def build_spec_points(
     yw_pts = y_widths.reshape(-1)
     # Keep only finite values with positive energy and finite flux
     mask_valid = (
-        np.isfinite(x_pts)
-        & (x_pts > 0)
-        & np.isfinite(y_pts)
-        & np.isfinite(f_pts)
+        np.isfinite(x_pts) & (x_pts > 0) & np.isfinite(y_pts) & np.isfinite(f_pts)
     )
     return x_pts[mask_valid], y_pts[mask_valid], f_pts[mask_valid], yw_pts[mask_valid]
 
 
-def build_all_frames(
-    er: ERData, pa: PitchAngle
-) -> Tuple[
+def build_all_frames(er: ERData, pa: PitchAngle) -> Tuple[
     Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
     float,
     float,
@@ -180,7 +179,9 @@ def make_figure(
 ) -> go.Figure:
     # Initial spectrum: pick first with data, else first entry
     initial_sn = int(first_nonempty if first_nonempty is not None else int(spec_nos[0]))
-    x0, y0, f0, yw0 = data_by_spec.get(initial_sn, (np.array([]), np.array([]), np.array([]), np.array([])))
+    x0, y0, f0, yw0 = data_by_spec.get(
+        initial_sn, (np.array([]), np.array([]), np.array([]), np.array([]))
+    )
     # Common log-color mapping setup
     eps = 1e-300
     cmin_log = np.log10(max(eps, vmin))
@@ -218,7 +219,9 @@ def make_figure(
                     x=x0_non,
                     y=y0_non,
                     mode="markers",
-                    marker=dict(size=7, color="#C0C0C0", line=dict(color="#666", width=0.4)),
+                    marker=dict(
+                        size=7, color="#C0C0C0", line=dict(color="#666", width=0.4)
+                    ),
                     hoverinfo="skip",
                     name="flux<=0",
                 )
@@ -242,7 +245,15 @@ def make_figure(
                     coloraxis="coloraxis",
                     line=dict(color="#222", width=0.2),
                 ),
-                customdata=np.stack([base0[pos_mask0], base0[pos_mask0] + width0[pos_mask0], f0[pos_mask0], 0.5 * yw0[pos_mask0]], axis=-1),
+                customdata=np.stack(
+                    [
+                        base0[pos_mask0],
+                        base0[pos_mask0] + width0[pos_mask0],
+                        f0[pos_mask0],
+                        0.5 * yw0[pos_mask0],
+                    ],
+                    axis=-1,
+                ),
                 hovertemplate=(
                     "Energy: %{customdata[0]:.3g}–%{customdata[1]:.3g} eV"
                     "<br>Pitch: %{y:.1f}° (±%{customdata[3]:.1f}°)"
@@ -259,7 +270,9 @@ def make_figure(
                     y=y0[~pos_mask0],
                     base=base0[~pos_mask0],
                     orientation="h",
-                    width=(bar_width_deg if bar_width_deg is not None else yw0[~pos_mask0]),
+                    width=(
+                        bar_width_deg if bar_width_deg is not None else yw0[~pos_mask0]
+                    ),
                     marker=dict(color="#C0C0C0", line=dict(color="#666", width=0.2)),
                     hoverinfo="skip",
                     name="flux<=0",
@@ -301,7 +314,9 @@ def make_figure(
                         x=x[~pos_mask],
                         y=y[~pos_mask],
                         mode="markers",
-                        marker=dict(size=7, color="#C0C0C0", line=dict(color="#666", width=0.4)),
+                        marker=dict(
+                            size=7, color="#C0C0C0", line=dict(color="#666", width=0.4)
+                        ),
                         hoverinfo="skip",
                         name="flux<=0",
                     )
@@ -315,13 +330,23 @@ def make_figure(
                     y=y[pos_mask],
                     base=base[pos_mask],
                     orientation="h",
-                    width=(bar_width_deg if bar_width_deg is not None else yw[pos_mask]),
+                    width=(
+                        bar_width_deg if bar_width_deg is not None else yw[pos_mask]
+                    ),
                     marker=dict(
                         color=np.log10(np.clip(f[pos_mask], eps, None)),
                         coloraxis="coloraxis",
                         line=dict(color="#222", width=0.2),
                     ),
-                    customdata=np.stack([base[pos_mask], base[pos_mask] + width[pos_mask], f[pos_mask], 0.5 * yw[pos_mask]], axis=-1),
+                    customdata=np.stack(
+                        [
+                            base[pos_mask],
+                            base[pos_mask] + width[pos_mask],
+                            f[pos_mask],
+                            0.5 * yw[pos_mask],
+                        ],
+                        axis=-1,
+                    ),
                     hovertemplate=(
                         "Energy: %{customdata[0]:.3g}–%{customdata[1]:.3g} eV"
                         "<br>Pitch: %{y:.1f}° (±%{customdata[3]:.1f}°)"
@@ -337,8 +362,14 @@ def make_figure(
                         y=y[~pos_mask],
                         base=base[~pos_mask],
                         orientation="h",
-                        width=(bar_width_deg if bar_width_deg is not None else yw[~pos_mask]),
-                        marker=dict(color="#C0C0C0", line=dict(color="#666", width=0.2)),
+                        width=(
+                            bar_width_deg
+                            if bar_width_deg is not None
+                            else yw[~pos_mask]
+                        ),
+                        marker=dict(
+                            color="#C0C0C0", line=dict(color="#666", width=0.2)
+                        ),
                         hoverinfo="skip",
                         name="flux<=0",
                     )
@@ -384,7 +415,11 @@ def make_figure(
     layout = go.Layout(
         title=title,
         template="plotly_white",
-        xaxis=dict(title="Energy (eV)", type="log", range=[np.log10(x_range[0]), np.log10(x_range[1])]),
+        xaxis=dict(
+            title="Energy (eV)",
+            type="log",
+            range=[np.log10(x_range[0]), np.log10(x_range[1])],
+        ),
         yaxis=dict(title="Pitch angle (deg)", range=[y_range[0], y_range[1]]),
         coloraxis=coloraxis,
         sliders=[
@@ -424,7 +459,10 @@ def make_figure(
                         "method": "animate",
                         "args": [
                             [None],
-                            {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"},
+                            {
+                                "frame": {"duration": 0, "redraw": False},
+                                "mode": "immediate",
+                            },
                         ],
                     },
                 ],
@@ -444,11 +482,11 @@ def main() -> None:
     er = ERData(str(day_file))
     pa = PitchAngle(er, str(config.DATA_DIR / config.THETA_FILE))
 
-    data_by_spec, vmin, vmax, spec_nos, x_range, y_range, first_nonempty = build_all_frames(er, pa)
-
-    title = (
-        f"Flux vs Energy/Pitch — {args.year:04d}-{args.month:02d}-{args.day:02d}"
+    data_by_spec, vmin, vmax, spec_nos, x_range, y_range, first_nonempty = (
+        build_all_frames(er, pa)
     )
+
+    title = f"Flux vs Energy/Pitch — {args.year:04d}-{args.month:02d}-{args.day:02d}"
     fig = make_figure(
         data_by_spec,
         spec_nos,

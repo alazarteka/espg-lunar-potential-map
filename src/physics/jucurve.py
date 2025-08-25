@@ -10,7 +10,8 @@ class JUCoefficients:
     Coefficients for the J-U curve.
 
     The curve is a double exponential function: J(U) = A * exp(-U / B) + C * exp(-U / D)
-    See https://doi.org/10.1029/2008JA013194 for more details. Equation and values described in paragraph 23 (page 4).
+    See https://doi.org/10.1029/2008JA013194 for more details. Equation and
+    values described in paragraph 23 (page 4).
     """
 
     A: float = 1.07e-6  # A/m^2
@@ -21,9 +22,11 @@ class JUCoefficients:
 
 def J_of_U(U: float, coefficients=JUCoefficients()):
     """
-    Calculate the current density from the spacecraft J for a given electric spacecraft potential U.
+    Calculate the current density from the spacecraft J for a given electric
+    spacecraft potential U.
 
-    The spacecraft emits electrons by the photoelectric effect, and this function uses the J-U curve coefficients to compute the current density.
+    The spacecraft emits electrons by the photoelectric effect, and this
+    function uses the J-U curve coefficients to compute the current density.
 
     Args:
         U (float): The electric field strength in volts.

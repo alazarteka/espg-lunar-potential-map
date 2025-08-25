@@ -50,7 +50,8 @@ CM2_TO_M2_FACTOR = 1.0e4  # unit conversion: cm^-2 → m^-2
 
 def theta_to_temperature_ev(theta: float, kappa: float) -> float:
     """
-    Helper function to convert the thermal spread parameter theta to electron temperature in eV.
+    Helper function to convert the thermal spread parameter theta to electron
+    temperature in eV.
 
     Args:
         theta (float): The thermal spread parameter in m/s.
@@ -71,7 +72,8 @@ def theta_to_temperature_ev(theta: float, kappa: float) -> float:
 
 def temperature_ev_to_theta(temperature_ev: float, kappa: float) -> float:
     """
-    Helper function to convert electron temperature in eV to the thermal spread parameter theta.
+    Helper function to convert electron temperature in eV to the thermal
+    spread parameter theta.
 
     Args:
         temperature_ev (float): The electron temperature in eV.

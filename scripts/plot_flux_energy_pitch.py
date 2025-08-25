@@ -113,9 +113,11 @@ def main() -> None:
         linewidths=0,
     )
     cbar = fig.colorbar(sc, ax=ax)
-    cbar.set_label("Flux [particles cm$^{-2}$ s$^{-1}$ sr$^{-1}$ eV$^{-1}$]", color="white")
+    cbar.set_label(
+        "Flux [particles cm$^{-2}$ s$^{-1}$ sr$^{-1}$ eV$^{-1}$]", color="white"
+    )
     cbar.ax.yaxis.set_tick_params(color="white")
-    plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')
+    plt.setp(plt.getp(cbar.ax.axes, "yticklabels"), color="white")
 
     ax.set_xscale("log")
     ax.set_xlabel("Energy (eV)", color="white")

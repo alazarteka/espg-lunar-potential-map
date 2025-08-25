@@ -46,8 +46,9 @@ class ERData:
         """
         Load the ER data from the specified file.
 
-        Reads the specified file into a pandas DataFrame, using the column names defined in ALL_COLS.
-        If the file is not found, or if there is an error parsing the file, the data attribute is set to None.
+        Reads the specified file into a pandas DataFrame, using the column names
+        defined in ALL_COLS. If the file is not found, or if there is an error
+        parsing the file, the data attribute is set to None.
         """
         try:
             self.data = pd.read_csv(
@@ -63,7 +64,10 @@ class ERData:
             self.data = pd.DataFrame()
         except pd.errors.ParserError:
             logger.error(
-                f"Error: The file {self.er_data_file} could not be parsed. Please check the file format."
+                (
+                    f"Error: The file {self.er_data_file} could not be parsed. "
+                    "Please check the file format."
+                )
             )
             self.data = pd.DataFrame()
         except Exception as e:
@@ -106,7 +110,12 @@ class ERData:
 
             removed_rows = original_rows - len(self.data)
             logger.debug(
-                f"Removed {removed_rows} rows ({removed_rows / original_rows * 100:.1f}%) from {len(invalid_spec_nos)} invalid sweeps"
+                (
+                    "Removed %d rows (%.1f%%) from %d invalid sweeps"
+                ),
+                removed_rows,
+                (removed_rows / original_rows * 100.0),
+                len(invalid_spec_nos),
             )
 
     def _add_count_columns(self) -> None:
@@ -132,7 +141,11 @@ class ERData:
             n_negative = np.sum(negative_flux_mask)
             total_values = negative_flux_mask.size
             logger.debug(
-                f"Found {n_negative} negative flux values ({n_negative / total_values * 100:.2f}%) - clamping to zero"
+                (
+                    "Found %d negative flux values (%.2f%%) - clamping to zero"
+                ),
+                n_negative,
+                (n_negative / total_values * 100.0),
             )
 
             F = np.maximum(F, 0 * F.units)
@@ -161,7 +174,9 @@ class PitchAngle:
     """
     Initialize the PitchAngle class with the ER data and theta values.
 
-    Data rows with invalid B-field are retained; all such rows are flagged via valid_mask and their derived quantities are NaN. Down-stream algorithms must honor this mask.
+    Data rows with invalid B-field are retained; all such rows are flagged via
+    valid_mask and their derived quantities are NaN. Down-stream algorithms
+    must honor this mask.
 
     Attributes:
         er_data: The ER data object.
@@ -244,9 +259,9 @@ class PitchAngle:
         """
         Calculate the pitch angles based on the loaded ER data and theta values.
 
-        The pitch angle is the angle between the magnetic field line and the radial direction.
-        It is calculated as the arccosine of the dot product between the unit magnetic field
-        vector and the radial direction vector.
+        The pitch angle is the angle between the magnetic field line and the
+        radial direction. It is calculated as the arccosine of the dot product
+        between the unit magnetic field vector and the radial direction vector.
         """
         # Check if data is loaded
         assert (
@@ -272,7 +287,8 @@ class LossConeFitter:
         Args:
             er_data (ERData): The ER data object.
             thetas (str): The path to the theta values file.
-            pitch_angle (PitchAngle, optional): Pre-computed pitch angle object. If None, creates a new one.
+            pitch_angle (PitchAngle, optional): Pre-computed pitch angle
+                object. If None, creates a new one.
         """
         self.er_data = er_data
         self.thetas = np.loadtxt(thetas, dtype=np.float64)
@@ -307,7 +323,8 @@ class LossConeFitter:
             measurement_chunk (int): The index of the measurement chunk.
 
         Returns:
-            np.ndarray: The normalized flux for the specified energy bin and measurement chunk.
+            np.ndarray: The normalized flux for the specified energy bin and
+                measurement chunk.
         """
         assert (
             not self.er_data.data.empty
@@ -325,7 +342,8 @@ class LossConeFitter:
             return np.full(config.CHANNELS, np.nan)
         angles = self.pitch_angle.pitch_angles[index]
         incident_mask = angles < 90
-        reflected_mask = ~incident_mask
+        # TODO: Check reconsider the reflected mask
+        # reflected_mask = ~incident_mask
 
         # Check if the electron flux is valid
         if not incident_mask.any():
@@ -352,7 +370,8 @@ class LossConeFitter:
             measurement_chunk (int): The index of the measurement chunk.
 
         Returns:
-            np.ndarray: The 2D normalized flux distribution for the specified measurement chunk.
+            np.ndarray: The 2D normalized flux distribution for the specified
+                measurement chunk.
         """
         # Check if data is loaded
         assert (
@@ -419,7 +438,7 @@ class LossConeFitter:
         if norm2d.shape[0] > actual_rows:
             norm2d = norm2d[:actual_rows]
 
-        # objective ---------------------------------------------------------------------
+        # Objective
         def chi2(params):
             delta_U, bs_over_bm = params
             model = synth_losscone(energies, pitches, delta_U, bs_over_bm)

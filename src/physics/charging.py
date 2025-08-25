@@ -20,7 +20,8 @@ def electron_current_density(
     n_steps: int = 100,
 ) -> CurrentDensityType:
     """
-    Calculate the electron current density for a given set of parameters describing the plasma.
+    Calculate the electron current density for a given set of parameters
+    describing the plasma.
 
     Args:
         params (KappaParams): The parameters describing the plasma.
@@ -68,7 +69,8 @@ def electron_current_density_magnitude(
     n_steps: int = 100,
 ) -> float:
     """
-    Calculate the electron current density for a given set of parameters describing the plasma.
+    Calculate the electron current density for a given set of parameters
+    describing the plasma.
 
     Meant to be used with scalar values. Expects magnitudes in the following units:
     - Density: particles / m^3

@@ -19,6 +19,7 @@ from .coordinates import (
     lat_lon_to_cartesian,
     ra_dec_to_unit,
 )
+from .energy import make_relative_energy_bounds
 from .file_ops import list_files, list_folder_files
 from .geometry import get_intersection_or_none
 from .spice_ops import (
@@ -27,7 +28,6 @@ from .spice_ops import (
     get_lp_vector_to_sun_in_lunar_frame,
     get_sun_vector_wrt_moon,
 )
-from .energy import make_relative_energy_bounds
 
 # Re-export for backward compatibility
 __all__ = [

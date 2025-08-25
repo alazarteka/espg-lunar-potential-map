@@ -1,5 +1,4 @@
 import argparse
-from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
@@ -41,7 +40,9 @@ def select_day_file(year: int, month: int, day: int) -> Path:
     return files[0]
 
 
-def plot_timeseries(times: np.ndarray, potentials: np.ndarray, output: str | None, display: bool) -> None:
+def plot_timeseries(
+    times: np.ndarray, potentials: np.ndarray, output: str | None, display: bool
+) -> None:
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.plot(times, potentials, marker="o", linestyle="-", markersize=2)
     ax.set_xlabel("Index (spectrum order)")

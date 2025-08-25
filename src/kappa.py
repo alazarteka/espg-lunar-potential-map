@@ -39,9 +39,11 @@ class FitResults:
 
     Attributes:
         params (KappaParams): The best-fit parameters.
-        params_uncertainty (KappaParams): The 1-sigma uncertainties of the fit parameters.
+        params_uncertainty (KappaParams): The 1-sigma uncertainties of the fit
+            parameters.
         error (float): The final chi-squared error of the fit.
-        is_good_fit (bool): A flag indicating if the fit is considered reliable.
+        is_good_fit (bool): A flag indicating if the fit is considered
+            reliable.
     """
 
     params: KappaParams
@@ -54,8 +56,9 @@ class Kappa:
     """
     Class for handling kappa distribution fitting and evaluation.
 
-    This class prepares the data for fitting, estimates the density, and provides methods
-    to fit the kappa distribution parameters (kappa and theta) to the data.
+    This class prepares the data for fitting, estimates the density, and
+    provides methods to fit the kappa distribution parameters (kappa and
+    theta) to the data.
     """
 
     DEFAULT_BOUNDS = [(2.5, 6.0), (6, 8)]  # kappa  # theta in log m/s
@@ -104,7 +107,10 @@ class Kappa:
                 ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
             ):
                 raise TypeError(
-                    "omnidirectional_differential_particle_flux must be a pint Quantity (OmnidirectionalFlux)"
+                    (
+                        "omnidirectional_differential_particle_flux must be a "
+                        "pint Quantity (OmnidirectionalFlux)"
+                    )
                 )
             if not isinstance(
                 self.energy_centers, Quantity
@@ -127,8 +133,9 @@ class Kappa:
         """
         Prepare the data for fitting.
 
-        This method extracts the relevant data for the specified `spec_no` from the `ERData` object,
-        calculates the sum of the electron flux over valid pitch angles, and sets the energy windows.
+        This method extracts the relevant data for the specified `spec_no` from
+        the `ERData` object, calculates the sum of the electron flux over valid
+        pitch angles, and sets the energy windows.
         """
         if self.spec_no not in self.er_data.data[config.SPEC_NO_COLUMN].values:
             logging.warning(f"Spec no {self.spec_no} not found in ERData.")
@@ -215,8 +222,8 @@ class Kappa:
         """
         Original objective function for optimization.
 
-        This function computes the squared difference between the log of the model differential flux
-        and the log of the measured flux.
+        Computes the squared difference between the log of the model
+        differential flux and the log of the measured flux.
 
         Args:
             kappa_theta (np.ndarray): Array containing kappa and log10(theta).
@@ -252,7 +259,10 @@ class Kappa:
                 omnidirectional_flux_units
             ):
                 raise TypeError(
-                    "model_differential_flux must be a pint Quantity (OmnidirectionalFlux)"
+                    (
+                        "model_differential_flux must be a pint Quantity "
+                        "(OmnidirectionalFlux)"
+                    )
                 )
             if not isinstance(
                 self.omnidirectional_differential_particle_flux, Quantity
@@ -260,7 +270,10 @@ class Kappa:
                 omnidirectional_flux_units
             ):
                 raise TypeError(
-                    "omnidirectional_differential_particle_flux must be a pint Quantity (OmnidirectionalFlux)"
+                    (
+                        "omnidirectional_differential_particle_flux must be a "
+                        "pint Quantity (OmnidirectionalFlux)"
+                    )
                 )
 
         log_model_differential_flux = np.log(
@@ -325,7 +338,7 @@ class Kappa:
         ln_energy_centers = np.log(energy_centers)
 
         # Convert relative width to Gaussian sigma in log-energy space
-        # The asinh transformation helps handle the conversion from relative to log space
+        # The asinh transform helps convert relative width to log space
         s = math.asinh(0.5 * energy_window_width_relative) / math.sqrt(
             2.0 * math.log(2.0)
         )
@@ -340,7 +353,8 @@ class Kappa:
         self, kappa_theta: np.ndarray, use_weights: bool, use_convolution: bool = True
     ) -> float:
         """
-        Fast Objective function for optimization using fast omnidirectional flux calculation.
+        Fast objective for optimization using the fast
+        omnidirectional flux calculation.
 
         Args:
             kappa_theta (np.ndarray): Array containing kappa and log10(theta).
@@ -397,7 +411,10 @@ class Kappa:
                 ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
             ):
                 raise TypeError(
-                    "omnidirectional_differential_particle_flux must be a pint Quantity (OmnidirectionalFlux)"
+                    (
+                        "omnidirectional_differential_particle_flux must be a "
+                        "pint Quantity (OmnidirectionalFlux)"
+                    )
                 )
             if not isinstance(
                 self.energy_centers, Quantity
@@ -436,7 +453,7 @@ class Kappa:
             use_fast (bool): Whether to use the fast objective function.
 
         Returns:
-            FitResults | None: An object containing the fit results, or None if the fit fails.
+            FitResults | None: The fit results, or None if the fit fails.
         """
         if not self.is_data_valid:
             raise ValueError(
@@ -541,8 +558,9 @@ class Kappa:
             3) Map κ temperature to ambient at U, build corrected params and return
 
         Returns:
-            (FitResults, float) | (None, None): Best-fit (possibly corrected) parameters and
-            spacecraft potential U [V], or (None, None) if fitting fails or geometry unavailable.
+            (FitResults, float) | (None, None): Best-fit (possibly corrected)
+            parameters and spacecraft potential U [V], or (None, None) if
+            fitting fails or geometry unavailable.
         """
         if not self.is_data_valid:
             raise ValueError(
@@ -581,7 +599,8 @@ class Kappa:
         if not original_fit or not original_fit.is_good_fit:
             return None, None
 
-        # Daylight branch: JU inversion + energy pre-shift + refit (mirrors spacecraft_potential)
+        # Daylight branch: JU inversion + energy pre-shift + refit
+        # (mirrors spacecraft_potential)
         if is_day:
             original_fit_params = original_fit.params
             Je = electron_current_density_magnitude(
@@ -637,7 +656,9 @@ class Kappa:
                 / config.ELECTRON_MASS_MAGNITUDE
             )
 
-        def sternglass_secondary_yield(E_imp: np.ndarray, E_m: float, delta_m: float) -> np.ndarray:
+        def sternglass_secondary_yield(
+            E_imp: np.ndarray, E_m: float, delta_m: float
+        ) -> np.ndarray:
             out = (
                 7.4
                 * delta_m
@@ -652,14 +673,20 @@ class Kappa:
         energy_grid = np.geomspace(max(E_min_ev, 0.5), E_max_ev, n_steps)
 
         CM2_TO_M2 = 1.0e4
-        def calc_currents(U: float, sey_E_m: float, sey_delta_m: float) -> tuple[float, float, float]:
+
+        def calc_currents(
+            U: float, sey_E_m: float, sey_delta_m: float
+        ) -> tuple[float, float, float]:
             T_c = temperature_uc + U / (kappa - 1.5)
             if T_c <= 0.0:
                 BIG = 1e12
                 return 0.0, 0.0, BIG
             theta_c = temperature_ev_to_theta(T_c, kappa)
             omni = omnidirectional_flux_magnitude(
-                density_mag=density_mag, kappa=kappa, theta_mag=theta_c, energy_mag=energy_grid
+                density_mag=density_mag,
+                kappa=kappa,
+                theta_mag=theta_c,
+                energy_mag=energy_grid,
             )
             flux_to_sc = 0.25 * omni * CM2_TO_M2
             mask = energy_grid >= abs(U)
@@ -674,7 +701,9 @@ class Kappa:
             )
             T_i = T_c + config.EPS
             vth_i = np.sqrt(
-                config.ELECTRON_CHARGE_MAGNITUDE * T_i / (2.0 * np.pi * config.PROTON_MASS_MAGNITUDE)
+                config.ELECTRON_CHARGE_MAGNITUDE
+                * T_i
+                / (2.0 * np.pi * config.PROTON_MASS_MAGNITUDE)
             )
             Ji0 = config.ELECTRON_CHARGE_MAGNITUDE * density_mag * vth_i
             Ji = Ji0 * np.sqrt(max(0.0, 1.0 - U / T_i))
@@ -686,7 +715,9 @@ class Kappa:
 
         sey_E_m, sey_delta_m = 500.0, 1.5
         U_low, U_high = -10.0, 10.0
-        f_low, f_high = balance(U_low, sey_E_m, sey_delta_m), balance(U_high, sey_E_m, sey_delta_m)
+        f_low, f_high = balance(U_low, sey_E_m, sey_delta_m), balance(
+            U_high, sey_E_m, sey_delta_m
+        )
         tries = 0
         while np.sign(f_low) == np.sign(f_high) and tries < 10:
             U_low *= 1.5
@@ -696,7 +727,14 @@ class Kappa:
             return None, None
 
         U_star = float(
-            brentq(balance, U_low, U_high, args=(sey_E_m, sey_delta_m), maxiter=200, xtol=1e-3)
+            brentq(
+                balance,
+                U_low,
+                U_high,
+                args=(sey_E_m, sey_delta_m),
+                maxiter=200,
+                xtol=1e-3,
+            )
         )
         T_c = temperature_uc + U_star / (kappa - 1.5)
         theta_c = temperature_ev_to_theta(T_c, kappa)
@@ -706,9 +744,12 @@ class Kappa:
             theta=theta_c * ureg.meter / ureg.second,
         )
         # Wrap into FitResults with original error/uncertainty since we did not refit
-        return FitResults(
-            params=corrected_params,
-            params_uncertainty=original_fit.params_uncertainty,
-            error=original_fit.error,
-            is_good_fit=original_fit.is_good_fit,
-        ), U_star
+        return (
+            FitResults(
+                params=corrected_params,
+                params_uncertainty=original_fit.params_uncertainty,
+                error=original_fit.error,
+                is_good_fit=original_fit.is_good_fit,
+            ),
+            U_star,
+        )

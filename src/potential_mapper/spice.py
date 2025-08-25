@@ -1,9 +1,9 @@
-from pathlib import Path
 import logging
 
 import spiceypy as spice
 
 import src.config as config
+
 
 def load_spice_files() -> None:
     """

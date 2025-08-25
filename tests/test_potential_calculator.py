@@ -11,6 +11,7 @@ from src.spacecraft_potential import (
 from src.utils.units import ureg
 from tests.test_kappa_fitter import prepare_synthetic_er
 
+
 @pytest.mark.skip_ci
 def test_current_balance_unphysical_temperature_positive(monkeypatch):
     """For very negative U that makes T_c<=0, F(U) should be large positive."""
@@ -28,6 +29,7 @@ def test_current_balance_unphysical_temperature_positive(monkeypatch):
     F = current_balance(U_too_negative, fit, E, sey_E_m=500.0, sey_delta_m=1.5)
     assert F > 0.0
 
+
 @pytest.mark.skip_ci
 def test_shade_potential_moves_toward_zero_with_higher_SEE(monkeypatch):
     """Increasing SEE yield should make U less negative (closer to 0).
@@ -44,9 +46,7 @@ def test_shade_potential_moves_toward_zero_with_higher_SEE(monkeypatch):
         "src.spacecraft_potential.get_intersection_or_none", lambda *args, **kwargs: 0
     )
     # Stub SPICE-dependent calls to avoid kernel access
-    monkeypatch.setattr(
-        "src.spacecraft_potential.spice.str2et", lambda s: 0.0
-    )
+    monkeypatch.setattr("src.spacecraft_potential.spice.str2et", lambda s: 0.0)
     monkeypatch.setattr(
         "src.spacecraft_potential.get_lp_position_wrt_moon", lambda *_: 0
     )
@@ -95,15 +95,14 @@ def test_shade_potential_moves_toward_zero_with_higher_SEE(monkeypatch):
     # U_high should be less negative (numerically larger)
     assert U_high.to(ureg.volt).magnitude > U_low.to(ureg.volt).magnitude
 
+
 @pytest.mark.skip_ci
 def test_day_branch_returns_positive_potential(monkeypatch):
     """In daylight, the calculator should return a positive potential."""
     er = prepare_synthetic_er(theta=1e7)
     # Force day: no intersection (None)
     # Stub SPICE-dependent calls to avoid kernel access
-    monkeypatch.setattr(
-        "src.spacecraft_potential.spice.str2et", lambda s: 0.0
-    )
+    monkeypatch.setattr("src.spacecraft_potential.spice.str2et", lambda s: 0.0)
     monkeypatch.setattr(
         "src.spacecraft_potential.get_lp_position_wrt_moon", lambda *_: 0
     )
@@ -119,6 +118,7 @@ def test_day_branch_returns_positive_potential(monkeypatch):
     assert out is not None
     _, U = out
     assert U.to(ureg.volt).magnitude >= 0.0
+
 
 @pytest.mark.skip_ci
 def test_barrier_empty_gives_zero_Je_Jsee(monkeypatch):

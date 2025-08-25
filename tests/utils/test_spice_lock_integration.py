@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import pytest
 
@@ -25,4 +24,3 @@ def test_local_spice_kernels_match_lock_if_present() -> None:
     assert res.extra == []
     if verify_hashes:
         assert res.mismatched == []
-

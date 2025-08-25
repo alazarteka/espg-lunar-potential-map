@@ -5,6 +5,7 @@ import pytest
 from pint import Quantity
 from scipy.integrate import simpson
 
+from src import config
 from src.physics.kappa import (
     KappaParams,
     directional_flux,
@@ -15,7 +16,6 @@ from src.physics.kappa import (
     omnidirectional_flux_integrated,
     velocity_from_energy,
 )
-from src import config
 from src.utils.energy import make_relative_energy_bounds
 from src.utils.units import (
     SpeedType,

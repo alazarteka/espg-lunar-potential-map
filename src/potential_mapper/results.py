@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+
 @dataclass()
 class PotentialResults:
     """
@@ -15,6 +16,7 @@ class PotentialResults:
     - spacecraft_in_sun: True if LP→Sun line-of-sight does not intersect Moon.
     - projection_in_sun: True if surface normal · Moon→Sun > 0 at intersection.
     """
+
     spacecraft_latitude: np.ndarray
     spacecraft_longitude: np.ndarray
     projection_latitude: np.ndarray

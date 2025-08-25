@@ -1,8 +1,8 @@
 import logging
 from pathlib import Path
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 import src.config as config
 from src.potential_mapper.results import PotentialResults
@@ -46,9 +46,9 @@ def plot_map(
     # Base mask: finite potentials
     mask = np.isfinite(results.projected_potential)
     # Optional illumination filter
-    if illumination == 'day':
+    if illumination == "day":
         mask &= results.projection_in_sun.astype(bool)
-    elif illumination == 'night':
+    elif illumination == "night":
         mask &= ~results.projection_in_sun.astype(bool)
     x = results.projection_longitude[mask]
     y = results.projection_latitude[mask]

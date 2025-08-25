@@ -5,21 +5,18 @@ from pathlib import Path
 import numpy as np
 
 import src.config as config
-from src.flux import (
-    ERData, 
-    PitchAngle, 
-    LossConeFitter
-)
-from src.utils.attitude import load_attitude_data
-from src.utils.geometry import get_intersections_or_none_batch
+from src.flux import ERData, LossConeFitter
+from src.potential_mapper import plot as plot_mod
 from src.potential_mapper.coordinates import (
     CoordinateArrays,
     CoordinateCalculator,
-    project_magnetic_fields,
     find_surface_intersection,
+    project_magnetic_fields,
 )
-from src.potential_mapper import plot as plot_mod
 from src.potential_mapper.results import PotentialResults
+from src.utils.attitude import load_attitude_data
+from src.utils.geometry import get_intersections_or_none_batch
+
 
 class DataLoader:
     """Discover ER files and load auxiliary attitude/theta data.
@@ -30,12 +27,18 @@ class DataLoader:
     """
 
     MONTH_TO_NUM = {
-        "JAN": "01", "FEB": "02",
-        "MAR": "03", "APR": "04",
-        "MAY": "05", "JUN": "06",
-        "JUL": "07", "AUG": "08",
-        "SEP": "09", "OCT": "10",
-        "NOV": "11", "DEC": "12",
+        "JAN": "01",
+        "FEB": "02",
+        "MAR": "03",
+        "APR": "04",
+        "MAY": "05",
+        "JUN": "06",
+        "JUL": "07",
+        "AUG": "08",
+        "SEP": "09",
+        "OCT": "10",
+        "NOV": "11",
+        "DEC": "12",
     }
 
     NUM_TO_MONTH = {v: k for k, v in MONTH_TO_NUM.items()}
@@ -66,7 +69,8 @@ class DataLoader:
         }
 
         candidates = [
-            p for p in data_dir.rglob(f"*{config.EXT_TAB}")
+            p
+            for p in data_dir.rglob(f"*{config.EXT_TAB}")
             if p.is_file() and p.name.lower() not in exclude_basenames
         ]
 
@@ -82,16 +86,19 @@ class DataLoader:
                 ok &= mm in s
             if day is not None:
                 dd = f"{day:02d}"
-                ok &= (f"{dd}{config.EXT_TAB}" in s)
+                ok &= f"{dd}{config.EXT_TAB}" in s
 
             return ok
 
         flux_files = sorted([p for p in candidates if matches_date(p)])
-        logging.debug(f"Discovered {len(flux_files)} candidate ER files under {data_dir}")
+        logging.debug(
+            f"Discovered {len(flux_files)} candidate ER files under {data_dir}"
+        )
         if (year or month or day) and not flux_files:
-            logging.warning("No ER files matched the provided date filters; returning empty list")
+            logging.warning(
+                "No ER files matched the provided date filters; returning empty list"
+            )
         return flux_files
-
 
 
 def process_lp_file(file_path: Path) -> PotentialResults:
@@ -106,11 +113,15 @@ def process_lp_file(file_path: Path) -> PotentialResults:
 
     # Load ER data and attitude
     er_data = ERData(str(file_path))
-    et_spin, ra_vals, dec_vals = load_attitude_data(config.DATA_DIR / config.ATTITUDE_FILE)
+    et_spin, ra_vals, dec_vals = load_attitude_data(
+        config.DATA_DIR / config.ATTITUDE_FILE
+    )
 
     # Coordinates and magnetic field projection
     coord_calc = CoordinateCalculator(et_spin, ra_vals, dec_vals)
-    coord_arrays: CoordinateArrays = coord_calc.calculate_coordinate_transformation(er_data)
+    coord_arrays: CoordinateArrays = coord_calc.calculate_coordinate_transformation(
+        er_data
+    )
     projected_b = project_magnetic_fields(er_data, coord_arrays)
 
     # Intersections on lunar sphere
@@ -126,8 +137,12 @@ def process_lp_file(file_path: Path) -> PotentialResults:
         # Vectorized lat/lon
         r_norm = np.linalg.norm(lp_pos, axis=1)
         valid_lp = r_norm > 0
-        spacecraft_lat[valid_lp] = np.rad2deg(np.arcsin(lp_pos[valid_lp, 2] / r_norm[valid_lp]))
-        spacecraft_lon[valid_lp] = np.rad2deg(np.arctan2(lp_pos[valid_lp, 1], lp_pos[valid_lp, 0]))
+        spacecraft_lat[valid_lp] = np.rad2deg(
+            np.arcsin(lp_pos[valid_lp, 2] / r_norm[valid_lp])
+        )
+        spacecraft_lon[valid_lp] = np.rad2deg(
+            np.arctan2(lp_pos[valid_lp, 1], lp_pos[valid_lp, 0])
+        )
 
     # Projection lat/lon from intersection points
     proj_lat = np.full(n, np.nan)
@@ -138,7 +153,9 @@ def process_lp_file(file_path: Path) -> PotentialResults:
         valid_p = r_norm_p > 0
         proj_lat_masked = np.full(p.shape[0], np.nan)
         proj_lon_masked = np.full(p.shape[0], np.nan)
-        proj_lat_masked[valid_p] = np.rad2deg(np.arcsin(p[valid_p, 2] / r_norm_p[valid_p]))
+        proj_lat_masked[valid_p] = np.rad2deg(
+            np.arcsin(p[valid_p, 2] / r_norm_p[valid_p])
+        )
         proj_lon_masked[valid_p] = np.rad2deg(np.arctan2(p[valid_p, 1], p[valid_p, 0]))
         proj_lat[mask] = proj_lat_masked
         proj_lon[mask] = proj_lon_masked
@@ -156,7 +173,9 @@ def process_lp_file(file_path: Path) -> PotentialResults:
     if np.any(mask):
         n_hat = p / r_norm_p[:, None]
         moon_to_sun = coord_arrays.moon_vectors_to_sun
-        moon_to_sun_hat = moon_to_sun / np.linalg.norm(moon_to_sun, axis=1, keepdims=True)
+        moon_to_sun_hat = moon_to_sun / np.linalg.norm(
+            moon_to_sun, axis=1, keepdims=True
+        )
         dots = np.sum(n_hat * moon_to_sun_hat[mask], axis=1)
         proj_in_sun_masked = dots > 0
         proj_in_sun[mask] = proj_in_sun_masked
@@ -197,8 +216,10 @@ def process_lp_file(file_path: Path) -> PotentialResults:
         projection_in_sun=proj_in_sun,
     )
 
+
 def _concat_results(results: list[PotentialResults]) -> PotentialResults:
     """Concatenate fields from multiple PotentialResults objects (row-wise)."""
+
     def cat(attr: str):
         return np.concatenate([getattr(r, attr) for r in results])
 
@@ -252,6 +273,7 @@ def run(args: argparse.Namespace) -> int:
         if args.display:
             try:
                 import matplotlib.pyplot as plt
+
                 plt.show()
             except Exception:
                 logging.warning("Display requested but matplotlib backend failed.")

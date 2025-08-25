@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-import hashlib
 from typing import Iterable, List, Tuple
 
 
@@ -84,8 +84,12 @@ def verify_kernels_lock(
         if p.is_file() and p.name != lock_path.name
     }
 
-    missing: List[Path] = [kernels_dir / name for name in expected_by_name if name not in actual_files]
-    extra: List[Path] = [path for name, path in actual_files.items() if name not in expected_by_name]
+    missing: List[Path] = [
+        kernels_dir / name for name in expected_by_name if name not in actual_files
+    ]
+    extra: List[Path] = [
+        path for name, path in actual_files.items() if name not in expected_by_name
+    ]
 
     mismatched: List[Tuple[Path, str, str]] = []
     if verify_hashes:
