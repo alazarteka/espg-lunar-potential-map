@@ -27,6 +27,7 @@ from .spice_ops import (
     get_lp_vector_to_sun_in_lunar_frame,
     get_sun_vector_wrt_moon,
 )
+from .energy import make_relative_energy_bounds
 
 # Re-export for backward compatibility
 __all__ = [
@@ -49,4 +50,6 @@ __all__ = [
     "get_time_range",
     # Geometry
     "get_intersection_or_none",
+    # Energy helpers
+    "make_relative_energy_bounds",
 ]

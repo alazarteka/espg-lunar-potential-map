@@ -15,6 +15,8 @@ from src.physics.kappa import (
     omnidirectional_flux_integrated,
     velocity_from_energy,
 )
+from src import config
+from src.utils.energy import make_relative_energy_bounds
 from src.utils.units import (
     SpeedType,
     ureg,
@@ -246,7 +248,9 @@ def test_omnidirectional_flux_integrated_basic(base_kappa_params):
     """Test basic integrated omnidirectional flux calculation."""
 
     energy_centers = np.linspace(1e1, 1e4, num=16) * ureg.electron_volt
-    energy_bounds = np.column_stack([0.75 * energy_centers, 1.25 * energy_centers])
+    energy_bounds = make_relative_energy_bounds(
+        energy_centers, rel_width=config.ENERGY_WINDOW_WIDTH_RELATIVE
+    )
 
     result = omnidirectional_flux_integrated(base_kappa_params, energy_bounds)
 

@@ -201,8 +201,10 @@ class Kappa:
 
         self.energy_centers = energies
         self.energy_centers_mag = energies.to(ureg.electron_volt).magnitude
-        self.energy_windows = np.column_stack(
-            [0.75 * energies, 1.25 * energies]
+        from src.utils.energy import make_relative_energy_bounds
+
+        self.energy_windows = make_relative_energy_bounds(
+            energies, rel_width=config.ENERGY_WINDOW_WIDTH_RELATIVE
         )  # shape (Energy Bins, 2)
 
         self.is_data_valid = True
@@ -306,7 +308,7 @@ class Kappa:
     @jit(nopython=True, cache=True)
     def build_log_energy_response_matrix(
         energy_centers: np.ndarray,
-        energy_window_width_relative: float = 0.5,
+        energy_window_width_relative: float = config.ENERGY_WINDOW_WIDTH_RELATIVE,
     ) -> np.ndarray:
         """
         Build a log-energy response matrix for instrumental energy resolution effects.
