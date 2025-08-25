@@ -13,12 +13,15 @@ dist/
 build/
 
 # =============================================================================
-# Data Directories (downloaded by data.py)
+# Data Directories (populated by src/data_acquisition.py)
 # =============================================================================
 data/*
 !data/.gitkeep
-spice_kernels/*
-!spice_kernels/.gitkeep
+
+!data/spice_kernels/
+data/spice_kernels/*
+!data/spice_kernels/kernels.lock
+
 temp/*
 !temp/.gitkeep
 
