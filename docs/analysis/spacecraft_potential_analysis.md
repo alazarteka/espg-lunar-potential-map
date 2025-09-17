@@ -353,7 +353,7 @@ else:
 * **`theta_to_temperature_ev` / `temperature_ev_to_theta`**
   κ identity; ensure $\kappa>1.5$. Your fitter bounds already enforce this.
 
-* **`sternglass_secondary_yield(E_imp, E_m, delta_m)`**
+* **`sternglass_secondary_yield(impact_energy_ev, peak_energy_ev, peak_yield)`**
   Clamp $E_{\text{imp}}\le0\to0$. Consider exposing alternative yield families if you later need material‑specific curves.
 
 * **`calculate_shaded_currents(U, fit, E, sey_E_m, sey_delta_m)`**
