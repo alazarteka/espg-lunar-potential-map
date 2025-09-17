@@ -30,14 +30,38 @@ def test_current_balance_unphysical_temperature_positive(monkeypatch):
     assert F > 0.0
 
 
+def test_nightside_synthetic_converges(monkeypatch):
+    """Synthetic nightside run should return a finite negative potential."""
+    er = prepare_synthetic_er()
+
+    monkeypatch.setattr("src.spacecraft_potential.spice.str2et", lambda s: 0.0)
+    monkeypatch.setattr(
+        "src.spacecraft_potential.get_lp_position_wrt_moon",
+        lambda *_: np.array([1700.0, 0.0, 0.0]),
+    )
+    monkeypatch.setattr(
+        "src.spacecraft_potential.get_lp_vector_to_sun_in_lunar_frame",
+        lambda *_: np.array([-1.0, 0.0, 0.0]),
+    )
+    monkeypatch.setattr(
+        "src.spacecraft_potential.get_intersection_or_none",
+        lambda *_, **__: np.zeros(3),
+    )
+
+    out = calculate_potential(er, 1)
+    assert out is not None
+    _, potential = out
+    U = potential.to(ureg.volt).magnitude
+    assert U < 0.0
+    assert U == pytest.approx(-14.289, rel=1e-3)
+
+
 @pytest.mark.skip_ci
 def test_shade_potential_moves_toward_zero_with_higher_SEE(monkeypatch):
-    """Increasing SEE yield should make U less negative (closer to 0).
+    """Moderate increase in SEE yield should make U less negative (closer to 0).
 
-    TODO: Occasionally this test cannot bracket a root with the default
-    search (skips in that case). Revisit bracketing strategy or defaults
-    (E_max_ev, bounds, Tc guard) to reduce flakiness and ensure a
-    deterministic bracket on synthetic cases.
+    Very large yields can eliminate the nightside equilibrium altogether;
+    pick deltas ≤1.2 so both runs converge and the trend remains observable.
     """
     er = prepare_synthetic_er(theta=1e7)
 
@@ -58,35 +82,41 @@ def test_shade_potential_moves_toward_zero_with_higher_SEE(monkeypatch):
     fitter = Kappa(er, 1)
     fit = fitter.fit()
     assert fit and fit.is_good_fit
+    def find_bracket(delta: float) -> tuple[float, float]:
+        low, high = -200.0, -0.5
+        f_low = current_balance(low, fit, E, sey_E_m=500.0, sey_delta_m=delta)
+        f_high = current_balance(high, fit, E, sey_E_m=500.0, sey_delta_m=delta)
+        tries = 0
+        while np.sign(f_low) == np.sign(f_high) and tries < 30:
+            low *= 1.5
+            f_low = current_balance(low, fit, E, sey_E_m=500.0, sey_delta_m=delta)
+            tries += 1
+        if np.sign(f_low) == np.sign(f_high):
+            pytest.skip("Could not bracket root for nightside under defaults")
+        return low, high
+
     E_min_ev, E_max_ev, n_steps = 1.0, 2.0e4, 400
     E = np.geomspace(max(E_min_ev, 0.5), E_max_ev, n_steps)
-    low, high = -200.0, -0.5
-    f_low = current_balance(low, fit, E, sey_E_m=500.0, sey_delta_m=1.0)
-    f_high = current_balance(high, fit, E, sey_E_m=500.0, sey_delta_m=1.0)
-    tries = 0
-    while np.sign(f_low) == np.sign(f_high) and tries < 30:
-        low *= 1.5
-        f_low = current_balance(low, fit, E, sey_E_m=500.0, sey_delta_m=1.0)
-        tries += 1
-    if np.sign(f_low) == np.sign(f_high):
-        pytest.skip("Could not bracket root for nightside under defaults")
 
+    low_weak, high = find_bracket(delta=1.0)
     out_low = calculate_potential(
         er,
         1,
         sey_E_m=500.0,
         sey_delta_m=1.0,
         n_steps=n_steps,
-        spacecraft_potential_low=low,
+        spacecraft_potential_low=low_weak,
         spacecraft_potential_high=high,
     )
+
+    low_strong, _ = find_bracket(delta=1.2)
     out_high = calculate_potential(
         er,
         1,
         sey_E_m=500.0,
-        sey_delta_m=2.0,
+        sey_delta_m=1.2,
         n_steps=n_steps,
-        spacecraft_potential_low=low,
+        spacecraft_potential_low=low_strong,
         spacecraft_potential_high=high,
     )
 

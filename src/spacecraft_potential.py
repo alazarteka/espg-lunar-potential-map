@@ -92,26 +92,30 @@ def temperature_ev_to_theta(temperature_ev: float, kappa: float) -> float:
 
 
 def sternglass_secondary_yield(
-    E_imp: np.ndarray, E_m: float = 500, delta_m: float = 1.5
+    impact_energy_ev: np.ndarray,
+    peak_energy_ev: float = 500,
+    peak_yield: float = 1.5,
 ) -> np.ndarray:
     """
     Calculates the Sternglass secondary electron yield.
 
     Args:
-        E_imp (np.ndarray): The impact energy at the surface in eV.
-        E_m (float): The energy where the yield peaks in eV.
-        delta_m (float): The maximum number of secondaries per incident primary.
+        impact_energy_ev (np.ndarray): The impact energy at the surface in eV.
+        peak_energy_ev (float): The energy where the yield peaks in eV.
+        peak_yield (float): The maximum number of secondaries per incident primary.
 
     Returns:
         np.ndarray: The Sternglass secondary electron yield.
     """
     out = (
         7.4
-        * delta_m
-        * (E_imp / E_m)
-        * np.exp(-2.0 * np.sqrt(np.maximum(E_imp, 0.0) / E_m))
+        * peak_yield
+        * (impact_energy_ev / peak_energy_ev)
+        * np.exp(
+            -2.0 * np.sqrt(np.maximum(impact_energy_ev, 0.0) / peak_energy_ev)
+        )
     )
-    out[E_imp <= 0.0] = 0.0
+    out[impact_energy_ev <= 0.0] = 0.0
     return out
 
 
@@ -144,51 +148,68 @@ def calculate_shaded_currents(
         - Ji: collected ion current density [A m^-2]
     """
 
-    density_mag, kappa, theta_uc = uncorrected_fit.params.to_tuple()
-    temperature_uc = theta_to_temperature_ev(theta_uc, kappa)
+    density_magnitude, kappa, theta_uncorrected_m_per_s = (
+        uncorrected_fit.params.to_tuple()
+    )
+    temperature_uncorrected_ev = theta_to_temperature_ev(
+        theta_uncorrected_m_per_s, kappa
+    )
 
     # boltzmann constant k = 1.0 when temperature is in eV
-    temperature_c = temperature_uc + spacecraft_potential / (kappa - 1.5)
+    temperature_corrected_ev = (
+        temperature_uncorrected_ev + spacecraft_potential / (kappa - 1.5)
+    )
     # Robustness: if the κ mapping yields a nonphysical ambient temperature,
     # bias the balance toward less-negative U by returning a large positive Ji.
-    if temperature_c <= 0.0:
-        BIG = 1e12
-        return 0.0, 0.0, BIG
+    if temperature_corrected_ev <= 0.0:
+        large_positive_current = 1e12
+        return 0.0, 0.0, large_positive_current
 
     # Calculating Je
-    theta_c = temperature_ev_to_theta(temperature_c, kappa)
+    theta_corrected_m_per_s = temperature_ev_to_theta(
+        temperature_corrected_ev, kappa
+    )
     omnidirectional_flux = omnidirectional_flux_magnitude(
-        density_mag=density_mag,  # unitless for normalization,
+        density_mag=density_magnitude,  # unitless for normalization,
         kappa=kappa,
-        theta_mag=theta_c,
+        theta_mag=theta_corrected_m_per_s,
         energy_mag=energy_grid,
     )
     # Isotropic 4π omni → plane: multiply by 1/4; then cm^-2 → m^-2.
     flux_to_spacecraft = 0.25 * omnidirectional_flux * CM2_TO_M2_FACTOR
 
-    mask = energy_grid >= abs(spacecraft_potential)
+    energy_above_barrier = energy_grid >= abs(spacecraft_potential)
     Je = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
-        flux_to_spacecraft[mask], energy_grid[mask]
+        flux_to_spacecraft[energy_above_barrier],
+        energy_grid[energy_above_barrier],
     )
 
     # Calculating Jsee
-    Eimp = energy_grid[mask] - abs(spacecraft_potential)
+    impact_energy_ev = energy_grid[energy_above_barrier] - abs(spacecraft_potential)
     Jsee = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
-        sternglass_secondary_yield(Eimp, E_m=sey_E_m, delta_m=sey_delta_m)
-        * flux_to_spacecraft[mask],
-        energy_grid[mask],
+        sternglass_secondary_yield(
+            impact_energy_ev=impact_energy_ev,
+            peak_energy_ev=sey_E_m,
+            peak_yield=sey_delta_m,
+        )
+        * flux_to_spacecraft[energy_above_barrier],
+        energy_grid[energy_above_barrier],
     )
 
     # Calculating Ji
     # Assuming ion temperature is same as electron temperature
-    ion_temperature = temperature_c + config.EPS  # upcoming denominator
+    ion_temperature = temperature_corrected_ev + config.EPS  # upcoming denominator
     vth_i = np.sqrt(
         config.ELECTRON_CHARGE_MAGNITUDE
         * ion_temperature
         / (2.0 * np.pi * config.PROTON_MASS_MAGNITUDE)
     )
-    Ji0 = config.ELECTRON_CHARGE_MAGNITUDE * density_mag * vth_i
-    Ji = Ji0 * np.sqrt(max(0.0, 1.0 - spacecraft_potential / ion_temperature))
+    ion_current_density_reference = (
+        config.ELECTRON_CHARGE_MAGNITUDE * density_magnitude * vth_i
+    )
+    Ji = ion_current_density_reference * np.sqrt(
+        max(0.0, 1.0 - spacecraft_potential / ion_temperature)
+    )
 
     return Je, Jsee, Ji
 
@@ -201,7 +222,7 @@ def current_balance(
     sey_delta_m: float,
 ) -> float:
     """
-    Balance function F(U) = Je(U) + Ji(U) − Jsee(U) [A m^-2].
+    Signed current balance F(U) = Ji(U) + Jsee(U) − Je(U) [A m^-2].
 
     Root at F(U)=0 defines the floating potential in shade. Positive F favors
     less-negative U; negative F favors more-negative U.
@@ -213,7 +234,11 @@ def current_balance(
         sey_E_m=sey_E_m,
         sey_delta_m=sey_delta_m,
     )
-    return Je + Ji - Jsee
+    # Currents in the balance are signed: electron collection removes charge from
+    # the spacecraft (negative current), while ion collection and SEE are
+    # positive contributions.  Expressed in magnitudes, the net current is
+    # Ji + Jsee − Je.
+    return Ji + Jsee - Je
 
 
 def calculate_potential(
@@ -223,7 +248,7 @@ def calculate_potential(
     E_max_ev: float = 2.0e4,
     n_steps: int = 500,
     spacecraft_potential_low: float = -1500.0,
-    spacecraft_potential_high: float = -1.0,
+    spacecraft_potential_high: float = 0.0,
     sey_E_m: float = 500.0,
     sey_delta_m: float = 1.5,
 ) -> Optional[tuple[KappaParams, VoltageType]]:
@@ -275,16 +300,16 @@ def calculate_potential(
     is_day = intersection is None
 
     # Perform initial fit
-    initial_fit = fitter.fit()
+    initial_fit_result = fitter.fit()
 
     if is_day:
-        if not initial_fit:
+        if not initial_fit_result:
             return None  # Place holder for daytime potential calculation
 
-        initial_fit_params = initial_fit.params
+        initial_fit_params = initial_fit_result.params
 
         initial_spacecraft_current_density = electron_current_density_magnitude(
-            *initial_fit_params.to_tuple(), E_min=1e1, E_max=2e4, n_steps=100
+            *initial_fit_params.to_tuple(), E_min=1e1, E_max=2e4, n_steps=10
         )
         # The spacecraft charges to low 1 or 2 digit positive voltages
         initial_spacecraft_potential = U_from_J(
@@ -303,12 +328,12 @@ def calculate_potential(
             ureg.particle / ureg.meter**3
         ).magnitude
 
-        corrected_fit = fitter.fit()
+        refit_result = fitter.fit()
 
-        if not corrected_fit:
+        if not refit_result:
             return None  # Place holder for daytime potential calculation
 
-        corrected_fit_params = corrected_fit.params
+        corrected_fit_params = refit_result.params
         corrected_spacecraft_current_density = electron_current_density_magnitude(
             *corrected_fit_params.to_tuple(), E_min=1e1, E_max=2e4, n_steps=100
         )
@@ -319,42 +344,54 @@ def calculate_potential(
         return corrected_fit_params, corrected_spacecraft_potential * ureg.volt
 
     else:
-        if not initial_fit:
+        if not initial_fit_result:
             return None
 
         # Unpack initial fit parameters
-        initial_fit_params = initial_fit.params
-        density, kappa, theta = initial_fit_params.to_tuple()
-        temperature_uc = theta_to_temperature_ev(theta, kappa)
+        initial_fit_params = initial_fit_result.params
+        density_magnitude, kappa, theta_uncorrected_m_per_s = (
+            initial_fit_params.to_tuple()
+        )
+        temperature_uncorrected_ev = theta_to_temperature_ev(
+            theta_uncorrected_m_per_s, kappa
+        )
 
         energy_grid = np.geomspace(max(E_min_ev, 0.5), E_max_ev, n_steps)
 
-        f_low, f_high = (
+        balance_low, balance_high = (
             current_balance(
-                spacecraft_potential_low, initial_fit, energy_grid, sey_E_m, sey_delta_m
+                spacecraft_potential_low,
+                initial_fit_result,
+                energy_grid,
+                sey_E_m,
+                sey_delta_m,
             ),
             current_balance(
                 spacecraft_potential_high,
-                initial_fit,
+                initial_fit_result,
                 energy_grid,
                 sey_E_m,
                 sey_delta_m,
             ),
         )
-        tries = 0
-        while np.sign(f_low) == np.sign(f_high) and tries < 10:
+        bracket_expansions = 0
+        while np.sign(balance_low) == np.sign(balance_high) and bracket_expansions < 10:
             spacecraft_potential_low *= 1.5
-            f_low = current_balance(
+            balance_low = current_balance(
                 spacecraft_potential_low,
-                initial_fit,
+                initial_fit_result,
                 energy_grid,
                 sey_E_m,
                 sey_delta_m,
             )
 
-            tries += 1
+            bracket_expansions += 1
 
-        if np.isnan(f_low) or np.isnan(f_high) or np.sign(f_low) == np.sign(f_high):
+        if (
+            np.isnan(balance_low)
+            or np.isnan(balance_high)
+            or np.sign(balance_low) == np.sign(balance_high)
+        ):
             return None
 
         spacecraft_potential = float(
@@ -362,19 +399,23 @@ def calculate_potential(
                 current_balance,
                 spacecraft_potential_low,
                 spacecraft_potential_high,
-                args=(initial_fit, energy_grid, sey_E_m, sey_delta_m),
+                args=(initial_fit_result, energy_grid, sey_E_m, sey_delta_m),
                 maxiter=200,
                 xtol=1e-3,
             )
         )
 
-        temperature_c = temperature_uc + spacecraft_potential / (kappa - 1.5)
-        theta_c = temperature_ev_to_theta(temperature_c, kappa)
+        temperature_corrected_ev = (
+            temperature_uncorrected_ev + spacecraft_potential / (kappa - 1.5)
+        )
+        theta_corrected_m_per_s = temperature_ev_to_theta(
+            temperature_corrected_ev, kappa
+        )
 
         corrected_fit_params = KappaParams(
-            density=density * ureg.particle / ureg.meter**3,
+            density=density_magnitude * ureg.particle / ureg.meter**3,
             kappa=kappa,
-            theta=theta_c * ureg.meter / ureg.second,
+            theta=theta_corrected_m_per_s * ureg.meter / ureg.second,
         )
 
         return corrected_fit_params, spacecraft_potential * ureg.volt
