@@ -1,3 +1,5 @@
+"""Profile the end-to-end κ fitter across a sample file."""
+
 import cProfile
 import pstats
 import time

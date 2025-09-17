@@ -1,3 +1,5 @@
+"""Compare κ-fit temperatures with and without count weighting."""
+
 import glob
 import multiprocessing as mp
 import os

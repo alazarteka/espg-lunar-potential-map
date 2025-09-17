@@ -1,3 +1,5 @@
+"""Plot electron density and temperature for a selected day."""
+
 import argparse
 from pathlib import Path
 from typing import List, Tuple
@@ -8,9 +10,9 @@ import numpy as np
 import src.config as config
 from src.flux import ERData
 from src.kappa import Kappa
-from src.potential_mapper.pipeline import DataLoader
 from src.potential_mapper.spice import load_spice_files
 from src.spacecraft_potential import theta_to_temperature_ev
+from src.utils.flux_files import select_flux_day_file
 from src.utils.units import ureg
 
 
@@ -46,15 +48,6 @@ def parse_args() -> argparse.Namespace:
         help="Disable weighting; use unweighted least squares in log-space",
     )
     return parser.parse_args()
-
-
-def select_day_file(year: int, month: int, day: int) -> Path:
-    files = DataLoader.discover_flux_files(year=year, month=month, day=day)
-    if not files:
-        raise FileNotFoundError("No ER file found for the requested date")
-    if len(files) > 1:
-        print(f"Warning: multiple files matched; using {files[0]}")
-    return files[0]
 
 
 def compute_series(
@@ -164,7 +157,7 @@ def main() -> None:
     except Exception as e:
         if args.verbose:
             print(f"SPICE load failed: {e}")
-    day_file = select_day_file(args.year, args.month, args.day)
+    day_file = select_flux_day_file(args.year, args.month, args.day)
     er_data = ERData(str(day_file))
 
     dens_orig, temp_orig_ev, dens_corr, temp_corr_ev = compute_series(

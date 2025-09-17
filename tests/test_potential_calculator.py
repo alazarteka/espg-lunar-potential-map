@@ -9,7 +9,7 @@ from src.spacecraft_potential import (
     theta_to_temperature_ev,
 )
 from src.utils.units import ureg
-from tests.test_kappa_fitter import prepare_synthetic_er
+from src.utils.synthetic import prepare_synthetic_er
 
 
 @pytest.mark.skip_ci

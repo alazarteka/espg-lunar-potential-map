@@ -1,3 +1,5 @@
+"""Profile the potential mapping pipeline CLI end-to-end."""
+
 import cProfile
 import pstats
 import time

@@ -1,3 +1,5 @@
+"""Run a quick κ-fit on the first available ER spectrum."""
+
 import glob
 
 import src.config as config

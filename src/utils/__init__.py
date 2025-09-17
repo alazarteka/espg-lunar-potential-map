@@ -22,6 +22,12 @@ from .coordinates import (
 from .energy import make_relative_energy_bounds
 from .file_ops import list_files, list_folder_files
 from .geometry import get_intersection_or_none
+from .flux_files import select_flux_day_file
+from .synthetic import (
+    prepare_flux,
+    prepare_phis,
+    prepare_synthetic_er,
+)
 from .spice_ops import (
     get_j2000_iau_moon_transform_matrix,
     get_lp_position_wrt_moon,
@@ -52,4 +58,10 @@ __all__ = [
     "get_intersection_or_none",
     # Energy helpers
     "make_relative_energy_bounds",
+    # Flux file helpers
+    "select_flux_day_file",
+    # Synthetic data helpers
+    "prepare_phis",
+    "prepare_flux",
+    "prepare_synthetic_er",
 ]

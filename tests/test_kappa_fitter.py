@@ -1,16 +1,11 @@
 # Tests for src/kappa.py
 
 import numpy as np
-import pandas as pd
 import pytest
 
-import src.config as config
-from src.flux import ERData
 from src.kappa import Kappa
-from src.physics.kappa import (
-    KappaParams,
-    omnidirectional_flux,
-)
+from src.physics.kappa import KappaParams
+from src.utils.synthetic import prepare_synthetic_er
 from src.utils.units import (
     ureg,
 )
@@ -31,134 +26,6 @@ def kappa_params_set(request):
     density, kappa, theta, expected_tuple = request.param
     params = KappaParams(density=density, kappa=kappa, theta=theta)
     return params, expected_tuple
-
-
-def prepare_phis():
-    """Prepare mock instrument viewing angles and solid angles.
-
-    This function generates a synthetic but realistic set of phi and theta
-    angles for the 88 instrument channels, based on the known latitude
-    bins of the Lunar Prospector instrument. It also returns the
-    corresponding solid angles.
-
-    Returns:
-        tuple[list[float], np.ndarray]: A tuple containing the list of phi
-                                        angles and the array of solid angles.
-    """
-    phis = []
-    phis_by_latitude = {
-        78.75: ([], 4, 0.119570),
-        56.25: ([], 8, 0.170253),
-        33.75: ([], 16, 0.127401),
-        11.25: ([], 16, 0.150279),
-        -11.25: ([], 16, 0.150279),
-        -33.75: ([], 16, 0.127401),
-        -56.25: ([], 8, 0.170253),
-        -78.75: ([], 4, 0.119570),
-    }
-    thetas = []
-    for key in phis_by_latitude.keys():
-        for _i in range(phis_by_latitude[key][1]):
-            thetas.append(key)
-
-    # Sort the thetas
-    # There is a small dependency on the order of thetas, so we sort them
-    # to ensure that the test passes consistently but also remove the need
-    # to download the data files.
-    thetas = sorted(np.array(thetas), key=lambda x: abs(x))
-    solid_angles = np.array([phis_by_latitude[theta][2] for theta in thetas])
-
-    # Fix the phi calculation - this was creating inconsistent data
-    phi_counter = {}
-    for theta in thetas:
-        if theta not in phi_counter:
-            phi_counter[theta] = 0
-        n_channels = phis_by_latitude[theta][1]
-        phi_value = phi_counter[theta] / n_channels * 360
-        phis.append(phi_value)
-        phi_counter[theta] += 1
-
-    return phis, solid_angles
-
-
-def prepare_flux(density=1e6, kappa=5.0, theta=1.1e5):
-    """Prepare a theoretical omnidirectional particle flux.
-
-    Calculates the expected omnidirectional flux for a given set of plasma
-    parameters (density, kappa, theta) over a standard range of energy centers.
-
-    Args:
-        density (float, optional): Electron number density in m^-3. Defaults to 1e6.
-        kappa (float, optional): Kappa parameter. Defaults to 5.0.
-        theta (float, optional): Theta parameter in m/s. Defaults to 1.1e5.
-
-    Returns:
-        tuple[Quantity, Quantity]: A tuple containing the omnidirectional
-                                   particle flux and the energy centers.
-    """
-
-    params = KappaParams(
-        density=density * ureg.particle / ureg.m**3,
-        kappa=kappa,
-        theta=theta * ureg.meter / ureg.second,
-    )
-
-    energy_centers = np.geomspace(2e1, 2e4, config.SWEEP_ROWS) * ureg.electron_volt
-    np.column_stack([energy_centers * 0.75, energy_centers * 1.25])
-
-    omnidirectional_particle_flux = omnidirectional_flux(
-        parameters=params, energy=energy_centers
-    )
-    return omnidirectional_particle_flux, energy_centers
-
-
-def prepare_synthetic_er(density=1e6, kappa=5.0, theta=1.1e5):
-    """Prepare a synthetic ERData object for testing.
-
-    This function constructs a complete, synthetic `ERData` object. It uses
-    the `prepare_phis` and `prepare_flux` helpers to generate realistic
-    instrument data based on a known set of input plasma parameters. This
-    provides a controlled dataset for testing the fitter's ability to
-    recover the original parameters.
-
-    Args:
-        density (float, optional): Electron number density in m^-3. Defaults to 1e6.
-        kappa (float, optional): Kappa parameter. Defaults to 5.0.
-        theta (float, optional): Theta parameter in m/s. Defaults to 1.1e5.
-
-    Returns:
-        ERData: A synthetic ERData object.
-    """
-    phis, solid_angles = prepare_phis()
-    omnidirectional_particle_flux, energy_centers = prepare_flux(
-        density=density, kappa=kappa, theta=theta
-    )
-
-    synthetic_er_data = pd.DataFrame(columns=config.ALL_COLS)
-    directional = omnidirectional_particle_flux / (4 * np.pi * ureg.steradian)  # J / sr
-    directional = directional.to(
-        ureg.particle
-        / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
-    )
-    synthetic_er_data[config.FLUX_COLS] = np.repeat(
-        directional.magnitude[:, None], config.CHANNELS, axis=1
-    )
-    # If needed, refer to previous flux calculation logic in documentation or version control.
-
-    synthetic_er_data[config.PHI_COLS] = phis
-    synthetic_er_data["UTC"] = "2025-07-25T12:30:00"
-    synthetic_er_data[config.TIME_COLUMN] = (
-        pd.to_datetime(synthetic_er_data["UTC"]).astype(np.int64) // 10**9
-    )
-    synthetic_er_data[config.ENERGY_COLUMN] = energy_centers.to(
-        ureg.electron_volt
-    ).magnitude
-    synthetic_er_data[config.SPEC_NO_COLUMN] = 1
-
-    np.random.seed(42)
-    synthetic_er_data[config.MAG_COLS] = np.random.rand(3)
-
-    return ERData.from_dataframe(synthetic_er_data, "NULL")
 
 
 @pytest.mark.skip_ci

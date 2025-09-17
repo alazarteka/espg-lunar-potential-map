@@ -11,7 +11,7 @@ This document details the analysis performed to establish a quantitative thresho
 
 The analysis was conducted in two main phases:
 
-1.  **Initial Data Collection:** The `scripts/error_distribution_analysis.py` script was run across the entire available dataset. This script iterates through all `.TAB` files, performs a kappa fit for every energy spectrum, and records the resulting chi-squared error.
+1.  **Initial Data Collection:** The `scripts/dev/error_distribution_analysis.py` script was run across the entire available dataset. This script iterates through all `.TAB` files, performs a kappa fit for every energy spectrum, and records the resulting chi-squared error.
 2.  **Outlier Filtering and Re-analysis:** The initial results showed that the error distribution was heavily skewed by a small number of catastrophic fits with extremely high chi-squared values. To get a clearer picture of the typical error distribution, these outliers were filtered out, and the statistics were re-calculated on the cleaned dataset.
 
 ## 3. Results

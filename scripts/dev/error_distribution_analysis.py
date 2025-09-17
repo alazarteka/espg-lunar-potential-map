@@ -1,3 +1,5 @@
+"""Histogram κ-fit error metrics across available ER files."""
+
 import glob
 
 import matplotlib.pyplot as plt

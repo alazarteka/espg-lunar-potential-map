@@ -1,7 +1,7 @@
 # κ‑Fit Electron Temperature: **Count‑Weighted vs Unweighted** Fits — Design & Analysis Summary
 
 **Date:** 2025‑08‑22
-**Module/Script:** `scripts/temperature_weighting_comparison.py`
+**Module/Script:** `scripts/profiling/temperature_weighting_study.py`
 **Scope:** Effect of count‑derived weighting on κ‑fit electron temperature $T_e$ (eV) for all 199x Lunar Prospector ER spectra using the **original** fit (no illumination correction or $U_{SC}$ energy shift).
 
 ---
@@ -170,7 +170,7 @@ We want to know how much the inferred electron temperature $T_e$ from a κ distr
 From repo root (Python 3.12 with `uv`):
 
 ```bash
-uv run python scripts/temperature_weighting_comparison.py
+uv run python scripts/profiling/temperature_weighting_study.py
 ```
 
 **Outputs:** written to `temp/`

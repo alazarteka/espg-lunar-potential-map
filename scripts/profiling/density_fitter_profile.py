@@ -1,3 +1,5 @@
+"""Profile execution of the density estimation helper."""
+
 import cProfile
 import pstats
 import time

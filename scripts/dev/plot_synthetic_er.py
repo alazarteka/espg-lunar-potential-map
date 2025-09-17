@@ -1,9 +1,11 @@
+"""Visualize synthetic ER flux and pitch-angle conventions."""
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 from src import config
 from src.flux import PitchAngle
-from tests.test_kappa_fitter import prepare_synthetic_er
+from src.utils.synthetic import prepare_synthetic_er
 
 
 def compute_pitch_sets(b_hat: np.ndarray, look: np.ndarray) -> dict[str, np.ndarray]:

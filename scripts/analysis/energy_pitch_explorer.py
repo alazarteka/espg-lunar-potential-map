@@ -1,3 +1,5 @@
+"""Interactive energy–pitch explorer for a day's spectra."""
+
 import argparse
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -7,7 +9,7 @@ import plotly.graph_objects as go
 
 import src.config as config
 from src.flux import ERData, PitchAngle
-from src.potential_mapper.pipeline import DataLoader
+from src.utils.flux_files import select_flux_day_file
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,15 +47,6 @@ def parse_args() -> argparse.Namespace:
         help="Override bar thickness in degrees for bars mode (default: 2 degrees)",
     )
     return parser.parse_args()
-
-
-def select_day_file(year: int, month: int, day: int) -> Path:
-    files = DataLoader.discover_flux_files(year=year, month=month, day=day)
-    if not files:
-        raise FileNotFoundError("No ER file found for the requested date")
-    if len(files) > 1:
-        print(f"Warning: multiple files matched; using {files[0]}")
-    return files[0]
 
 
 def _pitch_edges_from_centers(centers: np.ndarray) -> np.ndarray:
@@ -478,7 +471,7 @@ def make_figure(
 
 def main() -> None:
     args = parse_args()
-    day_file = select_day_file(args.year, args.month, args.day)
+    day_file = select_flux_day_file(args.year, args.month, args.day)
     er = ERData(str(day_file))
     pa = PitchAngle(er, str(config.DATA_DIR / config.THETA_FILE))
 
