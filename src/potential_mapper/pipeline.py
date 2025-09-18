@@ -61,6 +61,13 @@ class DataLoader:
         if not data_dir.exists():
             raise FileNotFoundError(f"Data directory {data_dir} not found")
 
+        if month is not None and not 1 <= month <= 12:
+            logging.warning("Month %s outside 1-12; no files processed.", month)
+            return []
+        if day is not None and not 1 <= day <= 31:
+            logging.warning("Day %s outside 1-31; no files processed.", day)
+            return []
+
         exclude_basenames = {
             config.ATTITUDE_FILE.lower(),
             config.SOLID_ANGLES_FILE.lower(),
@@ -82,7 +89,10 @@ class DataLoader:
             if year is not None:
                 ok &= str(year) in s
             if month is not None:
-                mm = DataLoader.NUM_TO_MONTH[f"{month:02d}"]
+                mm = DataLoader.NUM_TO_MONTH.get(f"{month:02d}")
+                if mm is None:
+                    logging.warning("Month %s not recognized; skipping discovery.", month)
+                    return False
                 ok &= mm in s
             if day is not None:
                 dd = f"{day:02d}"
@@ -116,6 +126,17 @@ def process_lp_file(file_path: Path) -> PotentialResults:
     et_spin, ra_vals, dec_vals = load_attitude_data(
         config.DATA_DIR / config.ATTITUDE_FILE
     )
+    if (
+        et_spin is None
+        or ra_vals is None
+        or dec_vals is None
+        or len(et_spin) == 0
+        or len(ra_vals) == 0
+        or len(dec_vals) == 0
+    ):
+        raise RuntimeError(
+            "Attitude data unavailable or empty; cannot process file."
+        )
 
     # Coordinates and magnetic field projection
     coord_calc = CoordinateCalculator(et_spin, ra_vals, dec_vals)

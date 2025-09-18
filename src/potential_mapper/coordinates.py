@@ -70,54 +70,80 @@ class CoordinateCalculator:
         """
         n_points = len(flux_data.data)
 
-        lp_positions = np.zeros((n_points, 3))  # Lunar frame
-        lp_vectors_to_sun = np.zeros((n_points, 3))  # Lunar frame
-        ra_dec_cartesian = np.zeros((n_points, 3))
-        moon_vectors_to_sun = np.zeros((n_points, 3))
-        j2000_to_iau_moon_mats = np.zeros((n_points, 3, 3))
+        lp_positions = np.full((n_points, 3), np.nan)
+        lp_vectors_to_sun = np.full((n_points, 3), np.nan)
+        ra_dec_cartesian = np.full((n_points, 3), np.nan)
+        moon_vectors_to_sun = np.full((n_points, 3), np.nan)
+        j2000_to_iau_moon_mats = np.full((n_points, 3, 3), np.nan)
 
         for t, utc_time in enumerate(flux_data.data[config.UTC_COLUMN]):
-            time = spice.str2et(utc_time)
+            try:
+                time = spice.str2et(utc_time)
+            except Exception as exc:
+                logging.warning(
+                    "Failed to convert UTC %s to ET (%s); marking row invalid.",
+                    utc_time,
+                    exc,
+                )
+                continue
 
             lp_position_t = get_lp_position_wrt_moon(time)
             lp_vector_to_sun_in_lunar_frame_t = get_lp_vector_to_sun_in_lunar_frame(
                 time
             )
-            right_ascension_t, declination_t = get_current_ra_dec(
+            moon_vector_to_sun_in_lunar_frame_t = get_sun_vector_wrt_moon(time)
+            ra_dec_pair = get_current_ra_dec(
                 time, self.et_spin, self.right_ascension, self.declination
             )
-            moon_vector_to_sun_in_lunar_frame_t = get_sun_vector_wrt_moon(time)
-            j2000_to_iau_moon_transformation_mats_t = (
-                get_j2000_iau_moon_transform_matrix(time)
-            )
+            if ra_dec_pair is None:
+                ra_dec_pair = (None, None)
+            right_ascension_t, declination_t = ra_dec_pair
 
             if any(
                 x is None
                 for x in [
                     lp_position_t,
                     lp_vector_to_sun_in_lunar_frame_t,
+                    moon_vector_to_sun_in_lunar_frame_t,
                     right_ascension_t,
                     declination_t,
                 ]
             ):
-                logging.warning(f"Invalid data at time {utc_time}, skipping...")
+                logging.warning("Incomplete geometry at %s; skipping row.", utc_time)
+                continue
 
-                lp_position_t = np.array([np.nan, np.nan, np.nan])
-                lp_vector_to_sun_in_lunar_frame_t = np.array([np.nan, np.nan, np.nan])
-                right_ascension_t = np.nan
-                declination_t = np.nan
+            if not np.isfinite([right_ascension_t, declination_t]).all():
+                logging.warning("Non-finite attitude values at %s; skipping row.", utc_time)
+                continue
+
+            vectors = (
+                ("lp_position", lp_position_t),
+                ("lp_to_sun", lp_vector_to_sun_in_lunar_frame_t),
+                ("moon_to_sun", moon_vector_to_sun_in_lunar_frame_t),
+            )
+            invalid_vector = False
+            for name, vec in vectors:
+                if not np.isfinite(vec).all() or np.linalg.norm(vec) <= 0.0:
+                    logging.warning("Invalid %s vector at %s; skipping row.", name, utc_time)
+                    invalid_vector = True
+                    break
+            if invalid_vector:
+                continue
+
+            j2m = get_j2000_iau_moon_transform_matrix(time)
+            if not np.isfinite(j2m).all():
+                logging.warning("Invalid J2000->IAU_MOON matrix at %s; skipping row.", utc_time)
+                continue
 
             lp_positions[t] = lp_position_t
             lp_vectors_to_sun[t] = lp_vector_to_sun_in_lunar_frame_t
-            ra_dec_cartesian[t] = ra_dec_to_unit(
-                right_ascension_t, declination_t
-            )  # TODO: Fix the type issue
+            ra_dec_cartesian[t] = ra_dec_to_unit(right_ascension_t, declination_t)
             moon_vectors_to_sun[t] = moon_vector_to_sun_in_lunar_frame_t
-            j2000_to_iau_moon_mats[t] = j2000_to_iau_moon_transformation_mats_t
+            j2000_to_iau_moon_mats[t] = j2m
 
-        unit_lp_vectors_to_sun = lp_vectors_to_sun / np.linalg.norm(
-            lp_vectors_to_sun, axis=1, keepdims=True
-        )
+        norms = np.linalg.norm(lp_vectors_to_sun, axis=1)
+        safe_norms = np.where(norms > 0.0, norms, np.nan)
+        unit_lp_vectors_to_sun = lp_vectors_to_sun / safe_norms[:, None]
         scd_to_j2000_transformation_mats = build_scd_to_j2000(
             ra_dec_cartesian, unit_lp_vectors_to_sun
         )
@@ -143,10 +169,21 @@ def project_magnetic_fields(
 
     Returns an array of shape (N, 3) in IAU_MOON coordinates.
     """
-    magnetic_field = flux_data.data[config.MAG_COLS].to_numpy()
-    unit_magnetic_field = magnetic_field / np.linalg.norm(
-        magnetic_field, axis=1, keepdims=True
-    )
+    magnetic_field = flux_data.data[config.MAG_COLS].to_numpy(dtype=float)
+    finite_mask = np.isfinite(magnetic_field).all(axis=1)
+    norms = np.linalg.norm(magnetic_field, axis=1)
+    valid = finite_mask & (norms > 0.0)
+
+    if np.any(~valid):
+        logging.warning(
+            "Magnetic field invalid for %d of %d rows; projection set to NaN.",
+            np.count_nonzero(~valid),
+            magnetic_field.shape[0],
+        )
+
+    unit_magnetic_field = np.full_like(magnetic_field, np.nan)
+    unit_magnetic_field[valid] = magnetic_field[valid] / norms[valid, None]
+
     projected_magnetic_field = np.einsum(
         "nij,nj->ni", coordinate_arrays.scd_to_iau_moon_mats, unit_magnetic_field
     )

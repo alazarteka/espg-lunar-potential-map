@@ -126,7 +126,16 @@ class ERData:
             - `count`: Integer electron counts for each energy bin.
             - `count_err`: Estimated error in the electron counts.
         """
-        thetas = np.loadtxt(config.DATA_DIR / config.THETA_FILE, dtype=np.float64)
+        theta_path = config.DATA_DIR / config.THETA_FILE
+        try:
+            thetas = np.loadtxt(theta_path, dtype=np.float64)
+        except OSError as exc:
+            logger.warning(
+                "Theta table %s unavailable (%s); skipping count reconstruction.",
+                theta_path,
+                exc,
+            )
+            return
 
         if self.data.empty:
             return
