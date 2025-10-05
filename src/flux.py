@@ -170,7 +170,12 @@ class ERData:
         count_estimate = np.rint(count_estimate.to(ureg.particle).magnitude).astype(int)
 
         count_estimate_sum = count_estimate.sum(axis=1)
-        count_err = np.sqrt(count_estimate_sum)
+        if np.any(count_estimate_sum < 0):
+            logger.debug(
+                "Negative count sums encountered; clamping to zero before sqrt"
+            )
+        count_estimate_sum = np.clip(count_estimate_sum, 0, None)
+        count_err = np.sqrt(count_estimate_sum.astype(np.float64, copy=False))
 
         count_df = pd.DataFrame(
             {config.COUNT_COLS[0]: count_estimate_sum, config.COUNT_COLS[1]: count_err}
@@ -288,7 +293,11 @@ class PitchAngle:
 
 class LossConeFitter:
     def __init__(
-        self, er_data: ERData, thetas: str, pitch_angle: PitchAngle | None = None
+        self,
+        er_data: ERData,
+        thetas: str,
+        pitch_angle: PitchAngle | None = None,
+        spacecraft_potential: np.ndarray | None = None,
     ):
         """
         Initialize the LossConeFitter class with the ER data and theta values.
@@ -298,12 +307,16 @@ class LossConeFitter:
             thetas (str): The path to the theta values file.
             pitch_angle (PitchAngle, optional): Pre-computed pitch angle
                 object. If None, creates a new one.
+            spacecraft_potential (np.ndarray | None): Optional per-row spacecraft
+                potential [V] aligned with `er_data.data`; used to shift energies
+                during the surface fit following Halekas et al.
         """
         self.er_data = er_data
         self.thetas = np.loadtxt(thetas, dtype=np.float64)
         self.pitch_angle = (
             pitch_angle if pitch_angle is not None else PitchAngle(er_data, thetas)
         )
+        self.spacecraft_potential = spacecraft_potential
 
         self.lhs = self._generate_latin_hypercube()
 
@@ -434,6 +447,17 @@ class LossConeFitter:
         energies = self.er_data.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[
             s:e
         ]
+
+        # When spacecraft charging is available, remove it from the observed
+        # energies so ΔU represents the actual lunar surface potential.
+
+        if self.spacecraft_potential is not None and self.spacecraft_potential.size:
+            chunk_sc = self.spacecraft_potential[s:e]
+            finite_sc = np.isfinite(chunk_sc)
+            if np.any(finite_sc):
+                sc_value = float(np.nanmedian(chunk_sc[finite_sc]))
+                energies = energies - sc_value
+                energies = np.clip(energies, config.EPS, None)
 
         # Ensure pitch angles exist for this range
         if self.pitch_angle.pitch_angles is None or s >= len(

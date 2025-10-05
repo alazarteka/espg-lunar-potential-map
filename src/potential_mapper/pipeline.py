@@ -1,5 +1,6 @@
 import argparse
 import logging
+import numbers
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,58 @@ from src.potential_mapper.coordinates import (
 from src.potential_mapper.results import PotentialResults
 from src.utils.attitude import load_attitude_data
 from src.utils.geometry import get_intersections_or_none_batch
+from src.utils.units import ureg
+
+
+def _spacecraft_potential_per_row(er_data: ERData, n_rows: int) -> np.ndarray:
+    """Return spacecraft potential per ER row by spec_no grouping."""
+
+    from src.spacecraft_potential import calculate_potential
+
+    potentials = np.full(n_rows, np.nan)
+    if n_rows == 0:
+        return potentials
+
+    spec_values = er_data.data[config.SPEC_NO_COLUMN].to_numpy()
+    unique_specs = np.unique(spec_values)
+    for spec_value in unique_specs:
+        if isinstance(spec_value, numbers.Real) and np.isnan(spec_value):
+            continue
+        mask_idx = np.flatnonzero(spec_values == spec_value)
+        if mask_idx.size == 0:
+            continue
+        raw_spec = er_data.data.iloc[mask_idx[0]][config.SPEC_NO_COLUMN]
+        try:
+            spec_no = int(raw_spec)
+        except (TypeError, ValueError):
+            logging.debug("Skipping non-integer spec_no %r", raw_spec)
+            continue
+        potential_result = None
+        energy_backup: np.ndarray | None = None
+        if config.ENERGY_COLUMN in er_data.data.columns:
+            energy_backup = er_data.data[config.ENERGY_COLUMN].to_numpy(copy=True)
+        try:
+            potential_result = calculate_potential(er_data, spec_no)
+        except Exception as exc:  # pragma: no cover - diagnostic only
+            logging.debug(
+                "Spacecraft potential failed for spec_no %s: %s",
+                spec_no,
+                exc,
+                exc_info=True,
+            )
+        finally:
+            if energy_backup is not None:
+                er_data.data.loc[:, config.ENERGY_COLUMN] = energy_backup
+        if not potential_result:
+            continue
+        _, potential_quantity = potential_result
+        try:
+            potential_value = float(potential_quantity.to(ureg.volt).magnitude)
+        except Exception:
+            potential_value = float(potential_quantity)
+        potentials[mask_idx] = potential_value
+
+    return potentials
 
 
 class DataLoader:
@@ -201,9 +254,17 @@ def process_lp_file(file_path: Path) -> PotentialResults:
         proj_in_sun_masked = dots > 0
         proj_in_sun[mask] = proj_in_sun_masked
 
+    # Spacecraft potential per spectrum (spec_no) – reused when combining ΔU.
+    sc_potential = _spacecraft_potential_per_row(er_data, n)
+
     # Fit surface potential ΔU per 15-row chunk and map to rows
     try:
-        fitter = LossConeFitter(er_data, str(config.DATA_DIR / config.THETA_FILE))
+        # Pass spacecraft potential so fitter can de-bias energies per spectrum.
+        fitter = LossConeFitter(
+            er_data,
+            str(config.DATA_DIR / config.THETA_FILE),
+            spacecraft_potential=sc_potential,
+        )
         fit_mat = fitter.fit_surface_potential()  # shape (n_chunks, 4)
         # Columns: [delta_U, bs_over_bm, chi2, chunk_index]
         proj_potential = np.full(n, np.nan)
@@ -218,13 +279,12 @@ def process_lp_file(file_path: Path) -> PotentialResults:
                 e = min((i + 1) * config.SWEEP_ROWS, n)
                 if s >= n:
                     break
-                proj_potential[s:e] = float(delta_U)
+                delta_u_value = float(delta_U)
+                proj_chunk = proj_potential[s:e]
+                proj_chunk[:] = delta_u_value
     except Exception as e:
         logging.exception(f"LossCone fitting failed for {file_path}: {e}")
         proj_potential = np.full(n, np.nan)
-
-    # Spacecraft potential placeholder (requires separate computation if needed)
-    sc_potential = np.full(n, np.nan)
 
     return PotentialResults(
         spacecraft_latitude=spacecraft_lat,

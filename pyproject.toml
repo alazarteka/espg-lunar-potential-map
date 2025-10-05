@@ -36,6 +36,8 @@ dependencies = [
     "pint>=0.24.4",
     "snakeviz>=2.2.2",
     "numba>=0.61.2",
+    "imageio[ffmpeg]>=2.37.0",
+    "kaleido>=1.1.0",
 ]
 
 [project.optional-dependencies]

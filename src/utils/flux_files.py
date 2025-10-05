@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from src.potential_mapper.pipeline import DataLoader
+if TYPE_CHECKING:  # pragma: no cover - for type hints only
+    from src.potential_mapper.pipeline import DataLoader
 
 __all__ = ["select_flux_day_file"]
 
@@ -32,6 +34,8 @@ def select_flux_day_file(year: int, month: int, day: int) -> Path:
     FileNotFoundError
         If no files match the requested date.
     """
+
+    from src.potential_mapper.pipeline import DataLoader
 
     files = DataLoader.discover_flux_files(year=year, month=month, day=day)
     if not files:

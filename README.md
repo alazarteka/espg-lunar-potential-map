@@ -106,6 +106,72 @@ uv run jupyter notebook
 uv run pytest
 ```
 
+### Batch potential cache generation
+
+The batch runner in `scripts/dev/potential_mapper_batch.py` processes ER files and
+writes per-file NPZ caches under `data/potential_cache/`. Each cache contains
+row-aligned spacecraft and surface potentials along with spectrum rollups.
+
+```bash
+# Compute caches for a single day (writes to data/potential_cache by default)
+uv run python scripts/dev/potential_mapper_batch.py \
+  --year 1998 --month 9 --day 16 --limit 1 --workers 1
+```
+
+Key options:
+- `--year/--month/--day`: filter ER files by tokenised date.
+- `--limit`: stop after processing the first *N* files (useful for quick checks).
+- `--output-dir`: target directory for NPZ artefacts.
+
+The command loads SPICE kernels as needed and is CPU-heavy; consider reducing the
+sample size (via `--limit`) when iterating locally.
+
+### Visualising cached potentials
+
+Two analysis CLIs load the cached NPZ artefacts for plotting:
+
+```bash
+# Static Matplotlib sphere projection
+uv run python scripts/analysis/potential_map_sphere.py \
+  --start 1998-09-16 --end 1998-09-16 \
+  --cache-dir data/potential_cache --sample 5000 --output plots/1998-09-16.png
+
+# Interactive Plotly globe with optional animation/MP4 export
+uv run python scripts/analysis/potential_map_plotly.py \
+  --start 1998-09-16 --end 1998-09-16 \
+  --cache-dir data/potential_cache --sample 5000 \
+  --output plots/1998-09-16.html --animate
+```
+
+For large animations, prefer modest sampling (`--sample`) and frame counts. MP4
+export requires Kaleido plus `imageio[ffmpeg]`; ensure Chrome/Chromium is
+available for Kaleido on headless systems.
+
+### Validating spacecraft potential outputs
+
+Cached files expose `rows_spacecraft_potential` and
+`rows_projected_potential`. Inspect a representative NPZ to confirm the pipeline
+is debiasing the loss-cone fits with the spacecraft charging term:
+
+```bash
+uv run python - <<'PY'
+import numpy as np
+from pathlib import Path
+path = Path('data/potential_cache/1998/244_273SEP/3D980916.npz')
+with np.load(path) as data:
+    sc = data['rows_spacecraft_potential']
+    proj = data['rows_projected_potential']
+    print(f"rows={sc.size}")
+    print(f"spacecraft phi range: {np.nanmin(sc):.2f} -> {np.nanmax(sc):.2f} V")
+    finite_proj = np.isfinite(proj)
+    print(f"surface phi samples: {finite_proj.sum()} / {proj.size}")
+PY
+```
+
+The example above reports approximately -74 V to +39 V spacecraft potentials and
+strong negative surface potentials for the September 16, 1998 pass, indicating
+the median spacecraft bias is being removed before fitting ΔU.
+
 ### Development
 
 ```bash
