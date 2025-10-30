@@ -70,6 +70,10 @@ plots/
 figures/
 results/
 gitingest/
+potential_timeseries*.html
+reports/monthly/
+reports/terminator_charge_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].json
+reports/terminator_charge_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md
 
 # =============================================================================
 # Temporary Files
