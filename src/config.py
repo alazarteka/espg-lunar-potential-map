@@ -63,6 +63,11 @@ ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 
 # ========== Fitting parameters ==========
 FIT_ERROR_THRESHOLD = 21500000000  # chi-squared threshold for a good fit
+LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
+LOSS_CONE_BEAM_WIDTH_FACTOR = 0.5  # beam energy width as fraction of |ΔU|
+LOSS_CONE_BEAM_AMP_MIN = 0.0  # lower bound for normalized beam amplitude
+LOSS_CONE_BEAM_AMP_MAX = 50.0  # upper bound for normalized beam amplitude
+LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
 
 
 # ========== Data Column names ==========

@@ -265,11 +265,11 @@ def process_lp_file(file_path: Path) -> PotentialResults:
             str(config.DATA_DIR / config.THETA_FILE),
             spacecraft_potential=sc_potential,
         )
-        fit_mat = fitter.fit_surface_potential()  # shape (n_chunks, 4)
-        # Columns: [delta_U, bs_over_bm, chi2, chunk_index]
+        fit_mat = fitter.fit_surface_potential()  # shape (n_chunks, 5)
+        # Columns: [delta_U, bs_over_bm, beam_amp, chi2, chunk_index]
         proj_potential = np.full(n, np.nan)
         if fit_mat.size > 0:
-            for delta_U, _bs, chi2, chunk_idx in fit_mat:
+            for delta_U, _bs, _beam_amp, chi2, chunk_idx in fit_mat:
                 i = int(chunk_idx)
                 if not np.isfinite(delta_U) or not np.isfinite(chi2):
                     continue

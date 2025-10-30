@@ -17,6 +17,7 @@ def synth_losscone(
     bs_over_bm: float,
     beam_width_eV: float = 0.0,
     beam_amp: float = 0.0,
+    beam_pitch_sigma_deg: float = 0.0,
 ) -> np.ndarray:
     """
     Build a loss-cone model that never returns NaN/Inf.
@@ -44,8 +45,15 @@ def synth_losscone(
 
     # Optional narrow beam
     if beam_width_eV > 0 and beam_amp > 0:
-        beam = beam_amp * np.exp(-0.5 * ((energy_grid - delta_U) / beam_width_eV) ** 2)
-        model += beam[:, None]
+        beam_center = max(abs(delta_U), beam_width_eV)
+        beam = beam_amp * np.exp(-0.5 * ((energy_grid - beam_center) / beam_width_eV) ** 2)
+        if beam_pitch_sigma_deg > 0:
+            pitch_weight = np.exp(
+                -0.5 * ((pitch_grid - 180.0) / beam_pitch_sigma_deg) ** 2
+            )
+        else:
+            pitch_weight = np.ones_like(pitch_grid)
+        model += beam[:, None] * pitch_weight
 
     return model
 

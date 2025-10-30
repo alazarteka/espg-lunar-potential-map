@@ -318,6 +318,11 @@ class LossConeFitter:
         )
         self.spacecraft_potential = spacecraft_potential
 
+        self.beam_width_factor = config.LOSS_CONE_BEAM_WIDTH_FACTOR
+        self.beam_amp_min = config.LOSS_CONE_BEAM_AMP_MIN
+        self.beam_amp_max = config.LOSS_CONE_BEAM_AMP_MAX
+        self.beam_pitch_sigma_deg = config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG
+
         self.lhs = self._generate_latin_hypercube()
 
     def _generate_latin_hypercube(self) -> np.ndarray:
@@ -327,12 +332,20 @@ class LossConeFitter:
         Returns:
             np.ndarray: The Latin Hypercube sample.
         """
-        # Generate a Latin Hypercube sample
-        bounds = np.array([[-1000.0, 0.1], [1000.0, 1.0]])  # lower  # upper
-        sampler = LatinHypercube(d=2, scramble=False)
+        # Generate a Latin Hypercube sample across ΔU, B_s/B_m, and beam amplitude
+        lower_bounds = np.array([-1000.0, 0.1, self.beam_amp_min], dtype=float)
+        upper_bounds = np.array([1000.0, 1.0, self.beam_amp_max], dtype=float)
+        if upper_bounds[2] <= lower_bounds[2]:
+            upper_bounds[2] = lower_bounds[2] + 1e-12
+        sampler = LatinHypercube(
+            d=len(lower_bounds), scramble=False, seed=config.LOSS_CONE_LHS_SEED
+        )
         lhs = sampler.random(n=400)  # 400 points
 
-        return scale(lhs, bounds[0], bounds[1])
+        scaled = scale(lhs, lower_bounds, upper_bounds)
+        if self.beam_amp_max <= self.beam_amp_min:
+            scaled[:, 2] = self.beam_amp_min
+        return scaled
 
     def _get_normalized_flux(
         self, energy_bin: int, measurement_chunk: int
@@ -473,8 +486,18 @@ class LossConeFitter:
 
         # Objective
         def chi2(params):
-            delta_U, bs_over_bm = params
-            model = synth_losscone(energies, pitches, delta_U, bs_over_bm)
+            delta_U, bs_over_bm, beam_amp = params
+            beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
+            beam_width = max(abs(delta_U) * self.beam_width_factor, config.EPS)
+            model = synth_losscone(
+                energies,
+                pitches,
+                delta_U,
+                bs_over_bm,
+                beam_width_eV=beam_width,
+                beam_amp=beam_amp,
+                beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
+            )
 
             if not np.all(np.isfinite(model)) or (model <= 0).all():
                 return 1e30  # big penalty
@@ -496,9 +519,9 @@ class LossConeFitter:
         )
         if not result.success:
             raise RuntimeError(f"Optimisation failed: {result.message}")
-        delta_U = result.x[0]
-        bs_over_bm = result.x[1]
-        return float(delta_U), float(bs_over_bm), float(result.fun)
+        delta_U, bs_over_bm, beam_amp = result.x
+        beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
+        return float(delta_U), float(bs_over_bm), beam_amp, float(result.fun)
 
     def fit_surface_potential(self) -> np.ndarray:
         """
@@ -506,9 +529,10 @@ class LossConeFitter:
         using χ² minimisation with scipy.optimize.minimize.
 
         Returns:
-            np.ndarray: Array with columns [delta_U, bs_over_bm, chi2, chunk_index]
+            np.ndarray: Array with columns [delta_U, bs_over_bm, beam_amp, chi2, chunk_index]
                 - delta_U: best-fit surface potential in volts
                 - bs_over_bm: best-fit B_s/B_m ratio
+                - beam_amp: best-fit Gaussian beam amplitude
                 - chi2: final χ² value
                 - chunk_index: measurement chunk index
         """
@@ -516,10 +540,10 @@ class LossConeFitter:
 
         # Fit for each chunk
         n_chunks = len(self.er_data.data) // config.SWEEP_ROWS
-        results = np.zeros((n_chunks, 4))
+        results = np.zeros((n_chunks, 5))
         for i in range(n_chunks):
-            delta_U, bs_over_bm, chi2 = self._fit_surface_potential(i)
-            results[i] = [delta_U, bs_over_bm, chi2, i]
+            delta_U, bs_over_bm, beam_amp, chi2 = self._fit_surface_potential(i)
+            results[i] = [delta_U, bs_over_bm, beam_amp, chi2, i]
 
         return results
 

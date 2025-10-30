@@ -83,8 +83,8 @@ class _FakeFitter:
     def fit_surface_potential(self):
         return np.array(
             [
-                [-15.0, 0.2, config.FIT_ERROR_THRESHOLD / 2, 0],
-                [-20.0, 0.3, config.FIT_ERROR_THRESHOLD / 2, 1],
+                [-15.0, 0.2, 0.5, config.FIT_ERROR_THRESHOLD / 2, 0],
+                [-20.0, 0.3, 0.5, config.FIT_ERROR_THRESHOLD / 2, 1],
             ]
         )
 
