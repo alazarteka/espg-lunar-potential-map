@@ -19,7 +19,7 @@ from typing import Iterable
 import webbrowser
 
 import numpy as np
-from numpy.linalg import LinAlgError, lstsq
+from numpy.linalg import LinAlgError, lstsq, solve
 
 try:
     # SciPy ≥1.15
@@ -319,6 +319,12 @@ def parse_args() -> argparse.Namespace:
         help="Maximum spherical harmonic degree to fit. Use a negative value to skip the fit.",
     )
     parser.add_argument(
+        "--regularize-l2",
+        type=float,
+        default=0.0,
+        help="Non-negative ridge penalty applied to spherical harmonic coefficients.",
+    )
+    parser.add_argument(
         "--plot-output",
         type=Path,
         default=None,
@@ -383,10 +389,14 @@ def _build_harmonic_design(lat_deg: np.ndarray, lon_deg: np.ndarray, lmax: int) 
     return design
 
 
-def spherical_harmonics(measurements: TimeSeriesRows, lmax: int) -> np.ndarray:
+def spherical_harmonics(
+    measurements: TimeSeriesRows, lmax: int, l2_penalty: float = 0.0
+) -> np.ndarray:
     """Fit spherical harmonic coefficients to the surface potential samples."""
     if lmax < 0:
         raise ValueError("lmax must be non-negative")
+    if l2_penalty < 0.0:
+        raise ValueError("l2_penalty must be non-negative")
 
     mask = _valid_harmonic_mask(measurements)
     if not np.any(mask):
@@ -402,7 +412,15 @@ def spherical_harmonics(measurements: TimeSeriesRows, lmax: int) -> np.ndarray:
         raise ValueError(
             f"Need at least {n_coeffs} finite rows for lmax={lmax}, got {potentials.size}"
         )
-    coeffs, *_ = lstsq(design, potentials, rcond=None)
+    potentials_complex = potentials.astype(np.complex128, copy=False)
+    if l2_penalty > 0.0:
+        gram = design.conj().T @ design
+        rhs = design.conj().T @ potentials_complex
+        diag = np.diag_indices_from(gram)
+        gram[diag] += l2_penalty
+        coeffs = solve(gram, rhs)
+    else:
+        coeffs, *_ = lstsq(design, potentials_complex, rcond=None)
     return coeffs
 
 
@@ -533,11 +551,18 @@ def main() -> int:
     
     if args.lmax >= 0:
         try:
-            coeffs = spherical_harmonics(rows, lmax=args.lmax)
+            coeffs = spherical_harmonics(
+                rows, lmax=args.lmax, l2_penalty=args.regularize_l2
+            )
         except (ValueError, LinAlgError) as exc:
             logging.error("Unable to compute spherical harmonics (lmax=%s): %s", args.lmax, exc)
             return 1
-        print(f"\nSpherical harmonic coefficients (lmax={args.lmax}):")
+        if args.regularize_l2 > 0.0:
+            print(
+                f"\nSpherical harmonic coefficients (lmax={args.lmax}, l2={args.regularize_l2:g}):"
+            )
+        else:
+            print(f"\nSpherical harmonic coefficients (lmax={args.lmax}):")
         for idx, coeff in enumerate(coeffs):
             real_part = f"{coeff.real:+.6f}"
             imag_part = f"{coeff.imag:+.6f}j"

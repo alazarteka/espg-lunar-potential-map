@@ -1,0 +1,842 @@
+"""
+Compute time-dependent spherical harmonic coefficients a_lm(t) for lunar surface potential.
+
+Implements the expansion:
+    U(φ, θ, t) = Σ_{l,m} a_lm(t) Y_lm(φ, θ)
+
+where a_lm(t) are fitted in temporal windows with spatial coverage validation.
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Iterator
+
+import numpy as np
+from numpy.linalg import LinAlgError, lstsq, solve
+
+try:
+    from scipy.special import sph_harm_y as _sph_harm
+except ImportError:
+    from scipy.special import sph_harm as _sph_harm
+
+# Default cache directory
+DEFAULT_CACHE_DIR = Path("data/potential_cache")
+
+
+@dataclass(slots=True)
+class TimeWindow:
+    """Single time window with measurements."""
+    start_time: np.datetime64
+    end_time: np.datetime64
+    midpoint: np.datetime64
+    utc: np.ndarray  # datetime64[ns]
+    lat: np.ndarray  # degrees
+    lon: np.ndarray  # degrees
+    potential: np.ndarray  # V
+    chi2: np.ndarray | None  # fit quality if available
+
+
+@dataclass(slots=True)
+class HarmonicCoefficients:
+    """Spherical harmonic coefficients for a single time window."""
+    time: np.datetime64  # midpoint of window
+    lmax: int
+    coeffs: np.ndarray  # complex, shape ((lmax+1)^2,)
+    n_samples: int
+    spatial_coverage: float  # fraction of bins with data
+    rms_residual: float  # RMS fit residual
+
+
+def _parse_iso_date(value: str) -> np.datetime64:
+    """Parse YYYY-MM-DD into numpy datetime64."""
+    try:
+        dt = datetime.strptime(value, "%Y-%m-%d")
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("Dates must be YYYY-MM-DD") from exc
+    return np.datetime64(dt.date())
+
+
+def _discover_npz(cache_dir: Path) -> list[Path]:
+    """Find all NPZ cache files."""
+    if not cache_dir.exists():
+        raise FileNotFoundError(f"Cache directory {cache_dir} does not exist")
+    return sorted(p for p in cache_dir.rglob("*.npz") if p.is_file())
+
+
+def _load_all_data(
+    files: list[Path],
+    start_ts: np.datetime64,
+    end_ts_exclusive: np.datetime64,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Load all measurements in the time range."""
+    utc_parts: list[np.ndarray] = []
+    lat_parts: list[np.ndarray] = []
+    lon_parts: list[np.ndarray] = []
+    pot_parts: list[np.ndarray] = []
+
+    start_str = str(start_ts.astype("datetime64[s]"))
+    end_str = str(end_ts_exclusive.astype("datetime64[s]"))
+
+    for path in files:
+        with np.load(path) as data:
+            utc = data["rows_utc"]
+            if utc.size == 0:
+                continue
+
+            valid_time = utc != ""
+            if not np.any(valid_time):
+                continue
+
+            mask = valid_time & (utc >= start_str) & (utc < end_str)
+            if not np.any(mask):
+                continue
+
+            try:
+                utc_vals = np.array(utc[mask], dtype="datetime64[ns]")
+            except ValueError:
+                logging.debug("Failed to parse UTC in %s", path)
+                continue
+
+            lat = data["rows_projection_latitude"].astype(np.float64)
+            lon = data["rows_projection_longitude"].astype(np.float64)
+            pot = data["rows_projected_potential"].astype(np.float64)
+
+            finite_mask = np.isfinite(lat) & np.isfinite(lon) & np.isfinite(pot)
+            mask_refined = mask & finite_mask
+            if not np.any(mask_refined):
+                continue
+
+            utc_parts.append(utc_vals[finite_mask[mask]])
+            lat_parts.append(lat[mask_refined])
+            lon_parts.append(lon[mask_refined])
+            pot_parts.append(pot[mask_refined])
+
+    if not utc_parts:
+        return (
+            np.array([], dtype="datetime64[ns]"),
+            np.array([]),
+            np.array([]),
+            np.array([]),
+        )
+
+    return (
+        np.concatenate(utc_parts),
+        np.concatenate(lat_parts),
+        np.concatenate(lon_parts),
+        np.concatenate(pot_parts),
+    )
+
+
+def _partition_into_windows(
+    utc: np.ndarray,
+    lat: np.ndarray,
+    lon: np.ndarray,
+    potential: np.ndarray,
+    window_hours: float,
+    stride_hours: float | None = None,
+) -> Iterator[TimeWindow]:
+    """
+    Partition data into temporal windows of specified duration.
+    
+    Args:
+        utc: Array of UTC timestamps
+        lat: Array of latitudes
+        lon: Array of longitudes
+        potential: Array of surface potentials
+        window_hours: Duration of each window
+        stride_hours: Step size between window starts (enables overlap).
+                     If None, defaults to window_hours (non-overlapping).
+    
+    Yields TimeWindow objects with spatially-contiguous measurements.
+    """
+    if utc.size == 0:
+        return
+
+    if stride_hours is None:
+        stride_hours = window_hours
+
+    # Sort by time
+    sort_idx = np.argsort(utc)
+    utc_sorted = utc[sort_idx]
+    lat_sorted = lat[sort_idx]
+    lon_sorted = lon[sort_idx]
+    pot_sorted = potential[sort_idx]
+
+    window_delta = np.timedelta64(int(window_hours * 3600), "s")
+    stride_delta = np.timedelta64(int(stride_hours * 3600), "s")
+    
+    current_start = utc_sorted[0]
+    
+    while current_start <= utc_sorted[-1]:
+        current_end = current_start + window_delta
+        
+        mask = (utc_sorted >= current_start) & (utc_sorted < current_end)
+        n_samples = np.sum(mask)
+        
+        if n_samples > 0:
+            window_utc = utc_sorted[mask]
+            midpoint = window_utc[0] + (window_utc[-1] - window_utc[0]) // 2
+            
+            yield TimeWindow(
+                start_time=current_start,
+                end_time=current_end,
+                midpoint=midpoint,
+                utc=window_utc,
+                lat=lat_sorted[mask],
+                lon=lon_sorted[mask],
+                potential=pot_sorted[mask],
+                chi2=None,
+            )
+        
+        # Slide window by stride
+        current_start = current_start + stride_delta
+
+
+def _compute_spatial_coverage(
+    lat: np.ndarray, lon: np.ndarray, bin_size_deg: float = 10.0
+) -> float:
+    """
+    Compute fraction of spatial bins that contain at least one measurement.
+    
+    Returns value in [0, 1] indicating global coverage quality.
+    """
+    lat_bins = int(180 / bin_size_deg)
+    lon_bins = int(360 / bin_size_deg)
+    
+    lat_indices = ((lat + 90) / bin_size_deg).astype(int)
+    lon_indices = ((lon + 180) / bin_size_deg).astype(int)
+    
+    lat_indices = np.clip(lat_indices, 0, lat_bins - 1)
+    lon_indices = np.clip(lon_indices, 0, lon_bins - 1)
+    
+    occupied = np.zeros((lat_bins, lon_bins), dtype=bool)
+    occupied[lat_indices, lon_indices] = True
+    
+    return float(np.sum(occupied)) / occupied.size
+
+
+def _harmonic_coefficient_count(lmax: int) -> int:
+    """Number of spherical harmonic coefficients up to degree lmax."""
+    return (lmax + 1) ** 2
+
+
+def _build_harmonic_design(
+    lat_deg: np.ndarray, lon_deg: np.ndarray, lmax: int
+) -> np.ndarray:
+    """Build design matrix of spherical harmonics."""
+    lat_rad = np.deg2rad(lat_deg)
+    lon_rad = np.deg2rad(lon_deg)
+    colatitudes = (np.pi / 2.0) - lat_rad
+
+    n_rows = lat_rad.size
+    n_cols = _harmonic_coefficient_count(lmax)
+    design = np.empty((n_rows, n_cols), dtype=np.complex128)
+    
+    col_idx = 0
+    for l in range(lmax + 1):
+        for m in range(-l, l + 1):
+            design[:, col_idx] = _sph_harm(m, l, lon_rad, colatitudes)
+            col_idx += 1
+    
+    return design
+
+
+def _enforce_reality_condition(coeffs: np.ndarray, lmax: int) -> np.ndarray:
+    """
+    Enforce reality condition: a_{l,-m} = (-1)^m * conj(a_{l,m}).
+    
+    For a real-valued field reconstructed from complex spherical harmonics,
+    the coefficients must satisfy this relationship. This function projects
+    the solution onto the real subspace.
+    """
+    coeffs_real = coeffs.copy()
+    
+    for l in range(lmax + 1):
+        for m in range(-l, l + 1):
+            if m == 0:
+                idx_zero = l * l + l
+                coeffs_real[idx_zero] = complex(coeffs_real[idx_zero].real, 0.0)
+            elif m > 0:
+                # Find positive m coefficient
+                idx_pos = l * l + l + m
+                # Find corresponding negative m coefficient
+                idx_neg = l * l + l - m
+                
+                # Average to enforce symmetry
+                a_pos = coeffs[idx_pos]
+                a_neg = coeffs[idx_neg]
+                
+                # Enforce: a_{l,-m} = (-1)^m * conj(a_{l,m})
+                phase = (-1) ** m
+                a_avg_pos = 0.5 * (a_pos + phase * np.conj(a_neg))
+                a_avg_neg = phase * np.conj(a_avg_pos)
+                
+                coeffs_real[idx_pos] = a_avg_pos
+                coeffs_real[idx_neg] = a_avg_neg
+    
+    return coeffs_real
+
+
+def _build_temporal_derivative_matrix(
+    delta_hours: np.ndarray,
+    n_coeffs: int,
+) -> "scipy.sparse.csr_matrix":
+    """
+    Build finite-difference operator for temporal derivatives.
+    
+    Returns sparse matrix D of shape:
+        ((n_windows-1)*n_coeffs, n_windows*n_coeffs)
+    
+    Encoding: D @ a_stacked ≈ [(a_2 - a_1)/Δt_1, ..., (a_N - a_{N-1})/Δt_{N-1}]
+    """
+    from scipy.sparse import diags, kron, eye
+    
+    if delta_hours.ndim != 1:
+        raise ValueError("delta_hours must be a 1D array of time-step lengths in hours")
+    if delta_hours.size == 0:
+        raise ValueError("delta_hours must contain at least one entry for temporal coupling")
+
+    safe_delta = np.clip(delta_hours, np.finfo(np.float64).eps, None)
+    inv_delta = 1.0 / safe_delta
+    n_windows = safe_delta.size + 1
+
+    # Time differences with per-step scaling
+    time_diff = diags(
+        [-inv_delta, inv_delta],
+        [0, 1],
+        shape=(n_windows - 1, n_windows),
+    )
+    
+    # Apply to all coefficients via Kronecker product
+    D_temporal = kron(time_diff, eye(n_coeffs), format='csr')
+    
+    return D_temporal
+
+
+def _fit_window_harmonics(
+    window: TimeWindow,
+    lmax: int,
+    l2_penalty: float = 0.0,
+    min_samples: int = 100,
+    min_coverage: float = 0.1,
+) -> HarmonicCoefficients | None:
+    """
+    Fit spherical harmonics to a single time window.
+    
+    Returns None if the window lacks sufficient spatial coverage.
+    """
+    if window.lat.size < min_samples:
+        logging.debug(
+            "Window at %s: insufficient samples (%d < %d)",
+            window.midpoint,
+            window.lat.size,
+            min_samples,
+        )
+        return None
+
+    coverage = _compute_spatial_coverage(window.lat, window.lon)
+    if coverage < min_coverage:
+        logging.debug(
+            "Window at %s: insufficient coverage (%.2f%% < %.2f%%)",
+            window.midpoint,
+            coverage * 100,
+            min_coverage * 100,
+        )
+        return None
+
+    n_coeffs = _harmonic_coefficient_count(lmax)
+    if window.lat.size < n_coeffs:
+        logging.debug(
+            "Window at %s: too few samples (%d) for lmax=%d (%d coeffs)",
+            window.midpoint,
+            window.lat.size,
+            lmax,
+            n_coeffs,
+        )
+        return None
+
+    # Build design matrix
+    design = _build_harmonic_design(window.lat, window.lon, lmax)
+    potential_complex = window.potential.astype(np.complex128)
+
+    # Solve with optional regularization
+    try:
+        if l2_penalty > 0.0:
+            gram = design.conj().T @ design
+            rhs = design.conj().T @ potential_complex
+            diag = np.diag_indices_from(gram)
+            gram[diag] += l2_penalty
+            coeffs = solve(gram, rhs)
+        else:
+            coeffs, *_ = lstsq(design, potential_complex, rcond=None)
+    except LinAlgError as exc:
+        logging.warning("Harmonic fit failed for window at %s: %s", window.midpoint, exc)
+        return None
+
+    # Enforce reality condition for physical solution
+    coeffs = _enforce_reality_condition(coeffs, lmax)
+    
+    # Compute RMS residual
+    predicted = np.real(design @ coeffs)
+    residuals = window.potential - predicted
+    rms_residual = float(np.sqrt(np.mean(residuals**2)))
+
+    return HarmonicCoefficients(
+        time=window.midpoint,
+        lmax=lmax,
+        coeffs=coeffs,
+        n_samples=window.lat.size,
+        spatial_coverage=coverage,
+        rms_residual=rms_residual,
+    )
+
+
+def _fit_coupled_windows(
+    windows: list[TimeWindow],
+    lmax: int,
+    spatial_lambda: float,
+    temporal_lambda: float,
+    min_samples: int,
+    min_coverage: float,
+) -> list[HarmonicCoefficients]:
+    """
+    Fit all windows jointly with temporal continuity constraint.
+    
+    Solves augmented least-squares system:
+        [X_block      ]       [Φ    ]
+        [√λ_s * I     ] @ a = [0    ]
+        [√λ_t * D_t   ]       [0    ]
+    """
+    from scipy.sparse import vstack, csr_matrix, diags, block_diag
+    from scipy.sparse.linalg import lsqr
+    
+    # Step 1: Filter windows by coverage and sample count
+    valid_windows = []
+    for w in windows:
+        if w.lat.size < min_samples:
+            logging.debug(
+                "Skipping window at %s: insufficient samples (%d < %d)",
+                w.midpoint,
+                w.lat.size,
+                min_samples,
+            )
+            continue
+        coverage = _compute_spatial_coverage(w.lat, w.lon)
+        if coverage < min_coverage:
+            logging.debug(
+                "Skipping window at %s: insufficient coverage (%.2f%% < %.2f%%)",
+                w.midpoint,
+                coverage * 100,
+                min_coverage * 100,
+            )
+            continue
+        valid_windows.append(w)
+    
+    n_windows = len(valid_windows)
+    n_coeffs = _harmonic_coefficient_count(lmax)
+    
+    if n_windows < 2:
+        # Not enough windows for temporal coupling - fall back to independent
+        logging.warning(
+            "Only %d valid windows; temporal coupling requires at least 2. "
+            "Falling back to independent fitting.",
+            n_windows,
+        )
+        return [
+            _fit_window_harmonics(w, lmax, spatial_lambda, min_samples, min_coverage)
+            for w in valid_windows
+            if _fit_window_harmonics(w, lmax, spatial_lambda, min_samples, min_coverage) is not None
+        ]
+    
+    logging.info(
+        "Fitting %d windows jointly with temporal_lambda=%.2e",
+        n_windows,
+        temporal_lambda,
+    )
+    
+    # Compute time deltas between consecutive window midpoints (hours)
+    delta_hours = np.empty(n_windows - 1, dtype=np.float64)
+    for i in range(n_windows - 1):
+        delta = valid_windows[i + 1].midpoint - valid_windows[i].midpoint
+        dt_hours = float(delta / np.timedelta64(1, "s")) / 3600.0
+        if dt_hours <= 0.0:
+            logging.warning(
+                "Non-positive Δt between windows at %s and %s; clamping to eps.",
+                valid_windows[i].midpoint,
+                valid_windows[i + 1].midpoint,
+            )
+            dt_hours = np.finfo(np.float64).eps
+        delta_hours[i] = dt_hours
+    
+    # Step 2: Build block-diagonal design matrix X_block
+    X_blocks = []
+    Phi_parts = []
+    
+    for window in valid_windows:
+        X_i = _build_harmonic_design(window.lat, window.lon, lmax)
+        Phi_i = window.potential.astype(np.complex128)
+        
+        X_blocks.append(csr_matrix(X_i))
+        Phi_parts.append(Phi_i)
+    
+    X_block = block_diag(X_blocks, format='csr')
+    Phi_stack = np.concatenate(Phi_parts)
+    
+    # Step 3: Build spatial regularization (diagonal)
+    n_total = n_windows * n_coeffs
+    R_spatial = np.sqrt(spatial_lambda) * diags(
+        [1.0], [0], shape=(n_total, n_total), format='csr'
+    )
+    
+    # Step 4: Build temporal regularization
+    D_temporal = _build_temporal_derivative_matrix(delta_hours, n_coeffs)
+    R_temporal = np.sqrt(temporal_lambda) * D_temporal
+    
+    # Step 5: Stack into augmented system
+    A_aug = vstack([X_block, R_spatial, R_temporal], format='csr')
+    b_aug = np.concatenate([
+        Phi_stack,
+        np.zeros(n_total, dtype=np.complex128),
+        np.zeros((n_windows - 1) * n_coeffs, dtype=np.complex128),
+    ])
+    
+    logging.info(
+        "Solving augmented system: %d equations, %d unknowns, %d non-zeros",
+        A_aug.shape[0],
+        A_aug.shape[1],
+        A_aug.nnz,
+    )
+    
+    # Step 6: Solve sparse least-squares
+    try:
+        coeffs_stacked, istop, itn, *_ = lsqr(A_aug, b_aug, atol=1e-8, btol=1e-8)
+        if istop not in [1, 2]:
+            logging.warning(
+                "lsqr converged with status %d after %d iterations", istop, itn
+            )
+    except Exception as exc:
+        logging.error("Failed to solve augmented system: %s", exc)
+        raise
+    
+    # Step 7: Reshape and compute residuals
+    results = []
+    for i, window in enumerate(valid_windows):
+        start_idx = i * n_coeffs
+        end_idx = (i + 1) * n_coeffs
+        
+        coeffs_i = coeffs_stacked[start_idx:end_idx]
+        
+        # Enforce reality condition for physical solution
+        coeffs_i = _enforce_reality_condition(coeffs_i, lmax)
+        
+        # Compute RMS residual for this window
+        X_i = X_blocks[i]
+        predicted = np.real(X_i @ coeffs_i)
+        residuals = window.potential - predicted
+        rms = float(np.sqrt(np.mean(residuals**2)))
+        
+        coverage = _compute_spatial_coverage(window.lat, window.lon)
+        
+        results.append(
+            HarmonicCoefficients(
+                time=window.midpoint,
+                lmax=lmax,
+                coeffs=coeffs_i,
+                n_samples=window.lat.size,
+                spatial_coverage=coverage,
+                rms_residual=rms,
+            )
+        )
+    
+    return results
+
+
+def compute_temporal_harmonics(
+    cache_dir: Path,
+    start_date: np.datetime64,
+    end_date: np.datetime64,
+    lmax: int,
+    window_hours: float = 24.0,
+    stride_hours: float | None = None,
+    l2_penalty: float = 0.0,
+    temporal_lambda: float = 0.0,
+    min_samples: int = 100,
+    min_coverage: float = 0.1,
+) -> list[HarmonicCoefficients]:
+    """
+    Compute time-dependent spherical harmonic coefficients a_lm(t).
+    
+    Args:
+        cache_dir: Directory containing NPZ potential cache files
+        start_date: Start date (inclusive)
+        end_date: End date (inclusive)
+        lmax: Maximum spherical harmonic degree
+        window_hours: Duration of each temporal window
+        stride_hours: Temporal stride in hours (None = non-overlapping)
+        l2_penalty: Ridge regularization strength (spatial)
+        temporal_lambda: Temporal continuity regularization strength
+        min_samples: Minimum measurements per window
+        min_coverage: Minimum spatial coverage fraction (0-1)
+    
+    Returns:
+        List of HarmonicCoefficients, one per valid time window.
+    """
+    logging.info("Discovering NPZ files in %s", cache_dir)
+    files = _discover_npz(cache_dir)
+    logging.info("Found %d NPZ files", len(files))
+
+    start_ts = start_date.astype("datetime64[s]")
+    end_ts_exclusive = (end_date + np.timedelta64(1, "D")).astype("datetime64[s]")
+
+    logging.info("Loading measurements from %s to %s", start_ts, end_ts_exclusive)
+    utc, lat, lon, potential = _load_all_data(files, start_ts, end_ts_exclusive)
+    logging.info("Loaded %d measurements", utc.size)
+
+    if utc.size == 0:
+        logging.warning("No measurements found in date range")
+        return []
+
+    stride_info = f" with {stride_hours:.1f}h stride" if stride_hours and stride_hours != window_hours else ""
+    logging.info("Partitioning into %.1f-hour windows%s", window_hours, stride_info)
+    windows = list(_partition_into_windows(utc, lat, lon, potential, window_hours, stride_hours))
+    logging.info("Created %d time windows", len(windows))
+
+    # Choose fitting strategy based on temporal_lambda
+    if temporal_lambda > 0.0:
+        logging.info("Using coupled fitting with temporal regularization")
+        results = _fit_coupled_windows(
+            windows,
+            lmax=lmax,
+            spatial_lambda=l2_penalty,
+            temporal_lambda=temporal_lambda,
+            min_samples=min_samples,
+            min_coverage=min_coverage,
+        )
+    else:
+        logging.info("Using independent window fitting (no temporal coupling)")
+        results: list[HarmonicCoefficients] = []
+        for i, window in enumerate(windows):
+            logging.debug(
+                "Fitting window %d/%d: %s (%d samples)",
+                i + 1,
+                len(windows),
+                window.midpoint,
+                window.lat.size,
+            )
+            
+            result = _fit_window_harmonics(
+                window,
+                lmax=lmax,
+                l2_penalty=l2_penalty,
+                min_samples=min_samples,
+                min_coverage=min_coverage,
+            )
+            
+            if result is not None:
+                results.append(result)
+                logging.info(
+                    "Window %s: %d samples, %.1f%% coverage, RMS=%.2f V",
+                    result.time,
+                    result.n_samples,
+                    result.spatial_coverage * 100,
+                    result.rms_residual,
+                )
+
+    logging.info("Successfully fitted %d/%d windows", len(results), len(windows))
+    return results
+
+
+def save_temporal_coefficients(
+    results: list[HarmonicCoefficients], output_path: Path
+) -> None:
+    """
+    Save time-dependent coefficients to NPZ file.
+    
+    Storage format:
+        times: array of datetime64[ns] midpoints
+        lmax: scalar integer
+        coeffs: complex array of shape (n_windows, (lmax+1)^2)
+        n_samples: integer array of sample counts
+        spatial_coverage: float array of coverage fractions
+        rms_residuals: float array of RMS fit residuals
+    """
+    if not results:
+        raise ValueError("No results to save")
+
+    times = np.array([r.time for r in results], dtype="datetime64[ns]")
+    lmax = results[0].lmax
+    n_coeffs = _harmonic_coefficient_count(lmax)
+    
+    coeffs = np.array([r.coeffs for r in results], dtype=np.complex128)
+    n_samples = np.array([r.n_samples for r in results], dtype=np.int32)
+    coverage = np.array([r.spatial_coverage for r in results], dtype=np.float64)
+    rms = np.array([r.rms_residual for r in results], dtype=np.float64)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        output_path,
+        times=times,
+        lmax=lmax,
+        coeffs=coeffs,
+        n_samples=n_samples,
+        spatial_coverage=coverage,
+        rms_residuals=rms,
+    )
+    logging.info("Saved temporal coefficients to %s", output_path)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Compute time-dependent spherical harmonic coefficients a_lm(t)",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--start",
+        required=True,
+        type=_parse_iso_date,
+        help="Start date (YYYY-MM-DD, inclusive)",
+    )
+    parser.add_argument(
+        "--end",
+        required=True,
+        type=_parse_iso_date,
+        help="End date (YYYY-MM-DD, inclusive)",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=DEFAULT_CACHE_DIR,
+        help="Root directory with potential_cache NPZ files",
+    )
+    parser.add_argument(
+        "--lmax",
+        type=int,
+        default=5,
+        help="Maximum spherical harmonic degree",
+    )
+    parser.add_argument(
+        "--window-hours",
+        type=float,
+        default=24.0,
+        help="Temporal window duration in hours",
+    )
+    parser.add_argument(
+        "--window-stride",
+        type=float,
+        default=None,
+        help="Temporal stride in hours (default: same as --window-hours for non-overlapping)",
+    )
+    parser.add_argument(
+        "--regularize-l2",
+        type=float,
+        default=0.0,
+        help="Ridge penalty for spatial coefficient fitting",
+    )
+    parser.add_argument(
+        "--temporal-lambda",
+        type=float,
+        default=0.0,
+        help="Temporal continuity regularization strength (0 = independent windows)",
+    )
+    parser.add_argument(
+        "--min-samples",
+        type=int,
+        default=100,
+        help="Minimum measurements required per window",
+    )
+    parser.add_argument(
+        "--min-coverage",
+        type=float,
+        default=0.1,
+        help="Minimum spatial coverage fraction (0-1)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="Output NPZ file for temporal coefficients",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging verbosity",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+
+    if args.end < args.start:
+        logging.error("--end must be >= --start")
+        return 1
+
+    if args.lmax < 0:
+        logging.error("--lmax must be non-negative")
+        return 1
+
+    if args.window_hours <= 0:
+        logging.error("--window-hours must be positive")
+        return 1
+
+    try:
+        results = compute_temporal_harmonics(
+            cache_dir=args.cache_dir,
+            start_date=args.start,
+            end_date=args.end,
+            lmax=args.lmax,
+            window_hours=args.window_hours,
+            stride_hours=args.window_stride,
+            l2_penalty=args.regularize_l2,
+            temporal_lambda=args.temporal_lambda,
+            min_samples=args.min_samples,
+            min_coverage=args.min_coverage,
+        )
+    except Exception as exc:
+        logging.exception("Failed to compute temporal harmonics: %s", exc)
+        return 1
+
+    if not results:
+        logging.warning("No valid time windows produced; nothing to save.")
+        return 1
+
+    try:
+        save_temporal_coefficients(results, args.output)
+    except Exception as exc:
+        logging.exception("Failed to save results: %s", exc)
+        return 1
+
+    # Print summary
+    times = np.array([r.time for r in results])
+    coverages = np.array([r.spatial_coverage for r in results])
+    rms_vals = np.array([r.rms_residual for r in results])
+    
+    print("\n" + "="*60)
+    print("Time-Dependent Spherical Harmonic Summary")
+    print("="*60)
+    print(f"Date range      : {args.start} → {args.end}")
+    print(f"Time windows    : {len(results)}")
+    print(f"Window duration : {args.window_hours:.1f} hours")
+    print(f"Max degree      : lmax = {args.lmax}")
+    print(f"Coefficients    : {_harmonic_coefficient_count(args.lmax)} per window")
+    print(f"Coverage range  : {coverages.min()*100:.1f}% - {coverages.max()*100:.1f}%")
+    print(f"RMS residuals   : {rms_vals.min():.2f} - {rms_vals.max():.2f} V")
+    print(f"Median RMS      : {np.median(rms_vals):.2f} V")
+    print(f"\nSaved to: {args.output}")
+    print("="*60)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
