@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the potential NPZ reader with optional spherical harmonic regularization.
+# Run the potential cache reader with optional spherical harmonic regularization.
 
 set -euo pipefail
 
@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 usage() {
     cat <<'EOF'
-Usage: run_potential_npz_reader.sh <YYYYMMDD> [m] [optional flags...]
+Usage: potential_cache_reader.sh <YYYYMMDD> [m] [optional flags...]
 
 DATE (YYYYMMDD) sets the --start date. When the optional `m` positional is
 present the run enables --plot-measurements and switches the output filename
@@ -109,7 +109,7 @@ PLOT_DIR="$(dirname "${PLOT_OUTPUT}")"
 mkdir -p "${PLOT_DIR}"
 
 CMD=(
-    uv run python "${SCRIPT_DIR}/potential_npz_reader.py"
+    uv run python "${SCRIPT_DIR}/potential_cache_reader.py"
     --start "${START_DATE}"
     --lmax "${LMAX_VALUE}"
     --regularize-l2 "${L2_PENALTY}"

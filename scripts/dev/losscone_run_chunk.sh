@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# usage: ./run_losscone.sh <chunk_number>
+# usage: ./losscone_run_chunk.sh <chunk_number>
 
 CHUNK=$1
 
@@ -9,7 +9,7 @@ if [ -z "$CHUNK" ]; then
   exit 1
 fi
 
-uv run python scripts/dev/plot_losscone_fit.py \
+uv run python scripts/dev/losscone_plot_fit.py \
   --file data/1998/060_090MAR/3D980323.TAB \
   --chunk "$CHUNK" \
   --output "temp/perf_runs/1998-03-23/losscone_chunk${CHUNK}.png" \

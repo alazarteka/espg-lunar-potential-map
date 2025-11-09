@@ -12,8 +12,8 @@
 - Sample cache stats (Apr 1–2, 1998) show spacecraft potentials in the tens of volts and strongly negative surface potentials with good spectral coverage.
 
 ## Analysis Tooling
-- `scripts/analysis/potential_map_sphere.py`: Matplotlib 3D scatter on a sphere for date ranges, optional down-sampling, colormap limits, and static image export.
-- `scripts/analysis/potential_map_plotly.py`: interactive Plotly 3D globe with moon texture, finite-data filtering, down-sampling, rotatable scatter, and orbit animation.
+- `scripts/analysis/potential_map_matplotlib_sphere.py`: Matplotlib 3D scatter on a sphere for date ranges, optional down-sampling, colormap limits, and static image export.
+- `scripts/analysis/potential_map_plotly_static.py`: interactive Plotly 3D globe with moon texture, finite-data filtering, down-sampling, rotatable scatter, and orbit animation.
   - Markers hover 1% above the surface so they remain visible over an opaque texture.
   - Texture is resampled (default 480×960) and quantized to ≤256 colours; automatically steps down when animation/MP4 is requested.
   - `--animate` adds play/pause controls; `--mp4-output` uses Kaleido + imageio[ffmpeg] to render orbit videos. Parameters exist for frames, duration, FPS, frame size, and sampling.

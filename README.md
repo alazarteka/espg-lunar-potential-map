@@ -132,12 +132,12 @@ Two analysis CLIs load the cached NPZ artefacts for plotting:
 
 ```bash
 # Static Matplotlib sphere projection
-uv run python scripts/analysis/potential_map_sphere.py \
+uv run python scripts/analysis/potential_map_matplotlib_sphere.py \
   --start 1998-09-16 --end 1998-09-16 \
   --cache-dir data/potential_cache --sample 5000 --output plots/1998-09-16.png
 
 # Interactive Plotly globe with optional animation/MP4 export
-uv run python scripts/analysis/potential_map_plotly.py \
+uv run python scripts/analysis/potential_map_plotly_static.py \
   --start 1998-09-16 --end 1998-09-16 \
   --cache-dir data/potential_cache --sample 5000 \
   --output plots/1998-09-16.html --animate
