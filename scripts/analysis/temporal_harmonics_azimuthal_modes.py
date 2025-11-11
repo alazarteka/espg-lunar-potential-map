@@ -13,6 +13,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from src.temporal import load_temporal_coefficients
+
 
 def analyze_azimuthal_power(
     coeffs: np.ndarray,
@@ -320,10 +322,10 @@ def main() -> int:
         return 1
     
     print(f"Loading temporal coefficients from {args.input}")
-    with np.load(args.input) as data:
-        coeffs = data['coeffs']
-        lmax = int(data['lmax'])
-        times = data['times']
+    dataset = load_temporal_coefficients(args.input)
+    coeffs = dataset.coeffs
+    lmax = dataset.lmax
+    times = dataset.times
     
     print(f"Dataset: {len(times)} windows, lmax={lmax}, {coeffs.shape[1]} coefficients")
     

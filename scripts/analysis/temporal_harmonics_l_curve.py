@@ -8,12 +8,15 @@ temporal smoothness and data fit quality.
 from __future__ import annotations
 
 import argparse
-import subprocess
-import tempfile
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+from src.temporal import compute_temporal_harmonics
+
+
+DEFAULT_CACHE_DIR = Path("data/potential_cache")
 
 
 def run_temporal_harmonics(
@@ -21,6 +24,7 @@ def run_temporal_harmonics(
     start: str,
     end: str,
     lmax: int,
+    cache_dir: Path,
 ) -> tuple[float, float]:
     """
     Run temporal harmonic fitting with given lambda and return metrics.
@@ -28,42 +32,22 @@ def run_temporal_harmonics(
     Returns:
         (temporal_roughness, data_misfit) tuple
     """
-    with tempfile.NamedTemporaryFile(suffix=".npz", delete=False) as tmp:
-        tmp_path = Path(tmp.name)
+    results = compute_temporal_harmonics(
+        cache_dir=cache_dir,
+        start_date=np.datetime64(start),
+        end_date=np.datetime64(end),
+        lmax=lmax,
+        temporal_lambda=temporal_lambda,
+    )
+    if len(results) < 2:
+        raise ValueError("Need at least two windows to compute temporal roughness")
     
-    try:
-        cmd = [
-            "uv", "run", "python",
-            "scripts/dev/temporal_harmonic_coefficients.py",
-            "--start", start,
-            "--end", end,
-            "--lmax", str(lmax),
-            "--temporal-lambda", str(temporal_lambda),
-            "--output", str(tmp_path),
-        ]
-        
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        
-        # Load results
-        with np.load(tmp_path) as data:
-            coeffs = data["coeffs"]
-            rms = data["rms_residuals"]
-        
-        # Compute metrics
-        diffs = np.diff(coeffs, axis=0)
-        temporal_roughness = np.mean(np.linalg.norm(diffs, axis=1))
-        data_misfit = np.median(rms)
-        
-        return temporal_roughness, data_misfit
-    
-    finally:
-        if tmp_path.exists():
-            tmp_path.unlink()
+    coeffs = np.array([r.coeffs for r in results])
+    rms = np.array([r.rms_residual for r in results])
+    diffs = np.diff(coeffs, axis=0)
+    temporal_roughness = float(np.mean(np.linalg.norm(diffs, axis=1)))
+    data_misfit = float(np.median(rms))
+    return temporal_roughness, data_misfit
 
 
 def plot_l_curve(
@@ -192,6 +176,12 @@ def parse_args() -> argparse.Namespace:
         default=Path("plots/l_curve"),
         help="Directory for output plots",
     )
+    parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=DEFAULT_CACHE_DIR,
+        help="Directory with cached potential rows (NPZ files)",
+    )
     return parser.parse_args()
 
 
@@ -222,13 +212,15 @@ def main() -> int:
                 args.start,
                 args.end,
                 args.lmax,
+                args.lmax,
+                args.cache_dir,
             )
             roughness[i] = rough
             misfit[i] = mis
             print(f"roughness={rough:.1f} V, misfit={mis:.1f} V")
         
-        except subprocess.CalledProcessError as e:
-            print(f"FAILED: {e}")
+        except Exception as exc:  # noqa: BLE001 - surface error to caller
+            print(f\"FAILED: {exc}\")
             return 1
     
     # Find optimal lambda

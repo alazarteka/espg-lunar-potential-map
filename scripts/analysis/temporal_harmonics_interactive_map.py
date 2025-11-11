@@ -14,46 +14,7 @@ import numpy as np
 import plotly.graph_objects as go
 from scipy.interpolate import interp1d
 
-try:
-    from scipy.special import sph_harm_y as _sph_harm
-except ImportError:
-    from scipy.special import sph_harm as _sph_harm
-
-
-def reconstruct_potential_map(
-    coeffs: np.ndarray,
-    lmax: int,
-    n_lat: int = 91,
-    n_lon: int = 181,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Reconstruct potential map from spherical harmonic coefficients.
-    
-    Returns:
-        (lat_grid, lon_grid, potential_map) all in degrees and volts
-    """
-    latitudes = np.linspace(-90.0, 90.0, n_lat)
-    longitudes = np.linspace(-180.0, 180.0, n_lon)
-    lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
-    
-    lat_rad = np.deg2rad(lat_grid.ravel())
-    lon_rad = np.deg2rad(lon_grid.ravel())
-    colatitudes = (np.pi / 2.0) - lat_rad
-    
-    n_points = lat_rad.size
-    n_coeffs = coeffs.size
-    design = np.empty((n_points, n_coeffs), dtype=np.complex128)
-    
-    col_idx = 0
-    for l in range(lmax + 1):
-        for m in range(-l, l + 1):
-            design[:, col_idx] = _sph_harm(m, l, lon_rad, colatitudes)
-            col_idx += 1
-    
-    potential_flat = np.real(design @ coeffs)
-    potential_map = potential_flat.reshape(lat_grid.shape)
-    
-    return lat_grid, lon_grid, potential_map
+from src.temporal import load_temporal_coefficients, reconstruct_global_map
 
 
 def latlon_to_xyz(lat: np.ndarray, lon: np.ndarray, radius: float = 1.0) -> tuple:
@@ -104,14 +65,19 @@ def create_interactive_sphere(
     
     # Generate potential maps for each interpolated time
     print("Reconstructing potential maps on sphere...")
-    lat_grid, lon_grid, potential_0 = reconstruct_potential_map(coeffs_interp[0], lmax)
+    latitudes, longitudes, potential_0 = reconstruct_global_map(
+        coeffs_interp[0], lmax, lat_steps=n_lat, lon_steps=n_lon
+    )
+    lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
     x, y, z = latlon_to_xyz(lat_grid, lon_grid)
     
     # Determine global color scale from all frames
     print("Computing global color range...")
     all_potentials = []
     for i in range(min(20, n_interp_frames)):  # Sample to save time
-        _, _, pot = reconstruct_potential_map(coeffs_interp[i], lmax)
+        _, _, pot = reconstruct_global_map(
+            coeffs_interp[i], lmax, lat_steps=n_lat, lon_steps=n_lon
+        )
         all_potentials.append(pot)
     
     vmin = np.percentile(np.concatenate([p.ravel() for p in all_potentials]), 1)
@@ -124,7 +90,9 @@ def create_interactive_sphere(
     frames = []
     
     for i in range(n_interp_frames):
-        _, _, potential = reconstruct_potential_map(coeffs_interp[i], lmax)
+        _, _, potential = reconstruct_global_map(
+            coeffs_interp[i], lmax, lat_steps=n_lat, lon_steps=n_lon
+        )
         
         # Convert interpolated time back to datetime
         t_interp = t0 + np.timedelta64(int(hours_interp[i] * 3600), 's')
@@ -300,10 +268,10 @@ def main() -> int:
         return 1
     
     print(f"Loading temporal coefficients from {args.input}")
-    with np.load(args.input) as data:
-        times = data['times']
-        coeffs = data['coeffs']
-        lmax = int(data['lmax'])
+    dataset = load_temporal_coefficients(args.input)
+    times = dataset.times
+    coeffs = dataset.coeffs
+    lmax = dataset.lmax
     
     print(f"\nDataset info:")
     print(f"  Date range: {np.datetime_as_string(times[0], unit='D')} to {np.datetime_as_string(times[-1], unit='D')}")

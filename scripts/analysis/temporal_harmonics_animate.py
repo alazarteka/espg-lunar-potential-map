@@ -21,94 +21,13 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 
-from scipy.special import sph_harm_y
-
-
-def _sph_harm(m: int, l: int, phi, theta):
-    """Evaluate spherical harmonics using SciPy's sph_harm_y (θ=colat, φ=azimuth)."""
-    return sph_harm_y(l, m, theta, phi)
-
-
-def _parse_datetime(ts: np.datetime64) -> str:
-    """Format numpy datetime64 for titles."""
-    return np.datetime_as_string(ts, unit="m")
-
-
-def load_temporal_coefficients(path: Path) -> dict[str, np.ndarray | int]:
-    """Load temporal coefficient dataset saved as NPZ."""
-    with np.load(path) as data:
-        return {
-            "times": data["times"],
-            "lmax": int(data["lmax"]),
-            "coeffs": data["coeffs"],
-            "n_samples": data.get("n_samples"),
-            "spatial_coverage": data.get("spatial_coverage"),
-            "rms_residuals": data.get("rms_residuals"),
-        }
-
-
-def reconstruct_global_map(
-    coeffs: np.ndarray,
-    lmax: int,
-    lat_steps: int = 181,
-    lon_steps: int = 361,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Reconstruct global potential map from spherical harmonic coefficients."""
-    latitudes = np.linspace(-90.0, 90.0, lat_steps)
-    longitudes = np.linspace(-180.0, 180.0, lon_steps)
-    lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
-
-    lat_rad = np.deg2rad(lat_grid.ravel())
-    lon_rad = np.deg2rad(lon_grid.ravel())
-    colatitudes = (np.pi / 2.0) - lat_rad
-
-    n_points = lat_rad.size
-    n_coeffs = coeffs.size
-    design = np.empty((n_points, n_coeffs), dtype=np.complex128)
-
-    col_idx = 0
-    for l in range(lmax + 1):
-        for m in range(-l, l + 1):
-            design[:, col_idx] = _sph_harm(m, l, lon_rad, colatitudes)
-            col_idx += 1
-
-    potential_flat = np.real(design @ coeffs)
-    potential_map = potential_flat.reshape(lat_grid.shape)
-    return latitudes, longitudes, potential_map
-
-
-def compute_potential_series(
-    coeffs: np.ndarray,
-    lmax: int,
-    lat_steps: int,
-    lon_steps: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Compute reconstructed potential map for each time index."""
-    latitudes: np.ndarray | None = None
-    longitudes: np.ndarray | None = None
-    maps = np.empty((coeffs.shape[0], lat_steps, lon_steps), dtype=np.float32)
-
-    for idx in range(coeffs.shape[0]):
-        lats, lons, potential = reconstruct_global_map(
-            coeffs[idx], lmax, lat_steps=lat_steps, lon_steps=lon_steps
-        )
-        if latitudes is None:
-            latitudes = lats
-        if longitudes is None:
-            longitudes = lons
-        maps[idx] = potential
-    assert latitudes is not None and longitudes is not None  # for mypy
-    return latitudes, longitudes, maps
-
-
-def _compute_edges(values: np.ndarray, clamp_min: float, clamp_max: float) -> np.ndarray:
-    """Derive cell-edge coordinates from monotonically increasing centers."""
-    diffs = np.diff(values) / 2.0
-    edges = np.empty(values.size + 1, dtype=values.dtype)
-    edges[1:-1] = values[:-1] + diffs
-    edges[0] = values[0] - diffs[0]
-    edges[-1] = values[-1] + diffs[-1]
-    return np.clip(edges, clamp_min, clamp_max)
+from src.temporal import (
+    compute_cell_edges,
+    compute_color_limits,
+    compute_potential_series,
+    format_timestamp,
+    load_temporal_coefficients,
+)
 
 
 def _prepare_writer(name: str, fps: int) -> animation.AnimationWriter:
@@ -146,11 +65,11 @@ def create_hemisphere_animation(
     north_maps = maps[:, north_indices, :]
     south_maps = maps[:, south_indices, :]
 
-    lon_edges = _compute_edges(longitudes, -180.0, 180.0)
+    lon_edges = compute_cell_edges(longitudes, -180.0, 180.0)
     theta_edges = np.deg2rad(lon_edges)
 
-    north_edges = _compute_edges(north_lats, 0.0, 90.0)
-    south_edges = _compute_edges(south_lats, -90.0, 0.0)
+    north_edges = compute_cell_edges(north_lats, 0.0, 90.0)
+    south_edges = compute_cell_edges(south_lats, -90.0, 0.0)
     north_r_edges = 90.0 - north_edges  # colatitude (0 = pole, 90 = equator)
     south_r_edges = south_edges + 90.0  # distance from south pole (0 = pole)
 
@@ -201,12 +120,12 @@ def create_hemisphere_animation(
     cbar = fig.colorbar(north_mesh, ax=[ax_north, ax_south], label="Φ_surface (V)")
     cbar.ax.tick_params(labelsize=9)
 
-    title = fig.suptitle(f"t = {_parse_datetime(times[0])}")
+    title = fig.suptitle(f"t = {format_timestamp(times[0])}")
 
     def update(frame: int):
         north_mesh.set_array(north_maps[frame].ravel())
         south_mesh.set_array(south_maps[frame].ravel())
-        title.set_text(f"t = {_parse_datetime(times[frame])}")
+        title.set_text(f"t = {format_timestamp(times[frame])}")
         return north_mesh, south_mesh, title
 
     ani = animation.FuncAnimation(
@@ -233,8 +152,8 @@ def create_global_animation(
     """Create equirectangular global animation."""
     fig, ax = plt.subplots(figsize=(10, 4.5), constrained_layout=True)
     cmap = plt.get_cmap("viridis")
-    lon_edges = _compute_edges(longitudes, -180.0, 180.0)
-    lat_edges = _compute_edges(latitudes, -90.0, 90.0)
+    lon_edges = compute_cell_edges(longitudes, -180.0, 180.0)
+    lat_edges = compute_cell_edges(latitudes, -90.0, 90.0)
     im = ax.imshow(
         maps[0],
         extent=(lon_edges[0], lon_edges[-1], lat_edges[0], lat_edges[-1]),
@@ -250,11 +169,11 @@ def create_global_animation(
     ax.set_ylabel("Latitude (°)")
     cbar = fig.colorbar(im, ax=ax, label="Φ_surface (V)")
 
-    title = fig.suptitle(f"t = {_parse_datetime(times[0])}")
+    title = fig.suptitle(f"t = {format_timestamp(times[0])}")
 
     def update(frame: int):
         im.set_data(maps[frame])
-        title.set_text(f"t = {_parse_datetime(times[frame])}")
+        title.set_text(f"t = {format_timestamp(times[frame])}")
         return im, title
 
     ani = animation.FuncAnimation(
@@ -264,38 +183,6 @@ def create_global_animation(
         ani.save(str(output_path), writer=writer, dpi=dpi)
     finally:
         plt.close(fig)
-
-
-def compute_color_limits(
-    maps: np.ndarray,
-    vmin: float | None,
-    vmax: float | None,
-    symmetric_percentile: float | None,
-) -> tuple[float, float]:
-    """Determine global color scale."""
-    if (
-        symmetric_percentile is not None
-        and 0.0 < symmetric_percentile <= 100.0
-        and (vmin is None or vmax is None)
-    ):
-        percentile_value = float(
-            np.nanpercentile(np.abs(maps), symmetric_percentile)
-        )
-        if percentile_value > 0:
-            if vmin is None:
-                vmin = -percentile_value
-            if vmax is None:
-                vmax = percentile_value
-
-    if vmin is None:
-        vmin = float(np.nanmin(maps))
-    if vmax is None:
-        vmax = float(np.nanmax(maps))
-    if np.isclose(vmin, vmax):
-        delta = max(1.0, abs(vmin) * 0.1 + 1.0)
-        vmin -= delta
-        vmax += delta
-    return vmin, vmax
 
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
@@ -381,10 +268,10 @@ def main(argv: Iterable[str] | None = None) -> int:
     if not args.input.exists():
         raise FileNotFoundError(f"Input file {args.input} not found")
 
-    data = load_temporal_coefficients(args.input)
-    times: np.ndarray = np.asarray(data["times"])
-    coeffs: np.ndarray = np.asarray(data["coeffs"])
-    lmax: int = int(data["lmax"])
+    dataset = load_temporal_coefficients(args.input)
+    times: np.ndarray = np.asarray(dataset.times)
+    coeffs: np.ndarray = np.asarray(dataset.coeffs)
+    lmax: int = int(dataset.lmax)
 
     if args.limit_frames is not None:
         max_frames = min(len(times), args.limit_frames)

@@ -13,28 +13,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-try:
-    from scipy.special import sph_harm_y as _sph_harm
-except ImportError:
-    from scipy.special import sph_harm as _sph_harm
+from src.temporal import load_temporal_coefficients, reconstruct_global_map
 
 
 def _parse_iso_datetime(value: str) -> np.datetime64:
     """Parse ISO datetime string."""
     return np.datetime64(value)
-
-
-def load_temporal_coefficients(path: Path) -> dict:
-    """Load temporal coefficient data from NPZ file."""
-    with np.load(path) as data:
-        return {
-            "times": data["times"],
-            "lmax": int(data["lmax"]),
-            "coeffs": data["coeffs"],
-            "n_samples": data["n_samples"],
-            "spatial_coverage": data["spatial_coverage"],
-            "rms_residuals": data["rms_residuals"],
-        }
 
 
 def _lm_to_index(l: int, m: int) -> int:
@@ -167,41 +151,6 @@ def plot_rms_evolution(
     plt.close(fig)
 
 
-def reconstruct_global_map(
-    coeffs: np.ndarray,
-    lmax: int,
-    lat_steps: int = 181,
-    lon_steps: int = 361,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Reconstruct global potential map from spherical harmonic coefficients.
-    
-    Returns (latitudes, longitudes, potential_map) all in degrees/volts.
-    """
-    latitudes = np.linspace(-90.0, 90.0, lat_steps)
-    longitudes = np.linspace(-180.0, 180.0, lon_steps)
-    lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
-
-    lat_rad = np.deg2rad(lat_grid.ravel())
-    lon_rad = np.deg2rad(lon_grid.ravel())
-    colatitudes = (np.pi / 2.0) - lat_rad
-
-    n_points = lat_rad.size
-    n_coeffs = coeffs.size
-    design = np.empty((n_points, n_coeffs), dtype=np.complex128)
-
-    col_idx = 0
-    for l in range(lmax + 1):
-        for m in range(-l, l + 1):
-            design[:, col_idx] = _sph_harm(m, l, lon_rad, colatitudes)
-            col_idx += 1
-
-    potential_flat = np.real(design @ coeffs)
-    potential_map = potential_flat.reshape(lat_grid.shape)
-
-    return latitudes, longitudes, potential_map
-
-
 def plot_snapshot_maps(
     times: np.ndarray,
     coeffs: np.ndarray,
@@ -323,14 +272,16 @@ def main() -> int:
         return 1
 
     print(f"Loading temporal coefficients from {args.input}")
-    data = load_temporal_coefficients(args.input)
+    dataset = load_temporal_coefficients(args.input)
 
-    times = data["times"]
-    coeffs = data["coeffs"]
-    lmax = data["lmax"]
-    n_samples = data["n_samples"]
-    coverage = data["spatial_coverage"]
-    rms = data["rms_residuals"]
+    times = dataset.times
+    coeffs = dataset.coeffs
+    lmax = dataset.lmax
+    n_samples = dataset.n_samples
+    coverage = dataset.spatial_coverage
+    rms = dataset.rms_residuals
+    if n_samples is None or coverage is None or rms is None:
+        raise ValueError("Dataset is missing quality metrics required for analysis plots")
 
     print(f"\nDataset Summary:")
     print(f"  Time range     : {times[0]} → {times[-1]}")

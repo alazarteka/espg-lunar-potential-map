@@ -12,18 +12,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-
-def load_coefficients(path: Path) -> dict:
-    """Load temporal coefficient data from NPZ file."""
-    with np.load(path) as data:
-        return {
-            "times": data["times"],
-            "lmax": int(data["lmax"]),
-            "coeffs": data["coeffs"],
-            "n_samples": data["n_samples"],
-            "spatial_coverage": data["spatial_coverage"],
-            "rms_residuals": data["rms_residuals"],
-        }
+from src.temporal import TemporalDataset, load_temporal_coefficients
 
 
 def plot_coefficient_comparison(
@@ -239,14 +228,14 @@ def plot_residual_comparison(
 
 
 def print_summary_statistics(
-    data_ind: dict,
-    data_coup: dict,
+    data_ind: TemporalDataset,
+    data_coup: TemporalDataset,
 ) -> None:
     """Print quantitative comparison statistics."""
     
     # Temporal roughness
-    diffs_ind = np.diff(data_ind["coeffs"], axis=0)
-    diffs_coup = np.diff(data_coup["coeffs"], axis=0)
+    diffs_ind = np.diff(data_ind.coeffs, axis=0)
+    diffs_coup = np.diff(data_coup.coeffs, axis=0)
     roughness_ind = np.linalg.norm(diffs_ind, axis=1)
     roughness_coup = np.linalg.norm(diffs_coup, axis=1)
     
@@ -259,14 +248,20 @@ def print_summary_statistics(
     print(f"  Coupled:     mean={roughness_coup.mean():.2f} V, std={roughness_coup.std():.2f} V")
     print(f"  Reduction:   {(1 - roughness_coup.mean()/roughness_ind.mean())*100:.1f}%")
     
-    print(f"\nRMS Residuals:")
-    print(f"  Independent: median={np.median(data_ind['rms_residuals']):.2f} V")
-    print(f"  Coupled:     median={np.median(data_coup['rms_residuals']):.2f} V")
-    print(f"  Change:      {(np.median(data_coup['rms_residuals'])/np.median(data_ind['rms_residuals']) - 1)*100:+.1f}%")
+    if data_ind.rms_residuals is None or data_coup.rms_residuals is None:
+        print("\nRMS residual arrays missing; skipping misfit summary.")
+    else:
+        median_ind = float(np.median(data_ind.rms_residuals))
+        median_coup = float(np.median(data_coup.rms_residuals))
+        change = (median_coup / median_ind - 1) * 100 if median_ind else 0.0
+        print(f"\nRMS Residuals:")
+        print(f"  Independent: median={median_ind:.2f} V")
+        print(f"  Coupled:     median={median_coup:.2f} V")
+        print(f"  Change:      {change:+.1f}%")
     
     print(f"\nCoefficient Statistics (all modes):")
-    print(f"  Independent: mean(|a|)={np.mean(np.abs(data_ind['coeffs'])):.2f} V")
-    print(f"  Coupled:     mean(|a|)={np.mean(np.abs(data_coup['coeffs'])):.2f} V")
+    print(f"  Independent: mean(|a|)={np.mean(np.abs(data_ind.coeffs)):.2f} V")
+    print(f"  Coupled:     mean(|a|)={np.mean(np.abs(data_coup.coeffs)):.2f} V")
     
     print("="*60 + "\n")
 
@@ -313,41 +308,41 @@ def main() -> int:
         return 1
     
     print(f"Loading independent fit from {args.independent}")
-    data_ind = load_coefficients(args.independent)
+    data_ind = load_temporal_coefficients(args.independent)
     
     print(f"Loading coupled fit from {args.coupled}")
-    data_coup = load_coefficients(args.coupled)
+    data_coup = load_temporal_coefficients(args.coupled)
     
-    if data_ind["lmax"] != data_coup["lmax"]:
-        print(f"Warning: lmax mismatch ({data_ind['lmax']} vs {data_coup['lmax']})")
+    if data_ind.lmax != data_coup.lmax:
+        print(f"Warning: lmax mismatch ({data_ind.lmax} vs {data_coup.lmax})")
     
     output_dir = args.output_dir if not args.display else None
     
     print("\nGenerating coefficient comparison plots...")
     plot_coefficient_comparison(
-        data_ind["times"],
-        data_ind["coeffs"],
-        data_coup["times"],
-        data_coup["coeffs"],
-        data_ind["lmax"],
+        data_ind.times,
+        data_ind.coeffs,
+        data_coup.times,
+        data_coup.coeffs,
+        data_ind.lmax,
         output_dir / "coefficient_comparison.png" if output_dir else None,
     )
     
     print("Generating temporal roughness plots...")
     plot_temporal_roughness(
-        data_ind["times"],
-        data_ind["coeffs"],
-        data_coup["times"],
-        data_coup["coeffs"],
+        data_ind.times,
+        data_ind.coeffs,
+        data_coup.times,
+        data_coup.coeffs,
         output_dir / "roughness_comparison.png" if output_dir else None,
     )
     
     print("Generating residual comparison plots...")
     plot_residual_comparison(
-        data_ind["times"],
-        data_ind["rms_residuals"],
-        data_coup["times"],
-        data_coup["rms_residuals"],
+        data_ind.times,
+        data_ind.rms_residuals,
+        data_coup.times,
+        data_coup.rms_residuals,
         output_dir / "residual_comparison.png" if output_dir else None,
     )
     
