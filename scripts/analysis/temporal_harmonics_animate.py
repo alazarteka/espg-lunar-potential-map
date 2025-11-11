@@ -21,10 +21,12 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 
-try:
-    from scipy.special import sph_harm_y as _sph_harm
-except ImportError:  # pragma: no cover - fallback for SciPy < 1.13
-    from scipy.special import sph_harm as _sph_harm
+from scipy.special import sph_harm_y
+
+
+def _sph_harm(m: int, l: int, phi, theta):
+    """Evaluate spherical harmonics using SciPy's sph_harm_y (θ=colat, φ=azimuth)."""
+    return sph_harm_y(l, m, theta, phi)
 
 
 def _parse_datetime(ts: np.datetime64) -> str:

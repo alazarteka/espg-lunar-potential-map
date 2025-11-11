@@ -3,7 +3,7 @@
 Compare loss-cone fits with and without the secondary beam component.
 
 Example:
-    uv run python scripts/dev/compare_losscone_beam.py \
+    uv run python scripts/dev/losscone_compare_beam.py \
         --file data/1998/060_090MAR/3D980323.TAB \
         --chunks 0 100 200 300 400 \
         --output temp/perf_runs/1998-03-23/beam_comparison.csv

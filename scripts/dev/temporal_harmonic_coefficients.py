@@ -19,10 +19,12 @@ from typing import Iterator
 import numpy as np
 from numpy.linalg import LinAlgError, lstsq, solve
 
-try:
-    from scipy.special import sph_harm_y as _sph_harm
-except ImportError:
-    from scipy.special import sph_harm as _sph_harm
+from scipy.special import sph_harm_y
+
+
+def _sph_harm(m: int, l: int, phi, theta):
+    """Evaluate spherical harmonics using SciPy's sph_harm_y (θ=colat, φ=azimuth)."""
+    return sph_harm_y(l, m, theta, phi)
 
 # Default cache directory
 DEFAULT_CACHE_DIR = Path("data/potential_cache")

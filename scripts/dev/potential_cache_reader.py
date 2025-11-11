@@ -1,6 +1,6 @@
 """Dev helper to inspect cached potential NPZ bundles.
 
-This script intentionally mirrors the CLI of `scripts/analysis/potential_timeseries.py`
+This script intentionally mirrors the CLI of `scripts/analysis/potential_timeseries_plotly.py`
 so it can be swapped into existing workflows while experimenting with new analyses.
 It currently loads the same cached NPZ rows and emits a textual summary (optionally
 wrapped in a minimal HTML shell when `--output` ends in `.html`). Extend the
@@ -257,7 +257,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Inspect cached spacecraft/surface potential NPZ files and emit a textual summary. "
-            "Arguments intentionally match scripts/analysis/potential_timeseries.py for CLI parity."
+            "Arguments intentionally match scripts/analysis/potential_timeseries_plotly.py for CLI parity."
         ),
     )
     parser.add_argument(

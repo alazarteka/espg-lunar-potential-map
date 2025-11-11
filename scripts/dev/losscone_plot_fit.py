@@ -4,7 +4,7 @@ Visualize observed vs. modelled loss-cone flux for a single measurement chunk.
 
 Usage
 -----
-uv run python scripts/dev/plot_losscone_fit.py \
+uv run python scripts/dev/losscone_plot_fit.py \
     --file data/1998/060_090MAR/3D980323.TAB \
     --chunk 0 \
     --theta-file data/theta.tab \
