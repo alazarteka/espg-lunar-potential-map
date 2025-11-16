@@ -1,4 +1,15 @@
-# Repository Guidelines
+# ESPG Lunar Potential Map
+
+## Project Overview
+
+This project maps the lunar surface electrostatic potential using physics-based models. It processes SPICE kernel data, applies temporal reconstruction techniques, and generates potential maps accounting for plasma interactions and surface properties.
+
+**Key capabilities:**
+- SPICE kernel data acquisition and processing
+- Flux calculations for plasma-surface interactions
+- Kappa distribution modeling for particle populations
+- Temporal coefficient reconstruction for time-varying phenomena
+- Electrostatic potential mapping with configurable physics models
 
 ## Project Structure & Module Organization
 

@@ -74,6 +74,17 @@ def compute_potential_series(
 
 def compute_cell_edges(values: np.ndarray, clamp_min: float, clamp_max: float) -> np.ndarray:
     """Derive cell-edge coordinates from monotonically increasing centers."""
+    if values.size == 0:
+        raise ValueError("values must contain at least one entry")
+    if values.size == 1:
+        span = abs(clamp_max - clamp_min)
+        half_step = max(1.0, 0.5 * span * 0.01)
+        edges = np.array(
+            [values[0] - half_step, values[0] + half_step],
+            dtype=values.dtype,
+        )
+        return np.clip(edges, clamp_min, clamp_max)
+
     diffs = np.diff(values) / 2.0
     edges = np.empty(values.size + 1, dtype=values.dtype)
     edges[1:-1] = values[:-1] + diffs
