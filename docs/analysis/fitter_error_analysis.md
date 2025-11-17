@@ -2,6 +2,7 @@
 # Fitter Error Threshold Analysis
 
 **Date:** 2025-08-08
+**Updated:** 2025-11-16
 
 ## 1. Objective
 
@@ -53,3 +54,54 @@ This threshold is justified for the following reasons:
 3.  **Robustness:** By being derived from the filtered data, it is not skewed by the catastrophic outliers and reflects the true distribution of errors for the bulk of the data.
 
 Any fit with a chi-squared value above this threshold will be considered "questionable" and should be treated with caution in subsequent analysis.
+
+## 5. Current Implementation Status (Updated 2025-11-16)
+
+**⚠️ DECISION PENDING:**
+
+The current code in `src/config.py` uses:
+
+```python
+FIT_ERROR_THRESHOLD = 21_500_000_000  # chi-squared threshold for a good fit
+```
+
+This value (2.15×10¹⁰) is approximately **100,000× larger** than the statistically-derived threshold documented above (2.15×10⁵).
+
+### 5.1. Comparison of Options
+
+| Threshold Value | Percentile | Fits Rejected | Rationale |
+|----------------|------------|---------------|-----------|
+| **215,000** | 95th (filtered) | ~5% | Statistically justified, rejects questionable fits |
+| **657,000** | 99th (filtered) | ~1% | Middle ground, keeps more data while still filtering poor fits |
+| **21,500,000,000** | ~99th+ (unfiltered) | <1% | Current code value, very permissive, accepts almost everything |
+
+### 5.2. Impact on Analysis
+
+The threshold is used in two places:
+
+1. **`src/kappa.py:528`** - Sets `is_good_fit` boolean flag (informational only)
+2. **`src/potential_mapper/pipeline.py:276`** - **Actively filters data**: fits with chi² > threshold are **discarded** from surface potential calculations
+
+With the current threshold of 2.15×10¹⁰:
+- Nearly all fits are accepted (only catastrophic failures rejected)
+- Pipeline includes data from the top ~5% of error values that would be rejected by the documented threshold
+- Trade-off: maximum data retention vs. potential inclusion of poor-quality fits
+
+### 5.3. Open Questions
+
+Before finalizing the threshold, the following should be investigated:
+
+1. **Data loss assessment:** How many measurements would be lost by using the stricter 215,000 threshold?
+2. **Spatial coverage:** Does the stricter threshold create gaps in spatial coverage?
+3. **Science impact:** Are the marginal fits (chi² between 215k and 21.5B) scientifically useful or problematic?
+4. **Validation:** Can we cross-validate fits in this range against other indicators (e.g., consistency with neighboring measurements)?
+
+### 5.4. Recommendation
+
+The choice of threshold should be documented and justified based on science requirements:
+
+- **If maximizing spatial coverage is critical:** Keep current permissive threshold but add validation checks
+- **If data quality is paramount:** Use the 95th percentile (215,000) from statistical analysis
+- **If balanced approach needed:** Consider 99th percentile (657,000) as middle ground
+
+**TODO:** Make explicit decision and update both `src/config.py` and this documentation accordingly.

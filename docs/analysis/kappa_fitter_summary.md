@@ -2,6 +2,7 @@
 # Kappa Fitter: Design and Analysis Summary
 
 **Date:** 2025-08-09
+**Updated:** 2025-11-16
 
 ## 1. Overview
 
@@ -32,11 +33,13 @@ This model accounts not only for the statistical Poisson noise (`N`) but also fo
 
 To programmatically distinguish between reliable and questionable fits, a statistical analysis was performed on the distribution of chi-squared errors across the entire dataset (see `docs/analysis/fitter_error_analysis.md` for details).
 
-Based on this analysis, a **fit quality threshold** was established at the 95th percentile of the filtered error distribution:
+Based on this analysis, a **fit quality threshold** was initially proposed at the 95th percentile of the filtered error distribution (215,000).
 
-**`FIT_ERROR_THRESHOLD = 215000`**
+**Current Implementation (as of 2025-11-16):**
 
-A boolean flag, `is_good_fit`, is returned with every fit, providing an immediate and statistically-backed assessment of the result's quality.
+The code currently uses `FIT_ERROR_THRESHOLD = 21_500_000_000` (2.15×10¹⁰), which is substantially more permissive than the statistically-derived value. This threshold accepts nearly all fits except catastrophic failures.
+
+A boolean flag, `is_good_fit`, is returned with every fit. **Note:** The interpretation of this flag depends on which threshold value is ultimately adopted. See `docs/analysis/fitter_error_analysis.md` Section 5 for ongoing discussion of threshold selection.
 
 ### 3.3. Uncertainty Calculation for Fitted Parameters
 
