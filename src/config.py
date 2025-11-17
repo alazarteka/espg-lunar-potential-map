@@ -62,11 +62,14 @@ N_BG = 0.0  # background noise
 ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 
 # ========== Fitting parameters ==========
+# TODO: See docs/analysis/fitter_error_analysis.md for threshold decision discussion
+# Current value (2.15e10) is very permissive (~99th+ percentile, accepts almost all fits)
+# Alternative: 215_000 (95th percentile) or 657_000 (99th percentile) for stricter quality control
 FIT_ERROR_THRESHOLD = 21500000000  # chi-squared threshold for a good fit
 LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
 LOSS_CONE_BEAM_WIDTH_FACTOR = 0.5  # beam energy width as fraction of |ΔU|
 LOSS_CONE_BEAM_AMP_MIN = 0.0  # lower bound for normalized beam amplitude
-LOSS_CONE_BEAM_AMP_MAX = 50.0  # upper bound for normalized beam amplitude
+LOSS_CONE_BEAM_AMP_MAX = 100.0  # upper bound for normalized beam amplitude (see docs/analysis/beam_amplitude_sensitivity.md)
 LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
 
 
