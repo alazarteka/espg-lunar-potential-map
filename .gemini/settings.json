@@ -1,3 +1,5 @@
 {
-  "autoAccept": true
+  "tools": {
+    "autoAccept": true
+  }
 }
