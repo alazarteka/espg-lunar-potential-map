@@ -65,7 +65,7 @@ ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 # TODO: See docs/analysis/fitter_error_analysis.md for threshold decision discussion
 # Current value (2.15e10) is very permissive (~99th+ percentile, accepts almost all fits)
 # Alternative: 215_000 (95th percentile) or 657_000 (99th percentile) for stricter quality control
-FIT_ERROR_THRESHOLD = 21500000000  # chi-squared threshold for a good fit
+FIT_ERROR_THRESHOLD = 657000  # chi-squared threshold for a good fit (99th percentile)
 LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
 # Beam width: energy bins have width 0.5U, factor of 0.5 gives ~half-bin spread
 LOSS_CONE_BEAM_WIDTH_FACTOR = 0.5  # beam energy width as fraction of |ΔU|
