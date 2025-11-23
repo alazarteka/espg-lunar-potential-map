@@ -33,47 +33,71 @@ def test_coordinate_calculator_masks_invalid_rows(monkeypatch, caplog):
     valid_position = np.array([1.0, 0.0, 0.0])
     valid_sun_vec = np.array([0.0, 1.0, 0.0])
 
-    def fake_lp_position(time: float) -> np.ndarray:
-        return valid_position
+    def fake_lp_position_batch(times_arr: np.ndarray) -> np.ndarray:
+        # Return (N, 3)
+        n = len(times_arr)
+        return np.tile(valid_position, (n, 1))
 
-    def fake_lp_vector_to_sun(time: float) -> np.ndarray:
-        if time == times["1998-01-01T00:00:02"]:
-            return np.zeros(3)
-        return valid_sun_vec
+    def fake_lp_vector_to_sun_batch(times_arr: np.ndarray) -> np.ndarray:
+        n = len(times_arr)
+        res = np.tile(valid_sun_vec, (n, 1))
+        # Row 2 (index 2) corresponds to time=2.0 -> zero vector
+        # But wait, row 1 is bad-et, so time is NaN.
+        # Row 2 is time=2.0.
+        # We need to find which index corresponds to time=2.0
+        # times_arr will have NaNs for bad-et.
+        
+        # Logic:
+        # Row 0: time=0.0
+        # Row 1: time=NaN
+        # Row 2: time=2.0
+        # Row 3: time=3.0
+        
+        # We can just use the index if we assume order is preserved (it is)
+        if n > 2:
+             res[2] = np.zeros(3)
+        return res
 
-    def fake_moon_vector_to_sun(time: float) -> np.ndarray:
-        return valid_sun_vec
+    def fake_moon_vector_to_sun_batch(times_arr: np.ndarray) -> np.ndarray:
+        n = len(times_arr)
+        return np.tile(valid_sun_vec, (n, 1))
 
-    def fake_get_current_ra_dec(*_args, **_kwargs):
-        return 10.0, 20.0
+    def fake_get_current_ra_dec_batch(times_arr, *args):
+        n = len(times_arr)
+        ra = np.full(n, 10.0)
+        dec = np.full(n, 20.0)
+        return ra, dec
 
-    def fake_transform_matrix(time: float) -> np.ndarray:
-        if time == times["1998-01-01T00:00:03"]:
-            return np.full((3, 3), np.nan)
-        return np.eye(3)
+    def fake_transform_matrix_batch(times_arr: np.ndarray) -> np.ndarray:
+        n = len(times_arr)
+        res = np.tile(np.eye(3), (n, 1, 1))
+        # Row 3 (index 3) corresponds to time=3.0 -> invalid matrix
+        if n > 3:
+            res[3] = np.full((3, 3), np.nan)
+        return res
 
     monkeypatch.setattr(
         "src.potential_mapper.coordinates.spice.str2et", fake_str2et
     )
     monkeypatch.setattr(
-        "src.potential_mapper.coordinates.get_lp_position_wrt_moon",
-        fake_lp_position,
+        "src.potential_mapper.coordinates.get_lp_position_wrt_moon_batch",
+        fake_lp_position_batch,
     )
     monkeypatch.setattr(
-        "src.potential_mapper.coordinates.get_lp_vector_to_sun_in_lunar_frame",
-        fake_lp_vector_to_sun,
+        "src.potential_mapper.coordinates.get_lp_vector_to_sun_in_lunar_frame_batch",
+        fake_lp_vector_to_sun_batch,
     )
     monkeypatch.setattr(
-        "src.potential_mapper.coordinates.get_sun_vector_wrt_moon",
-        fake_moon_vector_to_sun,
+        "src.potential_mapper.coordinates.get_sun_vector_wrt_moon_batch",
+        fake_moon_vector_to_sun_batch,
     )
     monkeypatch.setattr(
-        "src.potential_mapper.coordinates.get_current_ra_dec",
-        fake_get_current_ra_dec,
+        "src.potential_mapper.coordinates.get_current_ra_dec_batch",
+        fake_get_current_ra_dec_batch,
     )
     monkeypatch.setattr(
-        "src.potential_mapper.coordinates.get_j2000_iau_moon_transform_matrix",
-        fake_transform_matrix,
+        "src.potential_mapper.coordinates.get_j2000_iau_moon_transform_matrix_batch",
+        fake_transform_matrix_batch,
     )
 
     flux_data = _DummyFluxData(utc_rows)
@@ -93,5 +117,6 @@ def test_coordinate_calculator_masks_invalid_rows(monkeypatch, caplog):
 
     messages = "\n".join(caplog.messages)
     assert "Failed to convert UTC bad-et to ET" in messages
-    assert "Invalid lp_to_sun vector" in messages
-    assert "Invalid J2000->IAU_MOON matrix" in messages
+    # We no longer log per-row warnings for performance reasons
+    # assert "Invalid lp_to_sun vector" in messages
+    # assert "Invalid J2000->IAU_MOON matrix" in messages

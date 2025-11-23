@@ -59,6 +59,50 @@ def get_current_ra_dec(
     return ra_vals[idx], dec_vals[idx]
 
 
+def get_current_ra_dec_batch(
+    times: np.ndarray, et_spin: np.ndarray, ra_vals: np.ndarray, dec_vals: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Batch version of get_current_ra_dec using np.searchsorted.
+    
+    Args:
+        times: Array of ephemeris times to query
+        et_spin: Array of ephemeris times for attitude data (must be sorted)
+        ra_vals: Array of right ascension values
+        dec_vals: Array of declination values
+        
+    Returns:
+        Tuple of (ra, dec) arrays. Values are NaN where indices are out of bounds.
+    """
+    # searchsorted returns indices where elements should be inserted to maintain order.
+    # bisect_right is equivalent to searchsorted(side='right')
+    idxs = np.searchsorted(et_spin, times, side='right')
+    
+    # Mask invalid indices
+    # Valid indices for bisect_right logic in get_current_ra_dec are > 0 and < len(ra_vals)
+    # (Note: original code checks idx <= 0 or idx >= len(ra_vals), so valid is 0 < idx < len)
+    # Wait, original code: if idx <= 0 or idx >= len(ra_vals): return None
+    # So valid range is 1 to len(ra_vals)-1 ?
+    # Let's check: ra_vals[idx] is accessed. So idx must be < len(ra_vals).
+    # And idx > 0 check means we don't accept time < et_spin[0] (where insertion point is 0).
+    
+    n = len(ra_vals)
+    valid_mask = (idxs > 0) & (idxs < n)
+    
+    ra_out = np.full_like(times, np.nan)
+    dec_out = np.full_like(times, np.nan)
+    
+    # Use valid indices to fetch values
+    # We can just use boolean indexing
+    valid_idxs = idxs[valid_mask]
+    
+    if len(valid_idxs) > 0:
+        ra_out[valid_mask] = ra_vals[valid_idxs]
+        dec_out[valid_mask] = dec_vals[valid_idxs]
+        
+    return ra_out, dec_out
+
+
 def get_time_range(flux_data: Any) -> Tuple[str, str]:
     """
     Get the time range from the flux data.

@@ -86,3 +86,80 @@ def get_j2000_iau_moon_transform_matrix(time: float) -> np.ndarray:
     except Exception as e:
         logging.error(f"Error getting transformation matrix: {e}")
         return np.full((3, 3), np.nan)
+
+
+def get_lp_position_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
+    """
+    Batch version of get_lp_position_wrt_moon.
+    Returns (N, 3) array. Rows with errors are NaN.
+    """
+    n = len(times)
+    positions = np.full((n, 3), np.nan)
+    
+    # Pre-fetch common frames if possible, but spkpos depends on time.
+    # We loop here to avoid overhead in the main pipeline.
+    # spiceypy doesn't support vectorized spkpos yet.
+    for i, t in enumerate(times):
+        try:
+            pos, _ = spice.spkpos(LP, t, "J2000", "NONE", MOON)
+            mat = spice.pxform("J2000", "IAU_MOON", t)
+            positions[i] = spice.mxv(mat, pos)
+        except Exception:
+            pass # Leave as NaN
+            
+    return positions
+
+
+def get_lp_vector_to_sun_in_lunar_frame_batch(times: np.ndarray) -> np.ndarray:
+    """
+    Batch version of get_lp_vector_to_sun_in_lunar_frame.
+    Returns (N, 3) array. Rows with errors are NaN.
+    """
+    n = len(times)
+    vectors = np.full((n, 3), np.nan)
+    
+    for i, t in enumerate(times):
+        try:
+            pos, _ = spice.spkpos(SUN, t, "J2000", "NONE", LP)
+            mat = spice.pxform("J2000", "IAU_MOON", t)
+            vectors[i] = spice.mxv(mat, pos)
+        except Exception:
+            pass
+            
+    return vectors
+
+
+def get_sun_vector_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
+    """
+    Batch version of get_sun_vector_wrt_moon.
+    Returns (N, 3) array. Rows with errors are NaN.
+    """
+    n = len(times)
+    vectors = np.full((n, 3), np.nan)
+    
+    for i, t in enumerate(times):
+        try:
+            pos, _ = spice.spkpos(SUN, t, "J2000", "NONE", MOON)
+            mat = spice.pxform("J2000", "IAU_MOON", t)
+            vectors[i] = spice.mxv(mat, pos)
+        except Exception:
+            pass
+            
+    return vectors
+
+
+def get_j2000_iau_moon_transform_matrix_batch(times: np.ndarray) -> np.ndarray:
+    """
+    Batch version of get_j2000_iau_moon_transform_matrix.
+    Returns (N, 3, 3) array. Rows with errors are NaN.
+    """
+    n = len(times)
+    mats = np.full((n, 3, 3), np.nan)
+    
+    for i, t in enumerate(times):
+        try:
+            mats[i] = spice.pxform("J2000", "IAU_MOON", t)
+        except Exception:
+            pass
+            
+    return mats

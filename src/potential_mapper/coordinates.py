@@ -14,7 +14,12 @@ from src.utils.spice_ops import (
     get_lp_position_wrt_moon,
     get_lp_vector_to_sun_in_lunar_frame,
     get_sun_vector_wrt_moon,
+    get_lp_position_wrt_moon_batch,
+    get_lp_vector_to_sun_in_lunar_frame_batch,
+    get_sun_vector_wrt_moon_batch,
+    get_j2000_iau_moon_transform_matrix_batch,
 )
+from src.utils.attitude import get_current_ra_dec_batch
 
 
 @dataclass
@@ -68,85 +73,94 @@ class CoordinateCalculator:
         Returns a CoordinateArrays with per-row positions, Sun vectors, and
         transformation matrices sufficient to project vectors between frames.
         """
-        n_points = len(flux_data.data)
-
-        lp_positions = np.full((n_points, 3), np.nan)
-        lp_vectors_to_sun = np.full((n_points, 3), np.nan)
-        ra_dec_cartesian = np.full((n_points, 3), np.nan)
-        moon_vectors_to_sun = np.full((n_points, 3), np.nan)
-        j2000_to_iau_moon_mats = np.full((n_points, 3, 3), np.nan)
-
-        for t, utc_time in enumerate(flux_data.data[config.UTC_COLUMN]):
+        # 1. Convert UTC to ET
+        # spice.str2et is scalar, so we loop.
+        # We can use a list comprehension which is reasonably fast for string parsing.
+        utc_times = flux_data.data[config.UTC_COLUMN].to_numpy()
+        n_points = len(utc_times)
+        
+        et_times = np.full(n_points, np.nan)
+        for i, utc in enumerate(utc_times):
             try:
-                time = spice.str2et(utc_time)
+                et_times[i] = spice.str2et(utc)
             except Exception as exc:
                 logging.warning(
                     "Failed to convert UTC %s to ET (%s); marking row invalid.",
-                    utc_time,
+                    utc,
                     exc,
                 )
-                continue
-
-            lp_position_t = get_lp_position_wrt_moon(time)
-            lp_vector_to_sun_in_lunar_frame_t = get_lp_vector_to_sun_in_lunar_frame(
-                time
-            )
-            moon_vector_to_sun_in_lunar_frame_t = get_sun_vector_wrt_moon(time)
-            ra_dec_pair = get_current_ra_dec(
-                time, self.et_spin, self.right_ascension, self.declination
-            )
-            if ra_dec_pair is None:
-                ra_dec_pair = (None, None)
-            right_ascension_t, declination_t = ra_dec_pair
-
-            if any(
-                x is None
-                for x in [
-                    lp_position_t,
-                    lp_vector_to_sun_in_lunar_frame_t,
-                    moon_vector_to_sun_in_lunar_frame_t,
-                    right_ascension_t,
-                    declination_t,
-                ]
-            ):
-                logging.warning("Incomplete geometry at %s; skipping row.", utc_time)
-                continue
-
-            if not np.isfinite([right_ascension_t, declination_t]).all():
-                logging.warning("Non-finite attitude values at %s; skipping row.", utc_time)
-                continue
-
-            vectors = (
-                ("lp_position", lp_position_t),
-                ("lp_to_sun", lp_vector_to_sun_in_lunar_frame_t),
-                ("moon_to_sun", moon_vector_to_sun_in_lunar_frame_t),
-            )
-            invalid_vector = False
-            for name, vec in vectors:
-                if not np.isfinite(vec).all() or np.linalg.norm(vec) <= 0.0:
-                    logging.warning("Invalid %s vector at %s; skipping row.", name, utc_time)
-                    invalid_vector = True
-                    break
-            if invalid_vector:
-                continue
-
-            j2m = get_j2000_iau_moon_transform_matrix(time)
-            if not np.isfinite(j2m).all():
-                logging.warning("Invalid J2000->IAU_MOON matrix at %s; skipping row.", utc_time)
-                continue
-
-            lp_positions[t] = lp_position_t
-            lp_vectors_to_sun[t] = lp_vector_to_sun_in_lunar_frame_t
-            ra_dec_cartesian[t] = ra_dec_to_unit(right_ascension_t, declination_t)
-            moon_vectors_to_sun[t] = moon_vector_to_sun_in_lunar_frame_t
-            j2000_to_iau_moon_mats[t] = j2m
-
-        norms = np.linalg.norm(lp_vectors_to_sun, axis=1)
-        safe_norms = np.where(norms > 0.0, norms, np.nan)
-        unit_lp_vectors_to_sun = lp_vectors_to_sun / safe_norms[:, None]
-        scd_to_j2000_transformation_mats = build_scd_to_j2000(
-            ra_dec_cartesian, unit_lp_vectors_to_sun
+                # Leave as NaN
+        
+        # 2. Batch SPICE calls
+        # These functions handle NaNs in et_times gracefully (returning NaNs)
+        lp_positions = get_lp_position_wrt_moon_batch(et_times)
+        lp_vectors_to_sun = get_lp_vector_to_sun_in_lunar_frame_batch(et_times)
+        moon_vectors_to_sun = get_sun_vector_wrt_moon_batch(et_times)
+        j2000_to_iau_moon_mats = get_j2000_iau_moon_transform_matrix_batch(et_times)
+        
+        # 3. Attitude lookup
+        ra_vals, dec_vals = get_current_ra_dec_batch(
+            et_times, self.et_spin, self.right_ascension, self.declination
         )
+        
+        # 4. Validate and filter
+        # We need to identify rows where any component is invalid (NaN)
+        # Check finiteness
+        valid_mask = (
+            np.isfinite(et_times) &
+            np.all(np.isfinite(lp_positions), axis=1) &
+            np.all(np.isfinite(lp_vectors_to_sun), axis=1) &
+            np.all(np.isfinite(moon_vectors_to_sun), axis=1) &
+            np.all(np.isfinite(j2000_to_iau_moon_mats.reshape(n_points, -1)), axis=1) &
+            np.isfinite(ra_vals) &
+            np.isfinite(dec_vals)
+        )
+        
+        # Also check vector norms > 0
+        lp_sun_norms = np.linalg.norm(lp_vectors_to_sun, axis=1)
+        valid_mask &= (lp_sun_norms > 0)
+        
+        # Apply mask to invalidate bad rows (set to NaN)
+        # Note: The original code skipped rows, effectively leaving them as NaNs 
+        # (initialized to np.full(..., np.nan)).
+        # So we just need to ensure invalid rows remain NaNs.
+        # The batch functions already return NaNs on error, but we might have partial failures.
+        # We explicitly set invalid rows to NaN to be safe and consistent.
+        
+        if not np.all(valid_mask):
+            lp_positions[~valid_mask] = np.nan
+            lp_vectors_to_sun[~valid_mask] = np.nan
+            moon_vectors_to_sun[~valid_mask] = np.nan
+            j2000_to_iau_moon_mats[~valid_mask] = np.nan
+            ra_vals[~valid_mask] = np.nan
+            dec_vals[~valid_mask] = np.nan
+            
+        # 5. Derived quantities
+        ra_dec_cartesian = np.full((n_points, 3), np.nan)
+        # Only compute for valid rows to avoid warnings/errors
+        if np.any(valid_mask):
+            ra_dec_cartesian[valid_mask] = ra_dec_to_unit(
+                ra_vals[valid_mask], dec_vals[valid_mask]
+            )
+            
+        # Unit vectors to sun
+        unit_lp_vectors_to_sun = np.full_like(lp_vectors_to_sun, np.nan)
+        # Safe division
+        safe_norms = np.where(lp_sun_norms > 0, lp_sun_norms, 1.0)
+        np.divide(lp_vectors_to_sun, safe_norms[:, None], out=unit_lp_vectors_to_sun, where=valid_mask[:, None])
+        
+        # SCD to J2000
+        scd_to_j2000_transformation_mats = np.full((n_points, 3, 3), np.nan)
+        if np.any(valid_mask):
+            scd_to_j2000_transformation_mats[valid_mask] = build_scd_to_j2000(
+                ra_dec_cartesian[valid_mask], unit_lp_vectors_to_sun[valid_mask]
+            )
+            
+        # SCD to IAU_MOON
+        # Matrix multiplication: M_iau_j2000 @ M_j2000_scd
+        # j2000_to_iau_moon_mats is (N, 3, 3)
+        # scd_to_j2000_transformation_mats is (N, 3, 3)
+        # Result (N, 3, 3)
         scd_to_iau_moon_transformation_mats = np.einsum(
             "nij,njk->nik", j2000_to_iau_moon_mats, scd_to_j2000_transformation_mats
         )
