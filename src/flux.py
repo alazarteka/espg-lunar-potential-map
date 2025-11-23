@@ -598,7 +598,7 @@ class LossConeFitter:
             chi2_scalar,
             x0,
             method="Nelder-Mead",
-            options=dict(maxiter=1000, xatol=1e-4, fatol=1e-4),
+            options=dict(maxiter=200, xatol=1e-3, fatol=1e-3),
         )
         if not result.success:
             # Fallback to x0 if optimization fails (rare)
