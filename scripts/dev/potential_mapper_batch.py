@@ -150,10 +150,17 @@ def main() -> int:
         print("No flux files found; exiting.")
         return 0
 
+    total_files = len(flux_files)
     output_root = args.output_dir.resolve()
     output_root.mkdir(parents=True, exist_ok=True)
 
+    print(f"Processing {total_files} file{'s' if total_files != 1 else ''} with {args.workers} worker{'s' if args.workers != 1 else ''}...")
+    print(f"Output directory: {output_root}")
+    print()
+
     summary: dict[str, int] = {"written": 0, "skipped": 0, "failed": 0}
+    completed = 0
+
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
         futures = {
             executor.submit(_process_file, file_path, output_root, args.overwrite): file_path
@@ -164,14 +171,27 @@ def main() -> int:
             try:
                 _file, status = future.result()
                 summary[status] = summary.get(status, 0) + 1
-                print(f"[{status}] {file_path}")
+                completed += 1
+
+                # Progress indicator
+                pct = 100 * completed / total_files
+                elapsed = (datetime.now() - start).total_seconds()
+                rate = completed / elapsed if elapsed > 0 else 0
+                eta = (total_files - completed) / rate if rate > 0 else 0
+
+                print(f"[{completed}/{total_files} {pct:5.1f}%] [{status:7s}] {file_path.name} "
+                      f"(eta: {eta/60:.1f}m, {rate:.2f} files/s)")
             except Exception as exc:
                 summary["failed"] += 1
-                print(f"[failed] {file_path}: {exc}")
+                completed += 1
+                pct = 100 * completed / total_files
+                print(f"[{completed}/{total_files} {pct:5.1f}%] [failed ] {file_path.name}: {exc}")
 
     duration = datetime.now() - start
     report = ", ".join(f"{k}={v}" for k, v in summary.items())
-    print(f"Done in {duration.total_seconds():.1f}s ({report}).")
+    print()
+    print(f"Done in {duration.total_seconds():.1f}s ({duration.total_seconds()/60:.1f}m) - {report}")
+    print(f"Average: {total_files/duration.total_seconds():.2f} files/s")
     return 0 if summary["failed"] == 0 else 1
 
 
