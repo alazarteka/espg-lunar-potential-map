@@ -321,6 +321,9 @@ def calculate_potential(
         corrected_energy_centers = (
             fitter.energy_centers_mag - initial_spacecraft_potential
         )
+        # Clip to prevent negative energies (can happen if spacecraft potential
+        # exceeds low-energy bin values)
+        corrected_energy_centers = np.clip(corrected_energy_centers, config.EPS, None)
         fitter.er_data.data[config.ENERGY_COLUMN] = corrected_energy_centers
         fitter._prepare_data()
         fitter.density_estimate = fitter._get_density_estimate()
