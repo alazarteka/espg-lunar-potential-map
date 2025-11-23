@@ -261,7 +261,9 @@ class PitchAngle:
 
         magnetic_field = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
         magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
-        unit_magnetic_field = magnetic_field / magnetic_field_magnitude
+        # ER convention points +B roughly sunward; loss-cone tracing expects the
+        # opposite orientation (toward the Moon), so flip the direction here.
+        unit_magnetic_field = -magnetic_field / magnetic_field_magnitude
         unit_magnetic_field = np.tile(
             unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1)
         )
