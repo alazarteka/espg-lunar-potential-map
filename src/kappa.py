@@ -440,7 +440,7 @@ class Kappa:
 
     def fit(
         self,
-        n_starts: int = 50,
+        n_starts: int = 10,
         use_fast: bool = True,
         use_weights: bool = True,
         use_convolution: bool = True,
@@ -486,7 +486,7 @@ class Kappa:
             if best_result is None or (result.success and result.fun < best_result.fun):
                 best_result = result
 
-            if best_result and best_result.fun < 1e-3:
+            if best_result and best_result.fun < 0.01:
                 logging.debug(
                     f"Early stopping at sample {i + 1} with chi2={best_result.fun:.4f}"
                 )
@@ -536,7 +536,7 @@ class Kappa:
 
     def corrected_fit(
         self,
-        n_starts: int = 50,
+        n_starts: int = 10,
         use_fast: bool = True,
         use_weights: bool = True,
         use_convolution: bool = True,

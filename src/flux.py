@@ -53,8 +53,9 @@ class ERData:
         try:
             self.data = pd.read_csv(
                 self.er_data_file,
-                sep=r"\s+",
-                engine="python",
+                sep=" ",
+                engine="c",
+                skipinitialspace=True,
                 header=None,
                 names=config.ALL_COLS,
             )
