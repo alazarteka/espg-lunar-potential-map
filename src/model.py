@@ -93,15 +93,22 @@ def synth_losscone(
         model[final_mask] = 1.0
         
         # Beam
-        if beam_width_eV > 0:
+        if np.any(beam_width_eV > 0):
              # beam_center = max(abs(delta_U), beam_width_eV)
              # delta_U is (nParams, 1, 1)
-             beam_center = np.maximum(np.abs(delta_U), beam_width_eV)
-             
+             # beam_width_eV might be scalar or (nParams,), reshape to (nParams, 1, 1)
+             beam_width_eV_arr = np.asarray(beam_width_eV)
+             if beam_width_eV_arr.ndim == 0:
+                 beam_width_eV_exp = beam_width_eV_arr
+             else:
+                 beam_width_eV_exp = beam_width_eV_arr.reshape(-1, 1, 1)
+
+             beam_center = np.maximum(np.abs(delta_U), beam_width_eV_exp)
+
              # beam calculation
              # E is (1, nE, 1)
              # (nParams, nE, 1)
-             beam = beam_amp * np.exp(-0.5 * ((E_safe_exp - beam_center) / beam_width_eV) ** 2)
+             beam = beam_amp * np.exp(-0.5 * ((E_safe_exp - beam_center) / beam_width_eV_exp) ** 2)
              
              if beam_pitch_sigma_deg > 0:
                  pitch_weight = np.exp(
