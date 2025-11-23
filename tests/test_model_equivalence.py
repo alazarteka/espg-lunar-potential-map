@@ -122,7 +122,48 @@ def test_model_equivalence_edge_cases():
     # Case 2: delta_U makes x < 0 (full loss cone)
     # x < 0 -> ac=0 -> mask: pitch <= 180.
     # All 1s.
-    ref = reference_synth_losscone(energy_grid, pitch_grid, -200.0, 1.0) # -200/100 = -2 -> 1-2=-1 -> x=-1
     vec = synth_losscone(energy_grid, pitch_grid, -200.0, 1.0)
     np.testing.assert_allclose(ref, vec)
+
+
+def test_model_batch_equivalence():
+    """
+    Test that batch processing produces the same results as individual calls.
+    """
+    np.random.seed(42)
+    n_energy = 15
+    n_pitch = 20
+    n_batch = 10
+    
+    energy_grid = np.geomspace(10, 20000, n_energy)
+    pitch_grid = np.tile(np.linspace(0, 180, n_pitch), (n_energy, 1))
+    
+    delta_Us = np.random.uniform(-100, 0, n_batch)
+    bs_over_bms = np.random.uniform(0.1, 0.9, n_batch)
+    beam_amps = np.random.uniform(0, 10, n_batch)
+    beam_width = 10.0
+    beam_pitch_sigma = 10.0
+    
+    # Run batch
+    batch_result = synth_losscone(
+        energy_grid, pitch_grid, delta_Us, bs_over_bms,
+        beam_width_eV=beam_width,
+        beam_amp=beam_amps,
+        beam_pitch_sigma_deg=beam_pitch_sigma
+    )
+    
+    # Run individual
+    for i in range(n_batch):
+        individual_result = synth_losscone(
+            energy_grid, pitch_grid, delta_Us[i], bs_over_bms[i],
+            beam_width_eV=beam_width,
+            beam_amp=beam_amps[i],
+            beam_pitch_sigma_deg=beam_pitch_sigma
+        )
+        
+        np.testing.assert_allclose(
+            batch_result[i], individual_result,
+            rtol=1e-10, atol=1e-10,
+            err_msg=f"Batch mismatch at index {i}"
+        )
 
