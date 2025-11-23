@@ -191,7 +191,16 @@ def main() -> int:
     report = ", ".join(f"{k}={v}" for k, v in summary.items())
     print()
     print(f"Done in {duration.total_seconds():.1f}s ({duration.total_seconds()/60:.1f}m) - {report}")
-    print(f"Average: {total_files/duration.total_seconds():.2f} files/s")
+
+    # Show rate in appropriate units
+    avg_rate = total_files / duration.total_seconds() if duration.total_seconds() > 0 else 0
+    if avg_rate >= 0.01:
+        print(f"Average: {avg_rate:.2f} files/s ({duration.total_seconds()/total_files:.1f}s per file)")
+    else:
+        # For slow rates, show time per file instead
+        time_per_file = duration.total_seconds() / total_files if total_files > 0 else 0
+        print(f"Average: {time_per_file:.1f}s per file ({time_per_file/60:.1f}m per file)")
+
     return 0 if summary["failed"] == 0 else 1
 
 
