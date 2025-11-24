@@ -426,7 +426,7 @@ class LossConeFitter:
         return norm2d
 
     def _fit_surface_potential(
-        self, measurement_chunk: int, previous_solution: np.ndarray | None = None
+        self, measurement_chunk: int
     ) -> tuple[float, float, float]:
         """
         Fit surface potential (ΔU) and B_s/B_m for one 15-row measurement chunk
@@ -434,8 +434,6 @@ class LossConeFitter:
 
         Args:
             measurement_chunk (int): The index of the measurement chunk.
-            previous_solution (np.ndarray | None): Optional [delta_U, bs_over_bm, beam_amp]
-                from the previous chunk to seed the optimization (warm start).
 
         Returns:
             tuple[float, float, float]:
@@ -552,26 +550,6 @@ class LossConeFitter:
         best_lhs_chi2 = chi2_vals[best_idx]
         x0 = self.lhs[best_idx]
 
-        # Warm starting
-        if previous_solution is not None:
-            # Evaluate previous solution
-            p_delta_U, p_bs_over_bm, p_beam_amp = previous_solution
-            p_beam_width = max(abs(p_delta_U) * self.beam_width_factor, config.EPS)
-            
-            p_model = synth_losscone(
-                energies, pitches, p_delta_U, p_bs_over_bm,
-                beam_width_eV=p_beam_width, beam_amp=p_beam_amp,
-                beam_pitch_sigma_deg=self.beam_pitch_sigma_deg
-            )
-            
-            if np.all(np.isfinite(p_model)) and (p_model > 0).any():
-                p_diff = np.log(norm2d + eps) - np.log(p_model + eps)
-                p_chi2 = np.sum(p_diff**2)
-                
-                if p_chi2 < best_lhs_chi2:
-                    x0 = previous_solution
-                    # logger.debug(f"Warm start accepted: chi2 {p_chi2:.2f} < {best_lhs_chi2:.2f}")
-
         # 2) Local Nelder–Mead refinement
         # Objective for optimizer (scalar)
         def chi2_scalar(params):
@@ -623,15 +601,13 @@ class LossConeFitter:
         """
         assert not self.er_data.data.empty, "Data not loaded."
 
-        # Fit for each chunk
+        # Fit for each chunk independently (no warm-starting)
         n_chunks = len(self.er_data.data) // config.SWEEP_ROWS
         results = np.zeros((n_chunks, 5))
-        previous_solution = None
-        
+
         for i in range(n_chunks):
-            delta_U, bs_over_bm, beam_amp, chi2 = self._fit_surface_potential(i, previous_solution)
+            delta_U, bs_over_bm, beam_amp, chi2 = self._fit_surface_potential(i)
             results[i] = [delta_U, bs_over_bm, beam_amp, chi2, i]
-            previous_solution = np.array([delta_U, bs_over_bm, beam_amp])
 
         return results
 
