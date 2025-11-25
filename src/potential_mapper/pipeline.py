@@ -20,7 +20,49 @@ from src.potential_mapper.coordinates import (
 from src.potential_mapper.results import PotentialResults
 from src.utils.attitude import load_attitude_data
 from src.utils.geometry import get_intersections_or_none_batch
-from src.utils.units import ureg
+from src.utils.units import ureg, VoltageType
+
+
+def _init_worker_spice():
+    """Initialize SPICE kernels in worker process for thread-safety."""
+    from src.potential_mapper.spice import load_spice_files
+    load_spice_files()
+
+
+def spacecraft_potential_worker(
+    args: tuple[int, pd.DataFrame]
+) -> tuple[int, np.ndarray, float | None]:
+    """
+    Calculate spacecraft potential for one spectrum in parallel.
+
+    Args:
+        args: Tuple of (spec_no, spectrum_rows_df)
+
+    Returns:
+        Tuple of (spec_no, row_indices, potential_value)
+    """
+    from src.spacecraft_potential import calculate_potential
+
+    spec_no, rows_df = args
+
+    # Create isolated ERData for this spectrum only
+    # The copy ensures mutations don't affect shared state
+    er_data_subset = ERData.from_dataframe(rows_df.copy(), f"spec_{spec_no}")
+
+    try:
+        result = calculate_potential(er_data_subset, spec_no)
+
+        if result is None:
+            return spec_no, rows_df.index.to_numpy(), None
+
+        _, potential_quantity = result
+        potential_value = float(potential_quantity.to(ureg.volt).magnitude)
+
+        return spec_no, rows_df.index.to_numpy(), potential_value
+
+    except Exception as e:
+        logging.debug(f"SC potential failed for spec {spec_no}: {e}")
+        return spec_no, rows_df.index.to_numpy(), None
 
 
 def fit_worker(args: tuple[pd.DataFrame, str, np.ndarray]) -> np.ndarray:
@@ -52,7 +94,7 @@ def fit_worker(args: tuple[pd.DataFrame, str, np.ndarray]) -> np.ndarray:
 
 
 def _spacecraft_potential_per_row(er_data: ERData, n_rows: int) -> np.ndarray:
-    """Return spacecraft potential per ER row by spec_no grouping."""
+    """Return spacecraft potential per ER row by spec_no grouping (sequential)."""
 
     from src.spacecraft_potential import calculate_potential
 
@@ -62,10 +104,7 @@ def _spacecraft_potential_per_row(er_data: ERData, n_rows: int) -> np.ndarray:
 
     spec_values = er_data.data[config.SPEC_NO_COLUMN].to_numpy()
     unique_specs = np.unique(spec_values)
-    
-    # This loop can be slow for very large datasets. 
-    # But for a month (~1M rows), unique_specs is ~60k. It should be okay.
-    # We could parallelize this too if needed, but fitting is the bottleneck.
+
     for spec_value in tqdm(
         unique_specs, desc="Calculating SC Potential", unit="spec", leave=False
     ):
@@ -104,6 +143,82 @@ def _spacecraft_potential_per_row(er_data: ERData, n_rows: int) -> np.ndarray:
         except Exception:
             potential_value = float(potential_quantity)
         potentials[mask_idx] = potential_value
+
+    return potentials
+
+
+def _spacecraft_potential_per_row_parallel(
+    er_data: ERData, n_rows: int, num_workers: int | None = None
+) -> np.ndarray:
+    """
+    Return spacecraft potential per ER row using parallel processing.
+
+    Distributes spectrum-level calculations across multiple worker processes
+    to accelerate computation for large datasets.
+
+    Args:
+        er_data: ERData object containing the full dataset
+        n_rows: Total number of rows
+        num_workers: Number of worker processes (default: cpu_count - 1)
+
+    Returns:
+        Array of spacecraft potentials per row
+    """
+    potentials = np.full(n_rows, np.nan)
+    if n_rows == 0:
+        return potentials
+
+    # Group data by spec_no
+    df = er_data.data.reset_index(drop=True)
+    spec_groups = df.groupby(config.SPEC_NO_COLUMN, sort=False)
+
+    # Prepare tasks for workers
+    tasks = []
+    for spec_value, group_df in spec_groups:
+        if isinstance(spec_value, numbers.Real) and np.isnan(spec_value):
+            continue
+        try:
+            spec_no = int(spec_value)
+        except (TypeError, ValueError):
+            logging.debug(f"Skipping non-integer spec_no {spec_value}")
+            continue
+
+        # Each task is (spec_no, rows_for_this_spectrum)
+        tasks.append((spec_no, group_df))
+
+    if not tasks:
+        return potentials
+
+    # Determine worker count
+    num_workers = num_workers or max(1, multiprocessing.cpu_count() - 1)
+
+    logging.debug(
+        f"Starting parallel SC potential with {num_workers} workers, "
+        f"{len(tasks)} spectra"
+    )
+
+    # Execute in parallel with SPICE initialization per worker
+    with multiprocessing.Pool(
+        processes=num_workers, initializer=_init_worker_spice
+    ) as pool:
+        # Use imap_unordered for better memory efficiency
+        # Chunksize: distribute work in reasonable batches
+        chunksize = max(1, len(tasks) // (num_workers * 4))
+
+        results_iter = pool.imap_unordered(
+            spacecraft_potential_worker, tasks, chunksize=chunksize
+        )
+
+        # Collect results with progress bar
+        for spec_no, row_indices, potential_value in tqdm(
+            results_iter,
+            total=len(tasks),
+            desc="SC Potential (parallel)",
+            unit="spec",
+            leave=False,
+        ):
+            if potential_value is not None and np.isfinite(potential_value):
+                potentials[row_indices] = potential_value
 
     return potentials
 
@@ -255,12 +370,19 @@ def process_merged_data(
 ) -> PotentialResults:
     """
     Process the merged ER dataset.
-    
+
     Steps:
     1. Load attitude and calculate coordinates (vectorized).
-    2. Calculate spacecraft potential (vectorized/grouped).
-    3. Run surface potential fitting (optionally in parallel).
+    2. Calculate spacecraft potential (parallel if use_parallel=True).
+    3. Run surface potential fitting (parallel if use_parallel=True).
     4. Assemble results.
+
+    Args:
+        er_data: Merged ERData object
+        use_parallel: Enable multiprocessing for SC and surface potential (default: False)
+
+    Returns:
+        PotentialResults with all computed fields
     """
     logging.info("Processing merged dataset...")
 
@@ -352,7 +474,16 @@ def process_merged_data(
 
     # Spacecraft potential
     logging.info("Calculating spacecraft potential...")
-    sc_potential = _spacecraft_potential_per_row(er_data, n)
+    if use_parallel:
+        try:
+            sc_potential = _spacecraft_potential_per_row_parallel(er_data, n)
+        except (PermissionError, OSError) as e:
+            logging.warning(
+                "Parallel SC potential failed (%s); falling back to sequential", e
+            )
+            sc_potential = _spacecraft_potential_per_row(er_data, n)
+    else:
+        sc_potential = _spacecraft_potential_per_row(er_data, n)
 
     # Surface Potential Fitting
     theta_path = str(config.DATA_DIR / config.THETA_FILE)
