@@ -88,20 +88,20 @@ def main() -> int:
         raise RuntimeError(f"Chunk {args.chunk} contains no valid flux.")
 
     # Fit to retrieve the best parameters.
-    delta_U, bs_over_bm, beam_amp, chi2 = fitter._fit_surface_potential(args.chunk)
+    U_surface, bs_over_bm, beam_amp, chi2 = fitter._fit_surface_potential(args.chunk)
     print(
-        f"Chunk {args.chunk}: ΔU={delta_U:.2f} V, Bs/Bm={bs_over_bm:.3f}, "
+        f"Chunk {args.chunk}: U_surface={U_surface:.2f} V, Bs/Bm={bs_over_bm:.3f}, "
         f"beam_amp={beam_amp:.3f}, χ²={chi2:.3g}"
     )
 
     energies = er.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[chunk_slice]
     pitches = fitter.pitch_angle.pitch_angles[chunk_slice]
 
-    beam_width = max(abs(delta_U) * fitter.beam_width_factor, config.EPS)
+    beam_width = max(abs(U_surface) * fitter.beam_width_factor, config.EPS)
     model = synth_losscone(
         energies,
         pitches,
-        delta_U,
+        U_surface,
         bs_over_bm,
         beam_width_eV=beam_width,
         beam_amp=beam_amp,
@@ -145,7 +145,7 @@ def main() -> int:
     fig, axes = plt.subplots(1, 3, figsize=(16, 4.5), constrained_layout=True)
     titles = [
         f"Observed (chunk {args.chunk})",
-        f"Model ΔU={delta_U:.1f}V, Bs/Bm={bs_over_bm:.2f}",
+        f"Model U_surface={U_surface:.1f}V, Bs/Bm={bs_over_bm:.2f}",
         residual_title,
     ]
     datasets = [norm2d, model, residual]

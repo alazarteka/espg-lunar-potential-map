@@ -68,7 +68,7 @@ ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 FIT_ERROR_THRESHOLD = 657000  # chi-squared threshold for a good fit (99th percentile)
 LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
 # Beam width: energy bins have width 0.5U, factor of 0.5 gives ~half-bin spread
-LOSS_CONE_BEAM_WIDTH_FACTOR = 0.5  # beam energy width as fraction of |ΔU|
+LOSS_CONE_BEAM_WIDTH_FACTOR = 0.5  # beam energy width as fraction of |U_surface|
 LOSS_CONE_BEAM_AMP_MIN = 0.0  # lower bound for normalized beam amplitude
 LOSS_CONE_BEAM_AMP_MAX = 100.0  # upper bound (see docs/analysis/beam_amplitude_sensitivity.md)
 # Pitch sigma: reasonable angular spread for secondary electron beam

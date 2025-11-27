@@ -15,7 +15,7 @@ def plot_map(
     illumination: str | None = None,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Scatter plot of surface potential ΔU by projection lat/lon.
+    Scatter plot of surface potential U_surface by projection lat/lon.
 
     - Adds moon map background if `config.MOON_MAP_FILE` exists under DATA_DIR.
     - Filters by finite potentials; optional day/night filtering via `illumination`.
@@ -56,7 +56,7 @@ def plot_map(
 
     try:
         sc = axes.scatter(x, y, c=c, s=8, cmap="viridis")
-        fig.colorbar(sc, ax=axes, label="Surface potential ΔU (V)")
+        fig.colorbar(sc, ax=axes, label="Surface potential U_surface (V)")
     except Exception:
         axes.scatter(x, y, s=8)
 

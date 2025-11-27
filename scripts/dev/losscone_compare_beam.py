@@ -100,21 +100,21 @@ def main() -> int:
     comparisons: list[dict[str, float]] = []
 
     for idx in chunk_indices:
-        delta_U_b, bs_over_bm_b, beam_amp_b, chi2_b = fitter_beam._fit_surface_potential(idx)
-        delta_U_nb, bs_over_bm_nb, beam_amp_nb, chi2_nb = fitter_nobeam._fit_surface_potential(idx)
+        U_surface_b, bs_over_bm_b, beam_amp_b, chi2_b = fitter_beam._fit_surface_potential(idx)
+        U_surface_nb, bs_over_bm_nb, beam_amp_nb, chi2_nb = fitter_nobeam._fit_surface_potential(idx)
 
         comparisons.append(
             {
                 "chunk": idx,
-                "delta_U_with_beam": delta_U_b,
+                "U_surface_with_beam": U_surface_b,
                 "Bs/Bm_with_beam": bs_over_bm_b,
                 "beam_amp": beam_amp_b,
                 "chi2_with_beam": chi2_b,
-                "delta_U_no_beam": delta_U_nb,
+                "U_surface_no_beam": U_surface_nb,
                 "Bs/Bm_no_beam": bs_over_bm_nb,
                 "chi2_no_beam": chi2_nb,
                 "chi2_improvement": chi2_nb - chi2_b,
-                "delta_U_diff": delta_U_b - delta_U_nb,
+                "U_surface_diff": U_surface_b - U_surface_nb,
                 "Bs/Bm_diff": bs_over_bm_b - bs_over_bm_nb,
             }
         )

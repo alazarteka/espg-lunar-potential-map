@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test sensitivity of ΔU and Bs/Bm fits to beam amplitude parameter.
+Test sensitivity of U_surface and Bs/Bm fits to beam amplitude parameter.
 
 Compares several strategies:
 1. beam_amp as free parameter (current)
@@ -26,7 +26,7 @@ def fit_with_different_strategies(er_file: Path, n_chunks: int = 100):
 
     Returns:
         dict with keys 'free', 'fixed_25', 'no_beam', 'high_bound'
-        Each value is array of [delta_U, bs_bm, beam_amp, chi2, chunk_idx]
+        Each value is array of [U_surface, bs_bm, beam_amp, chi2, chunk_idx]
     """
     print(f"Loading {er_file.name}...")
     er_data = ERData(str(er_file))
@@ -50,28 +50,28 @@ def fit_with_different_strategies(er_file: Path, n_chunks: int = 100):
         try:
             # Strategy 1: Free beam_amp (current default, bounds 0-50)
             fitter = LossConeFitter(er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle)
-            delta_U, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
-            results['free'].append([delta_U, bs_bm, beam_amp, chi2, i])
+            U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
+            results['free'].append([U_surface, bs_bm, beam_amp, chi2, i])
 
             # Strategy 2: Fixed beam_amp = 25
             fitter_fixed = LossConeFitter(er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle)
             fitter_fixed.beam_amp_min = 25.0
             fitter_fixed.beam_amp_max = 25.0
-            delta_U, bs_bm, beam_amp, chi2 = fitter_fixed._fit_surface_potential(i)
-            results['fixed_25'].append([delta_U, bs_bm, beam_amp, chi2, i])
+            U_surface, bs_bm, beam_amp, chi2 = fitter_fixed._fit_surface_potential(i)
+            results['fixed_25'].append([U_surface, bs_bm, beam_amp, chi2, i])
 
             # Strategy 3: No beam (beam_amp = 0)
             fitter_nobeam = LossConeFitter(er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle)
             fitter_nobeam.beam_amp_min = 0.0
             fitter_nobeam.beam_amp_max = 0.0
-            delta_U, bs_bm, beam_amp, chi2 = fitter_nobeam._fit_surface_potential(i)
-            results['no_beam'].append([delta_U, bs_bm, beam_amp, chi2, i])
+            U_surface, bs_bm, beam_amp, chi2 = fitter_nobeam._fit_surface_potential(i)
+            results['no_beam'].append([U_surface, bs_bm, beam_amp, chi2, i])
 
             # Strategy 4: High upper bound (100)
             fitter_high = LossConeFitter(er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle)
             fitter_high.beam_amp_max = 100.0
-            delta_U, bs_bm, beam_amp, chi2 = fitter_high._fit_surface_potential(i)
-            results['high_bound'].append([delta_U, bs_bm, beam_amp, chi2, i])
+            U_surface, bs_bm, beam_amp, chi2 = fitter_high._fit_surface_potential(i)
+            results['high_bound'].append([U_surface, bs_bm, beam_amp, chi2, i])
 
         except Exception as e:
             # Skip failed fits
@@ -99,20 +99,20 @@ def plot_comparison(results: dict, output_path: Path):
 
         data = results[strategy]
 
-        # Compare ΔU
-        delta_U_free = free[:, 0]
-        delta_U_strat = data[:, 0]
+        # Compare U_surface
+        U_surface_free = free[:, 0]
+        U_surface_strat = data[:, 0]
 
-        ax.scatter(delta_U_free, delta_U_strat, alpha=0.5, s=20)
+        ax.scatter(U_surface_free, U_surface_strat, alpha=0.5, s=20)
         ax.plot([-1000, 1000], [-1000, 1000], 'r--', alpha=0.5, label='1:1')
-        ax.set_xlabel('ΔU (free beam_amp) [V]')
-        ax.set_ylabel(f'ΔU ({label}) [V]')
+        ax.set_xlabel('U_surface (free beam_amp) [V]')
+        ax.set_ylabel(f'U_surface ({label}) [V]')
         ax.set_title(f'{label}')
         ax.grid(True, alpha=0.3)
         ax.legend()
 
         # Calculate statistics
-        diff = delta_U_strat - delta_U_free
+        diff = U_surface_strat - U_surface_free
         mean_diff = np.mean(diff)
         std_diff = np.std(diff)
         max_diff = np.max(np.abs(diff))
@@ -161,13 +161,13 @@ def print_statistics(results: dict):
         print(f"\n{label}:")
         print(f"  Samples: {len(data)}")
 
-        # ΔU comparison
-        delta_U_diff = data[:, 0] - free[:, 0]
-        print(f"  ΔU difference:")
-        print(f"    Mean: {np.mean(delta_U_diff):.2f} V")
-        print(f"    Std: {np.std(delta_U_diff):.2f} V")
-        print(f"    Max: {np.max(np.abs(delta_U_diff)):.2f} V")
-        print(f"    RMS: {np.sqrt(np.mean(delta_U_diff**2)):.2f} V")
+        # U_surface comparison
+        U_surface_diff = data[:, 0] - free[:, 0]
+        print(f"  U_surface difference:")
+        print(f"    Mean: {np.mean(U_surface_diff):.2f} V")
+        print(f"    Std: {np.std(U_surface_diff):.2f} V")
+        print(f"    Max: {np.max(np.abs(U_surface_diff)):.2f} V")
+        print(f"    RMS: {np.sqrt(np.mean(U_surface_diff**2)):.2f} V")
 
         # Bs/Bm comparison
         bs_bm_diff = data[:, 1] - free[:, 1]
@@ -297,15 +297,15 @@ if __name__ == "__main__":
         free = combined_results['free']
         fixed = combined_results['fixed_25']
 
-    delta_U_diff = fixed[:, 0] - free[:, 0]
-    rms_diff = np.sqrt(np.mean(delta_U_diff**2))
+    U_surface_diff = fixed[:, 0] - free[:, 0]
+    rms_diff = np.sqrt(np.mean(U_surface_diff**2))
 
     if rms_diff < 10:
-        print("✓ ΔU is very robust to beam_amp choice (RMS < 10 V)")
+        print("✓ U_surface is very robust to beam_amp choice (RMS < 10 V)")
         print("  → Consider fixing beam_amp to simplify fitting")
     elif rms_diff < 50:
-        print("⚠ ΔU shows moderate sensitivity to beam_amp (RMS < 50 V)")
+        print("⚠ U_surface shows moderate sensitivity to beam_amp (RMS < 50 V)")
         print("  → Document this uncertainty but current approach is reasonable")
     else:
-        print("✗ ΔU is highly sensitive to beam_amp (RMS > 50 V)")
+        print("✗ U_surface is highly sensitive to beam_amp (RMS > 50 V)")
         print("  → Need to investigate further or reconsider model")

@@ -7,7 +7,7 @@ from src.model import synth_losscone
 def reference_synth_losscone(
     energy_grid,
     pitch_grid,
-    delta_U,
+    U_surface,
     bs_over_bm,
     beam_width_eV=0,
     beam_amp=0,
@@ -24,7 +24,7 @@ def reference_synth_losscone(
         if E <= 0:
             continue
 
-        x = bs_over_bm * (1.0 + delta_U / E)  # dimensionless
+        x = bs_over_bm * (1.0 + U_surface / E)  # dimensionless
 
         # Map illegal values onto physically plausible limits
         if x <= 0.0:
@@ -39,7 +39,7 @@ def reference_synth_losscone(
 
     # Optional narrow beam
     if beam_width_eV > 0 and beam_amp > 0:
-        beam_center = max(abs(delta_U), beam_width_eV)
+        beam_center = max(abs(U_surface), beam_width_eV)
         beam = beam_amp * np.exp(-0.5 * ((energy_grid - beam_center) / beam_width_eV) ** 2)
         if beam_pitch_sigma_deg > 0:
             pitch_weight = np.exp(
@@ -76,7 +76,7 @@ def test_model_equivalence_randomized(seed):
     pitch_grid_1d = np.linspace(0, 180, n_pitch)
     pitch_grid = np.tile(pitch_grid_1d, (n_energy, 1))
     
-    delta_U = np.random.uniform(-100, 0)
+    U_surface = np.random.uniform(-100, 0)
     bs_over_bm = np.random.uniform(0.1, 0.9)
     
     # Randomize beam parameters
@@ -86,12 +86,12 @@ def test_model_equivalence_randomized(seed):
     
     # Run both implementations
     ref_result = reference_synth_losscone(
-        energy_grid, pitch_grid, delta_U, bs_over_bm,
+        energy_grid, pitch_grid, U_surface, bs_over_bm,
         beam_width, beam_amp, beam_pitch_sigma
     )
     
     vec_result = synth_losscone(
-        energy_grid, pitch_grid, delta_U, bs_over_bm,
+        energy_grid, pitch_grid, U_surface, bs_over_bm,
         beam_width, beam_amp, beam_pitch_sigma
     )
     
@@ -110,7 +110,7 @@ def test_model_equivalence_edge_cases():
     energy_grid = np.array([100.0] * n_energy)
     pitch_grid = np.zeros((n_energy, n_pitch))
     
-    # Case 1: delta_U makes x > 1 (closed loss cone)
+    # Case 1: U_surface makes x > 1 (closed loss cone)
     # x = bs/bm * (1 + dU/E)
     # Try bs/bm=1.0, dU=0 -> x=1 -> ac=90 -> mask: pitch <= 90.
     # If pitch is 0, model should be 1.
@@ -119,7 +119,7 @@ def test_model_equivalence_edge_cases():
     vec = synth_losscone(energy_grid, pitch_grid, 0.0, 1.0)
     np.testing.assert_allclose(ref, vec)
     
-    # Case 2: delta_U makes x < 0 (full loss cone)
+    # Case 2: U_surface makes x < 0 (full loss cone)
     # x < 0 -> ac=0 -> mask: pitch <= 180.
     # All 1s.
     vec = synth_losscone(energy_grid, pitch_grid, -200.0, 1.0)
@@ -138,7 +138,7 @@ def test_model_batch_equivalence():
     energy_grid = np.geomspace(10, 20000, n_energy)
     pitch_grid = np.tile(np.linspace(0, 180, n_pitch), (n_energy, 1))
     
-    delta_Us = np.random.uniform(-100, 0, n_batch)
+    U_surfaces = np.random.uniform(-100, 0, n_batch)
     bs_over_bms = np.random.uniform(0.1, 0.9, n_batch)
     beam_amps = np.random.uniform(0, 10, n_batch)
     beam_width = 10.0
@@ -146,7 +146,7 @@ def test_model_batch_equivalence():
     
     # Run batch
     batch_result = synth_losscone(
-        energy_grid, pitch_grid, delta_Us, bs_over_bms,
+        energy_grid, pitch_grid, U_surfaces, bs_over_bms,
         beam_width_eV=beam_width,
         beam_amp=beam_amps,
         beam_pitch_sigma_deg=beam_pitch_sigma
@@ -155,7 +155,7 @@ def test_model_batch_equivalence():
     # Run individual
     for i in range(n_batch):
         individual_result = synth_losscone(
-            energy_grid, pitch_grid, delta_Us[i], bs_over_bms[i],
+            energy_grid, pitch_grid, U_surfaces[i], bs_over_bms[i],
             beam_width_eV=beam_width,
             beam_amp=beam_amps[i],
             beam_pitch_sigma_deg=beam_pitch_sigma

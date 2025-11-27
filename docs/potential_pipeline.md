@@ -210,15 +210,15 @@ between the spacecraft and the surface footprint. This is handled by
 ```python
 fitter = LossConeFitter(er_data, theta_file, spacecraft_potential=sc_potential)
 fit_mat = fitter.fit_surface_potential()  # returns matrix columns:
-# [delta_U, bs_over_bm, beam_amp, chi2, chunk_index]
+# [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
 r = np.full(n_rows, np.nan)
-for delta_U, *_ , chunk_idx in fit_mat:
-    if delta_U and chi2 ok:
-        r[s:e] = delta_U
+for U_surface, *_ , chunk_idx in fit_mat:
+    if U_surface and chi2 ok:
+        r[s:e] = U_surface
 ```
 
-Rows inherit the same `delta_U` within each chunk if the fit converges and
-passes a `chi2` threshold; otherwise they remain NaN. `delta_U` is stored in
+Rows inherit the same `U_surface` within each chunk if the fit converges and
+passes a `chi2` threshold; otherwise they remain NaN. `U_surface` is stored in
 the cache as `rows_projected_potential` and represents the potential difference
 between the surface and the spacecraft, so the total surface potential is
 `Φ_surface = Φ_sc + ΔΦ`.

@@ -26,15 +26,15 @@ def test_lhs_chi2_batch_matches_sequential():
     pitches = np.tile(pitch_grid_1d, (n_energy, 1))
 
     # Generate synthetic "measured" data
-    true_delta_U = -50.0
+    true_U_surface = -50.0
     true_bs_over_bm = 0.5
     true_beam_amp = 2.0
-    beam_width = abs(true_delta_U) * 0.2
+    beam_width = abs(true_U_surface) * 0.2
     beam_pitch_sigma = 10.0
     eps = 1e-6
 
     norm2d = synth_losscone(
-        energies, pitches, true_delta_U, true_bs_over_bm,
+        energies, pitches, true_U_surface, true_bs_over_bm,
         beam_width_eV=beam_width,
         beam_amp=true_beam_amp,
         beam_pitch_sigma_deg=beam_pitch_sigma
@@ -44,16 +44,16 @@ def test_lhs_chi2_batch_matches_sequential():
     norm2d = np.clip(norm2d, eps, None)
 
     # Generate LHS samples (simplified - just random)
-    lhs_delta_U = np.random.uniform(-100, -10, n_samples)
+    lhs_U_surface = np.random.uniform(-100, -10, n_samples)
     lhs_bs_over_bm = np.random.uniform(0.1, 0.9, n_samples)
     lhs_beam_amp = np.random.uniform(0, 5, n_samples)
-    lhs_beam_width = np.maximum(np.abs(lhs_delta_U) * 0.2, config.EPS)
+    lhs_beam_width = np.maximum(np.abs(lhs_U_surface) * 0.2, config.EPS)
 
     # VECTORIZED PATH (current implementation)
     models_batch = synth_losscone(
         energies,
         pitches,
-        lhs_delta_U,
+        lhs_U_surface,
         lhs_bs_over_bm,
         beam_width_eV=lhs_beam_width,
         beam_amp=lhs_beam_amp,
@@ -70,7 +70,7 @@ def test_lhs_chi2_batch_matches_sequential():
     for i in range(n_samples):
         model_i = synth_losscone(
             energies, pitches,
-            lhs_delta_U[i],
+            lhs_U_surface[i],
             lhs_bs_over_bm[i],
             beam_width_eV=lhs_beam_width[i],
             beam_amp=lhs_beam_amp[i],
@@ -107,7 +107,7 @@ def test_lhs_vectorization_with_edge_cases():
     eps = 1e-6
 
     # Edge case parameters
-    lhs_delta_U = np.array([
+    lhs_U_surface = np.array([
         -100.0,  # Normal
         -1.0,    # Very small (almost zero)
         -500.0,  # Very large
@@ -121,11 +121,11 @@ def test_lhs_vectorization_with_edge_cases():
     ])
     lhs_bs_over_bm = np.array([0.5, 0.1, 0.9, 0.5, 0.2, 0.8, 0.3, 0.7, 0.4, 0.6])
     lhs_beam_amp = np.array([0.0, 5.0, 2.0, 1.0, 0.0, 3.0, 4.0, 0.5, 2.5, 1.5])
-    lhs_beam_width = np.maximum(np.abs(lhs_delta_U) * 0.2, config.EPS)
+    lhs_beam_width = np.maximum(np.abs(lhs_U_surface) * 0.2, config.EPS)
 
     # Batch
     models_batch = synth_losscone(
-        energies, pitches, lhs_delta_U, lhs_bs_over_bm,
+        energies, pitches, lhs_U_surface, lhs_bs_over_bm,
         beam_width_eV=lhs_beam_width, beam_amp=lhs_beam_amp,
         beam_pitch_sigma_deg=10.0
     )
@@ -139,7 +139,7 @@ def test_lhs_vectorization_with_edge_cases():
     chi2_seq = []
     for i in range(n_samples):
         model = synth_losscone(
-            energies, pitches, lhs_delta_U[i], lhs_bs_over_bm[i],
+            energies, pitches, lhs_U_surface[i], lhs_bs_over_bm[i],
             beam_width_eV=lhs_beam_width[i], beam_amp=lhs_beam_amp[i],
             beam_pitch_sigma_deg=10.0
         )
@@ -170,15 +170,15 @@ def test_lhs_vectorization_randomized(seed):
     eps = 1e-6
 
     # Random LHS samples
-    lhs_delta_U = np.random.uniform(-200, -1, n_samples)
+    lhs_U_surface = np.random.uniform(-200, -1, n_samples)
     lhs_bs_over_bm = np.random.uniform(0.1, 0.9, n_samples)
     lhs_beam_amp = np.random.uniform(0, 5, n_samples)
-    lhs_beam_width = np.maximum(np.abs(lhs_delta_U) * 0.2, config.EPS)
+    lhs_beam_width = np.maximum(np.abs(lhs_U_surface) * 0.2, config.EPS)
     beam_pitch_sigma = np.random.uniform(5, 20)
 
     # Batch
     models_batch = synth_losscone(
-        energies, pitches, lhs_delta_U, lhs_bs_over_bm,
+        energies, pitches, lhs_U_surface, lhs_bs_over_bm,
         beam_width_eV=lhs_beam_width, beam_amp=lhs_beam_amp,
         beam_pitch_sigma_deg=beam_pitch_sigma
     )
@@ -192,7 +192,7 @@ def test_lhs_vectorization_randomized(seed):
     chi2_seq = []
     for i in range(n_samples):
         model = synth_losscone(
-            energies, pitches, lhs_delta_U[i], lhs_bs_over_bm[i],
+            energies, pitches, lhs_U_surface[i], lhs_bs_over_bm[i],
             beam_width_eV=lhs_beam_width[i], beam_amp=lhs_beam_amp[i],
             beam_pitch_sigma_deg=beam_pitch_sigma
         )
@@ -223,14 +223,14 @@ def test_beam_width_broadcasting():
     energies = np.linspace(100, 1000, n_energy)
     pitches = np.tile(np.linspace(0, 180, n_pitch), (n_energy, 1))
 
-    delta_Us = np.array([-100, -50, -25, -75, -150])
+    U_surfaces = np.array([-100, -50, -25, -75, -150])
     bs_over_bms = np.array([0.5, 0.5, 0.5, 0.5, 0.5])
     beam_amps = np.array([2.0, 2.0, 2.0, 2.0, 2.0])
-    beam_widths = np.abs(delta_Us) * 0.2  # Different widths for each sample
+    beam_widths = np.abs(U_surfaces) * 0.2  # Different widths for each sample
 
     # Batch call
     models_batch = synth_losscone(
-        energies, pitches, delta_Us, bs_over_bms,
+        energies, pitches, U_surfaces, bs_over_bms,
         beam_width_eV=beam_widths, beam_amp=beam_amps,
         beam_pitch_sigma_deg=10.0
     )
@@ -238,7 +238,7 @@ def test_beam_width_broadcasting():
     # Individual calls
     for i in range(n_samples):
         model_individual = synth_losscone(
-            energies, pitches, delta_Us[i], bs_over_bms[i],
+            energies, pitches, U_surfaces[i], bs_over_bms[i],
             beam_width_eV=beam_widths[i], beam_amp=beam_amps[i],
             beam_pitch_sigma_deg=10.0
         )

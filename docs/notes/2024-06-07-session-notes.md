@@ -2,7 +2,7 @@
 
 ## Flux & Pipeline Hardening
 - `ERData._add_count_columns` clamps negative summed counts before computing count errors to avoid `sqrt` on negative values (prevents downstream NaNs).
-- `LossConeFitter` now accepts per-row spacecraft potentials and subtracts the chunk median from energies so ΔU reflects the surface potential.
+- `LossConeFitter` now accepts per-row spacecraft potentials and subtracts the chunk median from energies so U_surface reflects the surface potential.
 - `_spacecraft_potential_per_row` (pipeline) batches SPICE potential estimates per spectrum, restores mutated energy columns, and propagates the voltages through `PotentialResults`.
 - Added tests in `tests/potential_mapper/` verifying the new helper, fitter wiring, energy restoration, and batch payload behaviour.
 

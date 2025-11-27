@@ -13,7 +13,7 @@ e_0 = 1.602e-19  # Elementary charge in Coulombs
 def synth_losscone(
     energy_grid: np.ndarray,
     pitch_grid: np.ndarray,
-    delta_U: float,
+    U_surface: float,
     bs_over_bm: float,
     beam_width_eV: float = 0.0,
     beam_amp: float = 0.0,
@@ -21,13 +21,13 @@ def synth_losscone(
 ) -> np.ndarray:
     """
     Build a loss-cone model that never returns NaN/Inf.
-    
+
     Supports broadcasting for vectorized LHS:
     - energy_grid: (nE,)
     - pitch_grid: (nE, nPitch)
-    - delta_U: scalar or (nParams,)
+    - U_surface: scalar or (nParams,) - lunar surface potential in volts
     - bs_over_bm: scalar or (nParams,)
-    
+
     Returns:
     - If params are scalar: (nE, nPitch)
     - If params are arrays: (nParams, nE, nPitch)
@@ -35,14 +35,14 @@ def synth_losscone(
     # Ensure inputs are arrays
     energy_grid = np.asarray(energy_grid)
     pitch_grid = np.asarray(pitch_grid)
-    
+
     # Handle parameter broadcasting
-    delta_U = np.asarray(delta_U)
+    U_surface = np.asarray(U_surface)
     bs_over_bm = np.asarray(bs_over_bm)
     beam_amp = np.asarray(beam_amp)
-    
+
     # Check if we are doing a batch calculation
-    is_batch = delta_U.ndim > 0 or bs_over_bm.ndim > 0 or beam_amp.ndim > 0
+    is_batch = U_surface.ndim > 0 or bs_over_bm.ndim > 0 or beam_amp.ndim > 0
     
     # Guard against E <= 0 (mask invalid energies)
     valid_E = energy_grid > 0
@@ -53,27 +53,27 @@ def synth_losscone(
     
     if is_batch:
         # Ensure params are at least 1D
-        if delta_U.ndim == 0: delta_U = delta_U[None]
+        if U_surface.ndim == 0: U_surface = U_surface[None]
         if bs_over_bm.ndim == 0: bs_over_bm = bs_over_bm[None]
         if beam_amp.ndim == 0: beam_amp = beam_amp[None]
-        
-        n_params = max(delta_U.size, bs_over_bm.size, beam_amp.size)
-        
+
+        n_params = max(U_surface.size, bs_over_bm.size, beam_amp.size)
+
         # Reshape params to (nParams, 1, 1)
-        delta_U = delta_U.reshape(-1, 1, 1)
+        U_surface = U_surface.reshape(-1, 1, 1)
         bs_over_bm = bs_over_bm.reshape(-1, 1, 1)
         beam_amp = beam_amp.reshape(-1, 1, 1)
-        
+
         # Reshape grids to (1, nE, nPitch)
         # pitch_grid is (nE, nPitch)
         pitch_grid_exp = pitch_grid[None, :, :]
         # E_safe is (nE,) -> (1, nE, 1)
         E_safe_exp = E_safe[None, :, None]
         valid_E_exp = valid_E[None, :, None]
-        
-        # Calculate x = B_s/B_m * (1 + delta_U / E)
+
+        # Calculate x = B_s/B_m * (1 + U_surface / E)
         # (nParams, 1, 1) * (1 + (nParams, 1, 1) / (1, nE, 1)) -> (nParams, nE, 1)
-        x = bs_over_bm * (1.0 + delta_U / E_safe_exp)
+        x = bs_over_bm * (1.0 + U_surface / E_safe_exp)
         
         # Initialize model
         # (nParams, nE, nPitch)
@@ -94,8 +94,8 @@ def synth_losscone(
         
         # Beam
         if np.any(beam_width_eV > 0):
-             # beam_center = max(abs(delta_U), beam_width_eV)
-             # delta_U is (nParams, 1, 1)
+             # beam_center = max(abs(U_surface), beam_width_eV)
+             # U_surface is (nParams, 1, 1)
              # beam_width_eV might be scalar or (nParams,), reshape to (nParams, 1, 1)
              beam_width_eV_arr = np.asarray(beam_width_eV)
              if beam_width_eV_arr.ndim == 0:
@@ -103,7 +103,7 @@ def synth_losscone(
              else:
                  beam_width_eV_exp = beam_width_eV_arr.reshape(-1, 1, 1)
 
-             beam_center = np.maximum(np.abs(delta_U), beam_width_eV_exp)
+             beam_center = np.maximum(np.abs(U_surface), beam_width_eV_exp)
 
              # beam calculation
              # E is (1, nE, 1)
@@ -133,10 +133,10 @@ def synth_losscone(
         # Reshape E for broadcasting against pitch_grid (nE, nPitch)
         # Assuming energy_grid is 1D (nE,) and pitch_grid is 2D (nE, nPitch) or compatible
         
-        # Calculate x = B_s/B_m * (1 + delta_U / E)
-        # We need to handle the shape carefully. 
+        # Calculate x = B_s/B_m * (1 + U_surface / E)
+        # We need to handle the shape carefully.
         # If energy_grid is 1D, we reshape to (nE, 1) to broadcast against (nE, nPitch)
-        x = bs_over_bm * (1.0 + delta_U / E_safe)
+        x = bs_over_bm * (1.0 + U_surface / E_safe)
         
         # If x is scalar or 1D, broadcast to match pitch_grid
         if x.ndim == 1 and pitch_grid.ndim == 2:
@@ -160,7 +160,7 @@ def synth_losscone(
 
         # Optional narrow beam
         if beam_width_eV > 0 and beam_amp > 0:
-            beam_center = max(abs(delta_U), beam_width_eV)
+            beam_center = max(abs(U_surface), beam_width_eV)
             # Vectorized beam calculation
             # E is (nE,), beam is (nE,)
             beam = beam_amp * np.exp(-0.5 * ((energy_grid - beam_center) / beam_width_eV) ** 2)
@@ -184,8 +184,8 @@ def synth_losscone(
 
 
 def _chi2(params, energies, pitches, data, eps):
-    delta_U, bs_over_bm = params
-    model = synth_losscone(energies, pitches, delta_U, bs_over_bm)
+    U_surface, bs_over_bm = params
+    model = synth_losscone(energies, pitches, U_surface, bs_over_bm)
 
     # Bail-out if the model went pathological
     if not np.all(np.isfinite(model)) or (model <= 0).all():

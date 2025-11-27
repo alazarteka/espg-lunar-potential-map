@@ -335,7 +335,7 @@ class LossConeFitter:
         Returns:
             np.ndarray: The Latin Hypercube sample.
         """
-        # Generate a Latin Hypercube sample across ΔU, B_s/B_m, and beam amplitude
+        # Generate a Latin Hypercube sample across U_surface, B_s/B_m, and beam amplitude
         lower_bounds = np.array([-1000.0, 0.1, self.beam_amp_min], dtype=float)
         upper_bounds = np.array([1000.0, 1.0, self.beam_amp_max], dtype=float)
         if upper_bounds[2] <= lower_bounds[2]:
@@ -429,7 +429,7 @@ class LossConeFitter:
         self, measurement_chunk: int
     ) -> tuple[float, float, float]:
         """
-        Fit surface potential (ΔU) and B_s/B_m for one 15-row measurement chunk
+        Fit surface potential (U_surface) and B_s/B_m for one 15-row measurement chunk
         using χ² minimisation with scipy.optimize.minimize.
 
         Args:
@@ -437,7 +437,7 @@ class LossConeFitter:
 
         Returns:
             tuple[float, float, float]:
-                - delta_U: best-fit surface potential in volts
+                - U_surface: best-fit surface potential in volts
                 - bs_over_bm: best-fit B_s/B_m ratio
                 - beam_amp: best-fit Gaussian beam amplitude
                 - chi2: final χ² value
@@ -466,7 +466,7 @@ class LossConeFitter:
         ]
 
         # When spacecraft charging is available, remove it from the observed
-        # energies so ΔU represents the actual lunar surface potential.
+        # energies so U_surface represents the actual lunar surface potential.
 
         if self.spacecraft_potential is not None and self.spacecraft_potential.size:
             chunk_sc = self.spacecraft_potential[s:e]
@@ -489,41 +489,41 @@ class LossConeFitter:
             norm2d = norm2d[:actual_rows]
 
         # 1) Vectorized Latin-hypercube global scan
-        # self.lhs is (N_samples, 3) -> [delta_U, bs_over_bm, beam_amp]
-        lhs_delta_U = self.lhs[:, 0]
+        # self.lhs is (N_samples, 3) -> [U_surface, bs_over_bm, beam_amp]
+        lhs_U_surface = self.lhs[:, 0]
         lhs_bs_over_bm = self.lhs[:, 1]
         lhs_beam_amp = self.lhs[:, 2]
-        
+
         # Calculate beam widths for all samples
-        # beam_width = max(abs(delta_U) * factor, EPS)
-        lhs_beam_width = np.maximum(np.abs(lhs_delta_U) * self.beam_width_factor, config.EPS)
+        # beam_width = max(abs(U_surface) * factor, EPS)
+        lhs_beam_width = np.maximum(np.abs(lhs_U_surface) * self.beam_width_factor, config.EPS)
         
         # Evaluate models in batch: (N_samples, nE, nPitch)
         # Note: synth_losscone handles broadcasting
         models = synth_losscone(
             energies,
             pitches,
-            lhs_delta_U,
+            lhs_U_surface,
             lhs_bs_over_bm,
-            beam_width_eV=lhs_beam_width, # This needs to be handled if passed as array? 
+            beam_width_eV=lhs_beam_width, # This needs to be handled if passed as array?
             # Wait, synth_losscone signature for beam_width_eV is float in my previous edit?
             # Let me check synth_losscone again.
             # I updated it to handle beam_width_eV if it's passed as array?
             # Actually, in my previous edit I didn't explicitly handle array beam_width_eV in the signature type hint,
-            # but I used `beam_center = np.maximum(np.abs(delta_U), beam_width_eV)`.
-            # If beam_width_eV is array (N,), and delta_U is (N,1,1), then max might broadcast?
+            # but I used `beam_center = np.maximum(np.abs(U_surface), beam_width_eV)`.
+            # If beam_width_eV is array (N,), and U_surface is (N,1,1), then max might broadcast?
             # Let's assume beam_width_eV should be broadcastable.
-            # If lhs_beam_width is (N,), I should reshape it to (N, 1, 1) to match delta_U.
+            # If lhs_beam_width is (N,), I should reshape it to (N, 1, 1) to match U_surface.
             beam_amp=lhs_beam_amp,
             beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
         )
-        
+
         # However, I need to be careful about beam_width_eV.
-        # In synth_losscone: `beam_center = np.maximum(np.abs(delta_U), beam_width_eV)`
-        # If delta_U is (N, 1, 1) and beam_width_eV is (N,), numpy broadcasts to (N, N, 1)? No.
+        # In synth_losscone: `beam_center = np.maximum(np.abs(U_surface), beam_width_eV)`
+        # If U_surface is (N, 1, 1) and beam_width_eV is (N,), numpy broadcasts to (N, N, 1)? No.
         # (N, 1, 1) and (N,) -> (N, N, 1) is dangerous.
         # I should reshape lhs_beam_width to (N, 1, 1) before passing.
-        
+
         # Let's fix the call below.
         
         # Calculate Chi2 for all models
@@ -553,13 +553,13 @@ class LossConeFitter:
         # 2) Local Nelder–Mead refinement
         # Objective for optimizer (scalar)
         def chi2_scalar(params):
-            delta_U, bs_over_bm, beam_amp = params
+            U_surface, bs_over_bm, beam_amp = params
             beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
-            beam_width = max(abs(delta_U) * self.beam_width_factor, config.EPS)
+            beam_width = max(abs(U_surface) * self.beam_width_factor, config.EPS)
             model = synth_losscone(
                 energies,
                 pitches,
-                delta_U,
+                U_surface,
                 bs_over_bm,
                 beam_width_eV=beam_width,
                 beam_amp=beam_amp,
@@ -581,19 +581,19 @@ class LossConeFitter:
         if not result.success:
             # Fallback to x0 if optimization fails (rare)
             return float(x0[0]), float(x0[1]), float(x0[2]), float(best_lhs_chi2)
-            
-        delta_U, bs_over_bm, beam_amp = result.x
+
+        U_surface, bs_over_bm, beam_amp = result.x
         beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
-        return float(delta_U), float(bs_over_bm), beam_amp, float(result.fun)
+        return float(U_surface), float(bs_over_bm), beam_amp, float(result.fun)
 
     def fit_surface_potential(self) -> np.ndarray:
         """
-        Fit surface potential (ΔU) and B_s/B_m for all 15-row measurement chunks
+        Fit surface potential (U_surface) and B_s/B_m for all 15-row measurement chunks
         using χ² minimisation with scipy.optimize.minimize.
 
         Returns:
-            np.ndarray: Array with columns [delta_U, bs_over_bm, beam_amp, chi2, chunk_index]
-                - delta_U: best-fit surface potential in volts
+            np.ndarray: Array with columns [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
+                - U_surface: best-fit surface potential in volts
                 - bs_over_bm: best-fit B_s/B_m ratio
                 - beam_amp: best-fit Gaussian beam amplitude
                 - chi2: final χ² value
@@ -606,8 +606,8 @@ class LossConeFitter:
         results = np.zeros((n_chunks, 5))
 
         for i in range(n_chunks):
-            delta_U, bs_over_bm, beam_amp, chi2 = self._fit_surface_potential(i)
-            results[i] = [delta_U, bs_over_bm, beam_amp, chi2, i]
+            U_surface, bs_over_bm, beam_amp, chi2 = self._fit_surface_potential(i)
+            results[i] = [U_surface, bs_over_bm, beam_amp, chi2, i]
 
         return results
 

@@ -92,8 +92,8 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
 
     for i in range(n_chunks):
         try:
-            delta_U, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
-            results_list.append([delta_U, bs_bm, beam_amp, chi2, i])
+            U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
+            results_list.append([U_surface, bs_bm, beam_amp, chi2, i])
         except Exception as e:
             # Skip failed fits
             continue
@@ -108,7 +108,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
     # Create frames for each chunk
     frames = []
 
-    for idx, (delta_U, bs_bm, beam_amp, chi2, chunk_idx) in enumerate(results):
+    for idx, (U_surface, bs_bm, beam_amp, chi2, chunk_idx) in enumerate(results):
         chunk_idx = int(chunk_idx)
 
         # Get data for this chunk
@@ -133,11 +133,11 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
         )
 
         # Create model on irregular grid first
-        beam_width = max(abs(delta_U) * config.LOSS_CONE_BEAM_WIDTH_FACTOR, 1.0)
+        beam_width = max(abs(U_surface) * config.LOSS_CONE_BEAM_WIDTH_FACTOR, 1.0)
         model_irregular = synth_losscone(
             energies,
             pitches,
-            delta_U,
+            U_surface,
             bs_bm,
             beam_width_eV=beam_width,
             beam_amp=beam_amp,
@@ -155,7 +155,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
             if E <= 0:
                 loss_cone_angle.append(np.nan)
                 continue
-            x = bs_bm * (1.0 + delta_U / E)
+            x = bs_bm * (1.0 + U_surface / E)
             if x <= 0:
                 ac = 0.0
             elif x >= 1:
@@ -175,7 +175,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
             'energies': energies_reg,
             'pitches': pitches_reg,  # Now 1D regular grid
             'loss_cone': loss_cone_angle,
-            'delta_U': delta_U,
+            'U_surface': U_surface,
             'bs_bm': bs_bm,
             'beam_amp': beam_amp,
             'chi2': chi2,
@@ -255,7 +255,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
     fig.update_layout(
         title=dict(
             text=f"Chunk {first_frame['chunk_idx']}: {first_frame['timestamp']}<br>"
-                 f"ΔU = {first_frame['delta_U']:.1f} V, Bs/Bm = {first_frame['bs_bm']:.2f}, "
+                 f"U_surface = {first_frame['U_surface']:.1f} V, Bs/Bm = {first_frame['bs_bm']:.2f}, "
                  f"Beam Amp = {first_frame['beam_amp']:.1f}, χ² = {first_frame['chi2']:.1e}",
             x=0.5,
             xanchor='center',
@@ -293,7 +293,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
                 {
                     "title": dict(
                         text=f"Chunk {frame['chunk_idx']}: {frame['timestamp']}<br>"
-                             f"ΔU = {frame['delta_U']:.1f} V, Bs/Bm = {frame['bs_bm']:.2f}, "
+                             f"U_surface = {frame['U_surface']:.1f} V, Bs/Bm = {frame['bs_bm']:.2f}, "
                              f"Beam Amp = {frame['beam_amp']:.1f}, χ² = {frame['chi2']:.1e}",
                         x=0.5,
                         xanchor='center',

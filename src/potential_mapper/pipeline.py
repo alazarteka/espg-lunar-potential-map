@@ -232,9 +232,9 @@ def _apply_fit_results(
     if fit_results.size == 0:
         return
 
-    for delta_U, _bs, _beam_amp, chi2, chunk_idx in fit_results:
+    for U_surface, _bs, _beam_amp, chi2, chunk_idx in fit_results:
         chunk_idx = int(chunk_idx)
-        if not np.isfinite(delta_U) or not np.isfinite(chi2):
+        if not np.isfinite(U_surface) or not np.isfinite(chi2):
             continue
         if chi2 > config.FIT_ERROR_THRESHOLD:
             continue
@@ -243,7 +243,7 @@ def _apply_fit_results(
         row_end = min(row_start + rows_per_sweep, n_total)
         if row_start >= n_total:
             break
-        proj_potential[row_start:row_end] = float(delta_U)
+        proj_potential[row_start:row_end] = float(U_surface)
 
 
 class DataLoader:

@@ -40,8 +40,8 @@ def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: P
 
     for i in range(n_chunks):
         try:
-            delta_U, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
-            results_list.append([delta_U, bs_bm, beam_amp, chi2, i])
+            U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
+            results_list.append([U_surface, bs_bm, beam_amp, chi2, i])
         except Exception as e:
             print(f"  Chunk {i} failed: {e}")
             continue
@@ -58,7 +58,7 @@ def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: P
         chunk_idx = len(results) // 2
         print(f"Requested chunk {chunk_idx} not available, using {chunk_idx}")
 
-    delta_U, bs_bm, beam_amp, chi2, chunk_idx_actual = results[chunk_idx]
+    U_surface, bs_bm, beam_amp, chi2, chunk_idx_actual = results[chunk_idx]
     chunk_idx = int(chunk_idx_actual)  # Use the actual chunk index from results
 
     # Get the data for this chunk
@@ -79,11 +79,11 @@ def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: P
     normalized_obs = flux_data / incident_avg
 
     # Create model
-    beam_width = max(abs(delta_U) * config.LOSS_CONE_BEAM_WIDTH_FACTOR, 1.0)
+    beam_width = max(abs(U_surface) * config.LOSS_CONE_BEAM_WIDTH_FACTOR, 1.0)
     model = synth_losscone(
         energies,
         pitches,
-        delta_U,
+        U_surface,
         bs_bm,
         beam_width_eV=beam_width,
         beam_amp=beam_amp,
@@ -96,7 +96,7 @@ def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: P
         if E <= 0:
             loss_cone_angle.append(np.nan)
             continue
-        x = bs_bm * (1.0 + delta_U / E)
+        x = bs_bm * (1.0 + U_surface / E)
         if x <= 0:
             ac = 0.0
         elif x >= 1:
@@ -150,7 +150,7 @@ def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: P
     axes[1].set_xscale('log')
     axes[1].set_xlabel('Energy [eV]')
     axes[1].set_ylabel('Pitch Angle [deg]')
-    axes[1].set_title(f'Best Fit\nΔU={delta_U:.1f}V, Bs/Bm={bs_bm:.2f}')
+    axes[1].set_title(f'Best Fit\nU_surface={U_surface:.1f}V, Bs/Bm={bs_bm:.2f}')
     axes[1].plot(energies, loss_cone_angle, 'w-', linewidth=2, label='Loss Cone')
     plt.colorbar(im1, ax=axes[1], label='Normalized Flux')
 
@@ -186,7 +186,7 @@ def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: P
 
     # Print fit results
     print(f"\nFit Results for chunk {chunk_idx}:")
-    print(f"  ΔU = {delta_U:.2f} V")
+    print(f"  U_surface = {U_surface:.2f} V")
     print(f"  Bs/Bm = {bs_bm:.3f}")
     print(f"  Beam amplitude = {beam_amp:.2f}")
     print(f"  χ² = {chi2:.2e}")

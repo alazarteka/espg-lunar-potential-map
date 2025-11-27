@@ -169,7 +169,7 @@ def process_lp_file(file_path: Path) -> PotentialResults:
     Process a single ER file into PotentialResults.
 
     Steps: load ER + attitude; build coordinate arrays; project B; find surface
-    intersections; compute lat/lon and day/night flags; fit ΔU per 15-row chunk
+    intersections; compute lat/lon and day/night flags; fit U_surface per 15-row chunk
     and map to rows.
     """
     logging.debug(f"Processing LP file: {file_path}")
@@ -254,10 +254,10 @@ def process_lp_file(file_path: Path) -> PotentialResults:
         proj_in_sun_masked = dots > 0
         proj_in_sun[mask] = proj_in_sun_masked
 
-    # Spacecraft potential per spectrum (spec_no) – reused when combining ΔU.
+    # Spacecraft potential per spectrum (spec_no) – reused when combining U_surface.
     sc_potential = _spacecraft_potential_per_row(er_data, n)
 
-    # Fit surface potential ΔU per 15-row chunk and map to rows
+    # Fit surface potential U_surface per 15-row chunk and map to rows
     try:
         # Pass spacecraft potential so fitter can de-bias energies per spectrum.
         fitter = LossConeFitter(
@@ -266,12 +266,12 @@ def process_lp_file(file_path: Path) -> PotentialResults:
             spacecraft_potential=sc_potential,
         )
         fit_mat = fitter.fit_surface_potential()  # shape (n_chunks, 5)
-        # Columns: [delta_U, bs_over_bm, beam_amp, chi2, chunk_index]
+        # Columns: [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
         proj_potential = np.full(n, np.nan)
         if fit_mat.size > 0:
-            for delta_U, _bs, _beam_amp, chi2, chunk_idx in fit_mat:
+            for U_surface, _bs, _beam_amp, chi2, chunk_idx in fit_mat:
                 i = int(chunk_idx)
-                if not np.isfinite(delta_U) or not np.isfinite(chi2):
+                if not np.isfinite(U_surface) or not np.isfinite(chi2):
                     continue
                 if chi2 > config.FIT_ERROR_THRESHOLD:
                     continue
@@ -279,7 +279,7 @@ def process_lp_file(file_path: Path) -> PotentialResults:
                 e = min((i + 1) * config.SWEEP_ROWS, n)
                 if s >= n:
                     break
-                delta_u_value = float(delta_U)
+                delta_u_value = float(U_surface)
                 proj_chunk = proj_potential[s:e]
                 proj_chunk[:] = delta_u_value
     except Exception as e:
