@@ -17,7 +17,7 @@ to harmonics-m-<DATE>.png.
 Defaults:
   --lmax 60
   --regularize-l2 1.0         (0.5 when `m` is provided)
-  --plot-output plots/harmonics[-m]-<DATE>.png
+  --plot-output artifacts/plots/harmonics[-m]-<DATE>.png
 
 Additional flags (e.g., --end, --plot-lat-steps) are forwarded to the Python
 CLI unchanged.
@@ -99,9 +99,9 @@ done
 
 if [[ "${CUSTOM_PLOT_OUTPUT}" == false ]]; then
     if [[ "${MEASUREMENTS}" == true ]]; then
-        PLOT_OUTPUT="plots/harmonics-m-${DATE_ARG}.png"
+        PLOT_OUTPUT="artifacts/plots/harmonics-m-${DATE_ARG}.png"
     else
-        PLOT_OUTPUT="plots/harmonics-${DATE_ARG}.png"
+        PLOT_OUTPUT="artifacts/plots/harmonics-${DATE_ARG}.png"
     fi
 fi
 

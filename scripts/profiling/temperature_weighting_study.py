@@ -221,7 +221,7 @@ def main() -> None:
 
     # Plots ---------------------------------------------------------------------
     # Ensure output directory exists
-    Path("temp").mkdir(parents=True, exist_ok=True)
+    Path("scratch").mkdir(parents=True, exist_ok=True)
 
     # 1) Overlay histogram of Te (weighted vs unweighted)
     plt.figure(figsize=(10, 6))
@@ -260,7 +260,7 @@ def main() -> None:
     plt.grid(True, alpha=0.3)
     plt.legend(loc="best")
     plt.tight_layout()
-    plt.savefig("temp/te_weighted_unweighted_hist.png", dpi=150)
+    plt.savefig("scratch/te_weighted_unweighted_hist.png", dpi=150)
 
     # 2) Histogram of absolute and relative differences
     plt.figure(figsize=(10, 6))
@@ -270,7 +270,7 @@ def main() -> None:
     plt.title("Difference in Temperatures (weighted − unweighted)")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("temp/te_diff_hist.png", dpi=150)
+    plt.savefig("scratch/te_diff_hist.png", dpi=150)
 
     plt.figure(figsize=(10, 6))
     finite_rel = np.isfinite(rel_delta_te)
@@ -280,7 +280,7 @@ def main() -> None:
     plt.title("Relative Difference in Temperatures (weighted vs unweighted)")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("temp/te_rel_diff_hist.png", dpi=150)
+    plt.savefig("scratch/te_rel_diff_hist.png", dpi=150)
 
     # 3) Scatter Te_w vs Te_uw with 1:1 line
     plt.figure(figsize=(7, 7))
@@ -297,7 +297,7 @@ def main() -> None:
     plt.grid(True, which="both", alpha=0.3)
     plt.legend(loc="best")
     plt.tight_layout()
-    plt.savefig("temp/te_weighted_vs_unweighted_scatter.png", dpi=150)
+    plt.savefig("scratch/te_weighted_vs_unweighted_scatter.png", dpi=150)
 
     # Console stats -------------------------------------------------------------
     print("\n--- Te Comparison (original fits) ---")

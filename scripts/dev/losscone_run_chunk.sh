@@ -12,5 +12,5 @@ fi
 uv run python scripts/dev/losscone_plot_fit.py \
   --file data/1998/060_090MAR/3D980323.TAB \
   --chunk "$CHUNK" \
-  --output "temp/perf_runs/1998-03-23/losscone_chunk${CHUNK}.png" \
-  --dump-dir "temp/perf_runs/1998-03-23/chunk${CHUNK}_dump"
+  --output "scratch/perf_runs/1998-03-23/losscone_chunk${CHUNK}.png" \
+  --dump-dir "scratch/perf_runs/1998-03-23/chunk${CHUNK}_dump"

@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover - fallback for older SciPy
     from scipy.special import sph_harm as _sph_harm
 
 # Default cache directory mirrors the batch runner output
-DEFAULT_CACHE_DIR = Path("data/potential_cache")
+DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 POTENTIAL_COLORMAP = "viridis"
 
 

@@ -173,7 +173,7 @@ From repo root (Python 3.12 with `uv`):
 uv run python scripts/profiling/temperature_weighting_study.py
 ```
 
-**Outputs:** written to `temp/`
+**Outputs:** written to `scratch/`
 
 - `te_weighted_unweighted_hist.png` (Fig. 1)
 - `te_weighted_vs_unweighted_scatter.png` (Fig. 2)

@@ -207,8 +207,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("data/potential_cache"),
-        help="Directory where output NPZ file is stored (default: data/potential_cache)",
+        default=Path("artifacts/potential_cache"),
+        help="Directory where output NPZ file is stored (default: artifacts/potential_cache)",
     )
     parser.add_argument(
         "--year",

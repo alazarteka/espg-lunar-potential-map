@@ -19,7 +19,7 @@ from src.utils.spice_ops import get_sun_vector_wrt_moon
 from scripts.analysis.potential_charge_report_md import _render_markdown
 
 # Default cache directory mirrors the batch runner output
-DEFAULT_CACHE_DIR = Path("data/potential_cache")
+DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 
 # Global guard so we only load kernels once
 _SPICE_LOADED = False

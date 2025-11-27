@@ -286,7 +286,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("plots/temporal_comparison"),
+        default=Path("artifacts/plots/temporal_comparison"),
         help="Directory for output plots",
     )
     parser.add_argument(

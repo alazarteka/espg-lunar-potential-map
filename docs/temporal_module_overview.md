@@ -79,7 +79,7 @@ UV_CACHE_DIR=.uv-cache uv run python -m src.temporal.coefficients \
   --window-hours 24 \
   --regularize-l2 1000 \
   --temporal-lambda 1e-2 \
-  --output data/temporal_coeffs_apr1998.npz \
+  --output artifacts/temporal_coeffs/temporal_coeffs_apr1998.npz \
   --log-level INFO
 ```
 
@@ -99,7 +99,7 @@ Every temporal CLI (`temporal_harmonics_animate`, `temporal_harmonics_analysis`,
 from pathlib import Path
 from src.temporal import load_temporal_coefficients
 
-dataset = load_temporal_coefficients(Path("data/temporal_coeffs_apr1998.npz"))
+dataset = load_temporal_coefficients(Path("artifacts/temporal_coeffs/temporal_coeffs_apr1998.npz"))
 print(dataset.times.shape)    # (N_windows,)
 print(dataset.lmax)           # e.g., 10
 print(dataset.coeffs.shape)   # (N_windows, (lmax+1)^2)
@@ -125,7 +125,7 @@ print(f"{format_timestamp(dataset.times[0])}: {maps[0].min():.1f} to {maps[0].ma
 import numpy as np
 from src.temporal import load_temporal_coefficients
 
-dataset = load_temporal_coefficients(Path("data/temporal_coeffs_apr1998.npz"))
+dataset = load_temporal_coefficients(Path("artifacts/temporal_coeffs/temporal_coeffs_apr1998.npz"))
 diffs = np.diff(dataset.coeffs, axis=0)
 roughness = np.mean(np.linalg.norm(diffs, axis=1))
 print(f"Mean temporal roughness: {roughness:.2f} V")
@@ -137,7 +137,7 @@ print(f"Mean temporal roughness: {roughness:.2f} V")
 import matplotlib.pyplot as plt
 from src.temporal import load_temporal_coefficients, reconstruct_global_map
 
-dataset = load_temporal_coefficients(Path("data/temporal_coeffs_apr1998.npz"))
+dataset = load_temporal_coefficients(Path("artifacts/temporal_coeffs/temporal_coeffs_apr1998.npz"))
 lat, lon, potential = reconstruct_global_map(dataset.coeffs[0], dataset.lmax)
 
 plt.imshow(

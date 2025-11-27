@@ -187,13 +187,13 @@ To reproduce this analysis:
 uv run python scripts/dev/test_beam_amp_sensitivity.py \
     --er-file data/1998/060_090MAR/3D980323.TAB \
     --chunks-per-date 100 \
-    --output temp/beam_amp_sensitivity_single.png
+    --output scratch/beam_amp_sensitivity_single.png
 
 # Multi-date (full analysis)
 uv run python scripts/dev/test_beam_amp_sensitivity.py \
     --n-dates 15 \
     --chunks-per-date 50 \
-    --output temp/beam_amp_sensitivity_multidate.png
+    --output scratch/beam_amp_sensitivity_multidate.png
 ```
 
 The script compares four strategies and outputs:

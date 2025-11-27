@@ -1,10 +1,10 @@
 # Terminator Charge Monthly Summary (1998-03 → 1998-10)
 
-This document consolidates the outputs of `scripts/analysis/potential_terminator_charge.py` for six months in 1998 (March, April, May, July, August, October). Each month’s detailed JSON and Markdown artifacts live under `reports/monthly/YYYY-MM/terminator_charge.{json,md}`.
+This document consolidates the outputs of `scripts/analysis/potential_terminator_charge.py` for six months in 1998 (March, April, May, July, August, October). Each month’s detailed JSON and Markdown artifacts live under `artifacts/reports/monthly/YYYY-MM/terminator_charge.{json,md}`.
 
 ## Inputs and Calculation Pipeline
 
-- **Source data** – Cached NPZ tiles under `data/potential_cache/**/3DYYMMDD.npz`. Each NPZ stores projected footprint locations, spacecraft/surface potentials, UTC strings, and illumination flags.
+- **Source data** – Cached NPZ tiles under `artifacts/potential_cache/**/3DYYMMDD.npz`. Each NPZ stores projected footprint locations, spacecraft/surface potentials, UTC strings, and illumination flags.
 - **Geometry & classification** – For every row, the analysis script recomputes solar zenith angle (SZA) via SPICE (`spice.utc2et`, `src.utils.spice_ops.get_sun_vector_wrt_moon`). Samples with `SZA ≤ 88°` become “sunlit”; `SZA ≥ 92°` become “shadowed”, ensuring a 4° guard band instead of trusting the cached `projection_in_sun` flag (the latter is only used for QA agreement metrics).
 - **Robust statistics** – Median/MAD estimates feed the sun/shadow surface potentials, spacecraft potential deltas, and the quadratic fit at SZA≈90°. Monte Carlo sampling (default 20 k draws) perturbs Φ_sun/Φ_shadow across the requested sheath ranges to estimate charge density quantiles (`σ_day`, `σ_night`, `Δσ`).
 - **Outputs** – For each NPZ day inside the requested window the script emits a record containing the metrics above, QA notes, run length, and whether a shadow→sun terminator crossing was observed. Markdown summaries reuse `_render_markdown` from `potential_charge_report_md.py`.
@@ -15,8 +15,8 @@ All reports were generated with UV’s managed environment:
 
 ```bash
 uv run python scripts/analysis/potential_terminator_charge.py --start YYYY-MM-01 --end YYYY-MM-<last> \
-  --output reports/monthly/YYYY-MM/terminator_charge.json \
-  --markdown reports/monthly/YYYY-MM/terminator_charge.md \
+  --output artifacts/reports/monthly/YYYY-MM/terminator_charge.json \
+  --markdown artifacts/reports/monthly/YYYY-MM/terminator_charge.md \
   --log-level INFO
 ```
 

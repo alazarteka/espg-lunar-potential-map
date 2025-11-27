@@ -308,7 +308,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("plots/azimuthal_analysis"),
+        default=Path("artifacts/plots/azimuthal_analysis"),
         help="Directory for output plots",
     )
     return parser.parse_args()

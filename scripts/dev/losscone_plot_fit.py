@@ -8,7 +8,7 @@ uv run python scripts/dev/losscone_plot_fit.py \
     --file data/1998/060_090MAR/3D980323.TAB \
     --chunk 0 \
     --theta-file data/theta.tab \
-    --output temp/losscone_chunk0.png
+    --output scratch/losscone_chunk0.png
 
 The script computes the normalized flux matrix used by LossConeFitter,
 reconstructs the best-fit model for the specified chunk, and renders:

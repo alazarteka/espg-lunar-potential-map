@@ -72,10 +72,10 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
 
     Args:
         er_file: Path to ER .TAB file
-        output_path: Where to save HTML (default: temp/loss_cone_viewer.html)
+        output_path: Where to save HTML (default: scratch/loss_cone_viewer.html)
     """
     if output_path is None:
-        output_path = Path("temp/loss_cone_viewer.html")
+        output_path = Path("scratch/loss_cone_viewer.html")
 
     # Load data
     print(f"Loading {er_file.name}...")

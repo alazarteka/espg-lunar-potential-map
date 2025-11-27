@@ -19,7 +19,7 @@ from typing import Iterable, Sequence
 
 import numpy as np
 
-DEFAULT_CACHE_DIR = Path("data/potential_cache")
+DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 
 TEXT_METRIC_HEADERS = (
     ("count", "Count"),
@@ -194,7 +194,7 @@ def main() -> None:
         "--cache-dir",
         type=Path,
         default=DEFAULT_CACHE_DIR,
-        help="Directory containing daily NPZ caches (default: data/potential_cache).",
+        help="Directory containing daily NPZ caches (default: artifacts/potential_cache).",
     )
     parser.add_argument(
         "--output",

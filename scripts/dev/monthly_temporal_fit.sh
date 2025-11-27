@@ -9,8 +9,8 @@ Example:
     ./scripts/dev/monthly_temporal_fit.sh 1998 04
 
 Environment overrides:
-    CACHE_DIR                 (default: data/potential_cache)
-    OUTPUT_ROOT               (default: data/temporal_coeffs)
+    CACHE_DIR                 (default: artifacts/potential_cache)
+    OUTPUT_ROOT               (default: artifacts/temporal_coeffs)
     L_MAX                     (default: 15)
     WINDOW_HOURS              (default: 24)
     WINDOW_STRIDE             (default: unset → non-overlapping)
@@ -49,8 +49,8 @@ if ! end_date=$(date -u -d "${start_date} +1 month -1 day" +%Y-%m-%d 2>/dev/null
     exit 1
 fi
 
-cache_dir=${CACHE_DIR:-data/potential_cache}
-output_root=${OUTPUT_ROOT:-data/temporal_coeffs}
+cache_dir=${CACHE_DIR:-artifacts/potential_cache}
+output_root=${OUTPUT_ROOT:-artifacts/temporal_coeffs}
 
 printf -v month_padded "%02d" "$month"
 output_dir="${output_root}/${year}"

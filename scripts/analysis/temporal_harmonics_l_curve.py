@@ -16,7 +16,7 @@ import numpy as np
 from src.temporal import compute_temporal_harmonics
 
 
-DEFAULT_CACHE_DIR = Path("data/potential_cache")
+DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 
 
 def run_temporal_harmonics(
@@ -173,7 +173,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("plots/l_curve"),
+        default=Path("artifacts/plots/l_curve"),
         help="Directory for output plots",
     )
     parser.add_argument(

@@ -93,7 +93,7 @@ def main():
             plt.legend(loc="best", fontsize=9)
 
     plt.tight_layout()
-    out = config.PROJECT_ROOT / "temp" / "synthetic_er_pitch_angle.png"
+    out = config.PROJECT_ROOT / "scratch" / "plots" / "synthetic_er_pitch_angle.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(out, dpi=150)
     print(f"Saved plot → {out}")

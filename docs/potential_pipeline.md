@@ -17,7 +17,7 @@ The document is organized as follows:
    cases, parameterizations, and fitting procedures.
 5. **Surface potential fitter** – how loss-cone spectra map to potentials on
    the surface.
-6. **Cache layout (`data/potential_cache`)** – contents of the NPZ rows that
+6. **Cache layout (`artifacts/potential_cache`)** – contents of the NPZ rows that
    down-stream tooling consumes.
 7. **Known issues and open questions** – why certain metrics look odd (e.g.,
    high projection failure rates, binary spacecraft potentials).
@@ -228,7 +228,7 @@ between the surface and the spacecraft, so the total surface potential is
 ## 6. Potential Cache Layout
 
 Every processed day produces a `3DYYMMDD.npz` under
-`data/potential_cache/YYYY/DDD_RANGE`. Each archive stores row-level arrays:
+`artifacts/potential_cache/YYYY/DDD_RANGE`. Each archive stores row-level arrays:
 
 | Key                              | Shape       | Description                                                  |
 | -------------------------------- | ----------- | ------------------------------------------------------------ |
@@ -304,7 +304,7 @@ lon_valid = lon[mask]
 ```python
 # Writing to cache (simplified)
 np.savez(
-    "data/potential_cache/1998/060_090MAR/3D980323.npz",
+    "artifacts/potential_cache/1998/060_090MAR/3D980323.npz",
     rows_projection_latitude=lat,
     rows_projection_longitude=lon,
     rows_spacecraft_potential=phi_sc,

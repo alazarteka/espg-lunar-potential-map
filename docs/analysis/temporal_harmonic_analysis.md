@@ -29,7 +29,7 @@ uv run python scripts/dev/temporal_harmonic_coefficients.py \
   --window-hours 24.0 \
   --min-coverage 0.15 \
   --regularize-l2 1e-3 \
-  --output data/temporal_coefficients_1998.npz
+  --output artifacts/temporal_coeffs/temporal_coefficients_1998.npz
 ```
 
 **Key Parameters:**
@@ -58,8 +58,8 @@ Use `scripts/analysis/temporal_harmonics_analysis.py` to visualize a_lm(t):
 
 ```bash
 uv run python scripts/analysis/temporal_harmonics_analysis.py \
-  --input data/temporal_coefficients_1998.npz \
-  --output-dir plots/temporal_harmonics \
+  --input artifacts/temporal_coeffs/temporal_coefficients_1998.npz \
+  --output-dir artifacts/plots/temporal_harmonics \
   --snapshot-times 0 50 100
 ```
 
@@ -144,19 +144,19 @@ uv run python scripts/dev/temporal_harmonic_coefficients.py \
   --start 1998-01-01 --end 1998-12-31 \
   --lmax 5 --window-hours 24 \
   --min-coverage 0.15 --regularize-l2 1e-3 \
-  --output data/temporal_coefficients_1998.npz
+  --output artifacts/temporal_coeffs/temporal_coefficients_1998.npz
 
 # 2. Analyze and visualize
 uv run python scripts/analysis/temporal_harmonics_analysis.py \
-  --input data/temporal_coefficients_1998.npz \
-  --output-dir plots/temporal_1998
+  --input artifacts/temporal_coeffs/temporal_coefficients_1998.npz \
+  --output-dir artifacts/plots/temporal_1998
 
 # 3. Compare different years
 for year in 1998 1999; do
   uv run python scripts/dev/temporal_harmonic_coefficients.py \
     --start ${year}-01-01 --end ${year}-12-31 \
     --lmax 5 --window-hours 24 \
-    --output data/temporal_coefficients_${year}.npz
+    --output artifacts/temporal_coeffs/temporal_coefficients_${year}.npz
 done
 ```
 

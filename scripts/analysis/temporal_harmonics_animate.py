@@ -200,7 +200,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("plots/temporal_harmonics_animation"),
+        default=Path("artifacts/plots/temporal_harmonics_animation"),
         help="Destination directory for animation files",
     )
     parser.add_argument(

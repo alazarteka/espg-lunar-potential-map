@@ -101,8 +101,8 @@ axes[1, 1].set_title('Zoom: +60° to +120° Longitude')
 axes[1, 1].grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig('plots/longitude_90_diagnostic.png', dpi=150, bbox_inches='tight')
-print("Saved diagnostic plot to plots/longitude_90_diagnostic.png")
+plt.savefig('artifacts/plots/longitude_90_diagnostic.png', dpi=150, bbox_inches='tight')
+print("Saved diagnostic plot to artifacts/plots/longitude_90_diagnostic.png")
 
 # Print statistics near ±90°
 print("\n" + "="*60)

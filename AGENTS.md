@@ -16,11 +16,13 @@ This project maps the lunar surface electrostatic potential using physics-based 
 - `src/`: Core Python package (e.g., `config.py`, `data_acquisition.py`, `flux.py`, `kappa.py`, `potential_mapper/`, plus `physics/` and `utils/`).
 - `tests/`: Pytest suite (`test_*.py`, with scopes like `physics/`, `utils/").
 - `data/`: Runtime data; `data/spice_kernels/` populated by acquisition; commit only small metadata (e.g., `kernels.lock").
+- `artifacts/`: Generated outputs (plots, reports, potential caches in `artifacts/potential_cache`); keep runtime inputs in `data/`.
+- `scratch/`: Ad-hoc experiments, perf runs, and attachments; gitignored by default.
 - `scripts/`: One-off helpers
   - `analysis/`: plotting & exploration CLIs intended for sharing
   - `profiling/`: performance measurement scripts
   - `dev/`: ad-hoc diagnostics, quick experiments
-- `notebooks/`, `docs/`, `temp/`: Research notes and outputs (avoid committing large binaries).
+- `notebooks/`, `docs/`: Research notes and outputs (avoid committing large binaries).
 
 ## Build, Test, and Development Commands
 

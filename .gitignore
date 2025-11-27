@@ -24,8 +24,8 @@ data/*
 data/spice_kernels/*
 !data/spice_kernels/kernels.lock
 
-temp/*
-!temp/.gitkeep
+scratch/
+temp/
 
 # =============================================================================
 # Development Tools
@@ -66,14 +66,17 @@ venv/
 *.jpg
 *.pdf
 *.svg
-plots/
 figures/
 results/
 gitingest/
 potential_timeseries*.html
-reports/monthly/
-reports/terminator_charge_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].json
-reports/terminator_charge_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md
+artifacts/plots/
+plots/
+artifacts/potential_cache/
+artifacts/temporal_coeffs/
+artifacts/reports/monthly/
+artifacts/reports/terminator_charge_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].json
+artifacts/reports/terminator_charge_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md
 
 # =============================================================================
 # Temporary Files

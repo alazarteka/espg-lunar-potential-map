@@ -15,7 +15,7 @@ def main() -> None:
     """
     Profile the potential mapping pipeline end-to-end.
 
-    Mirrors the profiling style of existing scripts, dumping a .prof file to temp
+    Mirrors the profiling style of existing scripts, dumping a .prof file to scratch
     and printing the top cumulative-time functions.
     """
     args = parse_arguments()
@@ -32,7 +32,7 @@ def main() -> None:
     dt = time.time() - t0
     pr.disable()
 
-    out_path = config.PROJECT_ROOT / "temp" / "potential_mapping_profile.prof"
+    out_path = config.PROJECT_ROOT / "scratch" / "profiles" / "potential_mapping_profile.prof"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pr.dump_stats(out_path)
 

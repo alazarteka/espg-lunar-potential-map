@@ -6,12 +6,12 @@ usage() {
 Usage: render_monthly_temporal_animation.sh YEAR MONTH
 
 Reads the monthly NPZ produced by monthly_temporal_fit.sh (default location
-data/temporal_coeffs/YYYY/YYYY-MM.npz) and renders hemisphere/global
-animations into plots/temporal/YYYY/YYYY-MM/.
+artifacts/temporal_coeffs/YYYY/YYYY-MM.npz) and renders hemisphere/global
+animations into artifacts/plots/temporal/YYYY/YYYY-MM/.
 
 Environment overrides:
-    INPUT_ROOT             (default: data/temporal_coeffs)
-    OUTPUT_ROOT            (default: plots/temporal)
+    INPUT_ROOT             (default: artifacts/temporal_coeffs)
+    OUTPUT_ROOT            (default: artifacts/plots/temporal)
     ANIMATE_WRITER         (default: pillow)
     FPS                    (default: 10)
     DPI                    (default: 120)
@@ -42,8 +42,8 @@ if ! [[ $month =~ ^[0-9]{1,2}$ ]] || (( month < 1 || month > 12 )); then
 fi
 
 printf -v month_padded "%02d" "$month"
-input_root=${INPUT_ROOT:-data/temporal_coeffs}
-output_root=${OUTPUT_ROOT:-plots/temporal}
+input_root=${INPUT_ROOT:-artifacts/temporal_coeffs}
+output_root=${OUTPUT_ROOT:-artifacts/plots/temporal}
 
 input_path="${input_root}/${year}/${year}-${month_padded}.npz"
 if [[ ! -f ${input_path} ]]; then

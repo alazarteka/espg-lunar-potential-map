@@ -52,7 +52,9 @@ def profile_kappa_fitting():
     end_time = time.time()
 
     pr.disable()
-    pr.dump_stats(config.PROJECT_ROOT / "temp" / "kappa_fitting_profile.prof")
+    profile_path = config.PROJECT_ROOT / "scratch" / "profiles" / "kappa_fitting_profile.prof"
+    profile_path.parent.mkdir(parents=True, exist_ok=True)
+    pr.dump_stats(profile_path)
 
     s = StringIO()
     ps = pstats.Stats(pr, stream=s).strip_dirs().sort_stats("cumulative")

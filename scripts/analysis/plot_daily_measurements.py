@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import PathCollection
 
-DEFAULT_CACHE_DIR = Path("data/potential_cache")
-DEFAULT_OUTPUT_DIR = Path("plots/daily_measurements")
+DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
+DEFAULT_OUTPUT_DIR = Path("artifacts/plots/daily_measurements")
 
 POINT_SIZE_POLAR = 20.0
 POINT_SIZE_GLOBAL = 12.0

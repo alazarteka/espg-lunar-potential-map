@@ -26,6 +26,11 @@ All dependencies are managed through UV and specified in `pyproject.toml`.
 ├── pyproject.toml          # UV project configuration and dependencies
 ├── uv.lock                 # Dependency lock file
 ├── .gitignore              # Git ignore file
+├── artifacts/              # Generated outputs (plots, reports, caches)
+│   ├── plots/              # Figures, animations, HTML exports
+│   ├── reports/            # Generated analysis summaries
+│   └── potential_cache/    # Default output for NPZ caches (was data/potential_cache)
+├── scratch/                # Ad-hoc scratch space for experiments (gitignored)
 ├── data/                   # Processed data (created/populated by src/data_acquisition.py)
 │   └── spice_kernels/      # SPICE kernel files
 │       └── kernels.lock    # SHA-1 for SPICE kernels
@@ -51,6 +56,9 @@ All dependencies are managed through UV and specified in `pyproject.toml`.
         ├── geometry.py
         └── spice_ops.py
 ```
+
+Generated plots and reports now live under `artifacts/`; use `scratch/` for ad-hoc runs
+and exploratory outputs that should stay out of version control.
 
 ## Installation
 
@@ -109,11 +117,11 @@ uv run pytest
 ### Batch potential cache generation
 
 The batch runner in `scripts/dev/potential_mapper_batch.py` processes ER files and
-writes per-file NPZ caches under `data/potential_cache/`. Each cache contains
+writes per-file NPZ caches under `artifacts/potential_cache/`. Each cache contains
 row-aligned spacecraft and surface potentials along with spectrum rollups.
 
 ```bash
-# Compute caches for a single day (writes to data/potential_cache by default)
+# Compute caches for a single day (writes to artifacts/potential_cache by default)
 uv run python scripts/dev/potential_mapper_batch.py \
   --year 1998 --month 9 --day 16 --limit 1 --workers 1
 ```
@@ -134,13 +142,13 @@ Two analysis CLIs load the cached NPZ artefacts for plotting:
 # Static Matplotlib sphere projection
 uv run python scripts/analysis/potential_map_matplotlib_sphere.py \
   --start 1998-09-16 --end 1998-09-16 \
-  --cache-dir data/potential_cache --sample 5000 --output plots/1998-09-16.png
+  --cache-dir artifacts/potential_cache --sample 5000 --output artifacts/plots/1998-09-16.png
 
 # Interactive Plotly globe with optional animation/MP4 export
 uv run python scripts/analysis/potential_map_plotly_static.py \
   --start 1998-09-16 --end 1998-09-16 \
-  --cache-dir data/potential_cache --sample 5000 \
-  --output plots/1998-09-16.html --animate
+  --cache-dir artifacts/potential_cache --sample 5000 \
+  --output artifacts/plots/1998-09-16.html --animate
 ```
 
 For large animations, prefer modest sampling (`--sample`) and frame counts. MP4
@@ -157,7 +165,7 @@ is debiasing the loss-cone fits with the spacecraft charging term:
 uv run python - <<'PY'
 import numpy as np
 from pathlib import Path
-path = Path('data/potential_cache/1998/244_273SEP/3D980916.npz')
+path = Path('artifacts/potential_cache/1998/244_273SEP/3D980916.npz')
 with np.load(path) as data:
     sc = data['rows_spacecraft_potential']
     proj = data['rows_projected_potential']

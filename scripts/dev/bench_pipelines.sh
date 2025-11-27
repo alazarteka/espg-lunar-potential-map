@@ -8,7 +8,7 @@ set -euo pipefail
 
 START_DATE=${1:-1998-01-16}
 DAYS=${2:-3}
-OUT_PATH=${3:-reports/pipeline_benchmark.txt}
+OUT_PATH=${3:-artifacts/reports/pipeline_benchmark.txt}
 
 UV_CACHE_DIR=${UV_CACHE_DIR:-.uv-cache}
 

@@ -6,7 +6,7 @@ Example:
     uv run python scripts/dev/losscone_compare_beam.py \
         --file data/1998/060_090MAR/3D980323.TAB \
         --chunks 0 100 200 300 400 \
-        --output temp/perf_runs/1998-03-23/beam_comparison.csv
+        --output scratch/perf_runs/1998-03-23/beam_comparison.csv
 """
 
 from __future__ import annotations

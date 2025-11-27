@@ -34,19 +34,23 @@ def create_interactive_sphere(
     coeffs: np.ndarray,
     lmax: int,
     n_interp_frames: int = 100,
+    resolution: int = 91,
     output_path: Path | None = None,
 ) -> go.Figure:
     """
     Create interactive 3D sphere with temporal animation.
-    
+
     Args:
         times: Array of datetime64 timestamps
         coeffs: Array of shape (n_windows, n_coeffs) with spherical harmonic coefficients
         lmax: Maximum spherical harmonic degree
         n_interp_frames: Number of interpolated frames for smooth animation
+        resolution: Number of latitude steps (longitude will be 2x)
         output_path: Optional path to save HTML file
     """
     n_windows = len(times)
+    n_lat = resolution
+    n_lon = resolution * 2
     
     # Convert times to hours since start for interpolation
     t0 = times[0]
@@ -242,7 +246,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("plots/interactive_temporal_sphere.html"),
+        default=Path("artifacts/plots/interactive_temporal_sphere.html"),
         help="Output HTML file path",
     )
     parser.add_argument(
@@ -286,6 +290,7 @@ def main() -> int:
         coeffs,
         lmax,
         n_interp_frames=args.frames,
+        resolution=args.resolution,
         output_path=args.output,
     )
     

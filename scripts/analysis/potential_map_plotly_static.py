@@ -15,7 +15,7 @@ import plotly.io as pio
 import src.config as config
 
 # Default cache directory mirrors the batch runner output
-DEFAULT_CACHE_DIR = Path("data/potential_cache")
+DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 
 
 def _parse_iso_date(value: str) -> np.datetime64:

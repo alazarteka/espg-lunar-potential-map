@@ -41,7 +41,7 @@ plt.title("Distribution of Fitting Errors (Chi-Squared) - Raw Data")
 plt.xlabel("Chi-Squared")
 plt.ylabel("Frequency (log scale)")
 plt.grid(True)
-plt.savefig("temp/error_distribution_raw.png")
+plt.savefig("scratch/error_distribution_raw.png")
 
 # Filter out extreme outliers
 outlier_threshold = 1_000_000
@@ -54,7 +54,7 @@ plt.title("Distribution of Fitting Errors (Chi-Squared) - Filtered")
 plt.xlabel("Chi-Squared")
 plt.ylabel("Frequency (log scale)")
 plt.grid(True)
-plt.savefig("temp/error_distribution_filtered.png")
+plt.savefig("scratch/error_distribution_filtered.png")
 
 
 # Print some statistics

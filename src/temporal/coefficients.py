@@ -27,7 +27,7 @@ def _sph_harm(m: int, l: int, phi, theta):
     return sph_harm_y(l, m, theta, phi)
 
 # Default cache directory
-DEFAULT_CACHE_DIR = Path("data/potential_cache")
+DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 DEFAULT_SYNODIC_PERIOD_DAYS = 29.530588
 
 

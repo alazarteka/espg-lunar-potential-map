@@ -228,7 +228,7 @@ if __name__ == "__main__":
     parser.add_argument("--n-dates", type=int, default=15, help="Number of random dates to test")
     parser.add_argument("--chunks-per-date", type=int, default=50, help="Number of chunks per date")
     parser.add_argument("--data-dir", type=Path, default=Path("data"), help="Data directory")
-    parser.add_argument("--output", type=Path, default=Path("temp/beam_amp_sensitivity.png"),
+    parser.add_argument("--output", type=Path, default=Path("scratch/beam_amp_sensitivity.png"),
                         help="Output plot path")
 
     args = parser.parse_args()

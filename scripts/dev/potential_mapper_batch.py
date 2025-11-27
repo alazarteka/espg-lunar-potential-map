@@ -122,7 +122,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("data/potential_cache"),
+        default=Path("artifacts/potential_cache"),
         help="Directory where per-file NPZ results are stored.",
     )
     parser.add_argument("--workers", type=int, default=os.cpu_count() or 1, help="Parallel workers")
