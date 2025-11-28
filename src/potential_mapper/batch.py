@@ -5,9 +5,10 @@ from __future__ import annotations
 # Disable BLAS/LAPACK multi-threading to ensure deterministic results
 # when using multiprocessing. Must be set before numpy is imported.
 import os
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1'
-os.environ['OMP_NUM_THREADS'] = '1'
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
 
 import argparse
 import logging
@@ -174,9 +175,7 @@ def run_batch(
 
     # Process merged data
     try:
-        logging.info(
-            f"Processing merged data (parallel={use_parallel})..."
-        )
+        logging.info(f"Processing merged data (parallel={use_parallel})...")
         results = process_merged_data(er_data, use_parallel=use_parallel)
     except Exception as e:
         logging.exception(f"Failed to process merged data: {e}")
@@ -210,23 +209,12 @@ def _parse_args() -> argparse.Namespace:
         default=Path("artifacts/potential_cache"),
         help="Directory where output NPZ file is stored (default: artifacts/potential_cache)",
     )
+    parser.add_argument("--year", type=int, default=None, help="Optional year filter")
     parser.add_argument(
-        "--year",
-        type=int,
-        default=None,
-        help="Optional year filter"
+        "--month", type=int, default=None, help="Optional month filter (1-12)"
     )
     parser.add_argument(
-        "--month",
-        type=int,
-        default=None,
-        help="Optional month filter (1-12)"
-    )
-    parser.add_argument(
-        "--day",
-        type=int,
-        default=None,
-        help="Optional day filter (1-31)"
+        "--day", type=int, default=None, help="Optional day filter (1-31)"
     )
     parser.add_argument(
         "--no-parallel",
@@ -234,15 +222,10 @@ def _parse_args() -> argparse.Namespace:
         help="Disable parallel fitting (use sequential)",
     )
     parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing output file"
+        "--overwrite", action="store_true", help="Overwrite existing output file"
     )
     parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Enable verbose logging"
+        "-v", "--verbose", action="store_true", help="Enable verbose logging"
     )
     return parser.parse_args()
 

@@ -26,11 +26,12 @@ from src.utils.units import ureg, VoltageType
 def _init_worker_spice():
     """Initialize SPICE kernels in worker process for thread-safety."""
     from src.potential_mapper.spice import load_spice_files
+
     load_spice_files()
 
 
 def spacecraft_potential_worker(
-    args: tuple[int, pd.DataFrame]
+    args: tuple[int, pd.DataFrame],
 ) -> tuple[int, np.ndarray, float | None]:
     """
     Calculate spacecraft potential for one spectrum in parallel.
@@ -68,22 +69,22 @@ def spacecraft_potential_worker(
 def fit_worker(args: tuple[pd.DataFrame, str, np.ndarray]) -> np.ndarray:
     """
     Worker function for parallel fitting.
-    
+
     Args:
         args: Tuple containing (chunk_df, theta_path, sc_pot).
-        
+
     Returns:
         Fitting results array from LossConeFitter.
     """
     chunk_df, theta_path, sc_pot = args
-    
-    # Create ERData from the chunk. 
+
+    # Create ERData from the chunk.
     # Note: This might re-trigger cleaning/counting if not handled in ERData,
     # but for now we assume it's acceptable or handled.
-    # To avoid double-counting if columns exist, we could check in ERData, 
+    # To avoid double-counting if columns exist, we could check in ERData,
     # but here we just pass it.
     er_data = ERData.from_dataframe(chunk_df, "batch_chunk")
-    
+
     # Initialize fitter with the chunk
     fitter = LossConeFitter(
         er_data,
@@ -307,7 +308,9 @@ class DataLoader:
             if month is not None:
                 mm = DataLoader.NUM_TO_MONTH.get(f"{month:02d}")
                 if mm is None:
-                    logging.warning("Month %s not recognized; skipping discovery.", month)
+                    logging.warning(
+                        "Month %s not recognized; skipping discovery.", month
+                    )
                     return False
                 ok &= mm in s
             if day is not None:
@@ -331,35 +334,39 @@ def load_all_data(files: list[Path]) -> ERData:
     """Load and merge all discovered files into a single ERData object."""
     dfs = []
     spec_offset = 0
-    
+
     for f in tqdm(files, desc="Loading files", unit="file"):
         try:
             # Load individual file
             er = ERData(str(f))
             if not er.data.empty:
                 if config.SPEC_NO_COLUMN in er.data.columns:
-                    er.data[config.SPEC_NO_COLUMN] = pd.to_numeric(
-                        er.data[config.SPEC_NO_COLUMN],
-                        errors="coerce",
-                    ).fillna(0).astype(int)
+                    er.data[config.SPEC_NO_COLUMN] = (
+                        pd.to_numeric(
+                            er.data[config.SPEC_NO_COLUMN],
+                            errors="coerce",
+                        )
+                        .fillna(0)
+                        .astype(int)
+                    )
 
                     er.data[config.SPEC_NO_COLUMN] += spec_offset
 
                     max_spec = er.data[config.SPEC_NO_COLUMN].max()
                     if pd.notna(max_spec):
                         spec_offset = max_spec + 1
-                        
+
                 dfs.append(er.data)
         except Exception as e:
             logging.warning(f"Failed to load {f}: {e}")
-    
+
     if not dfs:
         # Return empty ERData without attempting to read a file
         return ERData.from_dataframe(pd.DataFrame(), "empty")
-    
+
     # Concatenate all dataframes
     merged_df = pd.concat(dfs, ignore_index=True)
-    
+
     # Create a new ERData object from the merged dataframe
     # We use a dummy filename since it's a composite
     return ERData.from_dataframe(merged_df, "merged_dataset")
@@ -398,9 +405,7 @@ def process_merged_data(
         or len(ra_vals) == 0
         or len(dec_vals) == 0
     ):
-        raise RuntimeError(
-            "Attitude data unavailable or empty; cannot process file."
-        )
+        raise RuntimeError("Attitude data unavailable or empty; cannot process file.")
 
     # Coordinates and magnetic field projection
     logging.info("Calculating coordinates...")
@@ -442,17 +447,13 @@ def process_merged_data(
         proj_lat_masked[valid_p] = np.rad2deg(
             np.arcsin(p[valid_p, 2] / r_norm_p[valid_p])
         )
-        proj_lon_masked[valid_p] = np.rad2deg(
-            np.arctan2(p[valid_p, 1], p[valid_p, 0])
-        )
+        proj_lon_masked[valid_p] = np.rad2deg(np.arctan2(p[valid_p, 1], p[valid_p, 0]))
         proj_lat[mask] = proj_lat_masked
         proj_lon[mask] = proj_lon_masked
 
     # Sun illumination for spacecraft
     u_lp_to_sun = coord_arrays.lp_vectors_to_sun
-    u_lp_to_sun = u_lp_to_sun / np.linalg.norm(
-        u_lp_to_sun, axis=1, keepdims=True
-    )
+    u_lp_to_sun = u_lp_to_sun / np.linalg.norm(u_lp_to_sun, axis=1, keepdims=True)
     _, sc_shadow_hit = get_intersections_or_none_batch(
         pos=coord_arrays.lp_positions,
         direction=u_lp_to_sun,
@@ -587,11 +588,11 @@ def run(args: argparse.Namespace) -> int:
 
     # Load and merge all data
     er_data = load_all_data(flux_files)
-    
+
     if er_data.data.empty:
         logging.warning("Merged dataset is empty. Exiting.")
         return 1
-        
+
     logging.info(f"Loaded {len(er_data.data)} rows of data.")
 
     try:

@@ -144,7 +144,9 @@ class DataLoader:
             if month is not None:
                 mm = DataLoader.NUM_TO_MONTH.get(f"{month:02d}")
                 if mm is None:
-                    logging.warning("Month %s not recognized; skipping discovery.", month)
+                    logging.warning(
+                        "Month %s not recognized; skipping discovery.", month
+                    )
                     return False
                 ok &= mm in s
             if day is not None:
@@ -187,9 +189,7 @@ def process_lp_file(file_path: Path) -> PotentialResults:
         or len(ra_vals) == 0
         or len(dec_vals) == 0
     ):
-        raise RuntimeError(
-            "Attitude data unavailable or empty; cannot process file."
-        )
+        raise RuntimeError("Attitude data unavailable or empty; cannot process file.")
 
     # Coordinates and magnetic field projection
     coord_calc = CoordinateCalculator(et_spin, ra_vals, dec_vals)

@@ -111,9 +111,7 @@ def sternglass_secondary_yield(
         7.4
         * peak_yield
         * (impact_energy_ev / peak_energy_ev)
-        * np.exp(
-            -2.0 * np.sqrt(np.maximum(impact_energy_ev, 0.0) / peak_energy_ev)
-        )
+        * np.exp(-2.0 * np.sqrt(np.maximum(impact_energy_ev, 0.0) / peak_energy_ev))
     )
     out[impact_energy_ev <= 0.0] = 0.0
     return out
@@ -156,8 +154,8 @@ def calculate_shaded_currents(
     )
 
     # boltzmann constant k = 1.0 when temperature is in eV
-    temperature_corrected_ev = (
-        temperature_uncorrected_ev + spacecraft_potential / (kappa - 1.5)
+    temperature_corrected_ev = temperature_uncorrected_ev + spacecraft_potential / (
+        kappa - 1.5
     )
     # Robustness: if the κ mapping yields a nonphysical ambient temperature,
     # bias the balance toward less-negative U by returning a large positive Ji.
@@ -166,9 +164,7 @@ def calculate_shaded_currents(
         return 0.0, 0.0, large_positive_current
 
     # Calculating Je
-    theta_corrected_m_per_s = temperature_ev_to_theta(
-        temperature_corrected_ev, kappa
-    )
+    theta_corrected_m_per_s = temperature_ev_to_theta(temperature_corrected_ev, kappa)
     omnidirectional_flux = omnidirectional_flux_magnitude(
         density_mag=density_magnitude,  # unitless for normalization,
         kappa=kappa,
@@ -408,8 +404,8 @@ def calculate_potential(
             )
         )
 
-        temperature_corrected_ev = (
-            temperature_uncorrected_ev + spacecraft_potential / (kappa - 1.5)
+        temperature_corrected_ev = temperature_uncorrected_ev + spacecraft_potential / (
+            kappa - 1.5
         )
         theta_corrected_m_per_s = temperature_ev_to_theta(
             temperature_corrected_ev, kappa

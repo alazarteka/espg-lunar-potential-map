@@ -72,7 +72,9 @@ def compute_potential_series(
     return latitudes, longitudes, maps
 
 
-def compute_cell_edges(values: np.ndarray, clamp_min: float, clamp_max: float) -> np.ndarray:
+def compute_cell_edges(
+    values: np.ndarray, clamp_min: float, clamp_max: float
+) -> np.ndarray:
     """Derive cell-edge coordinates from monotonically increasing centers."""
     if values.size == 0:
         raise ValueError("values must contain at least one entry")

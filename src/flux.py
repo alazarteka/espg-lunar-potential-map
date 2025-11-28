@@ -111,9 +111,7 @@ class ERData:
 
             removed_rows = original_rows - len(self.data)
             logger.debug(
-                (
-                    "Removed %d rows (%.1f%%) from %d invalid sweeps"
-                ),
+                ("Removed %d rows (%.1f%%) from %d invalid sweeps"),
                 removed_rows,
                 (removed_rows / original_rows * 100.0),
                 len(invalid_spec_nos),
@@ -151,9 +149,7 @@ class ERData:
             n_negative = np.sum(negative_flux_mask)
             total_values = negative_flux_mask.size
             logger.debug(
-                (
-                    "Found %d negative flux values (%.2f%%) - clamping to zero"
-                ),
+                ("Found %d negative flux values (%.2f%%) - clamping to zero"),
                 n_negative,
                 (n_negative / total_values * 100.0),
             )

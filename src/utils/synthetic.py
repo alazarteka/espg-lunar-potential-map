@@ -109,11 +109,12 @@ def prepare_synthetic_er(
     synthetic_er_data[config.TIME_COLUMN] = (
         pd.to_datetime(synthetic_er_data["UTC"]).astype("int64") // 10**9
     )
-    synthetic_er_data[config.ENERGY_COLUMN] = energy_centers.to(ureg.electron_volt).magnitude
+    synthetic_er_data[config.ENERGY_COLUMN] = energy_centers.to(
+        ureg.electron_volt
+    ).magnitude
     synthetic_er_data[config.SPEC_NO_COLUMN] = 1
 
     np.random.seed(42)
     synthetic_er_data[config.MAG_COLS] = np.random.rand(3)
 
     return ERData.from_dataframe(synthetic_er_data, "synthetic")
-

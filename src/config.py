@@ -70,7 +70,9 @@ LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
 # Beam width: energy bins have width 0.5U, factor of 0.5 gives ~half-bin spread
 LOSS_CONE_BEAM_WIDTH_FACTOR = 0.5  # beam energy width as fraction of |U_surface|
 LOSS_CONE_BEAM_AMP_MIN = 0.0  # lower bound for normalized beam amplitude
-LOSS_CONE_BEAM_AMP_MAX = 100.0  # upper bound (see docs/analysis/beam_amplitude_sensitivity.md)
+LOSS_CONE_BEAM_AMP_MAX = (
+    100.0  # upper bound (see docs/analysis/beam_amplitude_sensitivity.md)
+)
 # Pitch sigma: reasonable angular spread for secondary electron beam
 LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
 
