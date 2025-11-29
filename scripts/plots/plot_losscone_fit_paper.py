@@ -168,7 +168,8 @@ def create_losscone_comparison_plot(
         energies,
         pitches,
         U_surface,
-        bs_bm,
+        U_spacecraft=usc,
+        bs_over_bm=bs_bm,
         beam_width_eV=beam_width,
         beam_amp=beam_amp,
         beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
@@ -177,13 +178,18 @@ def create_losscone_comparison_plot(
     # Interpolate model onto regular grid
     _, _, model_reg = interpolate_to_regular_grid(energies, pitches, model_irregular)
 
-    # Calculate loss cone boundary
+    # Calculate loss cone boundary (with spacecraft potential correction)
     loss_cone_angle = []
     for E in energies:
         if E <= 0:
             loss_cone_angle.append(np.nan)
             continue
-        x = bs_bm * (1.0 + U_surface / E)
+        # Apply spacecraft potential correction: E_plasma = E_measured - U_spacecraft
+        E_corrected = E - usc
+        if E_corrected <= 0:
+            loss_cone_angle.append(np.nan)
+            continue
+        x = bs_bm * (1.0 + U_surface / E_corrected)
         if x <= 0:
             ac = 0.0
         elif x >= 1:
@@ -304,9 +310,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--normalization",
-        choices=["global", "ratio"],
+        choices=["global", "ratio", "ratio2"],
         default="global",
-        help="Normalization mode: global max or reflected/incident ratio",
+        help="Normalization mode: global (max incident flux), ratio (per-energy mean), ratio2 (pairwise incident/reflected)",
     )
     parser.add_argument(
         "--fixed-beam-amp",

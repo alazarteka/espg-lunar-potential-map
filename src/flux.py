@@ -313,6 +313,7 @@ class LossConeFitter:
             normalization_mode (str): How to normalize flux for fitting.
                 - "global": divide entire 2D array by max incident flux (default)
                 - "ratio": per-energy ratio of reflected/incident flux
+                - "ratio2": pairwise normalization (incident→1, reflected→reflected/incident)
             beam_amp_fixed (float | None): If set, fix the Gaussian beam amplitude
                 to this value instead of fitting it.
         """
@@ -331,7 +332,7 @@ class LossConeFitter:
             self.beam_amp_max = beam_amp_fixed
         self.beam_pitch_sigma_deg = config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG
 
-        if normalization_mode not in {"global", "ratio"}:
+        if normalization_mode not in {"global", "ratio", "ratio2"}:
             raise ValueError(f"Unknown normalization_mode: {normalization_mode}")
         self.normalization_mode = normalization_mode
 
@@ -405,7 +406,10 @@ class LossConeFitter:
         """
         Build a 2D normalized flux distribution for a specific measurement chunk.
 
-        Uses either 'global' (max incident flux) or 'ratio' (per-energy) normalization.
+        Normalization modes:
+        - 'global': divide entire 2D array by max incident flux
+        - 'ratio': divide each energy by its own mean incident flux
+        - 'ratio2': pairwise normalization (incident→1.0, reflected→reflected/incident)
 
         Args:
             measurement_chunk (int): The index of the measurement chunk.
@@ -417,12 +421,74 @@ class LossConeFitter:
             not self.er_data.data.empty
         ), "Data not loaded. Please load the data first."
 
-        norm2d = np.vstack(
-            [
-                self._get_normalized_flux(energy_bin, measurement_chunk)
-                for energy_bin in range(config.SWEEP_ROWS)
-            ]
-        )
+        if self.normalization_mode == "ratio":
+            # Per-energy normalization: divide each energy by its own incident flux
+            norm2d = np.vstack(
+                [
+                    self._get_normalized_flux(energy_bin, measurement_chunk)
+                    for energy_bin in range(config.SWEEP_ROWS)
+                ]
+            )
+        elif self.normalization_mode == "ratio2":
+            # Pairwise normalization: mirror incident/reflected angles around 90°
+            # Each reflected angle normalized by its corresponding incident angle
+            s = measurement_chunk * config.SWEEP_ROWS
+            e = min((measurement_chunk + 1) * config.SWEEP_ROWS, len(self.er_data.data))
+
+            flux_2d = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[s:e]
+            pitches_2d = self.pitch_angle.pitch_angles[s:e]
+
+            nE, nPitch = flux_2d.shape
+            norm2d = np.full_like(flux_2d, np.nan)
+
+            # For each energy, find midpoint (≈90°) and pair up angles
+            for row in range(nE):
+                pitch_row = pitches_2d[row]
+                flux_row = flux_2d[row]
+
+                # Find index closest to 90°
+                mid = np.argmin(np.abs(pitch_row - 90.0))
+
+                # Pair up angles symmetrically around midpoint
+                for k in range(mid):
+                    i_inc = k                      # incident index (pitch < 90°)
+                    i_ref = (2 * mid - 1) - k     # reflected index (pitch > 90°), mirrored
+
+                    # Ensure reflected index is valid
+                    if i_ref >= nPitch:
+                        continue
+
+                    denom = flux_row[i_inc]
+                    if denom <= 0 or not np.isfinite(denom):
+                        norm2d[row, i_inc] = np.nan
+                        norm2d[row, i_ref] = np.nan
+                    else:
+                        norm2d[row, i_inc] = 1.0                        # incident = 1
+                        norm2d[row, i_ref] = flux_row[i_ref] / denom   # reflected/incident
+
+                # Handle bin at exactly 90° (set to 1.0)
+                if mid < nPitch:
+                    norm2d[row, mid] = 1.0
+
+        else:  # "global"
+            # Global normalization: divide entire 2D array by maximum incident flux
+            # First build the 2D flux array
+            s = measurement_chunk * config.SWEEP_ROWS
+            e = min((measurement_chunk + 1) * config.SWEEP_ROWS, len(self.er_data.data))
+
+            flux_2d = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[s:e]
+            pitches_2d = self.pitch_angle.pitch_angles[s:e]
+
+            # Find maximum incident flux across all energies
+            incident_mask = pitches_2d < 90
+            incident_flux_vals = flux_2d[incident_mask]
+            incident_flux_vals = incident_flux_vals[incident_flux_vals > 0]  # Remove zeros/negatives
+
+            if len(incident_flux_vals) == 0:
+                return np.full((config.SWEEP_ROWS, config.CHANNELS), np.nan)
+
+            global_incident_flux = float(np.max(incident_flux_vals))
+            norm2d = flux_2d / max(global_incident_flux, config.EPS)
 
         return norm2d
 
@@ -536,19 +602,26 @@ class LossConeFitter:
             diff = np.log(norm2d + eps) - np.log(model + eps)
             return np.sum(diff * diff)
 
+        # Use Nelder-Mead (unbounded but robust)
+        # Note: Bounded optimizers (L-BFGS-B, Powell) had numerical issues with this objective
         result = minimize(
             chi2_scalar,
             x0,
             method="Nelder-Mead",
             options=dict(maxiter=200, xatol=1e-3, fatol=1e-3),
         )
+
         if not result.success:
             # Fallback to x0 if optimization fails (rare)
             return float(x0[0]), float(x0[1]), float(x0[2]), float(best_lhs_chi2)
 
         U_surface, bs_over_bm, beam_amp = result.x
+
+        # Clip to physical bounds (done post-optimization since bounded optimizers struggled)
+        bs_over_bm = float(np.clip(bs_over_bm, 0.1, 1.0))
         beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
-        return float(U_surface), float(bs_over_bm), beam_amp, float(result.fun)
+
+        return float(U_surface), bs_over_bm, beam_amp, float(result.fun)
 
     def fit_surface_potential(self) -> np.ndarray:
         """

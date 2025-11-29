@@ -109,10 +109,11 @@ def synth_losscone(
     # Apply mask only where energies are valid
     final_mask = mask & valid_E_exp
     model[final_mask] = 1.0
+    # model[~final_mask] = 0.001  # Small value instead of zero
 
     # Add beam component
     if np.any(beam_width_eV > 0):
-        beam_center = np.maximum(np.abs(U_surface), beam_width_eV)
+        beam_center = np.maximum(np.abs(U_surface - U_spacecraft), beam_width_eV)
         beam = beam_amp * np.exp(
             -0.5 * ((E_safe_exp - beam_center) / beam_width_eV) ** 2
         )

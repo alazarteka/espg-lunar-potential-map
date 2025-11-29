@@ -8,10 +8,10 @@ Match the Halekas et al. (2008) loss cone fitting results for validating our imp
 **Source**: Figure 5, page 8 of Halekas et al. (2008) JGR paper
 
 **Exact quote from caption**:
-> "Normalized energy pitch angle distribution measured at 14:45 UT on 29 April 1999, with best fit synthetic distribution (on right) from automated surface potential determination. The best fit uses the spacecraft potential USC = −11 V and finds that the lunar surface potential UM = −160 V and the magnetic field ratio BS/BM = 0.975."
+> "Normalized energy pitch angle distribution measured at 14:45 UT on 29 April 1999, with best fit synthetic distribution (on right) from automated surface potential determination. The best fit uses the spacecraft potential USC = 11 V and finds that the lunar surface potential UM = −160 V and the magnetic field ratio BS/BM = 0.975."
 
 **Expected results**:
-- Spacecraft potential: USC = −11 V (note: minus sign)
+- Spacecraft potential: USC = +11 V (positive, per caption)
 - Lunar surface potential: UM = −160 V
 - Magnetic field ratio: BS/BM = 0.975
 - Timestamp: 14:45 UT on 29 April 1999 (UTC: 925397048.0)
@@ -21,249 +21,65 @@ Match the Halekas et al. (2008) loss cone fitting results for validating our imp
 - Spectrum number: 653
 - Timestamp: 925397048.0 (matches!)
 
-## Experiments
+## Experiments (caption-correct USC = +11 V)
 
-### Experiment 1: Original Implementation (Per-Energy Normalization, No SC Correction)
-**Date**: 2025-11-28
+All runs use spec_no=653 from `data/1999/091_120APR/3D990429.TAB`. Target: UM = −160 V, BS/BM = 0.975, USC = +11 V.
 
-**Method**:
-- Per-energy normalization: each energy row normalized by mean(incident_flux) at that energy
-- No spacecraft potential correction
-- Code: `_get_normalized_flux()` divides by `mean(flux[pitch < 90])`
+| Experiment | Normalization | USC [V] | U_surface [V] | BS/BM | beam_amp | χ² |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Per-energy (ratio) | None | -802.5 | 0.999 | 13.875 | 19502 |
+| 2 | Global | None | -236.6 | 1.200 | 1.071 | 51877 |
+| 3 | Global | -11 | -82.5 | 0.983 | 11.875 | 57739 |
+| 4 | Global | +11 (expected sign) | -247.3 | 1.404 | 0.900 | 51697 |
+| 5 | Per-energy (ratio) | -11 | -982.6 | 1.115 | 9.217 | 17069 |
+| 6 | Global | -11 (same as 3) | -82.5 | 0.983 | 11.875 | 57739 |
 
-**Results**:
+Key takeaways:
+- Expected setup (global, USC=+11) does not hit the target; U_surface is ~−247 V and BS/BM ~1.404.
+- Best BS/BM (~0.983) occurs with the wrong sign (USC=−11) and global normalization, but U_surface is far off.
+- Per-energy (“ratio”) normalization drives U_surface very negative and remains incompatible.
+- Bottom line: correcting the USC sign alone does not reconcile our fits with Figure 5; likely culprits include spectrum mismatch, energy calibration, beam handling, or normalization details beyond max/ratio.
+
+## CONCLUSIONS (updated with caption USC = +11 V)
+
+- None of the configurations reproduce the Figure 5 target (UM = −160 V, BS/BM = 0.975) when using USC = +11 V.
+- Global normalization retains energy structure better than per-energy, but with USC = +11 V it overshoots BS/BM (~1.4) and U_surface (~−247 V).
+- A deeper mismatch remains (possible spectrum mismatch, energy calibration, beam handling differences, or normalization details beyond the max/ratio tested here).
+
+## Updated quick check with corrected caption sign (USC = +11 V)
+
+Halekas-style settings (ratio normalization, USC=+11 V, fixed beam_amp=1):
+
 ```
-U_surface = -802.5 V
-Bs/Bm = 0.999
-beam_amp = 13.875
-χ² = 19502.10
-```
-
-**Analysis**:
-- U_surface is 5x too negative (-802V vs -160V expected)
-- Bs/Bm is slightly off (0.999 vs 0.975 expected)
-- Per-energy normalization destroys energy-dependent flux structure that encodes U_surface
-
----
-
-### Experiment 2: Global Normalization, No SC Correction
-**Date**: 2025-11-28
-
-**Method**:
-- Global normalization: entire 2D array normalized by max(all incident fluxes)
-- No spacecraft potential correction
-- Code: `norm2d = flux_2d / np.nanmax(incident_fluxes)`
-
-**Results**:
-```
-U_surface = -236.6 V
-Bs/Bm = 1.200
-beam_amp = 1.071
-χ² = 51877.09
+uv run python scripts/plots/plot_losscone_fit_paper.py \
+  --input data/1999/091_120APR/3D990429.TAB \
+  --spec-no 653 \
+  --output scratch/losscone_paper_mode.png \
+  --paper-mode
 ```
 
-**Analysis**:
-- U_surface much better! (-237V vs -160V expected, ~1.5x off)
-- Bs/Bm worse (1.200 vs 0.975)
-- Global normalization preserves energy structure, critical for U_surface fitting
-
----
-
-### Experiment 3: Global Normalization + USC = -11V
-**Date**: 2025-11-28
-
-**Method**:
-- Global normalization: `norm2d = flux_2d / np.nanmax(incident_fluxes)`
-- Spacecraft potential correction: USC = -11V (as stated in Halekas paper)
-- Energy correction: `energies = energies - sc_value` (line 502 in flux.py)
-
-**Results**:
+Result:
 ```
-U_surface = -82.5 V
-Bs/Bm = 0.983
-beam_amp = 11.875
-χ² = 57738.71
+U_surface = -1138.6 V
+Bs/Bm    = 1.137
+beam_amp = 1.000 (fixed)
+χ²       = 16892
 ```
 
-**Analysis**:
-- **Bs/Bm nearly perfect!** (0.983 vs 0.975, only 0.8% error)
-- U_surface now ~2x too small in magnitude (-82.5V vs -160V)
-- Best Bs/Bm fit of all experiments
+The mismatch to the target persists even with USC = +11 V.
 
----
+## Appendix: legacy runs under misread USC = −11 V (traceability only)
 
-### Experiment 4: Global Normalization + USC = +11V
-**Date**: 2025-11-28
+These pre-correction runs assumed USC = −11 V. They motivated the global-normalization change but were based on the wrong caption sign.
 
-**Method**:
-- Global normalization
-- Spacecraft potential correction: USC = +11V (testing sign interpretation)
-- Energy correction: `energies = energies - sc_value`
+1) Per-energy, no SC: U=-802.5 V, Bs/Bm=0.999, beam=13.875, χ²=19502  
+2) Global, no SC: U=-236.6 V, Bs/Bm=1.200, beam=1.071, χ²=51877  
+3) Global, USC=-11: U=-82.5 V, Bs/Bm=0.983, beam=11.875, χ²=57739  
+4) Global, USC=+11: U=-247.3 V, Bs/Bm=1.404, beam=0.900, χ²=51697  
+5) Per-energy, USC=-11: U=-982.6 V, Bs/Bm=1.115, beam=9.217, χ²=17069  
+6) Global, USC=-11 with reversed energy sign: U=-247.3 V, Bs/Bm=1.404, beam=0.900, χ²=51697
 
-**Results**:
-```
-U_surface = -247.3 V
-Bs/Bm = 1.404
-beam_amp = 0.900
-χ² = 51697.45
-```
-
-**Analysis**:
-- U_surface further from expected (-247V vs -160V)
-- Bs/Bm much worse (1.404 vs 0.975)
-- Confirms USC = -11V (negative) is correct
-
----
-
-### Experiment 5: Per-Energy Normalization + USC = -11V
-**Date**: 2025-11-28
-
-**Method**:
-- Per-energy normalization (original approach)
-- Spacecraft potential correction: USC = -11V
-
-**Results**:
-```
-U_surface = -982.6 V
-Bs/Bm = 1.115
-beam_amp = 9.217
-χ² = 17069.23
-```
-
-**Analysis**:
-- Worse than Experiment 1 (without SC correction!)
-- Per-energy normalization fundamentally incompatible with SC correction
-- Confirms global normalization is the correct approach
-
----
-
-### Experiment 6: Global Normalization + USC = -11V with REVERSED Sign
-**Date**: 2025-11-28
-
-**Method**:
-- Global normalization
-- Spacecraft potential: USC = -11V
-- **Energy correction REVERSED**: `energies = energies + sc_value` (changed from minus)
-- Code change in flux.py line 503
-
-**Results**:
-```
-U_surface = -247.3 V
-Bs/Bm = 1.404
-beam_amp = 0.900
-χ² = 51697.45
-```
-
-**Analysis**:
-- **IDENTICAL to Experiment 4!** (USC = +11V with minus sign)
-- Confirms: `E - (-11V) = E + 11V` and `E + (-11V) = E - 11V`
-- Original code with USC=-11V effectively adds 11eV → Best results (Bs/Bm = 0.983)
-- Reversed code with USC=-11V effectively subtracts 11eV → Worse results (Bs/Bm = 1.404)
-
-**Conclusion**:
-Original sign convention (`energies - sc_value`) with USC = -11V gives best fit.
-This means we're effectively adding 11eV to measured energies, which is physically correct
-if electrons LOSE 11eV falling into negative spacecraft potential well.
-
----
-
-## Summary of Findings
-
-### Key Insights
-
-1. **Normalization Method Critical**:
-   - Per-energy normalization destroys energy-dependent flux structure
-   - Global normalization (by max incident flux) preserves structure needed for U_surface fitting
-
-2. **Spacecraft Potential Sign**:
-   - USC = -11V gives best Bs/Bm fit (0.983 vs 0.975)
-   - USC = +11V gives worse results
-   - Halekas paper says "USC = −11 V" (minus sign present)
-
-3. **Best Configuration**:
-   - Global normalization + USC = -11V
-   - Achieves Bs/Bm = 0.983 (0.8% error from expected 0.975)
-   - U_surface = -82.5V (still ~2x smaller magnitude than expected -160V)
-
-### Remaining Discrepancies and Sign Convention Analysis
-
-**CRITICAL OBSERVATION**: Paper clearly states USC = −11V (verified negative sign in caption line 11)
-
-**Our Implementation**:
-```python
-# In flux.py line 502:
-energies = energies - sc_value
-# If sc_value = -11V:
-# energies = energies - (-11) = energies + 11V
-```
-
-**Physics of Spacecraft Potential**:
-- Spacecraft at USC = -11V means spacecraft is 11V below plasma potential
-- Electrons measured at spacecraft have already fallen UP this 11V potential well
-- To get original plasma energy: E_plasma = E_measured - |gain| = E_measured - 11V
-- Our code does: E = E - sc_value = E - (-11) = E + 11V ← **THIS IS BACKWARDS!**
-
-**Expected vs Observed**:
-```
-If spacecraft is at -11V (negative):
-  Electrons GAIN 11eV falling into spacecraft
-  Measured energy is 11eV HIGHER than plasma energy
-  Correction: E_plasma = E_measured - 11V
-  Our code does: E = E_measured + 11V  ← WRONG!
-```
-
-**Empirical Results**:
-- USC = -11V (our current code adds 11V): Best Bs/Bm = 0.983 ✓
-- USC = +11V (our code subtracts 11V): Worse Bs/Bm = 1.404 ✗
-
-**This suggests**:
-1. Either our sign convention is backwards (code should be `energies = energies + sc_value` not minus)
-2. OR Halekas uses opposite sign convention (their USC = -11V means +11V in standard convention)
-3. OR there's a deeper implementation issue
-
-**U_surface still off by ~2x**: (-82.5V vs -160V expected)
-
-Possible explanations:
-1. **Sign error compounds**: Spacecraft potential error affects U_surface by 2x somehow?
-2. **Different spectrum**: Though timestamp matches, spec_no 653 might not be Figure 5 spectrum
-3. **Different fitting bounds**: Our LHS samples [-1000V, +1000V], Halekas might use different range
-4. **Beam model differences**: Our beam_amp = 11.875, width and sigma might differ
-5. **Normalization differs from Halekas**: Our global max might not match their approach exactly
-6. **Energy correction applied wrong**: Should be `E + sc_value` not `E - sc_value`?
-
-**Next Steps**:
-1. ✅ **DONE**: Tested reversing sign (Experiment 6) - confirmed original is correct
-2. ⚠️ Review Halekas section 4 (pages 4-6) on spacecraft potential determination method
-3. ⚠️ Check Halekas section 5.1 (pages 7-8) for exact energy correction formula
-4. ⚠️ Verify which spectrum corresponds to Figure 5 (timestamp matches but is it spec_no 653?)
-5. ⚠️ Compare our loss cone equation implementation line-by-line with Halekas Equation 2
-6. ⚠️ Test multiple spectra to see if 2x error is systematic or varies
-7. ⚠️ Check if 2x discrepancy relates to factor-of-2 in some formula (beam width? normalization?)
-
-## CONCLUSIONS
-
-**What Works**:
-1. ✅ Global normalization (normalize by max incident flux across all energies)
-2. ✅ Spacecraft potential correction with USC = -11V (as stated in paper)
-3. ✅ Sign convention: `energies = energies - sc_value` (original implementation)
-4. ✅ Bs/Bm = 0.983 matches expected 0.975 within 0.8% error
-
-**What Doesn't Work**:
-1. ❌ Per-energy normalization (destroys energy structure)
-2. ❌ No spacecraft potential correction (gets U_surface 5x wrong)
-3. ❌ Wrong sign for spacecraft potential (USC = +11V or reversed equation)
-
-**Remaining Mystery**:
-- U_surface = -82.5V vs expected -160V (off by factor of ~1.94)
-- Bs/Bm nearly perfect suggests geometry/magnetic field handling is correct
-- U_surface error suggests energy scale or normalization issue
-- Possible causes:
-  * Different spectrum being analyzed
-  * Factor-of-2 error in beam model or normalization
-  * Energy calibration offset
-  * Different fitting methodology details
-
-## Code Changes Made
+## Code Changes (historical)
 
 ### `src/flux.py::build_norm2d()`
 Changed from per-energy to global normalization:

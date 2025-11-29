@@ -35,7 +35,7 @@ temp/
 .ropeproject/
 *.swp
 *.swo
-*~
+*~ 
 .pytest_cache/
 .ruff_cache/
 
@@ -71,7 +71,6 @@ results/
 gitingest/
 potential_timeseries*.html
 artifacts/plots/
-plots/
 artifacts/potential_cache/
 artifacts/temporal_coeffs/
 artifacts/reports/monthly/
