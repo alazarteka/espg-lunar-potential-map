@@ -310,9 +310,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--normalization",
-        choices=["global", "ratio", "ratio2"],
+        choices=["global", "ratio", "ratio2", "ratio_rescaled"],
         default="global",
-        help="Normalization mode: global (max incident flux), ratio (per-energy mean), ratio2 (pairwise incident/reflected)",
+        help="Normalization mode: global (max incident), ratio (per-energy), ratio2 (pairwise), ratio_rescaled (ratio then rescale to [0,1])",
     )
     parser.add_argument(
         "--fixed-beam-amp",

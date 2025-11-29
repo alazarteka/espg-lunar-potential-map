@@ -190,11 +190,11 @@ def create_3panel_debug_plot(
     if normalization == "ratio2":
         # ratio2: incident=1, reflected=ratio (can be > 1)
         vmin2, vmax2 = 0, np.nanmax([2.0, np.nanpercentile(norm_reg, 99)])
-    elif normalization == "global":
-        # global: scaled by max, values in [0, 1]
+    elif normalization in ("global", "ratio_rescaled"):
+        # global and ratio_rescaled: scaled to [0, 1]
         vmin2, vmax2 = 0, 1
     else:  # ratio
-        # ratio: per-energy, typically near 1
+        # ratio: per-energy, typically near 1 but can exceed
         vmin2, vmax2 = 0, np.nanmax([2.0, np.nanpercentile(norm_reg, 99)])
 
     im2 = ax2.pcolormesh(
@@ -305,7 +305,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--normalization",
-        choices=["global", "ratio", "ratio2"],
+        choices=["global", "ratio", "ratio2", "ratio_rescaled"],
         default="global",
         help="Normalization mode",
     )

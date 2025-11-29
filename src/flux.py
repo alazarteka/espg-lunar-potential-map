@@ -314,6 +314,7 @@ class LossConeFitter:
                 - "global": divide entire 2D array by max incident flux (default)
                 - "ratio": per-energy ratio of reflected/incident flux
                 - "ratio2": pairwise normalization (incident→1, reflected→reflected/incident)
+                - "ratio_rescaled": per-energy ratio, then rescale to [0, 1]
             beam_amp_fixed (float | None): If set, fix the Gaussian beam amplitude
                 to this value instead of fitting it.
         """
@@ -332,7 +333,7 @@ class LossConeFitter:
             self.beam_amp_max = beam_amp_fixed
         self.beam_pitch_sigma_deg = config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG
 
-        if normalization_mode not in {"global", "ratio", "ratio2"}:
+        if normalization_mode not in {"global", "ratio", "ratio2", "ratio_rescaled"}:
             raise ValueError(f"Unknown normalization_mode: {normalization_mode}")
         self.normalization_mode = normalization_mode
 
@@ -410,6 +411,7 @@ class LossConeFitter:
         - 'global': divide entire 2D array by max incident flux
         - 'ratio': divide each energy by its own mean incident flux
         - 'ratio2': pairwise normalization (incident→1.0, reflected→reflected/incident)
+        - 'ratio_rescaled': per-energy ratio, then rescale to [0, 1]
 
         Args:
             measurement_chunk (int): The index of the measurement chunk.
@@ -469,6 +471,25 @@ class LossConeFitter:
                 # Handle bin at exactly 90° (set to 1.0)
                 if mid < nPitch:
                     norm2d[row, mid] = 1.0
+
+        elif self.normalization_mode == "ratio_rescaled":
+            # Two-step hybrid: per-energy ratio, then global rescale to [0, 1]
+            # Step 1: Per-energy normalization (same as "ratio")
+            norm2d = np.vstack(
+                [
+                    self._get_normalized_flux(energy_bin, measurement_chunk)
+                    for energy_bin in range(config.SWEEP_ROWS)
+                ]
+            )
+
+            # Step 2: Global rescale to [0, 1]
+            # Find max across all finite values
+            finite_vals = norm2d[np.isfinite(norm2d)]
+            if len(finite_vals) > 0:
+                global_max = np.max(finite_vals)
+                if global_max > 0:
+                    norm2d = norm2d / global_max
+            # Now norm2d is in [0, 1] while preserving ratio structure
 
         else:  # "global"
             # Global normalization: divide entire 2D array by maximum incident flux
