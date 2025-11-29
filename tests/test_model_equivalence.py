@@ -91,8 +91,12 @@ def test_model_equivalence_randomized(seed):
     )
     
     vec_result = synth_losscone(
-        energy_grid, pitch_grid, U_surface, bs_over_bm,
-        beam_width, beam_amp, beam_pitch_sigma
+        energy_grid, pitch_grid, U_surface,
+        U_spacecraft=0.0,
+        bs_over_bm=bs_over_bm,
+        beam_width_eV=beam_width,
+        beam_amp=beam_amp,
+        beam_pitch_sigma_deg=beam_pitch_sigma
     )
     
     # Assert equivalence
@@ -116,13 +120,13 @@ def test_model_equivalence_edge_cases():
     # If pitch is 0, model should be 1.
     
     ref = reference_synth_losscone(energy_grid, pitch_grid, 0.0, 1.0)
-    vec = synth_losscone(energy_grid, pitch_grid, 0.0, 1.0)
+    vec = synth_losscone(energy_grid, pitch_grid, 0.0, U_spacecraft=0.0, bs_over_bm=1.0)
     np.testing.assert_allclose(ref, vec)
-    
+
     # Case 2: U_surface makes x < 0 (full loss cone)
     # x < 0 -> ac=0 -> mask: pitch <= 180.
     # All 1s.
-    vec = synth_losscone(energy_grid, pitch_grid, -200.0, 1.0)
+    vec = synth_losscone(energy_grid, pitch_grid, -200.0, U_spacecraft=0.0, bs_over_bm=1.0)
     np.testing.assert_allclose(ref, vec)
 
 
@@ -146,16 +150,20 @@ def test_model_batch_equivalence():
     
     # Run batch
     batch_result = synth_losscone(
-        energy_grid, pitch_grid, U_surfaces, bs_over_bms,
+        energy_grid, pitch_grid, U_surfaces,
+        U_spacecraft=0.0,
+        bs_over_bm=bs_over_bms,
         beam_width_eV=beam_width,
         beam_amp=beam_amps,
         beam_pitch_sigma_deg=beam_pitch_sigma
     )
-    
+
     # Run individual
     for i in range(n_batch):
         individual_result = synth_losscone(
-            energy_grid, pitch_grid, U_surfaces[i], bs_over_bms[i],
+            energy_grid, pitch_grid, U_surfaces[i],
+            U_spacecraft=0.0,
+            bs_over_bm=bs_over_bms[i],
             beam_width_eV=beam_width,
             beam_amp=beam_amps[i],
             beam_pitch_sigma_deg=beam_pitch_sigma

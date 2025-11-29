@@ -297,6 +297,8 @@ class LossConeFitter:
         thetas: str,
         pitch_angle: PitchAngle | None = None,
         spacecraft_potential: np.ndarray | None = None,
+        normalization_mode: str = "global",
+        beam_amp_fixed: float | None = None,
     ):
         """
         Initialize the LossConeFitter class with the ER data and theta values.
@@ -307,8 +309,12 @@ class LossConeFitter:
             pitch_angle (PitchAngle, optional): Pre-computed pitch angle
                 object. If None, creates a new one.
             spacecraft_potential (np.ndarray | None): Optional per-row spacecraft
-                potential [V] aligned with `er_data.data`; used to shift energies
-                during the surface fit following Halekas et al.
+                potential [V] aligned with `er_data.data`; used in synthetic model.
+            normalization_mode (str): How to normalize flux for fitting.
+                - "global": divide entire 2D array by max incident flux (default)
+                - "ratio": per-energy ratio of reflected/incident flux
+            beam_amp_fixed (float | None): If set, fix the Gaussian beam amplitude
+                to this value instead of fitting it.
         """
         self.er_data = er_data
         self.thetas = np.loadtxt(thetas, dtype=np.float64)
@@ -320,7 +326,14 @@ class LossConeFitter:
         self.beam_width_factor = config.LOSS_CONE_BEAM_WIDTH_FACTOR
         self.beam_amp_min = config.LOSS_CONE_BEAM_AMP_MIN
         self.beam_amp_max = config.LOSS_CONE_BEAM_AMP_MAX
+        if beam_amp_fixed is not None:
+            self.beam_amp_min = beam_amp_fixed
+            self.beam_amp_max = beam_amp_fixed
         self.beam_pitch_sigma_deg = config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG
+
+        if normalization_mode not in {"global", "ratio"}:
+            raise ValueError(f"Unknown normalization_mode: {normalization_mode}")
+        self.normalization_mode = normalization_mode
 
         self.lhs = self._generate_latin_hypercube()
 
@@ -383,31 +396,23 @@ class LossConeFitter:
         if not incident_mask.any():
             return np.full_like(electron_flux, np.nan)
 
-        # Get the angles and fluxes for the incident and reflected regions
         incident_flux = float(
             max(config.EPS, float(np.mean(electron_flux[incident_mask])))
         )
-        normalized_flux = electron_flux / incident_flux
-
-        # It's weird to normalize only the reflected flux
-        # Combine the incident and reflected fluxes
-        # combined_flux: np.ndarray = np.zeros_like(electron_flux)
-        # combined_flux[incident_mask] = electron_flux[incident_mask]
-        # combined_flux[reflected_mask] = normalized_flux
-        return normalized_flux
+        return electron_flux / incident_flux
 
     def build_norm2d(self, measurement_chunk: int) -> np.ndarray:
         """
         Build a 2D normalized flux distribution for a specific measurement chunk.
 
+        Uses either 'global' (max incident flux) or 'ratio' (per-energy) normalization.
+
         Args:
             measurement_chunk (int): The index of the measurement chunk.
 
         Returns:
-            np.ndarray: The 2D normalized flux distribution for the specified
-                measurement chunk.
+            np.ndarray: The 2D normalized flux distribution.
         """
-        # Check if data is loaded
         assert (
             not self.er_data.data.empty
         ), "Data not loaded. Please load the data first."
@@ -440,18 +445,15 @@ class LossConeFitter:
         """
         assert not self.er_data.data.empty, "Data not loaded."
 
-        # Prepare data for the chunk
         eps = 1e-6
         norm2d = self.build_norm2d(measurement_chunk)
 
-        # Check if we have valid data
         if np.isnan(norm2d).all():
             return np.nan, np.nan, np.nan, np.nan
 
         s = measurement_chunk * config.SWEEP_ROWS
         e = (measurement_chunk + 1) * config.SWEEP_ROWS
 
-        # Ensure indices are within bounds
         max_rows = len(self.er_data.data)
         if s >= max_rows:
             return np.nan, np.nan, np.nan, np.nan
@@ -461,30 +463,16 @@ class LossConeFitter:
             s:e
         ]
 
-        # When spacecraft charging is available, remove it from the observed
-        # energies so U_surface represents the actual lunar surface potential.
-
-        if self.spacecraft_potential is not None and self.spacecraft_potential.size:
-            chunk_sc = self.spacecraft_potential[s:e]
-            finite_sc = np.isfinite(chunk_sc)
-            if np.any(finite_sc):
-                sc_value = float(np.nanmedian(chunk_sc[finite_sc]))
-                energies = energies - sc_value
-                energies = np.clip(energies, config.EPS, None)
-
-        # Ensure pitch angles exist for this range
         if self.pitch_angle.pitch_angles is None or s >= len(
             self.pitch_angle.pitch_angles
         ):
             return np.nan, np.nan, np.nan, np.nan
         pitches = self.pitch_angle.pitch_angles[s:e]
 
-        # Adjust norm2d size if needed
         actual_rows = e - s
         if norm2d.shape[0] > actual_rows:
             norm2d = norm2d[:actual_rows]
 
-        # 1) Vectorized Latin-hypercube global scan
         # self.lhs is (N_samples, 3) -> [U_surface, bs_over_bm, beam_amp]
         lhs_U_surface = self.lhs[:, 0]
         lhs_bs_over_bm = self.lhs[:, 1]
@@ -492,56 +480,35 @@ class LossConeFitter:
 
         # Calculate beam widths for all samples
         # beam_width = max(abs(U_surface) * factor, EPS)
-        lhs_beam_width = np.maximum(np.abs(lhs_U_surface) * self.beam_width_factor, config.EPS)
-        
+        lhs_beam_width = np.maximum(
+            np.abs(lhs_U_surface) * self.beam_width_factor, config.EPS
+        )
+
         # Evaluate models in batch: (N_samples, nE, nPitch)
         # Note: synth_losscone handles broadcasting
         models = synth_losscone(
-            energies,
-            pitches,
-            lhs_U_surface,
-            lhs_bs_over_bm,
-            beam_width_eV=lhs_beam_width, # This needs to be handled if passed as array?
-            # Wait, synth_losscone signature for beam_width_eV is float in my previous edit?
-            # Let me check synth_losscone again.
-            # I updated it to handle beam_width_eV if it's passed as array?
-            # Actually, in my previous edit I didn't explicitly handle array beam_width_eV in the signature type hint,
-            # but I used `beam_center = np.maximum(np.abs(U_surface), beam_width_eV)`.
-            # If beam_width_eV is array (N,), and U_surface is (N,1,1), then max might broadcast?
-            # Let's assume beam_width_eV should be broadcastable.
-            # If lhs_beam_width is (N,), I should reshape it to (N, 1, 1) to match U_surface.
+            energy_grid=energies,
+            pitch_grid=pitches,
+            U_surface=lhs_U_surface,
+            U_spacecraft=self.spacecraft_potential[s:e] if self.spacecraft_potential is not None else 0.0,
+            bs_over_bm=lhs_bs_over_bm,
+            beam_width_eV=lhs_beam_width,  
             beam_amp=lhs_beam_amp,
             beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
         )
 
-        # However, I need to be careful about beam_width_eV.
-        # In synth_losscone: `beam_center = np.maximum(np.abs(U_surface), beam_width_eV)`
-        # If U_surface is (N, 1, 1) and beam_width_eV is (N,), numpy broadcasts to (N, N, 1)? No.
-        # (N, 1, 1) and (N,) -> (N, N, 1) is dangerous.
-        # I should reshape lhs_beam_width to (N, 1, 1) before passing.
-
-        # Let's fix the call below.
         
-        # Calculate Chi2 for all models
-        # norm2d is (nE, nPitch) -> broadcast to (1, nE, nPitch)
-        # models is (N_samples, nE, nPitch)
-        
-        # Avoid log(0)
         log_data = np.log(norm2d + eps)
         log_models = np.log(models + eps)
-        
+
         diff = log_data[None, :, :] - log_models
-        
+
         # Sum over energy and pitch axes (1, 2)
         chi2_vals = np.sum(diff**2, axis=(1, 2))
-        
-        # Check for invalid models (NaN or <=0 which might have been clipped/handled in log)
-        # If model was 0, log is log(eps).
-        # If model had NaNs, chi2 will be NaN.
-        # We should penalize NaNs.
+
         bad_mask = ~np.isfinite(chi2_vals)
         chi2_vals[bad_mask] = 1e30
-        
+
         best_idx = int(np.argmin(chi2_vals))
         best_lhs_chi2 = chi2_vals[best_idx]
         x0 = self.lhs[best_idx]
@@ -553,10 +520,11 @@ class LossConeFitter:
             beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
             beam_width = max(abs(U_surface) * self.beam_width_factor, config.EPS)
             model = synth_losscone(
-                energies,
-                pitches,
-                U_surface,
-                bs_over_bm,
+                energy_grid=energies,
+                pitch_grid=pitches,
+                U_surface=U_surface,
+                U_spacecraft=self.spacecraft_potential[s:e] if self.spacecraft_potential is not None else 0.0,
+                bs_over_bm=bs_over_bm,
                 beam_width_eV=beam_width,
                 beam_amp=beam_amp,
                 beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,

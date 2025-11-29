@@ -34,7 +34,9 @@ def test_lhs_chi2_batch_matches_sequential():
     eps = 1e-6
 
     norm2d = synth_losscone(
-        energies, pitches, true_U_surface, true_bs_over_bm,
+        energies, pitches, true_U_surface,
+        U_spacecraft=0.0,
+        bs_over_bm=true_bs_over_bm,
         beam_width_eV=beam_width,
         beam_amp=true_beam_amp,
         beam_pitch_sigma_deg=beam_pitch_sigma
@@ -54,7 +56,8 @@ def test_lhs_chi2_batch_matches_sequential():
         energies,
         pitches,
         lhs_U_surface,
-        lhs_bs_over_bm,
+        U_spacecraft=0.0,
+        bs_over_bm=lhs_bs_over_bm,
         beam_width_eV=lhs_beam_width,
         beam_amp=lhs_beam_amp,
         beam_pitch_sigma_deg=beam_pitch_sigma,
@@ -71,7 +74,8 @@ def test_lhs_chi2_batch_matches_sequential():
         model_i = synth_losscone(
             energies, pitches,
             lhs_U_surface[i],
-            lhs_bs_over_bm[i],
+            U_spacecraft=0.0,
+            bs_over_bm=lhs_bs_over_bm[i],
             beam_width_eV=lhs_beam_width[i],
             beam_amp=lhs_beam_amp[i],
             beam_pitch_sigma_deg=beam_pitch_sigma,
@@ -125,7 +129,9 @@ def test_lhs_vectorization_with_edge_cases():
 
     # Batch
     models_batch = synth_losscone(
-        energies, pitches, lhs_U_surface, lhs_bs_over_bm,
+        energies, pitches, lhs_U_surface,
+        U_spacecraft=0.0,
+        bs_over_bm=lhs_bs_over_bm,
         beam_width_eV=lhs_beam_width, beam_amp=lhs_beam_amp,
         beam_pitch_sigma_deg=10.0
     )
@@ -139,7 +145,9 @@ def test_lhs_vectorization_with_edge_cases():
     chi2_seq = []
     for i in range(n_samples):
         model = synth_losscone(
-            energies, pitches, lhs_U_surface[i], lhs_bs_over_bm[i],
+            energies, pitches, lhs_U_surface[i],
+            U_spacecraft=0.0,
+            bs_over_bm=lhs_bs_over_bm[i],
             beam_width_eV=lhs_beam_width[i], beam_amp=lhs_beam_amp[i],
             beam_pitch_sigma_deg=10.0
         )
@@ -178,7 +186,9 @@ def test_lhs_vectorization_randomized(seed):
 
     # Batch
     models_batch = synth_losscone(
-        energies, pitches, lhs_U_surface, lhs_bs_over_bm,
+        energies, pitches, lhs_U_surface,
+        U_spacecraft=0.0,
+        bs_over_bm=lhs_bs_over_bm,
         beam_width_eV=lhs_beam_width, beam_amp=lhs_beam_amp,
         beam_pitch_sigma_deg=beam_pitch_sigma
     )
@@ -192,7 +202,9 @@ def test_lhs_vectorization_randomized(seed):
     chi2_seq = []
     for i in range(n_samples):
         model = synth_losscone(
-            energies, pitches, lhs_U_surface[i], lhs_bs_over_bm[i],
+            energies, pitches, lhs_U_surface[i],
+            U_spacecraft=0.0,
+            bs_over_bm=lhs_bs_over_bm[i],
             beam_width_eV=lhs_beam_width[i], beam_amp=lhs_beam_amp[i],
             beam_pitch_sigma_deg=beam_pitch_sigma
         )
@@ -230,7 +242,9 @@ def test_beam_width_broadcasting():
 
     # Batch call
     models_batch = synth_losscone(
-        energies, pitches, U_surfaces, bs_over_bms,
+        energies, pitches, U_surfaces,
+        U_spacecraft=0.0,
+        bs_over_bm=bs_over_bms,
         beam_width_eV=beam_widths, beam_amp=beam_amps,
         beam_pitch_sigma_deg=10.0
     )
@@ -238,7 +252,9 @@ def test_beam_width_broadcasting():
     # Individual calls
     for i in range(n_samples):
         model_individual = synth_losscone(
-            energies, pitches, U_surfaces[i], bs_over_bms[i],
+            energies, pitches, U_surfaces[i],
+            U_spacecraft=0.0,
+            bs_over_bm=bs_over_bms[i],
             beam_width_eV=beam_widths[i], beam_amp=beam_amps[i],
             beam_pitch_sigma_deg=10.0
         )
