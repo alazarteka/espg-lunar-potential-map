@@ -109,7 +109,7 @@ def synth_losscone(
     # Apply mask only where energies are valid
     final_mask = mask & valid_E_exp
     model[final_mask] = 1.0
-    # model[~final_mask] = 0.001  # Small value instead of zero
+    model[~final_mask] = 0.05  # Small value instead of zero
 
     # Add beam component
     if np.any(beam_width_eV > 0):

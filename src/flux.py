@@ -399,7 +399,7 @@ class LossConeFitter:
             return np.full_like(electron_flux, np.nan)
 
         incident_flux = float(
-            max(config.EPS, float(np.mean(electron_flux[incident_mask])))
+            max(config.EPS, float(np.max(electron_flux[incident_mask])))
         )
         return electron_flux / incident_flux
 
@@ -600,7 +600,7 @@ class LossConeFitter:
         best_lhs_chi2 = chi2_vals[best_idx]
         x0 = self.lhs[best_idx]
 
-        # 2) Local Nelder–Mead refinement
+        # 2) Global optimization with differential_evolution
         # Objective for optimizer (scalar)
         def chi2_scalar(params):
             U_surface, bs_over_bm, beam_amp = params
@@ -623,22 +623,34 @@ class LossConeFitter:
             diff = np.log(norm2d + eps) - np.log(model + eps)
             return np.sum(diff * diff)
 
-        # Use Nelder-Mead (unbounded but robust)
-        # Note: Bounded optimizers (L-BFGS-B, Powell) had numerical issues with this objective
-        result = minimize(
+        # Use differential_evolution (global optimizer with bounds)
+        # More robust than LHS + Nelder-Mead for avoiding local minima
+        from scipy.optimize import differential_evolution
+
+        bounds = [
+            (-2000.0, 2000.0),  # U_surface
+            (0.1, 1.0),         # bs_over_bm
+            (self.beam_amp_min, self.beam_amp_max),  # beam_amp
+        ]
+
+        result = differential_evolution(
             chi2_scalar,
-            x0,
-            method="Nelder-Mead",
-            options=dict(maxiter=200, xatol=1e-3, fatol=1e-3),
+            bounds,
+            seed=42,
+            maxiter=1000,
+            atol=1e-3,
+            tol=1e-3,
+            workers=1,  # Single-threaded for reproducibility
+            updating='deferred',  # Faster convergence
         )
 
         if not result.success:
-            # Fallback to x0 if optimization fails (rare)
+            # Fallback to best LHS if optimization fails
             return float(x0[0]), float(x0[1]), float(x0[2]), float(best_lhs_chi2)
 
         U_surface, bs_over_bm, beam_amp = result.x
 
-        # Clip to physical bounds (done post-optimization since bounded optimizers struggled)
+        # Clip to ensure exact bounds (DE should respect them, but be safe)
         bs_over_bm = float(np.clip(bs_over_bm, 0.1, 1.0))
         beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
 
