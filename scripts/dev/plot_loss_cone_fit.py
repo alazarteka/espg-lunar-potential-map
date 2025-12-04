@@ -89,6 +89,7 @@ def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: P
         beam_width_eV=beam_width,
         beam_amp=beam_amp,
         beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
+        background=fitter.background,
     )
 
     # Calculate loss cone boundary for plotting

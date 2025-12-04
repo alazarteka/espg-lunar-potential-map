@@ -7,6 +7,7 @@ import numpy as np
 ###########
 
 EPS = 1e-12  # Small epsilon to avoid division by zero
+DEFAULT_BACKGROUND = 0.05  # Small non-zero value outside loss cone (match config)
 e_0 = 1.602e-19  # Elementary charge in Coulombs
 
 
@@ -19,6 +20,7 @@ def synth_losscone(
     beam_width_eV: float | np.ndarray = 0.0,
     beam_amp: float | np.ndarray = 0.0,
     beam_pitch_sigma_deg: float | np.ndarray = 0.0,
+    background: float | np.ndarray = DEFAULT_BACKGROUND,
 ) -> np.ndarray:
     """
     Build a loss-cone model that never returns NaN/Inf.
@@ -43,6 +45,7 @@ def synth_losscone(
     bs_over_bm = np.asarray(bs_over_bm)
     beam_amp = np.asarray(beam_amp)
     beam_width_eV = np.asarray(beam_width_eV)
+    background = np.asarray(background)
 
     # Remember if we need to squeeze output (all params were scalar)
     squeeze_output = (
@@ -50,6 +53,7 @@ def synth_losscone(
         and bs_over_bm.ndim == 0
         and beam_amp.ndim == 0
         and beam_width_eV.ndim == 0
+        and background.ndim == 0
     )
 
     # Always promote to 1D for unified batch processing
@@ -61,16 +65,24 @@ def synth_losscone(
         beam_amp = beam_amp[None]
     if beam_width_eV.ndim == 0:
         beam_width_eV = beam_width_eV[None]
-
+    if background.ndim == 0:
+        background = background[None]
 
     # Determine batch size
-    n_params = max(U_surface.size, bs_over_bm.size, beam_amp.size, beam_width_eV.size)
+    n_params = max(
+        U_surface.size,
+        bs_over_bm.size,
+        beam_amp.size,
+        beam_width_eV.size,
+        background.size,
+    )
 
     # Reshape params to (nParams, 1, 1) for broadcasting
     U_surface = U_surface.reshape(-1, 1, 1)
     bs_over_bm = bs_over_bm.reshape(-1, 1, 1)
     beam_amp = beam_amp.reshape(-1, 1, 1)
     beam_width_eV = beam_width_eV.reshape(-1, 1, 1)
+    background = background.reshape(-1, 1, 1)
 
     # Guard against E <= 0 (mask invalid energies)
     valid_E = energy_grid > 0
@@ -92,11 +104,13 @@ def synth_losscone(
 
     # Calculate x = B_s/B_m * (1 + U_surface / E - U_spacecraft)
     # (nParams, 1, 1) * (1 + (nParams, 1, 1) / (1, nE, 1)) -> (nParams, nE, 1)
-    x = bs_over_bm * (1.0 + U_surface /
-                      np.maximum(E_safe_exp - U_spacecraft, EPS)
-                      )
+    x = bs_over_bm * (
+        1.0 + U_surface / np.maximum(E_safe_exp - U_spacecraft, EPS)
+    )
 
-    model = np.zeros((n_params, pitch_grid.shape[0], pitch_grid.shape[1]))
+    model = np.broadcast_to(
+        background, (n_params, pitch_grid.shape[0], pitch_grid.shape[1])
+    ).copy()
 
     x_clipped = np.clip(x, 0.0, 1.0)
     ac_rad = np.arcsin(np.sqrt(x_clipped))
@@ -109,7 +123,6 @@ def synth_losscone(
     # Apply mask only where energies are valid
     final_mask = mask & valid_E_exp
     model[final_mask] = 1.0
-    model[~final_mask] = 0.05  # Small value instead of zero
 
     # Add beam component
     if np.any(beam_width_eV > 0):

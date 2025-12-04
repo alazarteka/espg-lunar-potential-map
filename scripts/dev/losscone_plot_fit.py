@@ -106,6 +106,7 @@ def main() -> int:
         beam_width_eV=beam_width,
         beam_amp=beam_amp,
         beam_pitch_sigma_deg=fitter.beam_pitch_sigma_deg,
+        background=fitter.background,
     )
 
     residual = norm2d - model

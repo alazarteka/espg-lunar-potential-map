@@ -3,6 +3,7 @@ import math
 import numpy as np
 import pytest
 from src.model import synth_losscone
+from src import config
 
 def reference_synth_losscone(
     energy_grid,
@@ -12,12 +13,13 @@ def reference_synth_losscone(
     beam_width_eV=0,
     beam_amp=0,
     beam_pitch_sigma_deg=0,
+    background=config.LOSS_CONE_BACKGROUND,
 ):
     """
     Original loop-based implementation of synth_losscone for equivalence testing.
     """
     nE, nPitch = pitch_grid.shape
-    model = np.zeros((nE, nPitch))
+    model = np.full((nE, nPitch), background, dtype=float)
 
     for i, E in enumerate(energy_grid):
         # Guard against E <= 0
@@ -174,4 +176,3 @@ def test_model_batch_equivalence():
             rtol=1e-10, atol=1e-10,
             err_msg=f"Batch mismatch at index {i}"
         )
-

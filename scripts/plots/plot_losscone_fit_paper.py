@@ -82,6 +82,8 @@ def create_losscone_comparison_plot(
     usc: float,
     normalization: str,
     fixed_beam_amp: float | None,
+    background: float,
+    incident_flux_stat: str,
     dpi: int = 150,
 ) -> None:
     """
@@ -95,6 +97,8 @@ def create_losscone_comparison_plot(
         usc: Spacecraft potential [V] applied to all rows
         normalization: Loss cone normalization mode ("global" or "ratio")
         fixed_beam_amp: If provided, fix Gaussian beam amplitude to this value
+        background: Model background outside the loss cone
+        incident_flux_stat: Statistic for incident flux ("mean" or "max")
         dpi: Resolution for output
     """
     print(f"Loading {er_file.name}...")
@@ -112,6 +116,8 @@ def create_losscone_comparison_plot(
         spacecraft_potential,
         normalization_mode=normalization,
         beam_amp_fixed=fixed_beam_amp,
+        loss_cone_background=background,
+        incident_flux_stat=incident_flux_stat,
     )
 
     # Validate and find the spectrum
@@ -173,6 +179,7 @@ def create_losscone_comparison_plot(
         beam_width_eV=beam_width,
         beam_amp=beam_amp,
         beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
+        background=fitter.background,
     )
 
     # Interpolate model onto regular grid
@@ -247,7 +254,9 @@ def create_losscone_comparison_plot(
     textstr = (
         f"UTC: {timestamp}\nU_surface = {U_surface:.1f} V\n"
         f"Bₛ/Bₘ = {bs_bm:.3f}\nBeam amp = {beam_amp:.3f}\n"
-        f"USC = {usc:.1f} V ({normalization})\nχ² = {chi2:.2f}"
+        f"USC = {usc:.1f} V ({normalization})\n"
+        f"bg = {fitter.background:.3f}, inc={incident_flux_stat}\n"
+        f"χ² = {chi2:.2f}"
     )
     ax2.text(
         0.98,
@@ -315,6 +324,18 @@ def parse_args() -> argparse.Namespace:
         help="Normalization mode: global (max incident), ratio (per-energy), ratio2 (pairwise), ratio_rescaled (ratio then rescale to [0,1])",
     )
     parser.add_argument(
+        "--background",
+        type=float,
+        default=config.LOSS_CONE_BACKGROUND,
+        help="Model background level outside the loss cone",
+    )
+    parser.add_argument(
+        "--incident-flux-stat",
+        choices=["mean", "max"],
+        default="mean",
+        help="Statistic to use for incident flux normalization",
+    )
+    parser.add_argument(
         "--fixed-beam-amp",
         type=float,
         default=None,
@@ -354,6 +375,8 @@ def main() -> int:
         args.usc,
         args.normalization,
         args.fixed_beam_amp,
+        args.background,
+        args.incident_flux_stat,
         args.dpi,
     )
     return 0

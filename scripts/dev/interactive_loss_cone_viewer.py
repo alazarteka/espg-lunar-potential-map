@@ -143,6 +143,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
             beam_width_eV=beam_width,
             beam_amp=beam_amp,
             beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
+            background=fitter.background,
         )
 
         # Interpolate model onto regular grid

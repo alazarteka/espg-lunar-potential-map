@@ -40,6 +40,8 @@ def create_3panel_debug_plot(
     usc: float,
     normalization: str,
     fixed_beam_amp: float | None,
+    background: float,
+    incident_flux_stat: str,
     dpi: int = 150,
 ) -> None:
     """
@@ -53,6 +55,8 @@ def create_3panel_debug_plot(
         usc: Spacecraft potential [V] applied to all rows
         normalization: Normalization mode ("global", "ratio", or "ratio2")
         fixed_beam_amp: If provided, fix Gaussian beam amplitude to this value
+        background: Model background outside the loss cone
+        incident_flux_stat: Statistic for incident flux ("mean" or "max")
         dpi: Resolution for output
     """
     print(f"Loading {er_file.name}...")
@@ -70,6 +74,8 @@ def create_3panel_debug_plot(
         spacecraft_potential,
         normalization_mode=normalization,
         beam_amp_fixed=fixed_beam_amp,
+        loss_cone_background=background,
+        incident_flux_stat=incident_flux_stat,
     )
 
     # Validate spectrum number
@@ -136,6 +142,7 @@ def create_3panel_debug_plot(
         beam_width_eV=beam_width,
         beam_amp=beam_amp,
         beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
+        background=fitter.background,
     )
 
     # Interpolate model onto regular grid
@@ -241,6 +248,7 @@ def create_3panel_debug_plot(
         f"Bₛ/Bₘ = {bs_bm:.3f}\n"
         f"Beam amp = {beam_amp:.3f}\n"
         f"USC = {usc:.1f} V\n"
+        f"bg = {fitter.background:.3f}, inc={incident_flux_stat}\n"
         f"norm = {normalization}\n"
         f"χ² = {chi2:.2f}"
     )
@@ -310,6 +318,18 @@ def parse_args() -> argparse.Namespace:
         help="Normalization mode",
     )
     parser.add_argument(
+        "--background",
+        type=float,
+        default=config.LOSS_CONE_BACKGROUND,
+        help="Model background level outside the loss cone",
+    )
+    parser.add_argument(
+        "--incident-flux-stat",
+        choices=["mean", "max"],
+        default="mean",
+        help="Statistic to use for incident flux normalization",
+    )
+    parser.add_argument(
         "--fixed-beam-amp",
         type=float,
         default=None,
@@ -337,6 +357,8 @@ def main() -> int:
         args.usc,
         args.normalization,
         args.fixed_beam_amp,
+        args.background,
+        args.incident_flux_stat,
         args.dpi,
     )
     return 0
