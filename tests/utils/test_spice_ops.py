@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from src import config
 from src.utils import spice_ops
 
 
@@ -173,6 +174,19 @@ def test_batch_spice_ops_with_real_kernels():
     # It will be skipped in CI but can run locally
 
     from src.potential_mapper.spice import load_spice_files
+
+    # Check if kernels exist before trying to load
+    spice_dir = config.SPICE_KERNELS_DIR
+    patterns = [f"*{config.EXT_BSP}", f"*{config.EXT_TPC}", f"*{config.EXT_TLS}"]
+    has_kernels = False
+    if spice_dir.exists():
+        for pattern in patterns:
+            if list(spice_dir.glob(pattern)):
+                has_kernels = True
+                break
+
+    if not has_kernels:
+        pytest.skip("No SPICE kernels found")
 
     # Load kernels
     load_spice_files()
