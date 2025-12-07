@@ -9,10 +9,8 @@ where a_lm(t) are fitted in temporal windows with spatial coverage validation.
 
 from __future__ import annotations
 
-import argparse
 import logging
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
@@ -58,13 +56,7 @@ class HarmonicCoefficients:
     rms_residual: float  # RMS fit residual
 
 
-def _parse_iso_date(value: str) -> np.datetime64:
-    """Parse YYYY-MM-DD into numpy datetime64."""
-    try:
-        dt = datetime.strptime(value, "%Y-%m-%d")
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("Dates must be YYYY-MM-DD") from exc
-    return np.datetime64(dt.date())
+
 
 
 def _discover_npz(cache_dir: Path) -> list[Path]:
@@ -843,190 +835,4 @@ def save_temporal_coefficients(
     logging.info("Saved temporal coefficients to %s", output_path)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Compute time-dependent spherical harmonic coefficients a_lm(t)",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument(
-        "--start",
-        required=True,
-        type=_parse_iso_date,
-        help="Start date (YYYY-MM-DD, inclusive)",
-    )
-    parser.add_argument(
-        "--end",
-        required=True,
-        type=_parse_iso_date,
-        help="End date (YYYY-MM-DD, inclusive)",
-    )
-    parser.add_argument(
-        "--cache-dir",
-        type=Path,
-        default=DEFAULT_CACHE_DIR,
-        help="Root directory with potential_cache NPZ files",
-    )
-    parser.add_argument(
-        "--lmax",
-        type=int,
-        default=5,
-        help="Maximum spherical harmonic degree",
-    )
-    parser.add_argument(
-        "--window-hours",
-        type=float,
-        default=24.0,
-        help="Temporal window duration in hours",
-    )
-    parser.add_argument(
-        "--window-stride",
-        type=float,
-        default=None,
-        help="Temporal stride in hours (default: same as --window-hours for non-overlapping)",
-    )
-    parser.add_argument(
-        "--regularize-l2",
-        type=float,
-        default=0.0,
-        help="Ridge penalty for spatial coefficient fitting",
-    )
-    parser.add_argument(
-        "--temporal-lambda",
-        type=float,
-        default=0.0,
-        help="Temporal continuity regularization strength (0 = independent windows)",
-    )
-    parser.add_argument(
-        "--min-samples",
-        type=int,
-        default=100,
-        help="Minimum measurements required per window",
-    )
-    parser.add_argument(
-        "--min-coverage",
-        type=float,
-        default=0.1,
-        help="Minimum spatial coverage fraction (0-1)",
-    )
-    parser.add_argument(
-        "--co-rotate",
-        action="store_true",
-        help="Rotate temporal derivative into a solar co-rotating frame",
-    )
-    parser.add_argument(
-        "--spatial-weight-exponent",
-        type=float,
-        default=None,
-        help="Exponent for degree-weighted spatial damping (None disables weighting)",
-    )
-    parser.add_argument(
-        "--rotation-period-days",
-        type=float,
-        default=DEFAULT_SYNODIC_PERIOD_DAYS,
-        help="Rotation period (days) used when --co-rotate is set (sign controls direction)",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        required=True,
-        help="Output NPZ file for temporal coefficients",
-    )
-    parser.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Logging verbosity",
-    )
-    return parser.parse_args()
 
-
-def main() -> int:
-    args = parse_args()
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s [%(levelname)s] %(message)s",
-    )
-
-    if args.end < args.start:
-        logging.error("--end must be >= --start")
-        return 1
-
-    if args.lmax < 0:
-        logging.error("--lmax must be non-negative")
-        return 1
-
-    if args.window_hours <= 0:
-        logging.error("--window-hours must be positive")
-        return 1
-    if args.co_rotate and args.rotation_period_days == 0.0:
-        logging.error("--rotation-period-days must be non-zero when --co-rotate is set")
-        return 1
-    if args.spatial_weight_exponent is not None and args.spatial_weight_exponent < 0.0:
-        logging.error("--spatial-weight-exponent must be non-negative")
-        return 1
-
-    try:
-        results = compute_temporal_harmonics(
-            cache_dir=args.cache_dir,
-            start_date=args.start,
-            end_date=args.end,
-            lmax=args.lmax,
-            window_hours=args.window_hours,
-            stride_hours=args.window_stride,
-            l2_penalty=args.regularize_l2,
-            temporal_lambda=args.temporal_lambda,
-            min_samples=args.min_samples,
-            min_coverage=args.min_coverage,
-            co_rotate=args.co_rotate,
-            rotation_period_days=args.rotation_period_days,
-            spatial_weight_exponent=args.spatial_weight_exponent,
-        )
-    except Exception as exc:
-        logging.exception("Failed to compute temporal harmonics: %s", exc)
-        return 1
-
-    if not results:
-        logging.warning("No valid time windows produced; nothing to save.")
-        return 1
-
-    try:
-        save_temporal_coefficients(results, args.output)
-    except Exception as exc:
-        logging.exception("Failed to save results: %s", exc)
-        return 1
-
-    # Print summary
-    times = np.array([r.time for r in results])
-    coverages = np.array([r.spatial_coverage for r in results])
-    rms_vals = np.array([r.rms_residual for r in results])
-
-    print("\n" + "=" * 60)
-    print("Time-Dependent Spherical Harmonic Summary")
-    print("=" * 60)
-    print(f"Date range      : {args.start} → {args.end}")
-    print(f"Time windows    : {len(results)}")
-    print(f"Window duration : {args.window_hours:.1f} hours")
-    print(f"Max degree      : lmax = {args.lmax}")
-    if args.co_rotate:
-        direction = "forward" if args.rotation_period_days > 0 else "reverse"
-        print(
-            f"Temporal frame  : solar co-rotating ({abs(args.rotation_period_days):.3f} d, {direction})"
-        )
-    else:
-        print("Temporal frame  : moon-fixed")
-    if args.spatial_weight_exponent is None:
-        print("Spatial weighting: uniform")
-    else:
-        print(f"Spatial weighting: [l(l+1)]^{args.spatial_weight_exponent:.2f} (l>0)")
-    print(f"Coefficients    : {_harmonic_coefficient_count(args.lmax)} per window")
-    print(f"Coverage range  : {coverages.min()*100:.1f}% - {coverages.max()*100:.1f}%")
-    print(f"RMS residuals   : {rms_vals.min():.2f} - {rms_vals.max():.2f} V")
-    print(f"Median RMS      : {np.median(rms_vals):.2f} V")
-    print(f"\nSaved to: {args.output}")
-    print("=" * 60)
-
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

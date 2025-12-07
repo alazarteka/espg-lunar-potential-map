@@ -1,11 +1,10 @@
-"""Temporal harmonic utilities shared by CLI scripts."""
+"""Temporal harmonic utilities for spherical harmonic coefficient computation."""
 
+from .cli import main, parse_args
 from .coefficients import (
     HarmonicCoefficients,
     TimeWindow,
     compute_temporal_harmonics,
-    main,
-    parse_args,
     save_temporal_coefficients,
 )
 from .dataset import TemporalDataset, load_temporal_coefficients
