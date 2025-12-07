@@ -77,4 +77,18 @@ select = ["E", "F", "W", "B", "I", "UP", "SIM"]
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
-plugins = ["pint.mypy_plugin"]
+check_untyped_defs = true
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = [
+    "spiceypy.*",
+    "plotly.*",
+    "numba.*",
+    "scipy.*",
+    "pandas.*",
+    "matplotlib.*",
+    "tqdm.*",
+]
+ignore_missing_imports = true

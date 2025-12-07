@@ -18,6 +18,7 @@ repos:
       - id: mypy
         additional_dependencies:
           - pint>=0.24.4
-        args: [--config-file=pyproject.toml]
+          - numpy>=2.0.0
+        args: [--config-file=pyproject.toml, --namespace-packages, --explicit-package-bases]
         # Only check src/, not tests or scripts
         files: ^src/
