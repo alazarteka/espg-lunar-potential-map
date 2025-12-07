@@ -137,7 +137,7 @@ def main():
     )
 
     # Save
-    fig.write_html(args.output)
+    fig.write_html(args.output, include_plotlyjs="cdn")
     print(f"Saved to {args.output}")
 
     # Print stats

@@ -339,7 +339,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
 
     # Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.write_html(str(output_path))
+    fig.write_html(str(output_path), include_plotlyjs="cdn")
     print(f"\nSaved interactive viewer to: {output_path}")
     print(f"Open in browser to navigate through {len(frames)} chunks")
 

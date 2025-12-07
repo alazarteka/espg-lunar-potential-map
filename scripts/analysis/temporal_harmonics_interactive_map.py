@@ -245,7 +245,7 @@ def create_interactive_sphere(
 
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.write_html(str(output_path))
+        fig.write_html(str(output_path), include_plotlyjs="cdn")
         print(f"\nSaved interactive visualization to {output_path}")
         print(f"File size: {output_path.stat().st_size / 1e6:.1f} MB")
 
