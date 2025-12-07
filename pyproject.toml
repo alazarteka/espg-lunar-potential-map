@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0.0", "black>=23.0.0", "ruff>=0.1.0", "mypy>=1.0.0"]
+dev = ["pytest>=7.0.0", "ruff>=0.8.0", "mypy>=1.0.0"]
 test = ["pytest>=7.0.0", "pytest-cov>=4.0.0"]
 
 [project.urls]
@@ -57,16 +57,17 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 
-[tool.black]
-line-length = 88
-target-version = ['py312']
+[tool.ruff.format]
+# Uses Ruff's formatter (replaces Black)
+quote-style = "double"
+indent-style = "space"
 
 [tool.ruff]
 line-length = 88
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "B", "I"]
+select = ["E", "F", "W", "B", "I", "UP", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
     "scripts/**/*.py" = ["E501"]

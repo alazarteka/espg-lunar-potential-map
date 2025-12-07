@@ -34,8 +34,9 @@ Use UV with Python 3.12.
 - Acquire data: `uv run python -m src.data_acquisition`
 - Tests: `uv run pytest -q` (coverage: `uv run pytest --cov=src`)
 - Lint: `uv run ruff check .`
-- Format: `uv run black src tests`
+- Format: `uv run ruff format src tests`
 - Type check: `uv run mypy src`
+- Pre-commit: `pre-commit run --all-files`
 
 ## Coding Style & Naming Conventions
 

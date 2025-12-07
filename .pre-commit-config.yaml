@@ -1,0 +1,23 @@
+# Pre-commit hooks for ESPG Lunar Potential Map
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.2
+    hooks:
+      # Linter
+      - id: ruff
+        args: [--fix]
+      # Formatter (replaces Black)
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pint>=0.24.4
+        args: [--config-file=pyproject.toml]
+        # Only check src/, not tests or scripts
+        files: ^src/
