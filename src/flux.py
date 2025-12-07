@@ -258,8 +258,12 @@ class PitchAngle:
 
         magnetic_field = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
         magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
-        # ER convention points +B roughly sunward; loss-cone tracing expects the
-        # opposite orientation (toward the Moon), so flip the direction here.
+        # The ER convention has the magnetic field pointing in the spin-stabilized,
+        # spacecraft-relative direction. The electron bins (phis and thetas) point
+        # in the directions the electrons are coming from (Look Direction).
+        # In order to compute the direction they are headed (velocity), and compute
+        # the pitch angle, we negate the magnetic field direction.
+        # This results in computing the angle between Velocity and B.
         unit_magnetic_field = -magnetic_field / magnetic_field_magnitude
         unit_magnetic_field = np.tile(
             unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1)
