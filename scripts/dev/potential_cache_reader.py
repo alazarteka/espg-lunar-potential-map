@@ -182,9 +182,7 @@ def _format_value(value: float | None, precision: int = 2) -> str:
     return f"{value:.{precision}f}"
 
 
-def summarize_rows(
-    rows: TimeSeriesRows, cache_dir: Path, files_scanned: int
-) -> str:
+def summarize_rows(rows: TimeSeriesRows, cache_dir: Path, files_scanned: int) -> str:
     """Return a multi-line textual summary of the loaded rows."""
     if rows.utc.size == 0:
         return "No cached rows found in the requested date range."
@@ -193,12 +191,22 @@ def summarize_rows(
     end = np.datetime_as_string(rows.utc.max().astype("datetime64[s]"), unit="s")
     sc_stats = _nan_stats(rows.spacecraft_potential)
     surf_stats = _nan_stats(rows.surface_potential)
-    lat_min = np.nanmin(rows.projection_lat) if rows.projection_lat.size else float("nan")
-    lat_max = np.nanmax(rows.projection_lat) if rows.projection_lat.size else float("nan")
-    lon_min = np.nanmin(rows.projection_lon) if rows.projection_lon.size else float("nan")
-    lon_max = np.nanmax(rows.projection_lon) if rows.projection_lon.size else float("nan")
+    lat_min = (
+        np.nanmin(rows.projection_lat) if rows.projection_lat.size else float("nan")
+    )
+    lat_max = (
+        np.nanmax(rows.projection_lat) if rows.projection_lat.size else float("nan")
+    )
+    lon_min = (
+        np.nanmin(rows.projection_lon) if rows.projection_lon.size else float("nan")
+    )
+    lon_max = (
+        np.nanmax(rows.projection_lon) if rows.projection_lon.size else float("nan")
+    )
     sunlit_fraction = (
-        float(rows.projection_in_sun.mean()) if rows.projection_in_sun.size else float("nan")
+        float(rows.projection_in_sun.mean())
+        if rows.projection_in_sun.size
+        else float("nan")
     )
 
     lines = [
@@ -369,7 +377,9 @@ def _valid_harmonic_mask(rows: TimeSeriesRows) -> np.ndarray:
     )
 
 
-def _build_harmonic_design(lat_deg: np.ndarray, lon_deg: np.ndarray, lmax: int) -> np.ndarray:
+def _build_harmonic_design(
+    lat_deg: np.ndarray, lon_deg: np.ndarray, lmax: int
+) -> np.ndarray:
     """Return design matrix of spherical harmonics evaluated at each location."""
     if lmax < 0:
         raise ValueError("lmax must be non-negative")
@@ -429,7 +439,9 @@ def evaluate_spherical_harmonics(
     """Evaluate a fitted coefficient vector at the provided positions."""
     expected = _harmonic_coefficient_count(lmax)
     if coeffs.size != expected:
-        raise ValueError(f"Expected {expected} coefficients for lmax={lmax}, got {coeffs.size}")
+        raise ValueError(
+            f"Expected {expected} coefficients for lmax={lmax}, got {coeffs.size}"
+        )
     design = _build_harmonic_design(latitudes, longitudes, lmax)
     return np.real(design @ coeffs)
 
@@ -554,7 +566,9 @@ def main() -> int:
                 rows, lmax=args.lmax, l2_penalty=args.regularize_l2
             )
         except (ValueError, LinAlgError) as exc:
-            logging.error("Unable to compute spherical harmonics (lmax=%s): %s", args.lmax, exc)
+            logging.error(
+                "Unable to compute spherical harmonics (lmax=%s): %s", args.lmax, exc
+            )
             return 1
         if args.regularize_l2 > 0.0:
             print(

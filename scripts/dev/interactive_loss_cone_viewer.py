@@ -3,6 +3,7 @@
 Interactive loss cone viewer using Plotly.
 Browse through different spec_no chunks and view raw (un-normalized) data.
 """
+
 import sys
 from pathlib import Path
 
@@ -57,8 +58,13 @@ def interpolate_to_regular_grid(energies, pitches, flux_data, n_pitch_bins=100):
             flux_pts_sorted = flux_pts[sort_idx]
 
             # Interpolate onto regular pitch grid
-            flux_reg[i] = np.interp(pitches_reg, pitch_pts_sorted, flux_pts_sorted,
-                                    left=np.nan, right=np.nan)
+            flux_reg[i] = np.interp(
+                pitches_reg,
+                pitch_pts_sorted,
+                flux_pts_sorted,
+                left=np.nan,
+                right=np.nan,
+            )
         else:
             # Not enough data, fill with NaN
             flux_reg[i] = np.nan
@@ -83,7 +89,9 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
     pitch_angle = PitchAngle(er_data, str(config.DATA_DIR / config.THETA_FILE))
 
     # Create fitter
-    fitter = LossConeFitter(er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle)
+    fitter = LossConeFitter(
+        er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle
+    )
 
     # Fit loss cone for all chunks
     print("Fitting loss cones...")
@@ -170,97 +178,104 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
 
         # Create frame with regular grid data
         frame_name = f"chunk_{chunk_idx}"
-        frames.append({
-            'name': frame_name,
-            'data': log_flux_reg,  # Regular grid, log10 flux
-            'model': model_reg,  # Regular grid
-            'energies': energies_reg,
-            'pitches': pitches_reg,  # Now 1D regular grid
-            'loss_cone': loss_cone_angle,
-            'U_surface': U_surface,
-            'bs_bm': bs_bm,
-            'beam_amp': beam_amp,
-            'chi2': chi2,
-            'timestamp': timestamp,
-            'chunk_idx': chunk_idx,
-        })
+        frames.append(
+            {
+                "name": frame_name,
+                "data": log_flux_reg,  # Regular grid, log10 flux
+                "model": model_reg,  # Regular grid
+                "energies": energies_reg,
+                "pitches": pitches_reg,  # Now 1D regular grid
+                "loss_cone": loss_cone_angle,
+                "U_surface": U_surface,
+                "bs_bm": bs_bm,
+                "beam_amp": beam_amp,
+                "chi2": chi2,
+                "timestamp": timestamp,
+                "chunk_idx": chunk_idx,
+            }
+        )
 
     # Create initial plot (first chunk)
     first_frame = frames[0]
 
     fig = make_subplots(
-        rows=1, cols=2,
-        subplot_titles=('Observed Flux', 'Model Flux'),
-        horizontal_spacing=0.12
+        rows=1,
+        cols=2,
+        subplot_titles=("Observed Flux", "Model Flux"),
+        horizontal_spacing=0.12,
     )
 
     # Observed data
     fig.add_trace(
         go.Heatmap(
-            z=first_frame['data'].T,
-            x=first_frame['energies'],
-            y=first_frame['pitches'],  # Now 1D regular grid
-            colorscale='Viridis',
-            name='Observed',
-            colorbar=dict(x=0.45, len=0.9, title='log₁₀(Flux)<br>[#/cm²/s/sr/eV]'),
+            z=first_frame["data"].T,
+            x=first_frame["energies"],
+            y=first_frame["pitches"],  # Now 1D regular grid
+            colorscale="Viridis",
+            name="Observed",
+            colorbar=dict(x=0.45, len=0.9, title="log₁₀(Flux)<br>[#/cm²/s/sr/eV]"),
         ),
-        row=1, col=1
+        row=1,
+        col=1,
     )
 
     # Loss cone boundary on observed
     fig.add_trace(
         go.Scatter(
-            x=first_frame['energies'],
-            y=first_frame['loss_cone'],
-            mode='lines',
-            line=dict(color='white', width=2),
-            name='Loss Cone',
+            x=first_frame["energies"],
+            y=first_frame["loss_cone"],
+            mode="lines",
+            line=dict(color="white", width=2),
+            name="Loss Cone",
             showlegend=False,
         ),
-        row=1, col=1
+        row=1,
+        col=1,
     )
 
     # Model
     fig.add_trace(
         go.Heatmap(
-            z=first_frame['model'].T,
-            x=first_frame['energies'],
-            y=first_frame['pitches'],  # Now 1D regular grid
-            colorscale='Viridis',
-            name='Model',
-            colorbar=dict(x=1.02, len=0.9, title='Normalized'),
+            z=first_frame["model"].T,
+            x=first_frame["energies"],
+            y=first_frame["pitches"],  # Now 1D regular grid
+            colorscale="Viridis",
+            name="Model",
+            colorbar=dict(x=1.02, len=0.9, title="Normalized"),
             zmin=0,
             zmax=1,
         ),
-        row=1, col=2
+        row=1,
+        col=2,
     )
 
     # Loss cone boundary on model
     fig.add_trace(
         go.Scatter(
-            x=first_frame['energies'],
-            y=first_frame['loss_cone'],
-            mode='lines',
-            line=dict(color='white', width=2),
-            name='Loss Cone',
+            x=first_frame["energies"],
+            y=first_frame["loss_cone"],
+            mode="lines",
+            line=dict(color="white", width=2),
+            name="Loss Cone",
             showlegend=False,
         ),
-        row=1, col=2
+        row=1,
+        col=2,
     )
 
     # Update layout
-    fig.update_xaxes(type='log', title_text='Energy [eV]', row=1, col=1)
-    fig.update_xaxes(type='log', title_text='Energy [eV]', row=1, col=2)
-    fig.update_yaxes(title_text='Pitch Angle [deg]', row=1, col=1)
-    fig.update_yaxes(title_text='Pitch Angle [deg]', row=1, col=2)
+    fig.update_xaxes(type="log", title_text="Energy [eV]", row=1, col=1)
+    fig.update_xaxes(type="log", title_text="Energy [eV]", row=1, col=2)
+    fig.update_yaxes(title_text="Pitch Angle [deg]", row=1, col=1)
+    fig.update_yaxes(title_text="Pitch Angle [deg]", row=1, col=2)
 
     fig.update_layout(
         title=dict(
             text=f"Chunk {first_frame['chunk_idx']}: {first_frame['timestamp']}<br>"
-                 f"U_surface = {first_frame['U_surface']:.1f} V, Bs/Bm = {first_frame['bs_bm']:.2f}, "
-                 f"Beam Amp = {first_frame['beam_amp']:.1f}, χ² = {first_frame['chi2']:.1e}",
+            f"U_surface = {first_frame['U_surface']:.1f} V, Bs/Bm = {first_frame['bs_bm']:.2f}, "
+            f"Beam Amp = {first_frame['beam_amp']:.1f}, χ² = {first_frame['chi2']:.1e}",
             x=0.5,
-            xanchor='center',
+            xanchor="center",
         ),
         height=600,
         showlegend=False,
@@ -274,31 +289,31 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
             args=[
                 {
                     "z": [
-                        frame['data'].T,
+                        frame["data"].T,
                         None,  # scatter trace
-                        frame['model'].T,
+                        frame["model"].T,
                         None,  # scatter trace
                     ],
                     "x": [
-                        frame['energies'],
-                        frame['energies'],
-                        frame['energies'],
-                        frame['energies'],
+                        frame["energies"],
+                        frame["energies"],
+                        frame["energies"],
+                        frame["energies"],
                     ],
                     "y": [
-                        frame['pitches'],  # Now 1D regular grid
-                        frame['loss_cone'],
-                        frame['pitches'],  # Now 1D regular grid
-                        frame['loss_cone'],
+                        frame["pitches"],  # Now 1D regular grid
+                        frame["loss_cone"],
+                        frame["pitches"],  # Now 1D regular grid
+                        frame["loss_cone"],
                     ],
                 },
                 {
                     "title": dict(
                         text=f"Chunk {frame['chunk_idx']}: {frame['timestamp']}<br>"
-                             f"U_surface = {frame['U_surface']:.1f} V, Bs/Bm = {frame['bs_bm']:.2f}, "
-                             f"Beam Amp = {frame['beam_amp']:.1f}, χ² = {frame['chi2']:.1e}",
+                        f"U_surface = {frame['U_surface']:.1f} V, Bs/Bm = {frame['bs_bm']:.2f}, "
+                        f"Beam Amp = {frame['beam_amp']:.1f}, χ² = {frame['chi2']:.1e}",
                         x=0.5,
-                        xanchor='center',
+                        xanchor="center",
                     ),
                 },
             ],
@@ -306,21 +321,19 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
         )
         steps.append(step)
 
-    sliders = [dict(
-        active=0,
-        yanchor="top",
-        y=-0.15,
-        xanchor="left",
-        currentvalue=dict(
-            prefix="Chunk: ",
-            visible=True,
-            xanchor="right"
-        ),
-        pad=dict(b=10, t=50),
-        len=0.9,
-        x=0.05,
-        steps=steps
-    )]
+    sliders = [
+        dict(
+            active=0,
+            yanchor="top",
+            y=-0.15,
+            xanchor="left",
+            currentvalue=dict(prefix="Chunk: ", visible=True, xanchor="right"),
+            pad=dict(b=10, t=50),
+            len=0.9,
+            x=0.05,
+            steps=steps,
+        )
+    ]
 
     fig.update_layout(sliders=sliders)
 

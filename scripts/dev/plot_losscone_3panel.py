@@ -12,6 +12,7 @@ Example:
         --usc 11.0 \\
         --normalization global
 """
+
 from __future__ import annotations
 
 import argparse
@@ -96,7 +97,9 @@ def create_3panel_debug_plot(
     chunk_data = er_data.data[chunk_mask]
 
     if len(chunk_data) != config.SWEEP_ROWS:
-        print(f"Warning: Expected {config.SWEEP_ROWS} rows for spectrum {spec_no}, got {len(chunk_data)}")
+        print(
+            f"Warning: Expected {config.SWEEP_ROWS} rows for spectrum {spec_no}, got {len(chunk_data)}"
+        )
 
     # Fit the specified spectrum
     print(f"Fitting spectrum {spec_no}...")
@@ -127,9 +130,7 @@ def create_3panel_debug_plot(
     energies_reg, pitches_reg, log_flux_reg = interpolate_to_regular_grid(
         energies, pitches, log_flux_data
     )
-    _, _, norm_reg = interpolate_to_regular_grid(
-        energies, pitches, norm2d
-    )
+    _, _, norm_reg = interpolate_to_regular_grid(energies, pitches, norm2d)
 
     # Create model on irregular grid first
     beam_width = max(abs(U_surface) * config.LOSS_CONE_BEAM_WIDTH_FACTOR, 1.0)
@@ -267,7 +268,9 @@ def create_3panel_debug_plot(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     print(f"Saved to {output_path}")
-    print(f"Fit parameters: U_surface={U_surface:.1f}V, Bₛ/Bₘ={bs_bm:.3f}, beam={beam_amp:.3f}, χ²={chi2:.2f}")
+    print(
+        f"Fit parameters: U_surface={U_surface:.1f}V, Bₛ/Bₘ={bs_bm:.3f}, beam={beam_amp:.3f}, χ²={chi2:.2f}"
+    )
 
 
 def parse_args() -> argparse.Namespace:

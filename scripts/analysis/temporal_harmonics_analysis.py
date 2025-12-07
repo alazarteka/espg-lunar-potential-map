@@ -42,7 +42,7 @@ def plot_coefficient_timeseries(
 ) -> None:
     """
     Plot time evolution of selected spherical harmonic coefficients.
-    
+
     Args:
         times: Array of datetime64 timestamps
         coeffs: Complex array of shape (n_times, n_coeffs)
@@ -102,7 +102,9 @@ def plot_coefficient_timeseries(
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
         fig.savefig(output_dir / "coefficient_timeseries.png", dpi=150)
-        print(f"Saved coefficient time series to {output_dir / 'coefficient_timeseries.png'}")
+        print(
+            f"Saved coefficient time series to {output_dir / 'coefficient_timeseries.png'}"
+        )
     else:
         plt.show()
 
@@ -281,7 +283,9 @@ def main() -> int:
     coverage = dataset.spatial_coverage
     rms = dataset.rms_residuals
     if n_samples is None or coverage is None or rms is None:
-        raise ValueError("Dataset is missing quality metrics required for analysis plots")
+        raise ValueError(
+            "Dataset is missing quality metrics required for analysis plots"
+        )
 
     print("\nDataset Summary:")
     print(f"  Time range     : {times[0]} → {times[-1]}")
@@ -289,7 +293,7 @@ def main() -> int:
     print(f"  Max degree     : lmax = {lmax}")
     print(f"  Coefficients   : {coeffs.shape[1]}")
     print(f"  Mean RMS       : {np.mean(rms):.2f} V")
-    print(f"  Mean coverage  : {np.mean(coverage)*100:.1f}%")
+    print(f"  Mean coverage  : {np.mean(coverage) * 100:.1f}%")
 
     output_dir = args.output_dir if not args.display else None
 

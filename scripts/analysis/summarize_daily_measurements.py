@@ -37,7 +37,9 @@ def _parse_iso_date(value: str) -> date:
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:  # pragma: no cover - argparse emits message
-        raise argparse.ArgumentTypeError("Dates must be provided as YYYY-MM-DD") from exc
+        raise argparse.ArgumentTypeError(
+            "Dates must be provided as YYYY-MM-DD"
+        ) from exc
 
 
 def _date_range(start_day: date, end_day: date) -> list[date]:
@@ -188,8 +190,12 @@ def main() -> None:
             "Compute summary statistics for cached potential measurements over a date range."
         )
     )
-    parser.add_argument("--start", type=_parse_iso_date, required=True, help="Start date (YYYY-MM-DD).")
-    parser.add_argument("--end", type=_parse_iso_date, required=True, help="End date (YYYY-MM-DD).")
+    parser.add_argument(
+        "--start", type=_parse_iso_date, required=True, help="Start date (YYYY-MM-DD)."
+    )
+    parser.add_argument(
+        "--end", type=_parse_iso_date, required=True, help="End date (YYYY-MM-DD)."
+    )
     parser.add_argument(
         "--cache-dir",
         type=Path,
@@ -219,9 +225,7 @@ def main() -> None:
 
     if missing:
         missing_str = ", ".join(day.strftime("%Y-%m-%d") for day in missing)
-        message = (
-            f"{len(missing)} day(s) skipped because no cache file was found: {missing_str}"
-        )
+        message = f"{len(missing)} day(s) skipped because no cache file was found: {missing_str}"
         if args.require_all:
             raise SystemExit(message)
         print(f"Warning: {message}", file=sys.stderr)

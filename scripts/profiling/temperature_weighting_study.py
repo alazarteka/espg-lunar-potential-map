@@ -304,18 +304,18 @@ def main() -> None:
     for name, arr in [("weighted", te_weighted_arr), ("unweighted", te_unweighted_arr)]:
         print(
             f"Te {name:10s}: mean={np.mean(arr):.3g} eV, median={np.median(arr):.3g} eV, "
-            f"P5={np.percentile(arr,5):.3g}, P95={np.percentile(arr,95):.3g}"
+            f"P5={np.percentile(arr, 5):.3g}, P95={np.percentile(arr, 95):.3g}"
         )
     print(
         f"ΔTe: mean={np.mean(delta_te):.3g} eV, median={np.median(delta_te):.3g} eV, "
-        f"P5={np.percentile(delta_te,5):.3g}, P95={np.percentile(delta_te,95):.3g}"
+        f"P5={np.percentile(delta_te, 5):.3g}, P95={np.percentile(delta_te, 95):.3g}"
     )
     finite_rel = np.isfinite(rel_delta_te)
     if np.any(finite_rel):
         rel = 100 * rel_delta_te[finite_rel]
         print(
             f"ΔTe/Te_uw: mean={np.mean(rel):.3g} %, median={np.median(rel):.3g} %, "
-            f"P5={np.percentile(rel,5):.3g} %, P95={np.percentile(rel,95):.3g} %"
+            f"P5={np.percentile(rel, 5):.3g} %, P95={np.percentile(rel, 95):.3g} %"
         )
 
 

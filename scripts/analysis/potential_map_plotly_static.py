@@ -64,9 +64,7 @@ def _load_rows(
                 continue
 
             finite_mask = (
-                np.isfinite(proj_lat)
-                & np.isfinite(proj_lon)
-                & np.isfinite(proj_pot)
+                np.isfinite(proj_lat) & np.isfinite(proj_lon) & np.isfinite(proj_pot)
             )
             mask &= finite_mask
             if not np.any(mask):
@@ -130,7 +128,9 @@ def _load_moon_texture(max_lat: int = 480, max_lon: int = 960) -> np.ndarray | N
     return texture
 
 
-def _sphere_coordinates(n_lat: int = 160, n_lon: int = 320) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _sphere_coordinates(
+    n_lat: int = 160, n_lon: int = 320
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     lat_vals = np.linspace(np.pi / 2, -np.pi / 2, n_lat)
     lon_vals = np.linspace(-np.pi, np.pi, n_lon, endpoint=False)
     lon_grid, lat_grid = np.meshgrid(lon_vals, lat_vals)
@@ -159,7 +159,10 @@ def _build_texture_surface(texture: np.ndarray, *, scale: float = 1.0) -> dict:
         surfacecolor = np.zeros_like(idx_map, dtype=float)
     else:
         colorscale = [
-            [i / (palette.shape[0] - 1), f"rgb({int(rgb[0])}, {int(rgb[1])}, {int(rgb[2])})"]
+            [
+                i / (palette.shape[0] - 1),
+                f"rgb({int(rgb[0])}, {int(rgb[1])}, {int(rgb[2])})",
+            ]
             for i, rgb in enumerate(palette)
         ]
         cmin, cmax = 0.0, float(palette.shape[0] - 1)
@@ -180,7 +183,9 @@ def _quantize_texture(texture: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     try:
         from PIL import Image
     except ImportError:
-        palette, inverse = np.unique(texture.reshape(-1, 3), axis=0, return_inverse=True)
+        palette, inverse = np.unique(
+            texture.reshape(-1, 3), axis=0, return_inverse=True
+        )
         palette = palette[:256]
         idx_map = inverse.reshape(texture.shape[0], texture.shape[1])
         idx_map = np.clip(idx_map, 0, palette.shape[0] - 1)
@@ -412,8 +417,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate an interactive Plotly sphere of cached surface potentials.",
     )
-    parser.add_argument("--start", required=True, type=_parse_iso_date, help="Start date (YYYY-MM-DD, inclusive)")
-    parser.add_argument("--end", required=True, type=_parse_iso_date, help="End date (YYYY-MM-DD, inclusive)")
+    parser.add_argument(
+        "--start",
+        required=True,
+        type=_parse_iso_date,
+        help="Start date (YYYY-MM-DD, inclusive)",
+    )
+    parser.add_argument(
+        "--end",
+        required=True,
+        type=_parse_iso_date,
+        help="End date (YYYY-MM-DD, inclusive)",
+    )
     parser.add_argument(
         "--cache-dir",
         type=Path,
@@ -426,14 +441,20 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Down-sample to at most this many rows before plotting",
     )
-    parser.add_argument("--seed", type=int, default=None, help="Random seed when --sample is used")
+    parser.add_argument(
+        "--seed", type=int, default=None, help="Random seed when --sample is used"
+    )
     parser.add_argument(
         "--colorscale",
         default="Viridis",
         help="Plotly colorscale for potentials (e.g., Viridis, Plasma)",
     )
-    parser.add_argument("--min-pot", type=float, default=None, help="Lower clip for potentials (V)")
-    parser.add_argument("--max-pot", type=float, default=None, help="Upper clip for potentials (V)")
+    parser.add_argument(
+        "--min-pot", type=float, default=None, help="Lower clip for potentials (V)"
+    )
+    parser.add_argument(
+        "--max-pot", type=float, default=None, help="Upper clip for potentials (V)"
+    )
     parser.add_argument(
         "--output",
         type=Path,
@@ -527,10 +548,7 @@ def main() -> int:
     cmin = args.min_pot if args.min_pot is not None else None
     cmax = args.max_pot if args.max_pot is not None else None
 
-    title = (
-        f"Φ_surface {str(args.start)} → {str(args.end)}"
-        f" | rows={pot.size:n}"
-    )
+    title = f"Φ_surface {str(args.start)} → {str(args.end)} | rows={pot.size:n}"
     texture_scale = 1.0
     if args.animate or args.mp4_output is not None:
         if args.animation_frames > 60:

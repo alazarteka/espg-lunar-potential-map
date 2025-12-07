@@ -12,6 +12,7 @@ Example:
         --end 1998-04-30 \\
         --output plots/publish/terminator_potential_profile.png
 """
+
 from __future__ import annotations
 
 import argparse
@@ -93,7 +94,9 @@ def load_date_range_data(
             in_sun = data["rows_projection_in_sun"]
 
             # Compute SZA for each measurement
-            for lat, lon, pot, utc_str, sun_flag in zip(lats, lons, pots, utcs, in_sun, strict=False):
+            for lat, lon, pot, utc_str, sun_flag in zip(
+                lats, lons, pots, utcs, in_sun, strict=False
+            ):
                 if not np.isfinite(pot):
                     continue
 
@@ -249,12 +252,27 @@ def create_terminator_profile_plot(
 
     # Add subsolar and anti-solar point annotations
     ax.axvline(0, color="orange", linestyle=":", linewidth=1.5, alpha=0.7)
-    ax.text(2, ax.get_ylim()[1] * 0.95, "Subsolar\nPoint",
-            fontsize=9, color="orange", weight="bold", va="top")
+    ax.text(
+        2,
+        ax.get_ylim()[1] * 0.95,
+        "Subsolar\nPoint",
+        fontsize=9,
+        color="orange",
+        weight="bold",
+        va="top",
+    )
 
     ax.axvline(180, color="navy", linestyle=":", linewidth=1.5, alpha=0.7)
-    ax.text(178, ax.get_ylim()[1] * 0.95, "Anti-Solar\nPoint",
-            fontsize=9, color="navy", weight="bold", va="top", ha="right")
+    ax.text(
+        178,
+        ax.get_ylim()[1] * 0.95,
+        "Anti-Solar\nPoint",
+        fontsize=9,
+        color="navy",
+        weight="bold",
+        va="top",
+        ha="right",
+    )
 
     # Formatting
     ax.set_xlabel("Solar Zenith Angle (°)", fontsize=12)

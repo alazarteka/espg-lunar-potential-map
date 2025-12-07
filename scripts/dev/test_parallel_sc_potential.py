@@ -18,7 +18,9 @@ from src.potential_mapper import pipeline
 from src.potential_mapper.spice import load_spice_files
 
 
-def compare_results(seq: np.ndarray, par: np.ndarray, name: str = "SC Potential") -> bool:
+def compare_results(
+    seq: np.ndarray, par: np.ndarray, name: str = "SC Potential"
+) -> bool:
     """Compare two arrays with NaN-aware comparison."""
 
     if seq.shape != par.shape:
@@ -32,7 +34,9 @@ def compare_results(seq: np.ndarray, par: np.ndarray, name: str = "SC Potential"
     if not np.array_equal(seq_nan_mask, par_nan_mask):
         nan_diff = np.sum(seq_nan_mask != par_nan_mask)
         print(f"❌ {name}: NaN mask mismatch ({nan_diff} differences)")
-        print(f"   Sequential NaNs: {np.sum(seq_nan_mask)}, Parallel NaNs: {np.sum(par_nan_mask)}")
+        print(
+            f"   Sequential NaNs: {np.sum(seq_nan_mask)}, Parallel NaNs: {np.sum(par_nan_mask)}"
+        )
         return False
 
     # Compare non-NaN values
@@ -42,13 +46,17 @@ def compare_results(seq: np.ndarray, par: np.ndarray, name: str = "SC Potential"
         max_diff = np.max(diff)
         mean_diff = np.mean(diff)
 
-        mismatch_indices = np.where(~np.isclose(seq, par, rtol=1e-9, atol=1e-12, equal_nan=True))[0]
+        mismatch_indices = np.where(
+            ~np.isclose(seq, par, rtol=1e-9, atol=1e-12, equal_nan=True)
+        )[0]
         print(f"❌ {name}: Value mismatch")
         print(f"   Max diff: {max_diff:.2e}, Mean diff: {mean_diff:.2e}")
         print(f"   Mismatches: {len(mismatch_indices)} / {np.sum(valid_mask)}")
         print("   First 5 mismatches:")
         for i in mismatch_indices[:5]:
-            print(f"     [{i}] seq={seq[i]:.6f}, par={par[i]:.6f}, diff={abs(seq[i]-par[i]):.2e}")
+            print(
+                f"     [{i}] seq={seq[i]:.6f}, par={par[i]:.6f}, diff={abs(seq[i] - par[i]):.2e}"
+            )
         return False
 
     print(f"✅ {name}: Match ({np.sum(valid_mask)} valid values)")
@@ -56,7 +64,9 @@ def compare_results(seq: np.ndarray, par: np.ndarray, name: str = "SC Potential"
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Test parallel SC potential correctness")
+    parser = argparse.ArgumentParser(
+        description="Test parallel SC potential correctness"
+    )
     parser.add_argument("--year", type=int, default=1998)
     parser.add_argument("--month", type=int, default=1)
     parser.add_argument("--day", type=int, default=16)
@@ -68,7 +78,9 @@ def main():
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
-    print(f"Testing parallel SC potential for {args.year}-{args.month:02d}-{args.day:02d}")
+    print(
+        f"Testing parallel SC potential for {args.year}-{args.month:02d}-{args.day:02d}"
+    )
     print("=" * 70)
 
     # Load SPICE
@@ -103,6 +115,7 @@ def main():
     except Exception as e:
         print(f"❌ Sequential processing failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
@@ -116,6 +129,7 @@ def main():
     except Exception as e:
         print(f"❌ Parallel processing failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
@@ -131,49 +145,53 @@ def main():
     all_match &= compare_results(
         seq_results.spacecraft_latitude,
         par_results.spacecraft_latitude,
-        "Spacecraft Latitude"
+        "Spacecraft Latitude",
     )
 
     all_match &= compare_results(
         seq_results.spacecraft_longitude,
         par_results.spacecraft_longitude,
-        "Spacecraft Longitude"
+        "Spacecraft Longitude",
     )
 
     all_match &= compare_results(
         seq_results.projection_latitude,
         par_results.projection_latitude,
-        "Projection Latitude"
+        "Projection Latitude",
     )
 
     all_match &= compare_results(
         seq_results.projection_longitude,
         par_results.projection_longitude,
-        "Projection Longitude"
+        "Projection Longitude",
     )
 
     all_match &= compare_results(
         seq_results.spacecraft_potential,
         par_results.spacecraft_potential,
-        "Spacecraft Potential"
+        "Spacecraft Potential",
     )
 
     all_match &= compare_results(
         seq_results.projected_potential,
         par_results.projected_potential,
-        "Projected Potential"
+        "Projected Potential",
     )
 
     # Boolean arrays
     if not np.array_equal(seq_results.spacecraft_in_sun, par_results.spacecraft_in_sun):
-        diff_count = np.sum(seq_results.spacecraft_in_sun != par_results.spacecraft_in_sun)
+        diff_count = np.sum(
+            seq_results.spacecraft_in_sun != par_results.spacecraft_in_sun
+        )
         print(f"❌ Spacecraft In Sun: {diff_count} differences")
         all_match = False
     else:
         print("✅ Spacecraft In Sun: Match")
 
     if not np.array_equal(seq_results.projection_in_sun, par_results.projection_in_sun):
-        diff_count = np.sum(seq_results.projection_in_sun != par_results.projection_in_sun)
+        diff_count = np.sum(
+            seq_results.projection_in_sun != par_results.projection_in_sun
+        )
         print(f"❌ Projection In Sun: {diff_count} differences")
         all_match = False
     else:

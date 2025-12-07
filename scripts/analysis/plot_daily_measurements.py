@@ -366,7 +366,9 @@ def _create_base_figure(
     }
 
 
-def _update_scatter(collection: PathCollection, offsets: np.ndarray, size: float) -> None:
+def _update_scatter(
+    collection: PathCollection, offsets: np.ndarray, size: float
+) -> None:
     """Update offsets and marker sizes for a PathCollection."""
     collection.set_offsets(offsets)
     collection.set_sizes(np.full(offsets.shape[0], size))

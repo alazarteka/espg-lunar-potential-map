@@ -21,12 +21,16 @@ def run_once(spec_no: int) -> None:
 
     with (
         patch("src.spacecraft_potential.spice.str2et", return_value=fake_et),
-        patch("src.spacecraft_potential.get_lp_position_wrt_moon", return_value=fake_pos),
+        patch(
+            "src.spacecraft_potential.get_lp_position_wrt_moon", return_value=fake_pos
+        ),
         patch(
             "src.spacecraft_potential.get_lp_vector_to_sun_in_lunar_frame",
             return_value=fake_sun_vec,
         ),
-        patch("src.spacecraft_potential.get_intersection_or_none", return_value=fake_pos),
+        patch(
+            "src.spacecraft_potential.get_intersection_or_none", return_value=fake_pos
+        ),
     ):
         calculate_potential(er_data, spec_no)
 

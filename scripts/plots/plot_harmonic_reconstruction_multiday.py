@@ -17,6 +17,7 @@ Example:
         --output plots/publish/harmonic_reconstruction_apr.png \\
         --auto-select
 """
+
 from __future__ import annotations
 
 import argparse
@@ -62,9 +63,7 @@ def create_multiday_reconstruction_plot(
     # Validate time indices
     for idx in time_indices:
         if idx < 0 or idx >= len(times):
-            raise ValueError(
-                f"Time index {idx} out of range [0, {len(times)-1}]"
-            )
+            raise ValueError(f"Time index {idx} out of range [0, {len(times) - 1}]")
 
     print("\nDataset Info:")
     print(f"  Time range: {times[0]} → {times[-1]}")
@@ -189,9 +188,7 @@ def create_multiday_reconstruction_plot(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     print(f"\nSaved to {output_path}")
-    print(
-        f"Global potential range: {vmin:.1f}V to {vmax:.1f}V"
-    )
+    print(f"Global potential range: {vmin:.1f}V to {vmax:.1f}V")
 
 
 def auto_select_indices(total_windows: int, n_select: int = 6) -> list[int]:
@@ -206,9 +203,7 @@ def auto_select_indices(total_windows: int, n_select: int = 6) -> list[int]:
         List of evenly-spaced indices
     """
     if total_windows < n_select:
-        raise ValueError(
-            f"Not enough windows ({total_windows}) to select {n_select}"
-        )
+        raise ValueError(f"Not enough windows ({total_windows}) to select {n_select}")
 
     # Select evenly spaced indices
     indices = np.linspace(0, total_windows - 1, n_select, dtype=int).tolist()

@@ -82,6 +82,7 @@ def test_shade_potential_moves_toward_zero_with_higher_SEE(monkeypatch):
     fitter = Kappa(er, 1)
     fit = fitter.fit()
     assert fit and fit.is_good_fit
+
     def find_bracket(delta: float) -> tuple[float, float]:
         low, high = -200.0, -0.5
         f_low = current_balance(low, fit, E, sey_E_m=500.0, sey_delta_m=delta)

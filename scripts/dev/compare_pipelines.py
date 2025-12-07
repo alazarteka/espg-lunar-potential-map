@@ -1,4 +1,3 @@
-
 import argparse
 import logging
 import sys
@@ -78,6 +77,7 @@ def compare_results(res1: PotentialResults, res2: PotentialResults):
 
     return all_match
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--year", type=int, default=1998)
@@ -88,9 +88,11 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     from src.potential_mapper.spice import load_spice_files
+
     load_spice_files()
 
     print(f"Running OLD pipeline for {args.year}-{args.month}-{args.day}...")
+
     # Mock args for pipeline run
     class Args:
         year = args.year
@@ -131,6 +133,7 @@ def main():
         print("\n✅ Pipelines produce identical results!")
     else:
         print("\n❌ Pipelines differ!")
+
 
 if __name__ == "__main__":
     main()

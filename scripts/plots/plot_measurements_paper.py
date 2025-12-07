@@ -16,6 +16,7 @@ Example:
         --end 1998-04-30 \\
         --output plots/publish/surface_measurements_april1998.png
 """
+
 from __future__ import annotations
 
 import argparse
@@ -85,9 +86,7 @@ def load_measurements(
             in_sun = data["rows_projection_in_sun"]
 
             # Filter valid measurements
-            valid = (
-                np.isfinite(lats) & np.isfinite(lons) & np.isfinite(pots)
-            )
+            valid = np.isfinite(lats) & np.isfinite(lons) & np.isfinite(pots)
 
             all_lats.append(lats[valid])
             all_lons.append(lons[valid])
@@ -122,16 +121,12 @@ def create_measurements_plot(
         dpi: Resolution for output
     """
     # Load data
-    lats, lons, potentials, in_sun = load_measurements(
-        cache_dir, start_day, end_day
-    )
+    lats, lons, potentials, in_sun = load_measurements(cache_dir, start_day, end_day)
 
     print(f"\nLoaded {len(lats)} valid measurements")
     print(f"  Sunlit: {np.sum(in_sun)}")
     print(f"  Shadowed: {np.sum(~in_sun)}")
-    print(
-        f"  Potential range: {np.min(potentials):.1f}V to {np.max(potentials):.1f}V"
-    )
+    print(f"  Potential range: {np.min(potentials):.1f}V to {np.max(potentials):.1f}V")
 
     # Create figure
     fig, ax = plt.subplots(figsize=(12, 6), constrained_layout=True, dpi=dpi)
@@ -166,9 +161,7 @@ def create_measurements_plot(
         date_str = start_day.strftime("%Y-%m-%d")
     else:
         date_str = f"{start_day.strftime('%Y-%m-%d')} to {end_day.strftime('%Y-%m-%d')}"
-    ax.set_title(
-        f"Surface Potential Measurements ({date_str})", fontsize=13
-    )
+    ax.set_title(f"Surface Potential Measurements ({date_str})", fontsize=13)
 
     # Colorbar
     cbar = fig.colorbar(scatter, ax=ax, label="Φ_surface (V)")

@@ -2,6 +2,7 @@
 """
 Benchmark different pandas CSV parsing engines for ER data files.
 """
+
 import sys
 import time
 from pathlib import Path
@@ -26,13 +27,14 @@ def benchmark_engine(file_path, engine, sep=r"\s+", **kwargs):
             engine=engine,
             header=None,
             names=config.ALL_COLS,
-            **kwargs
+            **kwargs,
         )
         elapsed = time.time() - start
         return elapsed, len(df), None
     except Exception as e:
         elapsed = time.time() - start
         return elapsed, 0, str(e)
+
 
 def main():
     # Get a test file
@@ -49,12 +51,18 @@ def main():
     configs = [
         ("python", r"\s+", {}, "Python engine with regex sep"),
         ("c", r"\s+", {}, "C engine with regex sep (may fail)"),
-        ("c", " ", {"skipinitialspace": True}, "C engine with space + skipinitialspace"),
+        (
+            "c",
+            " ",
+            {"skipinitialspace": True},
+            "C engine with space + skipinitialspace",
+        ),
     ]
 
     # Try pyarrow if available
     try:
         import pyarrow
+
         configs.append(("pyarrow", r"\s+", {}, "PyArrow engine"))
     except ImportError:
         print("PyArrow not installed, skipping...")
@@ -86,6 +94,7 @@ def main():
             print(f"{desc:50s} {elapsed:6.3f}s  ({speedup:4.1f}x speedup)")
     else:
         print("No successful runs!")
+
 
 if __name__ == "__main__":
     main()

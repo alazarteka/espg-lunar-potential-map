@@ -34,8 +34,16 @@ def test_prepare_payload_spec_summary():
     df = pd.DataFrame(
         {
             config.SPEC_NO_COLUMN: [10, 10, 11],
-            config.TIME_COLUMN: ["2000-01-01T00:00:00", "2000-01-01T00:05:00", "2000-01-01T00:10:00"],
-            config.UTC_COLUMN: ["2000-01-01T00:00:00", "2000-01-01T00:05:00", "2000-01-01T00:10:00"],
+            config.TIME_COLUMN: [
+                "2000-01-01T00:00:00",
+                "2000-01-01T00:05:00",
+                "2000-01-01T00:10:00",
+            ],
+            config.UTC_COLUMN: [
+                "2000-01-01T00:00:00",
+                "2000-01-01T00:05:00",
+                "2000-01-01T00:10:00",
+            ],
         }
     )
     results = _make_results(3, projected=np.array([np.nan, -5.0, np.nan]))

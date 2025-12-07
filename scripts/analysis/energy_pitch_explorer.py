@@ -101,7 +101,9 @@ def build_spec_points(
     return x_pts[mask_valid], y_pts[mask_valid], f_pts[mask_valid], yw_pts[mask_valid]
 
 
-def build_all_frames(er: ERData, pa: PitchAngle) -> tuple[
+def build_all_frames(
+    er: ERData, pa: PitchAngle
+) -> tuple[
     dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
     float,
     float,

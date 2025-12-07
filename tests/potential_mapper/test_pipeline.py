@@ -134,7 +134,9 @@ def patched_environment(monkeypatch):
         return fitter
 
     monkeypatch.setattr(pipeline, "LossConeFitter", fake_loss_cone_fitter)
-    monkeypatch.setattr(pipeline, "project_magnetic_fields", lambda *_: np.zeros((n_rows, 3)))
+    monkeypatch.setattr(
+        pipeline, "project_magnetic_fields", lambda *_: np.zeros((n_rows, 3))
+    )
     monkeypatch.setattr(
         pipeline,
         "find_surface_intersection",
@@ -165,12 +167,16 @@ def patched_environment(monkeypatch):
     def fake_calculate_potential(_er_data, spec_no):
         return (object(), sc_values[spec_no] * ureg.volt)
 
-    monkeypatch.setattr(spacecraft_potential, "calculate_potential", fake_calculate_potential)
+    monkeypatch.setattr(
+        spacecraft_potential, "calculate_potential", fake_calculate_potential
+    )
 
     return n_rows, captured
 
 
-def test_process_lp_file_combines_spacecraft_potential(monkeypatch, tmp_path, patched_environment):
+def test_process_lp_file_combines_spacecraft_potential(
+    monkeypatch, tmp_path, patched_environment
+):
     n_rows, captured = patched_environment
 
     dummy_file = tmp_path / "dummy.tab"

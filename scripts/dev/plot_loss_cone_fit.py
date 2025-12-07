@@ -3,6 +3,7 @@
 Create Halekas-style loss cone fit visualization.
 Shows observed normalized flux vs best-fit model with loss cone boundary.
 """
+
 import sys
 from pathlib import Path
 
@@ -17,7 +18,9 @@ from src.flux import ERData, LossConeFitter, PitchAngle
 from src.model import synth_losscone
 
 
-def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: Path = None):
+def plot_loss_cone_comparison(
+    er_file: Path, chunk_idx: int = 10, output_path: Path = None
+):
     """
     Create side-by-side plot of observed vs model loss cone.
 
@@ -32,7 +35,9 @@ def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: P
     pitch_angle = PitchAngle(er_data, str(config.DATA_DIR / config.THETA_FILE))
 
     # Create fitter
-    fitter = LossConeFitter(er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle)
+    fitter = LossConeFitter(
+        er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle
+    )
 
     # Fit loss cone for all chunks (but catch failures)
     print("Fitting loss cones...")
@@ -124,63 +129,65 @@ def plot_loss_cone_comparison(er_file: Path, chunk_idx: int = 10, output_path: P
     # Left: Observed
     im0 = axes[0].imshow(
         normalized_obs.T,
-        aspect='auto',
-        origin='lower',
+        aspect="auto",
+        origin="lower",
         extent=extent,
-        cmap='viridis',
+        cmap="viridis",
         vmin=vmin,
         vmax=vmax,
-        interpolation='nearest'
+        interpolation="nearest",
     )
-    axes[0].set_xscale('log')
-    axes[0].set_xlabel('Energy [eV]')
-    axes[0].set_ylabel('Pitch Angle [deg]')
-    axes[0].set_title(f'Observed (chunk {chunk_idx})\n{timestamp}')
-    axes[0].plot(energies, loss_cone_angle, 'w-', linewidth=2, label='Loss Cone')
-    plt.colorbar(im0, ax=axes[0], label='Normalized Flux')
+    axes[0].set_xscale("log")
+    axes[0].set_xlabel("Energy [eV]")
+    axes[0].set_ylabel("Pitch Angle [deg]")
+    axes[0].set_title(f"Observed (chunk {chunk_idx})\n{timestamp}")
+    axes[0].plot(energies, loss_cone_angle, "w-", linewidth=2, label="Loss Cone")
+    plt.colorbar(im0, ax=axes[0], label="Normalized Flux")
 
     # Middle: Model
     im1 = axes[1].imshow(
         model.T,
-        aspect='auto',
-        origin='lower',
+        aspect="auto",
+        origin="lower",
         extent=extent,
-        cmap='viridis',
+        cmap="viridis",
         vmin=vmin,
         vmax=vmax,
-        interpolation='nearest'
+        interpolation="nearest",
     )
-    axes[1].set_xscale('log')
-    axes[1].set_xlabel('Energy [eV]')
-    axes[1].set_ylabel('Pitch Angle [deg]')
-    axes[1].set_title(f'Best Fit\nU_surface={U_surface:.1f}V, Bs/Bm={bs_bm:.2f}')
-    axes[1].plot(energies, loss_cone_angle, 'w-', linewidth=2, label='Loss Cone')
-    plt.colorbar(im1, ax=axes[1], label='Normalized Flux')
+    axes[1].set_xscale("log")
+    axes[1].set_xlabel("Energy [eV]")
+    axes[1].set_ylabel("Pitch Angle [deg]")
+    axes[1].set_title(f"Best Fit\nU_surface={U_surface:.1f}V, Bs/Bm={bs_bm:.2f}")
+    axes[1].plot(energies, loss_cone_angle, "w-", linewidth=2, label="Loss Cone")
+    plt.colorbar(im1, ax=axes[1], label="Normalized Flux")
 
     # Right: Residual
     residual = normalized_obs - model
-    vmax_res = max(abs(np.nanpercentile(residual, 5)), abs(np.nanpercentile(residual, 95)))
+    vmax_res = max(
+        abs(np.nanpercentile(residual, 5)), abs(np.nanpercentile(residual, 95))
+    )
     im2 = axes[2].imshow(
         residual.T,
-        aspect='auto',
-        origin='lower',
+        aspect="auto",
+        origin="lower",
         extent=extent,
-        cmap='RdBu_r',
+        cmap="RdBu_r",
         vmin=-vmax_res,
         vmax=vmax_res,
-        interpolation='nearest'
+        interpolation="nearest",
     )
-    axes[2].set_xscale('log')
-    axes[2].set_xlabel('Energy [eV]')
-    axes[2].set_ylabel('Pitch Angle [deg]')
-    axes[2].set_title(f'Residual (obs - model)\nχ²={chi2:.1e}')
-    axes[2].plot(energies, loss_cone_angle, 'k-', linewidth=1, alpha=0.5)
-    plt.colorbar(im2, ax=axes[2], label='Residual')
+    axes[2].set_xscale("log")
+    axes[2].set_xlabel("Energy [eV]")
+    axes[2].set_ylabel("Pitch Angle [deg]")
+    axes[2].set_title(f"Residual (obs - model)\nχ²={chi2:.1e}")
+    axes[2].plot(energies, loss_cone_angle, "k-", linewidth=1, alpha=0.5)
+    plt.colorbar(im2, ax=axes[2], label="Residual")
 
     plt.tight_layout()
 
     if output_path:
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=150, bbox_inches="tight")
         print(f"Saved to {output_path}")
     else:
         plt.show()

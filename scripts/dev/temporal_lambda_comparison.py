@@ -41,7 +41,11 @@ for co_rotate in CO_ROTATE_OPTIONS:
     for temporal_lambda in TEMPORAL_LAMBDAS:
         # Build output filename
         rotate_str = "corotate" if co_rotate else "fixed"
-        lambda_str = f"{temporal_lambda:.1e}".replace(".", "p").replace("+", "").replace("-", "m")
+        lambda_str = (
+            f"{temporal_lambda:.1e}".replace(".", "p")
+            .replace("+", "")
+            .replace("-", "m")
+        )
         output_file = OUTPUT_ROOT / f"1998-04_{rotate_str}_lambda_{lambda_str}.npz"
 
         logging.info(
@@ -53,18 +57,33 @@ for co_rotate in CO_ROTATE_OPTIONS:
 
         # Build command
         cmd = [
-            "uv", "run", "python", "-m", "src.temporal.coefficients",
-            "--start", START_DATE,
-            "--end", END_DATE,
-            "--cache-dir", str(CACHE_DIR),
-            "--output", str(output_file),
-            "--lmax", str(LMAX),
-            "--window-hours", str(WINDOW_HOURS),
-            "--regularize-l2", str(REGULARIZE_L2),
-            "--temporal-lambda", str(temporal_lambda),
-            "--min-samples", str(MIN_SAMPLES),
-            "--min-coverage", str(MIN_COVERAGE),
-            "--log-level", "WARNING",  # Suppress verbose output
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "src.temporal.coefficients",
+            "--start",
+            START_DATE,
+            "--end",
+            END_DATE,
+            "--cache-dir",
+            str(CACHE_DIR),
+            "--output",
+            str(output_file),
+            "--lmax",
+            str(LMAX),
+            "--window-hours",
+            str(WINDOW_HOURS),
+            "--regularize-l2",
+            str(REGULARIZE_L2),
+            "--temporal-lambda",
+            str(temporal_lambda),
+            "--min-samples",
+            str(MIN_SAMPLES),
+            "--min-coverage",
+            str(MIN_COVERAGE),
+            "--log-level",
+            "WARNING",  # Suppress verbose output
         ]
 
         if co_rotate:
@@ -109,19 +128,21 @@ for co_rotate in CO_ROTATE_OPTIONS:
             continue
 
 # Print summary table
-print("\n" + "="*100)
+print("\n" + "=" * 100)
 print("TEMPORAL LAMBDA COMPARISON SUMMARY")
-print("="*100)
-print(f"{'Co-Rotate':<12} {'Lambda':<12} {'Windows':<10} {'Median RMS':<12} {'Mean RMS':<12} {'Std RMS':<12} {'Coverage':<10}")
-print("-"*100)
+print("=" * 100)
+print(
+    f"{'Co-Rotate':<12} {'Lambda':<12} {'Windows':<10} {'Median RMS':<12} {'Mean RMS':<12} {'Std RMS':<12} {'Coverage':<10}"
+)
+print("-" * 100)
 
 for s in results_summary:
     rotate_label = "YES" if s["co_rotate"] else "NO"
     print(
         f"{rotate_label:<12} {s['temporal_lambda']:<12.1e} {s['n_windows']:<10} "
-        f"{s['mean_rms']:<12.2f} {s['mean_rms']:<12.2f} {s['std_rms']:<12.2f} {s['median_coverage']*100:<10.1f}"
+        f"{s['mean_rms']:<12.2f} {s['mean_rms']:<12.2f} {s['std_rms']:<12.2f} {s['median_coverage'] * 100:<10.1f}"
     )
 
-print("="*100)
+print("=" * 100)
 print(f"\nResults saved to: {OUTPUT_ROOT}")
-print("="*100)
+print("=" * 100)

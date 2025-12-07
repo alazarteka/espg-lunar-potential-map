@@ -34,12 +34,14 @@ def test_lhs_chi2_batch_matches_sequential():
     eps = 1e-6
 
     norm2d = synth_losscone(
-        energies, pitches, true_U_surface,
+        energies,
+        pitches,
+        true_U_surface,
         U_spacecraft=0.0,
         bs_over_bm=true_bs_over_bm,
         beam_width_eV=beam_width,
         beam_amp=true_beam_amp,
-        beam_pitch_sigma_deg=beam_pitch_sigma
+        beam_pitch_sigma_deg=beam_pitch_sigma,
     )
     # Add noise
     norm2d = norm2d * np.random.uniform(0.8, 1.2, norm2d.shape)
@@ -72,7 +74,8 @@ def test_lhs_chi2_batch_matches_sequential():
     chi2_sequential = np.zeros(n_samples)
     for i in range(n_samples):
         model_i = synth_losscone(
-            energies, pitches,
+            energies,
+            pitches,
             lhs_U_surface[i],
             U_spacecraft=0.0,
             bs_over_bm=lhs_bs_over_bm[i],
@@ -87,9 +90,11 @@ def test_lhs_chi2_batch_matches_sequential():
 
     # Should match exactly
     np.testing.assert_allclose(
-        chi2_batch, chi2_sequential,
-        rtol=1e-10, atol=1e-10,
-        err_msg="Vectorized chi2 does not match sequential evaluation"
+        chi2_batch,
+        chi2_sequential,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="Vectorized chi2 does not match sequential evaluation",
     )
 
     # Best fit should be the same
@@ -111,29 +116,34 @@ def test_lhs_vectorization_with_edge_cases():
     eps = 1e-6
 
     # Edge case parameters
-    lhs_U_surface = np.array([
-        -100.0,  # Normal
-        -1.0,    # Very small (almost zero)
-        -500.0,  # Very large
-        0.0,     # Zero
-        -50.0,   # Normal
-        -200.0,  # Large
-        -10.0,   # Small
-        -75.0,   # Normal
-        -150.0,  # Moderate
-        -25.0,   # Small
-    ])
+    lhs_U_surface = np.array(
+        [
+            -100.0,  # Normal
+            -1.0,  # Very small (almost zero)
+            -500.0,  # Very large
+            0.0,  # Zero
+            -50.0,  # Normal
+            -200.0,  # Large
+            -10.0,  # Small
+            -75.0,  # Normal
+            -150.0,  # Moderate
+            -25.0,  # Small
+        ]
+    )
     lhs_bs_over_bm = np.array([0.5, 0.1, 0.9, 0.5, 0.2, 0.8, 0.3, 0.7, 0.4, 0.6])
     lhs_beam_amp = np.array([0.0, 5.0, 2.0, 1.0, 0.0, 3.0, 4.0, 0.5, 2.5, 1.5])
     lhs_beam_width = np.maximum(np.abs(lhs_U_surface) * 0.2, config.EPS)
 
     # Batch
     models_batch = synth_losscone(
-        energies, pitches, lhs_U_surface,
+        energies,
+        pitches,
+        lhs_U_surface,
         U_spacecraft=0.0,
         bs_over_bm=lhs_bs_over_bm,
-        beam_width_eV=lhs_beam_width, beam_amp=lhs_beam_amp,
-        beam_pitch_sigma_deg=10.0
+        beam_width_eV=lhs_beam_width,
+        beam_amp=lhs_beam_amp,
+        beam_pitch_sigma_deg=10.0,
     )
 
     log_data = np.log(norm2d + eps)
@@ -145,14 +155,17 @@ def test_lhs_vectorization_with_edge_cases():
     chi2_seq = []
     for i in range(n_samples):
         model = synth_losscone(
-            energies, pitches, lhs_U_surface[i],
+            energies,
+            pitches,
+            lhs_U_surface[i],
             U_spacecraft=0.0,
             bs_over_bm=lhs_bs_over_bm[i],
-            beam_width_eV=lhs_beam_width[i], beam_amp=lhs_beam_amp[i],
-            beam_pitch_sigma_deg=10.0
+            beam_width_eV=lhs_beam_width[i],
+            beam_amp=lhs_beam_amp[i],
+            beam_pitch_sigma_deg=10.0,
         )
         log_model = np.log(model + eps)
-        chi2_seq.append(np.sum((log_data - log_model)**2))
+        chi2_seq.append(np.sum((log_data - log_model) ** 2))
 
     chi2_seq = np.array(chi2_seq)
 
@@ -186,11 +199,14 @@ def test_lhs_vectorization_randomized(seed):
 
     # Batch
     models_batch = synth_losscone(
-        energies, pitches, lhs_U_surface,
+        energies,
+        pitches,
+        lhs_U_surface,
         U_spacecraft=0.0,
         bs_over_bm=lhs_bs_over_bm,
-        beam_width_eV=lhs_beam_width, beam_amp=lhs_beam_amp,
-        beam_pitch_sigma_deg=beam_pitch_sigma
+        beam_width_eV=lhs_beam_width,
+        beam_amp=lhs_beam_amp,
+        beam_pitch_sigma_deg=beam_pitch_sigma,
     )
 
     log_data = np.log(norm2d + eps)
@@ -202,21 +218,26 @@ def test_lhs_vectorization_randomized(seed):
     chi2_seq = []
     for i in range(n_samples):
         model = synth_losscone(
-            energies, pitches, lhs_U_surface[i],
+            energies,
+            pitches,
+            lhs_U_surface[i],
             U_spacecraft=0.0,
             bs_over_bm=lhs_bs_over_bm[i],
-            beam_width_eV=lhs_beam_width[i], beam_amp=lhs_beam_amp[i],
-            beam_pitch_sigma_deg=beam_pitch_sigma
+            beam_width_eV=lhs_beam_width[i],
+            beam_amp=lhs_beam_amp[i],
+            beam_pitch_sigma_deg=beam_pitch_sigma,
         )
         log_model = np.log(model + eps)
-        chi2_seq.append(np.sum((log_data - log_model)**2))
+        chi2_seq.append(np.sum((log_data - log_model) ** 2))
 
     chi2_seq = np.array(chi2_seq)
 
     np.testing.assert_allclose(
-        chi2_batch, chi2_seq,
-        rtol=1e-10, atol=1e-10,
-        err_msg=f"Mismatch for seed {seed}"
+        chi2_batch,
+        chi2_seq,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg=f"Mismatch for seed {seed}",
     )
 
 
@@ -242,25 +263,32 @@ def test_beam_width_broadcasting():
 
     # Batch call
     models_batch = synth_losscone(
-        energies, pitches, U_surfaces,
+        energies,
+        pitches,
+        U_surfaces,
         U_spacecraft=0.0,
         bs_over_bm=bs_over_bms,
-        beam_width_eV=beam_widths, beam_amp=beam_amps,
-        beam_pitch_sigma_deg=10.0
+        beam_width_eV=beam_widths,
+        beam_amp=beam_amps,
+        beam_pitch_sigma_deg=10.0,
     )
 
     # Individual calls
     for i in range(n_samples):
         model_individual = synth_losscone(
-            energies, pitches, U_surfaces[i],
+            energies,
+            pitches,
+            U_surfaces[i],
             U_spacecraft=0.0,
             bs_over_bm=bs_over_bms[i],
-            beam_width_eV=beam_widths[i], beam_amp=beam_amps[i],
-            beam_pitch_sigma_deg=10.0
+            beam_width_eV=beam_widths[i],
+            beam_amp=beam_amps[i],
+            beam_pitch_sigma_deg=10.0,
         )
 
         np.testing.assert_allclose(
-            models_batch[i], model_individual,
+            models_batch[i],
+            model_individual,
             rtol=1e-10,
-            err_msg=f"Beam width broadcasting failed for sample {i}"
+            err_msg=f"Beam width broadcasting failed for sample {i}",
         )

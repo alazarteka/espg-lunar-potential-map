@@ -45,7 +45,9 @@ def _to_unicode(arr) -> np.ndarray:
     return np.asarray(arr, dtype="U64")
 
 
-def _prepare_payload(er_data: ERData, results: PotentialResults) -> dict[str, np.ndarray]:
+def _prepare_payload(
+    er_data: ERData, results: PotentialResults
+) -> dict[str, np.ndarray]:
     df = er_data.data.reset_index(drop=True)
     n_rows = len(df)
     if n_rows != len(results.spacecraft_latitude):
@@ -69,7 +71,9 @@ def _prepare_payload(er_data: ERData, results: PotentialResults) -> dict[str, np
         "rows_projection_in_sun": results.projection_in_sun.astype(bool),
     }
 
-    uniq_specs, start_indices, counts = np.unique(spec_no, return_index=True, return_counts=True)
+    uniq_specs, start_indices, counts = np.unique(
+        spec_no, return_index=True, return_counts=True
+    )
     spec_time_start = []
     spec_time_end = []
     spec_valid = []
@@ -95,7 +99,9 @@ def _prepare_payload(er_data: ERData, results: PotentialResults) -> dict[str, np
 
 def _write_npz_atomic(out_path: Path, payload: dict[str, np.ndarray]) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=out_path.parent, suffix=".tmp", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(
+        dir=out_path.parent, suffix=".tmp", delete=False
+    ) as tmp:
         np.savez_compressed(tmp, **payload)
         tmp.flush()
         os.fsync(tmp.fileno())
@@ -103,7 +109,9 @@ def _write_npz_atomic(out_path: Path, payload: dict[str, np.ndarray]) -> None:
     os.replace(tmp_path, out_path)
 
 
-def _process_file(file_path: Path, output_root: Path, overwrite: bool) -> tuple[str, str]:
+def _process_file(
+    file_path: Path, output_root: Path, overwrite: bool
+) -> tuple[str, str]:
     _ensure_spice_loaded()
     out_path = _relative_output_path(file_path, output_root)
     if out_path.exists() and not overwrite:
@@ -117,18 +125,28 @@ def _process_file(file_path: Path, output_root: Path, overwrite: bool) -> tuple[
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Batch compute potential mapper outputs.")
+    parser = argparse.ArgumentParser(
+        description="Batch compute potential mapper outputs."
+    )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("artifacts/potential_cache"),
         help="Directory where per-file NPZ results are stored.",
     )
-    parser.add_argument("--workers", type=int, default=os.cpu_count() or 1, help="Parallel workers")
-    parser.add_argument("--overwrite", action="store_true", help="Recompute even if output exists")
+    parser.add_argument(
+        "--workers", type=int, default=os.cpu_count() or 1, help="Parallel workers"
+    )
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Recompute even if output exists"
+    )
     parser.add_argument("--year", type=int, default=None, help="Optional year filter")
-    parser.add_argument("--month", type=int, default=None, help="Optional month filter (1-12)")
-    parser.add_argument("--day", type=int, default=None, help="Optional day filter (1-31)")
+    parser.add_argument(
+        "--month", type=int, default=None, help="Optional month filter (1-12)"
+    )
+    parser.add_argument(
+        "--day", type=int, default=None, help="Optional day filter (1-31)"
+    )
     parser.add_argument(
         "--limit",
         type=int,
@@ -141,7 +159,9 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     args = _parse_args()
     start = datetime.now()
-    flux_files = DataLoader.discover_flux_files(year=args.year, month=args.month, day=args.day)
+    flux_files = DataLoader.discover_flux_files(
+        year=args.year, month=args.month, day=args.day
+    )
     if args.limit is not None:
         flux_files = flux_files[: args.limit]
 
@@ -153,7 +173,9 @@ def main() -> int:
     output_root = args.output_dir.resolve()
     output_root.mkdir(parents=True, exist_ok=True)
 
-    print(f"Processing {total_files} file{'s' if total_files != 1 else ''} with {args.workers} worker{'s' if args.workers != 1 else ''}...")
+    print(
+        f"Processing {total_files} file{'s' if total_files != 1 else ''} with {args.workers} worker{'s' if args.workers != 1 else ''}..."
+    )
     print(f"Output directory: {output_root}")
     print()
 
@@ -162,7 +184,9 @@ def main() -> int:
 
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
         futures = {
-            executor.submit(_process_file, file_path, output_root, args.overwrite): file_path
+            executor.submit(
+                _process_file, file_path, output_root, args.overwrite
+            ): file_path
             for file_path in flux_files
         }
         for future in as_completed(futures):
@@ -178,27 +202,39 @@ def main() -> int:
                 rate = completed / elapsed if elapsed > 0 else 0
                 eta = (total_files - completed) / rate if rate > 0 else 0
 
-                print(f"[{completed}/{total_files} {pct:5.1f}%] [{status:7s}] {file_path.name} "
-                      f"(eta: {eta/60:.1f}m, {rate:.2f} files/s)")
+                print(
+                    f"[{completed}/{total_files} {pct:5.1f}%] [{status:7s}] {file_path.name} "
+                    f"(eta: {eta / 60:.1f}m, {rate:.2f} files/s)"
+                )
             except Exception as exc:
                 summary["failed"] += 1
                 completed += 1
                 pct = 100 * completed / total_files
-                print(f"[{completed}/{total_files} {pct:5.1f}%] [failed ] {file_path.name}: {exc}")
+                print(
+                    f"[{completed}/{total_files} {pct:5.1f}%] [failed ] {file_path.name}: {exc}"
+                )
 
     duration = datetime.now() - start
     report = ", ".join(f"{k}={v}" for k, v in summary.items())
     print()
-    print(f"Done in {duration.total_seconds():.1f}s ({duration.total_seconds()/60:.1f}m) - {report}")
+    print(
+        f"Done in {duration.total_seconds():.1f}s ({duration.total_seconds() / 60:.1f}m) - {report}"
+    )
 
     # Show rate in appropriate units
-    avg_rate = total_files / duration.total_seconds() if duration.total_seconds() > 0 else 0
+    avg_rate = (
+        total_files / duration.total_seconds() if duration.total_seconds() > 0 else 0
+    )
     if avg_rate >= 0.01:
-        print(f"Average: {avg_rate:.2f} files/s ({duration.total_seconds()/total_files:.1f}s per file)")
+        print(
+            f"Average: {avg_rate:.2f} files/s ({duration.total_seconds() / total_files:.1f}s per file)"
+        )
     else:
         # For slow rates, show time per file instead
         time_per_file = duration.total_seconds() / total_files if total_files > 0 else 0
-        print(f"Average: {time_per_file:.1f}s per file ({time_per_file/60:.1f}m per file)")
+        print(
+            f"Average: {time_per_file:.1f}s per file ({time_per_file / 60:.1f}m per file)"
+        )
 
     return 0 if summary["failed"] == 0 else 1
 

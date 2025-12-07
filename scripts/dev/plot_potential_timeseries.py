@@ -11,22 +11,31 @@ from plotly.subplots import make_subplots
 def main():
     parser = argparse.ArgumentParser(description="Plot surface potential time series")
     parser.add_argument("--input", required=True, help="NPZ potential cache file")
-    parser.add_argument("--output", default="artifacts/plots/potential_timeseries.html", help="Output HTML file")
-    parser.add_argument("--sample", type=int, default=1000, help="Downsample to N points for faster rendering")
+    parser.add_argument(
+        "--output",
+        default="artifacts/plots/potential_timeseries.html",
+        help="Output HTML file",
+    )
+    parser.add_argument(
+        "--sample",
+        type=int,
+        default=1000,
+        help="Downsample to N points for faster rendering",
+    )
     args = parser.parse_args()
 
     print(f"Loading data from {args.input}")
     data = np.load(args.input)
 
     # Extract data
-    times = data['rows_time']  # Unix timestamps
-    proj_potential = data['rows_projected_potential']
-    proj_lat = data['rows_projection_latitude']
-    proj_lon = data['rows_projection_longitude']
-    in_sun = data['rows_projection_in_sun']
+    times = data["rows_time"]  # Unix timestamps
+    proj_potential = data["rows_projected_potential"]
+    proj_lat = data["rows_projection_latitude"]
+    proj_lon = data["rows_projection_longitude"]
+    in_sun = data["rows_projection_in_sun"]
 
     # Convert to datetime
-    datetimes = [np.datetime64(int(float(t)), 's') for t in times]
+    datetimes = [np.datetime64(int(float(t)), "s") for t in times]
 
     # Filter valid potentials
     valid = np.isfinite(proj_potential) & np.isfinite(proj_lat)
@@ -55,10 +64,11 @@ def main():
 
     # Create figure with subplots
     fig = make_subplots(
-        rows=2, cols=1,
+        rows=2,
+        cols=1,
         subplot_titles=("Surface Potential vs Time", "Spatial Coverage"),
         vertical_spacing=0.12,
-        row_heights=[0.7, 0.3]
+        row_heights=[0.7, 0.3],
     )
 
     # Time series plot
@@ -67,12 +77,13 @@ def main():
             go.Scattergl(
                 x=datetimes[day_mask],
                 y=proj_potential[day_mask],
-                mode='markers',
-                marker=dict(size=2, color='orange', opacity=0.5),
-                name='Dayside',
-                hovertemplate='%{x}<br>Potential: %{y:.1f} V<extra></extra>'
+                mode="markers",
+                marker=dict(size=2, color="orange", opacity=0.5),
+                name="Dayside",
+                hovertemplate="%{x}<br>Potential: %{y:.1f} V<extra></extra>",
             ),
-            row=1, col=1
+            row=1,
+            col=1,
         )
 
     if np.any(night_mask):
@@ -80,12 +91,13 @@ def main():
             go.Scattergl(
                 x=datetimes[night_mask],
                 y=proj_potential[night_mask],
-                mode='markers',
-                marker=dict(size=2, color='darkblue', opacity=0.5),
-                name='Nightside',
-                hovertemplate='%{x}<br>Potential: %{y:.1f} V<extra></extra>'
+                mode="markers",
+                marker=dict(size=2, color="darkblue", opacity=0.5),
+                name="Nightside",
+                hovertemplate="%{x}<br>Potential: %{y:.1f} V<extra></extra>",
             ),
-            row=1, col=1
+            row=1,
+            col=1,
         )
 
     # Spatial coverage (lat/lon scatter)
@@ -93,23 +105,20 @@ def main():
         go.Scattergl(
             x=proj_lon,
             y=proj_lat,
-            mode='markers',
+            mode="markers",
             marker=dict(
                 size=2,
                 color=proj_potential,
-                colorscale='RdBu_r',
+                colorscale="RdBu_r",
                 showscale=True,
-                colorbar=dict(
-                    title="Potential (V)",
-                    y=0.2,
-                    len=0.3
-                ),
-                opacity=0.6
+                colorbar=dict(title="Potential (V)", y=0.2, len=0.3),
+                opacity=0.6,
             ),
-            name='Coverage',
-            hovertemplate='Lat: %{y:.1f}°<br>Lon: %{x:.1f}°<br>Potential: %{marker.color:.1f} V<extra></extra>'
+            name="Coverage",
+            hovertemplate="Lat: %{y:.1f}°<br>Lon: %{x:.1f}°<br>Potential: %{marker.color:.1f} V<extra></extra>",
         ),
-        row=2, col=1
+        row=2,
+        col=1,
     )
 
     # Update axes
@@ -124,7 +133,7 @@ def main():
         height=900,
         title_text="Lunar Surface Potential Time Series",
         showlegend=True,
-        hovermode='closest'
+        hovermode="closest",
     )
 
     # Save
@@ -134,7 +143,9 @@ def main():
     # Print stats
     print("\nStatistics:")
     print(f"  Date range: {datetimes[0]} to {datetimes[-1]}")
-    print(f"  Potential range: {np.nanmin(proj_potential):.1f} to {np.nanmax(proj_potential):.1f} V")
+    print(
+        f"  Potential range: {np.nanmin(proj_potential):.1f} to {np.nanmax(proj_potential):.1f} V"
+    )
     print(f"  Mean potential: {np.nanmean(proj_potential):.1f} V")
     print(f"  Dayside fraction: {100 * np.sum(day_mask) / len(day_mask):.1f}%")
 

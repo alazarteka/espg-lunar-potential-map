@@ -1,4 +1,3 @@
-
 import cProfile
 import io
 import logging
@@ -22,6 +21,7 @@ def profile_run(limit=1):
 
     # Load SPICE kernels
     from src.potential_mapper.spice import load_spice_files
+
     load_spice_files()
 
     # Discover files (no date filter to get any available files)
@@ -46,6 +46,7 @@ def profile_run(limit=1):
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
             import traceback
+
             traceback.print_exc()
 
     pr.disable()
@@ -55,16 +56,17 @@ def profile_run(limit=1):
     ps = pstats.Stats(pr, stream=s).sort_stats(pstats.SortKey.CUMULATIVE)
     ps.print_stats(50)
 
-    print("\n" + "="*80 + "\n")
+    print("\n" + "=" * 80 + "\n")
     print("TOP 50 BY CUMULATIVE TIME")
-    print("="*80)
+    print("=" * 80)
     print(s.getvalue())
 
     # Look specifically for fitting-related functions
-    print("\n" + "="*80 + "\n")
+    print("\n" + "=" * 80 + "\n")
     print("FITTING-RELATED FUNCTIONS")
-    print("="*80)
+    print("=" * 80)
     ps.print_stats("fit|synth|minimize|chi2")
+
 
 if __name__ == "__main__":
     profile_run(limit=1)

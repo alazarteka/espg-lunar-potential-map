@@ -115,11 +115,7 @@ def test_get_j2000_iau_moon_transform_matrix_batch_with_mock(monkeypatch):
         # Return rotation matrix that depends on time
         angle = time * 0.1
         c, s = np.cos(angle), np.sin(angle)
-        return np.array([
-            [c, -s, 0],
-            [s, c, 0],
-            [0, 0, 1]
-        ])
+        return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
 
     monkeypatch.setattr("spiceypy.pxform", mock_pxform)
 

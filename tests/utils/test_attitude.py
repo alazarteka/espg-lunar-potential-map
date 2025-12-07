@@ -21,7 +21,9 @@ def test_get_current_ra_dec_batch_matches_scalar():
     query_times = np.array([5.0, 15.0, 25.0, 35.0])
 
     # Batch call
-    ra_batch, dec_batch = get_current_ra_dec_batch(query_times, et_spin, ra_vals, dec_vals)
+    ra_batch, dec_batch = get_current_ra_dec_batch(
+        query_times, et_spin, ra_vals, dec_vals
+    )
 
     # Scalar calls
     ra_scalar = []
@@ -49,14 +51,18 @@ def test_get_current_ra_dec_batch_handles_out_of_bounds():
     # Query times outside valid range
     # time < et_spin[0] -> idx=0 -> invalid (idx <= 0)
     # time > et_spin[-1] -> idx=len(et_spin) -> invalid (idx >= len(ra_vals))
-    query_times = np.array([
-        5.0,   # Before first -> idx=0 -> invalid
-        15.0,  # Between 0,1 -> idx=1 -> valid
-        25.0,  # Between 1,2 -> idx=2 -> valid
-        35.0,  # After last -> idx=3 -> invalid
-    ])
+    query_times = np.array(
+        [
+            5.0,  # Before first -> idx=0 -> invalid
+            15.0,  # Between 0,1 -> idx=1 -> valid
+            25.0,  # Between 1,2 -> idx=2 -> valid
+            35.0,  # After last -> idx=3 -> invalid
+        ]
+    )
 
-    ra_batch, dec_batch = get_current_ra_dec_batch(query_times, et_spin, ra_vals, dec_vals)
+    ra_batch, dec_batch = get_current_ra_dec_batch(
+        query_times, et_spin, ra_vals, dec_vals
+    )
 
     # First should be NaN
     assert np.isnan(ra_batch[0])
@@ -82,7 +88,9 @@ def test_get_current_ra_dec_batch_edge_cases():
 
     # Edge case: exactly at boundary
     query_times = np.array([10.0])
-    ra_batch, dec_batch = get_current_ra_dec_batch(query_times, et_spin, ra_vals, dec_vals)
+    ra_batch, dec_batch = get_current_ra_dec_batch(
+        query_times, et_spin, ra_vals, dec_vals
+    )
 
     # bisect_right(10.0) in [0, 10] -> idx=2 -> invalid (>= len(ra_vals)=2)
     assert np.isnan(ra_batch[0])
@@ -90,7 +98,9 @@ def test_get_current_ra_dec_batch_edge_cases():
 
     # Just before boundary should be valid
     query_times = np.array([9.999])
-    ra_batch, dec_batch = get_current_ra_dec_batch(query_times, et_spin, ra_vals, dec_vals)
+    ra_batch, dec_batch = get_current_ra_dec_batch(
+        query_times, et_spin, ra_vals, dec_vals
+    )
 
     # bisect_right(9.999) -> idx=1 -> valid
     assert np.isfinite(ra_batch[0])
@@ -111,10 +121,12 @@ def test_get_current_ra_dec_batch_consistency_with_searchsorted():
     np.random.seed(42)
     query_times = np.random.uniform(-100, 1100, 50)
 
-    ra_batch, dec_batch = get_current_ra_dec_batch(query_times, et_spin, ra_vals, dec_vals)
+    ra_batch, dec_batch = get_current_ra_dec_batch(
+        query_times, et_spin, ra_vals, dec_vals
+    )
 
     # Verify with manual searchsorted
-    idxs = np.searchsorted(et_spin, query_times, side='right')
+    idxs = np.searchsorted(et_spin, query_times, side="right")
     valid_mask = (idxs > 0) & (idxs < len(ra_vals))
 
     for i, t in enumerate(query_times):
@@ -144,7 +156,9 @@ def test_get_current_ra_dec_batch_randomized(seed):
     query_times = np.random.uniform(-100, 1100, n_queries)
 
     # Batch
-    ra_batch, dec_batch = get_current_ra_dec_batch(query_times, et_spin, ra_vals, dec_vals)
+    ra_batch, dec_batch = get_current_ra_dec_batch(
+        query_times, et_spin, ra_vals, dec_vals
+    )
 
     # Scalar
     ra_scalar = []
@@ -159,10 +173,8 @@ def test_get_current_ra_dec_batch_randomized(seed):
 
     # Should match exactly (no floating point ops, just indexing)
     np.testing.assert_array_equal(
-        ra_batch, ra_scalar,
-        err_msg=f"RA mismatch for seed {seed}"
+        ra_batch, ra_scalar, err_msg=f"RA mismatch for seed {seed}"
     )
     np.testing.assert_array_equal(
-        dec_batch, dec_scalar,
-        err_msg=f"DEC mismatch for seed {seed}"
+        dec_batch, dec_scalar, err_msg=f"DEC mismatch for seed {seed}"
     )

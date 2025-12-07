@@ -10,6 +10,7 @@ Example:
         --time-index 15 \\
         --output plots/publish/harmonic_reconstruction.png
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,9 +48,7 @@ def create_harmonic_reconstruction_plot(
 
     # Validate time index
     if time_index < 0 or time_index >= len(times):
-        raise ValueError(
-            f"Time index {time_index} out of range [0, {len(times)-1}]"
-        )
+        raise ValueError(f"Time index {time_index} out of range [0, {len(times) - 1}]")
 
     print("\nDataset Info:")
     print(f"  Time range: {times[0]} → {times[-1]}")
@@ -79,12 +78,8 @@ def create_harmonic_reconstruction_plot(
         ax.set_ylabel("Latitude", fontsize=12)
         ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
     else:  # rectangular
-        fig, ax = plt.subplots(
-            figsize=(10, 6), constrained_layout=True, dpi=dpi
-        )
-        mesh = ax.pcolormesh(
-            lons, lats, potential, shading="auto", cmap="viridis"
-        )
+        fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True, dpi=dpi)
+        mesh = ax.pcolormesh(lons, lats, potential, shading="auto", cmap="viridis")
         ax.set_xlabel("Longitude (°)", fontsize=12)
         ax.set_ylabel("Latitude (°)", fontsize=12)
         ax.set_xlim(-180, 180)
@@ -123,9 +118,7 @@ def create_harmonic_reconstruction_plot(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     print(f"\nSaved to {output_path}")
-    print(
-        f"Potential range: {np.min(valid_pot):.1f}V to {np.max(valid_pot):.1f}V"
-    )
+    print(f"Potential range: {np.min(valid_pot):.1f}V to {np.max(valid_pot):.1f}V")
 
 
 def parse_args() -> argparse.Namespace:

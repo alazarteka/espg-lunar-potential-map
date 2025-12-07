@@ -10,6 +10,7 @@ Example:
         --spec-no 50 \\
         --output plots/publish/losscone_fit_comparison.png
 """
+
 from __future__ import annotations
 
 import argparse
@@ -66,7 +67,11 @@ def interpolate_to_regular_grid(
 
             # Interpolate onto regular pitch grid
             flux_reg[i] = np.interp(
-                pitches_reg, pitch_pts_sorted, flux_pts_sorted, left=np.nan, right=np.nan
+                pitches_reg,
+                pitch_pts_sorted,
+                flux_pts_sorted,
+                left=np.nan,
+                right=np.nan,
             )
         else:
             flux_reg[i] = np.nan
@@ -138,7 +143,9 @@ def create_losscone_comparison_plot(
     chunk_data = er_data.data[chunk_mask]
 
     if len(chunk_data) != config.SWEEP_ROWS:
-        print(f"Warning: Expected {config.SWEEP_ROWS} rows for spectrum {spec_no}, got {len(chunk_data)}")
+        print(
+            f"Warning: Expected {config.SWEEP_ROWS} rows for spectrum {spec_no}, got {len(chunk_data)}"
+        )
 
     # Fit the specified spectrum
     print(f"Fitting spectrum {spec_no}...")
@@ -273,7 +280,9 @@ def create_losscone_comparison_plot(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     print(f"Saved to {output_path}")
-    print(f"Fit parameters: U_surface={U_surface:.1f}V, Bₛ/Bₘ={bs_bm:.3f}, beam={beam_amp:.3f}, χ²={chi2:.2f}")
+    print(
+        f"Fit parameters: U_surface={U_surface:.1f}V, Bₛ/Bₘ={bs_bm:.3f}, beam={beam_amp:.3f}, χ²={chi2:.2f}"
+    )
 
 
 def parse_args() -> argparse.Namespace:

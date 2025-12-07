@@ -60,9 +60,7 @@ def _load_rows(
                 continue
 
             finite_mask = (
-                np.isfinite(proj_lat)
-                & np.isfinite(proj_lon)
-                & np.isfinite(proj_pot)
+                np.isfinite(proj_lat) & np.isfinite(proj_lon) & np.isfinite(proj_pot)
             )
             mask &= finite_mask
             if not np.any(mask):
@@ -123,7 +121,9 @@ def _plot_sphere(
     sphere_x = np.outer(np.sin(phi), np.cos(theta))
     sphere_y = np.outer(np.sin(phi), np.sin(theta))
     sphere_z = np.outer(np.cos(phi), np.ones_like(theta))
-    ax.plot_wireframe(sphere_x, sphere_y, sphere_z, color="lightgray", linewidth=0.3, alpha=0.3)
+    ax.plot_wireframe(
+        sphere_x, sphere_y, sphere_z, color="lightgray", linewidth=0.3, alpha=0.3
+    )
 
     ax.set_box_aspect([1, 1, 1])
     ax.set_axis_off()
@@ -218,10 +218,7 @@ def main() -> int:
 
     lat, lon, pot = _sample_rows(lat, lon, pot, args.sample, args.seed)
 
-    title = (
-        f"Φ_surface {str(args.start)} → {str(args.end)}"
-        f" | rows={pot.size:n}"
-    )
+    title = f"Φ_surface {str(args.start)} → {str(args.end)} | rows={pot.size:n}"
     fig, _ = _plot_sphere(
         lat=lat,
         lon=lon,

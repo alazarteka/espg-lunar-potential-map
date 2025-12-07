@@ -22,7 +22,7 @@ def test_verify_kernels_lock_with_temp_files(tmp_path: Path) -> None:
 
     lock = kernels_dir / "kernels.lock"
     lock.write_text(
-        f"{_sha1_bytes(b'hello')}  {a.name}\n" f"{_sha1_bytes(b'world')}  {b.name}\n",
+        f"{_sha1_bytes(b'hello')}  {a.name}\n{_sha1_bytes(b'world')}  {b.name}\n",
         encoding="utf-8",
     )
 

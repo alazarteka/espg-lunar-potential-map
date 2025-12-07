@@ -54,17 +54,23 @@ def create_interactive_sphere(
 
     # Convert times to hours since start for interpolation
     t0 = times[0]
-    hours = (times - t0) / np.timedelta64(1, 'h')
+    hours = (times - t0) / np.timedelta64(1, "h")
     hours_interp = np.linspace(hours[0], hours[-1], n_interp_frames)
 
     # Interpolate coefficients for smooth temporal evolution
-    print(f"Interpolating {coeffs.shape[1]} coefficients across {n_interp_frames} frames...")
+    print(
+        f"Interpolating {coeffs.shape[1]} coefficients across {n_interp_frames} frames..."
+    )
     coeffs_interp = np.zeros((n_interp_frames, coeffs.shape[1]), dtype=np.complex128)
 
     for i in range(coeffs.shape[1]):
         # Interpolate real and imaginary parts separately
-        f_real = interp1d(hours, coeffs[:, i].real, kind='cubic', fill_value='extrapolate')
-        f_imag = interp1d(hours, coeffs[:, i].imag, kind='cubic', fill_value='extrapolate')
+        f_real = interp1d(
+            hours, coeffs[:, i].real, kind="cubic", fill_value="extrapolate"
+        )
+        f_imag = interp1d(
+            hours, coeffs[:, i].imag, kind="cubic", fill_value="extrapolate"
+        )
         coeffs_interp[:, i] = f_real(hours_interp) + 1j * f_imag(hours_interp)
 
     # Generate potential maps for each interpolated time
@@ -99,21 +105,25 @@ def create_interactive_sphere(
         )
 
         # Convert interpolated time back to datetime
-        t_interp = t0 + np.timedelta64(int(hours_interp[i] * 3600), 's')
+        t_interp = t0 + np.timedelta64(int(hours_interp[i] * 3600), "s")
 
         frame = go.Frame(
-            data=[go.Surface(
-                x=x, y=y, z=z,
-                surfacecolor=potential,
-                colorscale='RdBu_r',
-                cmin=vmin,
-                cmax=vmax,
-                showscale=True,
-                colorbar=dict(
-                    title="Potential (V)",
-                    x=1.02,
-                ),
-            )],
+            data=[
+                go.Surface(
+                    x=x,
+                    y=y,
+                    z=z,
+                    surfacecolor=potential,
+                    colorscale="RdBu_r",
+                    cmin=vmin,
+                    cmax=vmax,
+                    showscale=True,
+                    colorbar=dict(
+                        title="Potential (V)",
+                        x=1.02,
+                    ),
+                )
+            ],
             name=str(i),
             layout=go.Layout(
                 title_text=f"Lunar Surface Potential - {np.datetime_as_string(t_interp, unit='D')}"
@@ -122,22 +132,26 @@ def create_interactive_sphere(
         frames.append(frame)
 
         if (i + 1) % 20 == 0:
-            print(f"  Created {i+1}/{n_interp_frames} frames")
+            print(f"  Created {i + 1}/{n_interp_frames} frames")
 
     # Create initial figure
     fig = go.Figure(
-        data=[go.Surface(
-            x=x, y=y, z=z,
-            surfacecolor=potential_0,
-            colorscale='RdBu_r',
-            cmin=vmin,
-            cmax=vmax,
-            showscale=True,
-            colorbar=dict(
-                title="Potential (V)",
-                x=1.02,
-            ),
-        )],
+        data=[
+            go.Surface(
+                x=x,
+                y=y,
+                z=z,
+                surfacecolor=potential_0,
+                colorscale="RdBu_r",
+                cmin=vmin,
+                cmax=vmax,
+                showscale=True,
+                colorbar=dict(
+                    title="Potential (V)",
+                    x=1.02,
+                ),
+            )
+        ],
         frames=frames,
     )
 
@@ -148,7 +162,7 @@ def create_interactive_sphere(
             xaxis=dict(visible=False),
             yaxis=dict(visible=False),
             zaxis=dict(visible=False),
-            aspectmode='data',
+            aspectmode="data",
             camera=dict(
                 eye=dict(x=1.5, y=1.5, z=0.5),
             ),
@@ -161,21 +175,27 @@ def create_interactive_sphere(
                     dict(
                         label="Play",
                         method="animate",
-                        args=[None, {
-                            "frame": {"duration": 100, "redraw": True},
-                            "fromcurrent": True,
-                            "mode": "immediate",
-                            "transition": {"duration": 50},
-                        }],
+                        args=[
+                            None,
+                            {
+                                "frame": {"duration": 100, "redraw": True},
+                                "fromcurrent": True,
+                                "mode": "immediate",
+                                "transition": {"duration": 50},
+                            },
+                        ],
                     ),
                     dict(
                         label="Pause",
                         method="animate",
-                        args=[[None], {
-                            "frame": {"duration": 0, "redraw": False},
-                            "mode": "immediate",
-                            "transition": {"duration": 0},
-                        }],
+                        args=[
+                            [None],
+                            {
+                                "frame": {"duration": 0, "redraw": False},
+                                "mode": "immediate",
+                                "transition": {"duration": 0},
+                            },
+                        ],
                     ),
                 ],
                 x=0.1,
@@ -199,8 +219,8 @@ def create_interactive_sphere(
                         ],
                         method="animate",
                         label=np.datetime_as_string(
-                            t0 + np.timedelta64(int(hours_interp[i] * 3600), 's'),
-                            unit='D',
+                            t0 + np.timedelta64(int(hours_interp[i] * 3600), "s"),
+                            unit="D",
                         ),
                     )
                     for i in range(0, n_interp_frames, max(1, n_interp_frames // 20))
@@ -278,7 +298,9 @@ def main() -> int:
     lmax = dataset.lmax
 
     print("\nDataset info:")
-    print(f"  Date range: {np.datetime_as_string(times[0], unit='D')} to {np.datetime_as_string(times[-1], unit='D')}")
+    print(
+        f"  Date range: {np.datetime_as_string(times[0], unit='D')} to {np.datetime_as_string(times[-1], unit='D')}"
+    )
     print(f"  Time windows: {len(times)}")
     print(f"  lmax: {lmax}")
     print(f"  Coefficients per window: {coeffs.shape[1]}")
@@ -294,7 +316,9 @@ def main() -> int:
         output_path=args.output,
     )
 
-    print("\nDone! Open the HTML file in a browser to explore the interactive visualization.")
+    print(
+        "\nDone! Open the HTML file in a browser to explore the interactive visualization."
+    )
     print("Use the play button or slider to animate through time.")
 
     return 0

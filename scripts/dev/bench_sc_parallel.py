@@ -43,6 +43,7 @@ def main():
 
     # Extract unique spec count
     import src.config as config
+
     unique_specs = er_data.data[config.SPEC_NO_COLUMN].nunique()
     print(f"Unique spectra: {unique_specs:,}")
     print()
@@ -52,7 +53,7 @@ def main():
     start = time.time()
     sc_potential_seq = pipeline._spacecraft_potential_per_row(er_data, n_rows)
     seq_time = time.time() - start
-    print(f"✅ Sequential: {seq_time:.1f}s ({seq_time/60:.1f}m)")
+    print(f"✅ Sequential: {seq_time:.1f}s ({seq_time / 60:.1f}m)")
     print()
 
     # Parallel benchmark
@@ -60,15 +61,15 @@ def main():
     start = time.time()
     sc_potential_par = pipeline._spacecraft_potential_per_row_parallel(er_data, n_rows)
     par_time = time.time() - start
-    print(f"✅ Parallel: {par_time:.1f}s ({par_time/60:.1f}m)")
+    print(f"✅ Parallel: {par_time:.1f}s ({par_time / 60:.1f}m)")
     print()
 
     # Results
     print("=" * 70)
     print(f"Sequential: {seq_time:.1f}s")
     print(f"Parallel:   {par_time:.1f}s")
-    print(f"Speedup:    {seq_time/par_time:.2f}x")
-    print(f"Saved:      {seq_time - par_time:.1f}s ({(seq_time - par_time)/60:.1f}m)")
+    print(f"Speedup:    {seq_time / par_time:.2f}x")
+    print(f"Saved:      {seq_time - par_time:.1f}s ({(seq_time - par_time) / 60:.1f}m)")
     print()
 
     # Quick correctness check

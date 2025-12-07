@@ -55,7 +55,7 @@ def test_coordinate_calculator_masks_invalid_rows(monkeypatch, caplog):
 
         # We can just use the index if we assume order is preserved (it is)
         if n > 2:
-             res[2] = np.zeros(3)
+            res[2] = np.zeros(3)
         return res
 
     def fake_moon_vector_to_sun_batch(times_arr: np.ndarray) -> np.ndarray:
@@ -76,9 +76,7 @@ def test_coordinate_calculator_masks_invalid_rows(monkeypatch, caplog):
             res[3] = np.full((3, 3), np.nan)
         return res
 
-    monkeypatch.setattr(
-        "src.potential_mapper.coordinates.spice.str2et", fake_str2et
-    )
+    monkeypatch.setattr("src.potential_mapper.coordinates.spice.str2et", fake_str2et)
     monkeypatch.setattr(
         "src.potential_mapper.coordinates.get_lp_position_wrt_moon_batch",
         fake_lp_position_batch,
