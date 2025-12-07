@@ -1,10 +1,9 @@
-from typing import Union
 
 import numpy as np
 
 
 def ra_dec_to_unit(
-    ra_deg: Union[float, np.ndarray], dec_deg: Union[float, np.ndarray]
+    ra_deg: float | np.ndarray, dec_deg: float | np.ndarray
 ) -> np.ndarray:
     """
     Convert right ascension and declination to unit vectors.

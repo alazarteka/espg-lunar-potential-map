@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Tuple
 
 
 @dataclass(frozen=True)
@@ -18,9 +18,9 @@ class LockEntry:
 class VerificationResult:
     """Result of verifying files against kernels.lock."""
 
-    missing: List[Path]
-    extra: List[Path]
-    mismatched: List[Tuple[Path, str, str]]  # (path, expected_sha1, actual_sha1)
+    missing: list[Path]
+    extra: list[Path]
+    mismatched: list[tuple[Path, str, str]]  # (path, expected_sha1, actual_sha1)
 
 
 def _iter_lock_lines(text: str) -> Iterable[str]:
@@ -31,12 +31,12 @@ def _iter_lock_lines(text: str) -> Iterable[str]:
         yield line
 
 
-def read_lock(lock_path: Path) -> List[LockEntry]:
+def read_lock(lock_path: Path) -> list[LockEntry]:
     """Parse kernels.lock into entries.
 
     Expects lines like: '<sha1>  spice_kernels/<filename>' (two spaces between).
     """
-    entries: List[LockEntry] = []
+    entries: list[LockEntry] = []
     text = lock_path.read_text(encoding="utf-8")
     for line in _iter_lock_lines(text):
         parts = line.split()
@@ -84,14 +84,14 @@ def verify_kernels_lock(
         if p.is_file() and p.name != lock_path.name
     }
 
-    missing: List[Path] = [
+    missing: list[Path] = [
         kernels_dir / name for name in expected_by_name if name not in actual_files
     ]
-    extra: List[Path] = [
+    extra: list[Path] = [
         path for name, path in actual_files.items() if name not in expected_by_name
     ]
 
-    mismatched: List[Tuple[Path, str, str]] = []
+    mismatched: list[tuple[Path, str, str]] = []
     if verify_hashes:
         for name, path in actual_files.items():
             entry = expected_by_name.get(name)

@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import argparse
 import csv
-import sys
 import json
+import sys
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import numpy as np
 

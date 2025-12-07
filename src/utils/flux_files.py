@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover - for type hints only
-    from src.potential_mapper.pipeline import DataLoader
+    pass
 
 __all__ = ["select_flux_day_file"]
 

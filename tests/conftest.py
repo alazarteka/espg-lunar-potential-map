@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
+
 from src import config
+
 
 @pytest.fixture(autouse=True)
 def mock_data_files(monkeypatch):

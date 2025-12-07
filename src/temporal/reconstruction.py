@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Tuple
-
 import numpy as np
 from scipy.special import sph_harm_y
 

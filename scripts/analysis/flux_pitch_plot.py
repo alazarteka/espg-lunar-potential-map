@@ -2,7 +2,6 @@
 
 import argparse
 from pathlib import Path
-from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,7 +35,7 @@ Each point corresponds to one channel measurement at a given energy row, colored
 """
 
 
-def extract_spectrum(er: ERData, spec_no: int) -> Tuple[np.ndarray, np.ndarray]:
+def extract_spectrum(er: ERData, spec_no: int) -> tuple[np.ndarray, np.ndarray]:
     rows = er.data[er.data[config.SPEC_NO_COLUMN] == spec_no]
     if rows.empty:
         raise ValueError(f"Spectrum {spec_no} not found in file {er.er_data_file}")

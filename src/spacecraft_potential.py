@@ -20,7 +20,6 @@ See docs/analysis/spacecraft_potential_analysis.md for a deeper discussion.
 """
 
 import math
-from typing import Optional
 
 import numpy as np
 import spiceypy as spice
@@ -247,7 +246,7 @@ def calculate_potential(
     spacecraft_potential_high: float = 0.0,
     sey_E_m: float = 500.0,
     sey_delta_m: float = 1.5,
-) -> Optional[tuple[KappaParams, VoltageType]]:
+) -> tuple[KappaParams, VoltageType] | None:
     """
     Estimate spacecraft potential for a given spectrum.
 

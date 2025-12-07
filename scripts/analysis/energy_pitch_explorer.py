@@ -2,7 +2,6 @@
 
 import argparse
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 import numpy as np
 import plotly.graph_objects as go
@@ -62,7 +61,7 @@ def _pitch_edges_from_centers(centers: np.ndarray) -> np.ndarray:
 
 def build_spec_points(
     er: ERData, pa: PitchAngle, spec_no: int
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     mask = er.data[config.SPEC_NO_COLUMN] == spec_no
     idxs = np.nonzero(mask.to_numpy())[0]
     if idxs.size == 0:
@@ -102,21 +101,21 @@ def build_spec_points(
     return x_pts[mask_valid], y_pts[mask_valid], f_pts[mask_valid], yw_pts[mask_valid]
 
 
-def build_all_frames(er: ERData, pa: PitchAngle) -> Tuple[
-    Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
+def build_all_frames(er: ERData, pa: PitchAngle) -> tuple[
+    dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
     float,
     float,
     np.ndarray,
-    Tuple[float, float],
-    Tuple[float, float],
-    Optional[int],
+    tuple[float, float],
+    tuple[float, float],
+    int | None,
 ]:
     spec_nos = er.data[config.SPEC_NO_COLUMN].unique()
-    data_by_spec: Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
+    data_by_spec: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
     all_pos = []
     x_min, x_max = np.inf, -np.inf
     y_min, y_max = np.inf, -np.inf
-    first_nonempty: Optional[int] = None
+    first_nonempty: int | None = None
 
     for sn in spec_nos:
         x, y, f, yw = build_spec_points(er, pa, int(sn))
@@ -158,17 +157,17 @@ def build_all_frames(er: ERData, pa: PitchAngle) -> Tuple[
 
 
 def make_figure(
-    data_by_spec: Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
+    data_by_spec: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
     spec_nos: np.ndarray,
     vmin: float,
     vmax: float,
     title: str,
-    x_range: Tuple[float, float],
-    y_range: Tuple[float, float],
-    first_nonempty: Optional[int],
+    x_range: tuple[float, float],
+    y_range: tuple[float, float],
+    first_nonempty: int | None,
     include_zeros: bool,
     mode: str,
-    bar_width_deg: Optional[float],
+    bar_width_deg: float | None,
 ) -> go.Figure:
     # Initial spectrum: pick first with data, else first entry
     initial_sn = int(first_nonempty if first_nonempty is not None else int(spec_nos[0]))

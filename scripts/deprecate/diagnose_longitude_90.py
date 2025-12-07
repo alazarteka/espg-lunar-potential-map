@@ -2,9 +2,9 @@
 Visualize measurement coverage and potential values to diagnose ±90° anomalies.
 """
 
-import numpy as np
+
 import matplotlib.pyplot as plt
-from pathlib import Path
+import numpy as np
 
 # Load one month of data
 print("Loading temporal coefficients and reconstructing...")
@@ -17,27 +17,28 @@ with np.load('data/temporal_coeffs_lmax10.npz') as data:
 # Reconstruct one timestamp
 from scipy.special import sph_harm
 
+
 def reconstruct_map(coeffs_single, lmax):
     """Reconstruct potential map."""
     lat_grid = np.linspace(-90, 90, 181)
     lon_grid = np.linspace(-180, 180, 361)
     lons, lats = np.meshgrid(lon_grid, lat_grid)
-    
+
     lat_rad = np.deg2rad(lats.ravel())
     lon_rad = np.deg2rad(lons.ravel())
     colat = np.pi/2 - lat_rad
-    
+
     # Build design matrix
     n_points = lat_rad.size
     n_coeffs = (lmax + 1)**2
     design = np.empty((n_points, n_coeffs), dtype=np.complex128)
-    
+
     idx = 0
     for l in range(lmax + 1):
         for m in range(-l, l + 1):
             design[:, idx] = sph_harm(m, l, lon_rad, colat)
             idx += 1
-    
+
     potential = np.real(design @ coeffs_single).reshape(lats.shape)
     return lats, lons, potential
 
@@ -112,12 +113,12 @@ print("="*60)
 for lon_target in [-90, 90]:
     lon_idx = np.argmin(np.abs(lons[0, :] - lon_target))
     slice_pot = potential[:, lon_idx]
-    
+
     print(f"\nAt {lon_target:+d}° longitude:")
     print(f"  Mean:   {slice_pot.mean():+8.1f} V")
     print(f"  Std:    {slice_pot.std():8.1f} V")
     print(f"  Range:  {slice_pot.min():+8.1f} to {slice_pot.max():+8.1f} V")
-    
+
     # Check for discontinuities
     if lon_idx > 0 and lon_idx < len(lons[0, :]) - 1:
         left_slice = potential[:, lon_idx - 1]

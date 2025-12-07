@@ -4,15 +4,16 @@ Create Halekas-style loss cone fit visualization.
 Shows observed normalized flux vs best-fit model with loss cone boundary.
 """
 import sys
-import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src import config
-from src.flux import ERData, PitchAngle, LossConeFitter
+from src.flux import ERData, LossConeFitter, PitchAngle
 from src.model import synth_losscone
 
 

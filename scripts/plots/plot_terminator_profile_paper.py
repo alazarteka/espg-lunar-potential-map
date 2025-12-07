@@ -22,7 +22,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import spiceypy as spice
 
-from src import config
 from src.potential_mapper import spice as spice_loader
 from src.utils import spice_ops
 
@@ -94,7 +93,7 @@ def load_date_range_data(
             in_sun = data["rows_projection_in_sun"]
 
             # Compute SZA for each measurement
-            for lat, lon, pot, utc_str, sun_flag in zip(lats, lons, pots, utcs, in_sun):
+            for lat, lon, pot, utc_str, sun_flag in zip(lats, lons, pots, utcs, in_sun, strict=False):
                 if not np.isfinite(pot):
                     continue
 

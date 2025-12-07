@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import spiceypy as spice
+from plotly.subplots import make_subplots
 
-import src.config as config
 from src.potential_mapper.spice import load_spice_files
 from src.utils.spice_ops import get_sun_vector_wrt_moon
 

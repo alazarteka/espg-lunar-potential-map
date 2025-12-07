@@ -107,10 +107,10 @@ class Kappa:
                 ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
             ):
                 raise TypeError(
-                    (
+
                         "omnidirectional_differential_particle_flux must be a "
                         "pint Quantity (OmnidirectionalFlux)"
-                    )
+
                 )
             if not isinstance(
                 self.energy_centers, Quantity
@@ -259,10 +259,10 @@ class Kappa:
                 omnidirectional_flux_units
             ):
                 raise TypeError(
-                    (
+
                         "model_differential_flux must be a pint Quantity "
                         "(OmnidirectionalFlux)"
-                    )
+
                 )
             if not isinstance(
                 self.omnidirectional_differential_particle_flux, Quantity
@@ -270,10 +270,10 @@ class Kappa:
                 omnidirectional_flux_units
             ):
                 raise TypeError(
-                    (
+
                         "omnidirectional_differential_particle_flux must be a "
                         "pint Quantity (OmnidirectionalFlux)"
-                    )
+
                 )
 
         log_model_differential_flux = np.log(
@@ -411,10 +411,10 @@ class Kappa:
                 ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
             ):
                 raise TypeError(
-                    (
+
                         "omnidirectional_differential_particle_flux must be a "
                         "pint Quantity (OmnidirectionalFlux)"
-                    )
+
                 )
             if not isinstance(
                 self.energy_centers, Quantity

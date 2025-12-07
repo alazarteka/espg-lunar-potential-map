@@ -66,11 +66,11 @@ def create_multiday_reconstruction_plot(
                 f"Time index {idx} out of range [0, {len(times)-1}]"
             )
 
-    print(f"\nDataset Info:")
+    print("\nDataset Info:")
     print(f"  Time range: {times[0]} → {times[-1]}")
     print(f"  Total windows: {len(times)}")
     print(f"  Max degree: lmax = {lmax}")
-    print(f"  Selected times:")
+    print("  Selected times:")
     for i, idx in enumerate(time_indices, 1):
         print(f"    {i}. {times[idx]} (index {idx})")
 

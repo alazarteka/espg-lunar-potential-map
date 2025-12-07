@@ -6,8 +6,9 @@ and co_rotate settings.
 
 import logging
 import subprocess
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 import numpy as np
 
 logging.basicConfig(

@@ -2,7 +2,6 @@ import logging
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
 from scipy.stats.qmc import LatinHypercube, scale
 
 from src import config
@@ -65,10 +64,10 @@ class ERData:
             self.data = pd.DataFrame()
         except pd.errors.ParserError:
             logger.error(
-                (
+
                     f"Error: The file {self.er_data_file} could not be parsed. "
                     "Please check the file format."
-                )
+
             )
             self.data = pd.DataFrame()
         except Exception as e:

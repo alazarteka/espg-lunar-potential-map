@@ -8,7 +8,6 @@ import time
 from multiprocessing import Process
 from multiprocessing.queues import Queue as MPQueue
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 # Prevent BLAS/OpenMP oversubscription in workers and avoid after-fork hangs
 # Set thread caps before importing numpy/scipy/matplotlib
@@ -61,7 +60,7 @@ def _init_worker() -> None:
         pass
 
 
-def extract_temperature_eV(fit: Optional[FitResults]) -> Optional[float]:
+def extract_temperature_eV(fit: FitResults | None) -> float | None:
     """Return Te [eV] from a FitResults, or None if unavailable/invalid."""
     if fit is None or not fit.is_good_fit:
         return None
@@ -72,9 +71,9 @@ def extract_temperature_eV(fit: Optional[FitResults]) -> Optional[float]:
         return None
 
 
-def _process_one_file(path: str) -> Tuple[List[float], List[float]]:
-    te_w_list: List[float] = []
-    te_uw_list: List[float] = []
+def _process_one_file(path: str) -> tuple[list[float], list[float]]:
+    te_w_list: list[float] = []
+    te_uw_list: list[float] = []
     start_t = time.monotonic()
     try:
         print(f"[worker] start {path}")
@@ -152,7 +151,7 @@ def main() -> None:
     # Custom spawn-based pool with per-task kill
     mp_ctx = mp.get_context("spawn")
     result_q: MPQueue = mp_ctx.Queue()
-    active: Dict[str, tuple[Process, float]] = {}
+    active: dict[str, tuple[Process, float]] = {}
     pending = list(data_files)
 
     with tqdm(total=len(data_files), desc="Files", unit="file") as pbar:

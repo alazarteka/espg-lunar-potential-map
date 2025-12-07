@@ -24,12 +24,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import matplotlib.pyplot as plt
 import numpy as np
 
+# Import interpolation function from the original script
+from plots.plot_losscone_fit_paper import interpolate_to_regular_grid
+
 from src import config
 from src.flux import ERData, LossConeFitter, PitchAngle
 from src.model import synth_losscone
-
-# Import interpolation function from the original script
-from plots.plot_losscone_fit_paper import interpolate_to_regular_grid
 
 
 def create_3panel_debug_plot(

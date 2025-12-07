@@ -20,7 +20,7 @@ from src.potential_mapper.coordinates import (
 from src.potential_mapper.results import PotentialResults
 from src.utils.attitude import load_attitude_data
 from src.utils.geometry import get_intersections_or_none_batch
-from src.utils.units import ureg, VoltageType
+from src.utils.units import ureg
 
 
 def _init_worker_spice():

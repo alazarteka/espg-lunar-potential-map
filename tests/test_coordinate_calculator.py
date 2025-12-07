@@ -46,13 +46,13 @@ def test_coordinate_calculator_masks_invalid_rows(monkeypatch, caplog):
         # Row 2 is time=2.0.
         # We need to find which index corresponds to time=2.0
         # times_arr will have NaNs for bad-et.
-        
+
         # Logic:
         # Row 0: time=0.0
         # Row 1: time=NaN
         # Row 2: time=2.0
         # Row 3: time=3.0
-        
+
         # We can just use the index if we assume order is preserved (it is)
         if n > 2:
              res[2] = np.zeros(3)

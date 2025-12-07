@@ -9,15 +9,16 @@ Compares several strategies:
 4. Higher upper bound (100)
 """
 import sys
-import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src import config
-from src.flux import ERData, PitchAngle, LossConeFitter
+from src.flux import ERData, LossConeFitter, PitchAngle
 
 
 def fit_with_different_strategies(er_file: Path, n_chunks: int = 100):
@@ -73,7 +74,7 @@ def fit_with_different_strategies(er_file: Path, n_chunks: int = 100):
             U_surface, bs_bm, beam_amp, chi2 = fitter_high._fit_surface_potential(i)
             results['high_bound'].append([U_surface, bs_bm, beam_amp, chi2, i])
 
-        except Exception as e:
+        except Exception:
             # Skip failed fits
             continue
 
@@ -94,7 +95,7 @@ def plot_comparison(results: dict, output_path: Path):
     strategies = ['fixed_25', 'no_beam', 'high_bound']
     labels = ['Fixed beam_amp=25', 'No beam (beam_amp=0)', 'High bound (0-100)']
 
-    for idx, (strategy, label) in enumerate(zip(strategies, labels)):
+    for idx, (strategy, label) in enumerate(zip(strategies, labels, strict=False)):
         ax = axes.flat[idx]
 
         data = results[strategy]
@@ -146,7 +147,7 @@ def print_statistics(results: dict):
 
     free = results['free']
 
-    print(f"\nBaseline (free beam_amp, bounds 0-50):")
+    print("\nBaseline (free beam_amp, bounds 0-50):")
     print(f"  Samples: {len(free)}")
     print(f"  beam_amp hitting upper bound (≥49.9): {np.sum(free[:, 2] >= 49.9)} ({100*np.sum(free[:, 2] >= 49.9)/len(free):.1f}%)")
     print(f"  beam_amp mean: {np.mean(free[:, 2]):.1f}")
@@ -155,7 +156,7 @@ def print_statistics(results: dict):
     strategies = ['fixed_25', 'no_beam', 'high_bound']
     labels = ['Fixed beam_amp=25', 'No beam (beam_amp=0)', 'High bound (0-100)']
 
-    for strategy, label in zip(strategies, labels):
+    for strategy, label in zip(strategies, labels, strict=False):
         data = results[strategy]
 
         print(f"\n{label}:")
@@ -163,7 +164,7 @@ def print_statistics(results: dict):
 
         # U_surface comparison
         U_surface_diff = data[:, 0] - free[:, 0]
-        print(f"  U_surface difference:")
+        print("  U_surface difference:")
         print(f"    Mean: {np.mean(U_surface_diff):.2f} V")
         print(f"    Std: {np.std(U_surface_diff):.2f} V")
         print(f"    Max: {np.max(np.abs(U_surface_diff)):.2f} V")
@@ -171,14 +172,14 @@ def print_statistics(results: dict):
 
         # Bs/Bm comparison
         bs_bm_diff = data[:, 1] - free[:, 1]
-        print(f"  Bs/Bm difference:")
+        print("  Bs/Bm difference:")
         print(f"    Mean: {np.mean(bs_bm_diff):.4f}")
         print(f"    Std: {np.std(bs_bm_diff):.4f}")
         print(f"    Max: {np.max(np.abs(bs_bm_diff)):.4f}")
 
         # Chi2 comparison
         chi2_ratio = data[:, 3] / free[:, 3]
-        print(f"  χ² ratio (strategy/baseline):")
+        print("  χ² ratio (strategy/baseline):")
         print(f"    Median: {np.median(chi2_ratio):.2f}")
 
         if strategy == 'high_bound':

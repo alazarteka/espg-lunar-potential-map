@@ -67,7 +67,7 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
     spec_time_start = []
     spec_time_end = []
     spec_valid = []
-    for idx, count in zip(start_indices, counts):
+    for idx, count in zip(start_indices, counts, strict=False):
         row_slice = slice(idx, idx + count)
         spec_time_start.append(time_vals[row_slice.start])
         spec_time_end.append(time_vals[row_slice.stop - 1])

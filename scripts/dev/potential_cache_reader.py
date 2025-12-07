@@ -11,12 +11,11 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from html import escape
 from pathlib import Path
-from typing import Iterable
-import webbrowser
 
 import numpy as np
 from numpy.linalg import LinAlgError, lstsq, solve
@@ -548,7 +547,7 @@ def main() -> int:
     if rows.utc.size == 0:
         print("No cached rows found in the requested date range.")
         return 1
-    
+
     if args.lmax >= 0:
         try:
             coeffs = spherical_harmonics(

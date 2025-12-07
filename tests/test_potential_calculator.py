@@ -8,8 +8,8 @@ from src.spacecraft_potential import (
     current_balance,
     theta_to_temperature_ev,
 )
-from src.utils.units import ureg
 from src.utils.synthetic import prepare_synthetic_er
+from src.utils.units import ureg
 
 
 @pytest.mark.skip_ci
@@ -53,7 +53,7 @@ def test_nightside_synthetic_converges(monkeypatch):
     _, potential = out
     U = potential.to(ureg.volt).magnitude
     assert U < 0.0
-    assert U == pytest.approx(-14.289, rel=1e-3)
+    assert pytest.approx(-14.289, rel=1e-3) == U
 
 
 @pytest.mark.skip_ci

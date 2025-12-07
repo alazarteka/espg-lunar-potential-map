@@ -6,20 +6,15 @@ import spiceypy as spice
 
 import src.config as config
 from src.flux import FluxData
-from src.utils.attitude import get_current_ra_dec
+from src.utils.attitude import get_current_ra_dec_batch
 from src.utils.coordinates import build_scd_to_j2000, ra_dec_to_unit
 from src.utils.geometry import get_intersections_or_none_batch
 from src.utils.spice_ops import (
-    get_j2000_iau_moon_transform_matrix,
-    get_lp_position_wrt_moon,
-    get_lp_vector_to_sun_in_lunar_frame,
-    get_sun_vector_wrt_moon,
+    get_j2000_iau_moon_transform_matrix_batch,
     get_lp_position_wrt_moon_batch,
     get_lp_vector_to_sun_in_lunar_frame_batch,
     get_sun_vector_wrt_moon_batch,
-    get_j2000_iau_moon_transform_matrix_batch,
 )
-from src.utils.attitude import get_current_ra_dec_batch
 
 
 @dataclass

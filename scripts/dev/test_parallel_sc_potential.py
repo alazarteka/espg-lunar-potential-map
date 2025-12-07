@@ -46,7 +46,7 @@ def compare_results(seq: np.ndarray, par: np.ndarray, name: str = "SC Potential"
         print(f"❌ {name}: Value mismatch")
         print(f"   Max diff: {max_diff:.2e}, Mean diff: {mean_diff:.2e}")
         print(f"   Mismatches: {len(mismatch_indices)} / {np.sum(valid_mask)}")
-        print(f"   First 5 mismatches:")
+        print("   First 5 mismatches:")
         for i in mismatch_indices[:5]:
             print(f"     [{i}] seq={seq[i]:.6f}, par={par[i]:.6f}, diff={abs(seq[i]-par[i]):.2e}")
         return False
@@ -170,14 +170,14 @@ def main():
         print(f"❌ Spacecraft In Sun: {diff_count} differences")
         all_match = False
     else:
-        print(f"✅ Spacecraft In Sun: Match")
+        print("✅ Spacecraft In Sun: Match")
 
     if not np.array_equal(seq_results.projection_in_sun, par_results.projection_in_sun):
         diff_count = np.sum(seq_results.projection_in_sun != par_results.projection_in_sun)
         print(f"❌ Projection In Sun: {diff_count} differences")
         all_match = False
     else:
-        print(f"✅ Projection In Sun: Match")
+        print("✅ Projection In Sun: Match")
 
     print("-" * 70)
 

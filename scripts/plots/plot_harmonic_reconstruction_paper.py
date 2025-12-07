@@ -51,14 +51,14 @@ def create_harmonic_reconstruction_plot(
             f"Time index {time_index} out of range [0, {len(times)-1}]"
         )
 
-    print(f"\nDataset Info:")
+    print("\nDataset Info:")
     print(f"  Time range: {times[0]} → {times[-1]}")
     print(f"  Total windows: {len(times)}")
     print(f"  Max degree: lmax = {lmax}")
     print(f"  Selected time: {times[time_index]} (index {time_index})")
 
     # Reconstruct map at selected time
-    print(f"\nReconstructing global map...")
+    print("\nReconstructing global map...")
     lats, lons, potential = reconstruct_global_map(coeffs[time_index], lmax)
 
     # Create figure

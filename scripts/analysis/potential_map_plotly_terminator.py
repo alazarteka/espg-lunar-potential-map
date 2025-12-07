@@ -13,7 +13,6 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import spiceypy as spice
 
-import src.config as config
 from src.potential_mapper.spice import load_spice_files
 from src.utils.spice_ops import get_sun_vector_wrt_moon
 

@@ -2,6 +2,7 @@
 """Create Plotly time series of lunar surface potential."""
 
 import argparse
+
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -131,7 +132,7 @@ def main():
     print(f"Saved to {args.output}")
 
     # Print stats
-    print(f"\nStatistics:")
+    print("\nStatistics:")
     print(f"  Date range: {datetimes[0]} to {datetimes[-1]}")
     print(f"  Potential range: {np.nanmin(proj_potential):.1f} to {np.nanmax(proj_potential):.1f} V")
     print(f"  Mean potential: {np.nanmean(proj_potential):.1f} V")

@@ -10,10 +10,10 @@ from the cached potential rows.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt

@@ -1,13 +1,13 @@
 import logging
 from bisect import bisect_right
-from typing import Any, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import spiceypy as spice
 
 
-def load_attitude_data(path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def load_attitude_data(path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Load attitude data from the specified file.
 
@@ -37,7 +37,7 @@ def load_attitude_data(path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 def get_current_ra_dec(
     time: float, et_spin: np.ndarray, ra_vals: np.ndarray, dec_vals: np.ndarray
-) -> Tuple[Union[float, None], Union[float, None]]:
+) -> tuple[float | None, float | None]:
     """
     Get the current right ascension and declination at a given time.
 
@@ -61,7 +61,7 @@ def get_current_ra_dec(
 
 def get_current_ra_dec_batch(
     times: np.ndarray, et_spin: np.ndarray, ra_vals: np.ndarray, dec_vals: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Batch version of get_current_ra_dec using np.searchsorted.
 
@@ -103,7 +103,7 @@ def get_current_ra_dec_batch(
     return ra_out, dec_out
 
 
-def get_time_range(flux_data: Any) -> Tuple[str, str]:
+def get_time_range(flux_data: Any) -> tuple[str, str]:
     """
     Get the time range from the flux data.
 

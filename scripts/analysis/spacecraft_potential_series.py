@@ -2,7 +2,6 @@
 
 import argparse
 from pathlib import Path
-from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -60,7 +59,7 @@ def main() -> None:
     er_data = ERData(str(day_file))
 
     spec_nos = er_data.data[config.SPEC_NO_COLUMN].unique()
-    potentials: List[float] = []
+    potentials: list[float] = []
     valid_mask = []
 
     for spec_no in spec_nos:

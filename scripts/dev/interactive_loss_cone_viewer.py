@@ -4,17 +4,17 @@ Interactive loss cone viewer using Plotly.
 Browse through different spec_no chunks and view raw (un-normalized) data.
 """
 import sys
+from pathlib import Path
+
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from pathlib import Path
-from scipy.interpolate import griddata
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src import config
-from src.flux import ERData, PitchAngle, LossConeFitter
+from src.flux import ERData, LossConeFitter, PitchAngle
 from src.model import synth_losscone
 
 
@@ -94,7 +94,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
         try:
             U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
             results_list.append([U_surface, bs_bm, beam_amp, chi2, i])
-        except Exception as e:
+        except Exception:
             # Skip failed fits
             continue
 

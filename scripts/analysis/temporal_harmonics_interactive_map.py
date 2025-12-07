@@ -21,11 +21,11 @@ def latlon_to_xyz(lat: np.ndarray, lon: np.ndarray, radius: float = 1.0) -> tupl
     """Convert lat/lon to Cartesian coordinates on sphere."""
     lat_rad = np.deg2rad(lat)
     lon_rad = np.deg2rad(lon)
-    
+
     x = radius * np.cos(lat_rad) * np.cos(lon_rad)
     y = radius * np.cos(lat_rad) * np.sin(lon_rad)
     z = radius * np.sin(lat_rad)
-    
+
     return x, y, z
 
 
@@ -51,22 +51,22 @@ def create_interactive_sphere(
     n_windows = len(times)
     n_lat = resolution
     n_lon = resolution * 2
-    
+
     # Convert times to hours since start for interpolation
     t0 = times[0]
     hours = (times - t0) / np.timedelta64(1, 'h')
     hours_interp = np.linspace(hours[0], hours[-1], n_interp_frames)
-    
+
     # Interpolate coefficients for smooth temporal evolution
     print(f"Interpolating {coeffs.shape[1]} coefficients across {n_interp_frames} frames...")
     coeffs_interp = np.zeros((n_interp_frames, coeffs.shape[1]), dtype=np.complex128)
-    
+
     for i in range(coeffs.shape[1]):
         # Interpolate real and imaginary parts separately
         f_real = interp1d(hours, coeffs[:, i].real, kind='cubic', fill_value='extrapolate')
         f_imag = interp1d(hours, coeffs[:, i].imag, kind='cubic', fill_value='extrapolate')
         coeffs_interp[:, i] = f_real(hours_interp) + 1j * f_imag(hours_interp)
-    
+
     # Generate potential maps for each interpolated time
     print("Reconstructing potential maps on sphere...")
     latitudes, longitudes, potential_0 = reconstruct_global_map(
@@ -74,7 +74,7 @@ def create_interactive_sphere(
     )
     lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
     x, y, z = latlon_to_xyz(lat_grid, lon_grid)
-    
+
     # Determine global color scale from all frames
     print("Computing global color range...")
     all_potentials = []
@@ -83,24 +83,24 @@ def create_interactive_sphere(
             coeffs_interp[i], lmax, lat_steps=n_lat, lon_steps=n_lon
         )
         all_potentials.append(pot)
-    
+
     vmin = np.percentile(np.concatenate([p.ravel() for p in all_potentials]), 1)
     vmax = np.percentile(np.concatenate([p.ravel() for p in all_potentials]), 99)
-    
+
     print(f"Color scale: {vmin:.0f} to {vmax:.0f} V")
-    
+
     # Create frames for animation
     print("Creating animation frames...")
     frames = []
-    
+
     for i in range(n_interp_frames):
         _, _, potential = reconstruct_global_map(
             coeffs_interp[i], lmax, lat_steps=n_lat, lon_steps=n_lon
         )
-        
+
         # Convert interpolated time back to datetime
         t_interp = t0 + np.timedelta64(int(hours_interp[i] * 3600), 's')
-        
+
         frame = go.Frame(
             data=[go.Surface(
                 x=x, y=y, z=z,
@@ -120,10 +120,10 @@ def create_interactive_sphere(
             ),
         )
         frames.append(frame)
-        
+
         if (i + 1) % 20 == 0:
             print(f"  Created {i+1}/{n_interp_frames} frames")
-    
+
     # Create initial figure
     fig = go.Figure(
         data=[go.Surface(
@@ -140,7 +140,7 @@ def create_interactive_sphere(
         )],
         frames=frames,
     )
-    
+
     # Add slider and play/pause buttons
     fig.update_layout(
         title=f"Lunar Surface Potential Evolution (lmax={lmax})",
@@ -222,13 +222,13 @@ def create_interactive_sphere(
         width=1200,
         height=800,
     )
-    
+
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         fig.write_html(str(output_path))
         print(f"\nSaved interactive visualization to {output_path}")
         print(f"File size: {output_path.stat().st_size / 1e6:.1f} MB")
-    
+
     return fig
 
 
@@ -266,25 +266,25 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    
+
     if not args.input.exists():
         print(f"Error: {args.input} not found")
         return 1
-    
+
     print(f"Loading temporal coefficients from {args.input}")
     dataset = load_temporal_coefficients(args.input)
     times = dataset.times
     coeffs = dataset.coeffs
     lmax = dataset.lmax
-    
-    print(f"\nDataset info:")
+
+    print("\nDataset info:")
     print(f"  Date range: {np.datetime_as_string(times[0], unit='D')} to {np.datetime_as_string(times[-1], unit='D')}")
     print(f"  Time windows: {len(times)}")
     print(f"  lmax: {lmax}")
     print(f"  Coefficients per window: {coeffs.shape[1]}")
     print(f"  Animation frames: {args.frames}")
     print()
-    
+
     fig = create_interactive_sphere(
         times,
         coeffs,
@@ -293,10 +293,10 @@ def main() -> int:
         resolution=args.resolution,
         output_path=args.output,
     )
-    
+
     print("\nDone! Open the HTML file in a browser to explore the interactive visualization.")
     print("Use the play button or slider to animate through time.")
-    
+
     return 0
 
 

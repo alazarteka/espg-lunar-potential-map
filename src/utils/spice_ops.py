@@ -1,5 +1,4 @@
 import logging
-from typing import Union
 
 import numpy as np
 import spiceypy as spice
@@ -10,7 +9,7 @@ MOON = "301"
 SUN = "10"
 
 
-def get_lp_position_wrt_moon(time: float) -> Union[np.ndarray, None]:
+def get_lp_position_wrt_moon(time: float) -> np.ndarray | None:
     """
     Get the position of the Lunar Prospector at a given time with respect to the Moon.
 
@@ -30,7 +29,7 @@ def get_lp_position_wrt_moon(time: float) -> Union[np.ndarray, None]:
         return None
 
 
-def get_lp_vector_to_sun_in_lunar_frame(time: float) -> Union[np.ndarray, None]:
+def get_lp_vector_to_sun_in_lunar_frame(time: float) -> np.ndarray | None:
     """
     Get the vector from Lunar Prospector to the Sun in lunar frame.
 
@@ -50,7 +49,7 @@ def get_lp_vector_to_sun_in_lunar_frame(time: float) -> Union[np.ndarray, None]:
         return None
 
 
-def get_sun_vector_wrt_moon(time: float) -> Union[np.ndarray, None]:
+def get_sun_vector_wrt_moon(time: float) -> np.ndarray | None:
     """
     Get the position vector of the Sun with respect to the Moon.
 

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np

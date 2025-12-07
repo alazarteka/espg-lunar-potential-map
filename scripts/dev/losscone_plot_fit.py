@@ -170,7 +170,7 @@ def main() -> int:
 
     energy_edges = np.clip(energy_edges, config.EPS, None)
 
-    for ax, title, data in zip(axes, titles, datasets):
+    for ax, title, data in zip(axes, titles, datasets, strict=False):
         pcm = ax.pcolormesh(
             energy_edges,
             pitch_edges,

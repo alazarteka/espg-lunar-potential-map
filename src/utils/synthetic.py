@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Tuple
-
 import numpy as np
 import pandas as pd
 
@@ -19,7 +17,7 @@ __all__ = [
 ]
 
 
-def prepare_phis() -> Tuple[list[float], np.ndarray]:
+def prepare_phis() -> tuple[list[float], np.ndarray]:
     """Prepare mock instrument viewing angles and solid angles.
 
     Returns

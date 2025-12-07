@@ -17,7 +17,6 @@ from src.potential_mapper.pipeline import DataLoader, process_lp_file
 from src.potential_mapper.results import PotentialResults
 from src.potential_mapper.spice import load_spice_files
 
-
 _SPICE_LOADED = False
 
 
@@ -74,7 +73,7 @@ def _prepare_payload(er_data: ERData, results: PotentialResults) -> dict[str, np
     spec_time_start = []
     spec_time_end = []
     spec_valid = []
-    for idx, count in zip(start_indices, counts):
+    for idx, count in zip(start_indices, counts, strict=False):
         row_slice = slice(idx, idx + count)
         spec_time_start.append(time_vals[row_slice.start])
         spec_time_end.append(time_vals[row_slice.stop - 1])

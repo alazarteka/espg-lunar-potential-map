@@ -10,13 +10,12 @@ where a_lm(t) are fitted in temporal windows with spatial coverage validation.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 from numpy.linalg import LinAlgError, lstsq
-
 from scipy.special import sph_harm_y
 
 
@@ -325,7 +324,7 @@ def _build_temporal_derivative_matrix(
     delta_hours: np.ndarray,
     lmax: int,
     rotation_angles: np.ndarray | None = None,
-) -> "scipy.sparse.csr_matrix":
+) -> scipy.sparse.csr_matrix:
     """
     Build finite-difference operator for temporal derivatives.
 
@@ -479,7 +478,7 @@ def _fit_coupled_windows(
         [√λ_s * I     ] @ a = [0    ]
         [√λ_t * D_t   ]       [0    ]
     """
-    from scipy.sparse import vstack, csr_matrix, diags, block_diag
+    from scipy.sparse import block_diag, csr_matrix, diags, vstack
     from scipy.sparse.linalg import lsqr
 
     # Step 1: Filter windows by coverage and sample count

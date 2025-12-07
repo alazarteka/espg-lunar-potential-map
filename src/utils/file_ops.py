@@ -1,9 +1,8 @@
 import logging
 import os
-from typing import List
 
 
-def list_files(directory: str) -> List[str]:
+def list_files(directory: str) -> list[str]:
     """
     List all files in the specified directory.
 
@@ -21,7 +20,7 @@ def list_files(directory: str) -> List[str]:
         return []
 
 
-def list_folder_files(directory: str) -> List[str]:
+def list_folder_files(directory: str) -> list[str]:
     """
     List all subdirectories in the specified directory.
 

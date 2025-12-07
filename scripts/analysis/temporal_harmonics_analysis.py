@@ -283,7 +283,7 @@ def main() -> int:
     if n_samples is None or coverage is None or rms is None:
         raise ValueError("Dataset is missing quality metrics required for analysis plots")
 
-    print(f"\nDataset Summary:")
+    print("\nDataset Summary:")
     print(f"  Time range     : {times[0]} → {times[-1]}")
     print(f"  Number of windows : {len(times)}")
     print(f"  Max degree     : lmax = {lmax}")
@@ -318,7 +318,7 @@ def main() -> int:
 
     if output_dir:
         print(f"\nAll plots saved to {output_dir}")
-    
+
     print("\nAnalysis complete!")
     return 0
 

@@ -2,7 +2,6 @@
 
 import argparse
 from pathlib import Path
-from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -52,12 +51,12 @@ def parse_args() -> argparse.Namespace:
 
 def compute_series(
     er_data: ERData, verbose: bool = False, use_weights: bool = True
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     spec_nos = er_data.data[config.SPEC_NO_COLUMN].unique()
-    dens_orig: List[float] = []
-    temp_orig_ev: List[float] = []
-    dens_corr: List[float] = []
-    temp_corr_ev: List[float] = []
+    dens_orig: list[float] = []
+    temp_orig_ev: list[float] = []
+    dens_corr: list[float] = []
+    temp_corr_ev: list[float] = []
 
     for spec_no in spec_nos:
         try:
