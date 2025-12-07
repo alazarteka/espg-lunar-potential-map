@@ -201,15 +201,24 @@ def fit_temporal_basis(
 
     potential_complex = potential.astype(np.complex128)
 
-    # Solve with optional ridge regularization
+    # Solve with optional ridge regularization using scipy.sparse.linalg.lsqr
+    # This avoids materializing the full augmented matrix
+    from scipy.sparse.linalg import lsqr
+
+    logging.info(
+        "Solving system: %d equations, %d unknowns (%.1f MB dense)",
+        N, K * n_coeffs, N * K * n_coeffs * 16 / 1e6,
+    )
+
     if l2_penalty > 0.0:
-        lam = np.sqrt(l2_penalty)
-        identity = np.eye(K * n_coeffs, dtype=design.dtype)
-        design_aug = np.vstack([design, lam * identity])
-        rhs_aug = np.concatenate([potential_complex, np.zeros(K * n_coeffs, dtype=np.complex128)])
-        b_flat, *_ = lstsq(design_aug, rhs_aug, rcond=None)
+        # Use lsqr with damp parameter instead of explicit augmented matrix
+        # lsqr solves: min ||A @ x - b||^2 + damp^2 * ||x||^2
+        damp = np.sqrt(l2_penalty)
+        result = lsqr(design, potential_complex, damp=damp, atol=1e-8, btol=1e-8)
+        b_flat = result[0]
     else:
-        b_flat, *_ = lstsq(design, potential_complex, rcond=None)
+        result = lsqr(design, potential_complex, atol=1e-8, btol=1e-8)
+        b_flat = result[0]
 
     # Reshape to (K, n_coeffs)
     b = b_flat.reshape(K, n_coeffs)
