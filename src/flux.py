@@ -259,12 +259,13 @@ class PitchAngle:
         magnetic_field = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
         magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
         # The ER convention has the magnetic field pointing in the spin-stabilized,
-        # spacecraft-relative direction. The electron bins (phis and thetas) point
-        # in the directions the electrons are coming from (Look Direction).
-        # In order to compute the direction they are headed (velocity), and compute
-        # the pitch angle, we negate the magnetic field direction.
-        # This results in computing the angle between Velocity and B.
-        unit_magnetic_field = -magnetic_field / magnetic_field_magnitude
+        # spacecraft-relative direction (roughly Sunward). The electron bins (phis
+        # and thetas) point in the directions the electrons are coming from (Look
+        # Direction, which is Sunward for incident electrons from space).
+        # We want the pitch angle to be < 90 for the incident electrons.
+        # Comparing the Sunward Look Direction with the Sunward B-field yields
+        # an angle of ~0 deg. Therefore, we do not negate the magnetic field.
+        unit_magnetic_field = magnetic_field / magnetic_field_magnitude
         unit_magnetic_field = np.tile(
             unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1)
         )
@@ -408,8 +409,9 @@ class LossConeFitter:
         if len(self.pitch_angle.pitch_angles) == 0:
             return np.full(config.CHANNELS, np.nan)
         angles = self.pitch_angle.pitch_angles[index]
-        incident_mask = angles > 90
-        # Reflected mask is angles <= 90
+        incident_mask = angles < 90
+        # TODO: Check reconsider the reflected mask
+        # reflected_mask = ~incident_mask
 
         # Check if the electron flux is valid
         if not incident_mask.any():
@@ -473,7 +475,7 @@ class LossConeFitter:
                 pitch_row = pitches_2d[row]
                 flux_row = flux_2d[row]
 
-                incident_mask = pitch_row > 90.0
+                incident_mask = pitch_row < 90.0
                 reflected_mask = ~incident_mask
 
                 incident_idx = np.nonzero(incident_mask)[0]
@@ -538,7 +540,7 @@ class LossConeFitter:
             pitches_2d = self.pitch_angle.pitch_angles[s:e]
 
             # Find maximum incident flux across all energies
-            incident_mask = pitches_2d > 90
+            incident_mask = pitches_2d < 90
             incident_flux_vals = flux_2d[incident_mask]
             incident_flux_vals = incident_flux_vals[incident_flux_vals > 0]  # Remove zeros/negatives
 
