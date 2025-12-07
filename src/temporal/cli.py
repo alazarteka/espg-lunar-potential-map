@@ -28,6 +28,7 @@ def _parse_iso_date(value: str) -> np.datetime64:
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for temporal coefficient computation."""
     parser = argparse.ArgumentParser(
+        prog="python -m src.temporal",
         description="Compute time-dependent spherical harmonic coefficients a_lm(t)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

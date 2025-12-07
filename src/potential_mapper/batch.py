@@ -201,7 +201,9 @@ def run_batch(
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Batch process potential mapper with merged data loading."
+        prog="python -m src.potential_mapper.batch",
+        description="Batch process potential mapper with merged data loading.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--output-dir",

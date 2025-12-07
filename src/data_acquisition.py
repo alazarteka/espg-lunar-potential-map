@@ -234,7 +234,9 @@ class DataManager:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Download Lunar Prospector data files."
+        prog="python -m src.data_acquisition",
+        description="Download Lunar Prospector data files.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "-v",

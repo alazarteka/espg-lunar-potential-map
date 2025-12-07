@@ -13,11 +13,12 @@ def parse_arguments() -> argparse.Namespace:
     verbosity, and an optional illumination filter (day/night) for display.
     """
     parser = argparse.ArgumentParser(
+        prog="python -m src.potential_mapper",
         description=(
             "This tool maps the surface potential of the Moon using data from "
             "the Lunar Prospector mission."
         ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     parser.add_argument(
