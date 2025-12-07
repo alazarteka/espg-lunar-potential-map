@@ -75,7 +75,9 @@ LOSS_CONE_BEAM_AMP_MAX = (
 )
 # Pitch sigma: reasonable angular spread for secondary electron beam
 LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
-LOSS_CONE_BACKGROUND = 0.05  # baseline model value outside loss cone (for log stability)
+LOSS_CONE_BACKGROUND = (
+    0.05  # baseline model value outside loss cone (for log stability)
+)
 
 
 # ========== Data Column names ==========

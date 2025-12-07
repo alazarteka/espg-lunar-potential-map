@@ -191,7 +191,7 @@ def run_batch(
     duration = datetime.now() - start
     logging.info(
         f"Done in {duration.total_seconds():.1f}s "
-        f"({duration.total_seconds()/60:.1f}m)"
+        f"({duration.total_seconds() / 60:.1f}m)"
     )
     logging.info(f"Output saved to: {output_path}")
 

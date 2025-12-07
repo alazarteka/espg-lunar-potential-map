@@ -20,7 +20,7 @@ class JUCoefficients:
     D: float = 60.0  # V
 
 
-def J_of_U(U: float, coefficients=JUCoefficients()):
+def J_of_U(U: float, coefficients: JUCoefficients | None = None):
     """
     Calculate the current density from the spacecraft J for a given electric
     spacecraft potential U.
@@ -30,10 +30,13 @@ def J_of_U(U: float, coefficients=JUCoefficients()):
 
     Args:
         U (float): The electric field strength in volts.
+        coefficients: J-U curve coefficients. Uses default if None.
 
     Returns:
         float: The current density in A/m^2.
     """
+    if coefficients is None:
+        coefficients = JUCoefficients()
     return coefficients.A * math.exp(-U / coefficients.B) + coefficients.C * math.exp(
         -U / coefficients.D
     )
@@ -41,7 +44,7 @@ def J_of_U(U: float, coefficients=JUCoefficients()):
 
 def U_from_J(
     J_target: float,
-    coefficients=JUCoefficients(),
+    coefficients: JUCoefficients | None = None,
     U_min: float = 0.0,
     U_max: float = 150.0,
 ) -> float:
@@ -50,13 +53,15 @@ def U_from_J(
 
     Args:
         J_target (float): The target current density in A/m^2.
-        coefficients (JUCoefficients): The coefficients for the J-U curve.
+        coefficients: J-U curve coefficients. Uses default if None.
         U_min (float): The minimum electric potential to consider.
         U_max (float): The maximum electric potential to consider.
 
     Returns:
         float: The electric potential U in volts.
     """
+    if coefficients is None:
+        coefficients = JUCoefficients()
 
     def f(U):
         return J_of_U(U, coefficients) - J_target

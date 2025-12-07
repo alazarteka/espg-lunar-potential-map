@@ -208,7 +208,9 @@ def main() -> int:
     else:
         print(f"Spatial weighting: [l(l+1)]^{args.spatial_weight_exponent:.2f} (l>0)")
     print(f"Coefficients    : {_harmonic_coefficient_count(args.lmax)} per window")
-    print(f"Coverage range  : {coverages.min()*100:.1f}% - {coverages.max()*100:.1f}%")
+    print(
+        f"Coverage range  : {coverages.min() * 100:.1f}% - {coverages.max() * 100:.1f}%"
+    )
     print(f"RMS residuals   : {rms_vals.min():.2f} - {rms_vals.max():.2f} V")
     print(f"Median RMS      : {np.median(rms_vals):.2f} V")
     print(f"\nSaved to: {args.output}")

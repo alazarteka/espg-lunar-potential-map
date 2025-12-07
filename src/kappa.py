@@ -107,10 +107,8 @@ class Kappa:
                 ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
             ):
                 raise TypeError(
-
-                        "omnidirectional_differential_particle_flux must be a "
-                        "pint Quantity (OmnidirectionalFlux)"
-
+                    "omnidirectional_differential_particle_flux must be a "
+                    "pint Quantity (OmnidirectionalFlux)"
                 )
             if not isinstance(
                 self.energy_centers, Quantity
@@ -259,10 +257,8 @@ class Kappa:
                 omnidirectional_flux_units
             ):
                 raise TypeError(
-
-                        "model_differential_flux must be a pint Quantity "
-                        "(OmnidirectionalFlux)"
-
+                    "model_differential_flux must be a pint Quantity "
+                    "(OmnidirectionalFlux)"
                 )
             if not isinstance(
                 self.omnidirectional_differential_particle_flux, Quantity
@@ -270,10 +266,8 @@ class Kappa:
                 omnidirectional_flux_units
             ):
                 raise TypeError(
-
-                        "omnidirectional_differential_particle_flux must be a "
-                        "pint Quantity (OmnidirectionalFlux)"
-
+                    "omnidirectional_differential_particle_flux must be a "
+                    "pint Quantity (OmnidirectionalFlux)"
                 )
 
         log_model_differential_flux = np.log(
@@ -411,10 +405,8 @@ class Kappa:
                 ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
             ):
                 raise TypeError(
-
-                        "omnidirectional_differential_particle_flux must be a "
-                        "pint Quantity (OmnidirectionalFlux)"
-
+                    "omnidirectional_differential_particle_flux must be a "
+                    "pint Quantity (OmnidirectionalFlux)"
                 )
             if not isinstance(
                 self.energy_centers, Quantity
@@ -715,8 +707,9 @@ class Kappa:
 
         sey_E_m, sey_delta_m = 500.0, 1.5
         U_low, U_high = -10.0, 10.0
-        f_low, f_high = balance(U_low, sey_E_m, sey_delta_m), balance(
-            U_high, sey_E_m, sey_delta_m
+        f_low, f_high = (
+            balance(U_low, sey_E_m, sey_delta_m),
+            balance(U_high, sey_E_m, sey_delta_m),
         )
         tries = 0
         while np.sign(f_low) == np.sign(f_high) and tries < 10:

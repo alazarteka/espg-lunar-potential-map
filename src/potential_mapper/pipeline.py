@@ -211,7 +211,7 @@ def _spacecraft_potential_per_row_parallel(
         )
 
         # Collect results with progress bar
-        for spec_no, row_indices, potential_value in tqdm(
+        for _spec_no, row_indices, potential_value in tqdm(
             results_iter,
             total=len(tasks),
             desc="SC Potential (parallel)",

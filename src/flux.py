@@ -64,10 +64,8 @@ class ERData:
             self.data = pd.DataFrame()
         except pd.errors.ParserError:
             logger.error(
-
-                    f"Error: The file {self.er_data_file} could not be parsed. "
-                    "Please check the file format."
-
+                f"Error: The file {self.er_data_file} could not be parsed. "
+                "Please check the file format."
             )
             self.data = pd.DataFrame()
         except Exception as e:
@@ -243,12 +241,12 @@ class PitchAngle:
         and stores indices of valid and invalid data points.
         """
 
-        assert (
-            not self.er_data.data.empty
-        ), "Data not loaded. Please load the data first."
-        assert (
-            len(self.thetas) == config.CHANNELS
-        ), f"Theta values must match the number of channels {config.CHANNELS}."
+        assert not self.er_data.data.empty, (
+            "Data not loaded. Please load the data first."
+        )
+        assert len(self.thetas) == config.CHANNELS, (
+            f"Theta values must match the number of channels {config.CHANNELS}."
+        )
 
         # Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z)
         phis = np.deg2rad(self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64))
@@ -276,9 +274,9 @@ class PitchAngle:
         between the unit magnetic field vector and the radial direction vector.
         """
         # Check if data is loaded
-        assert (
-            not self.er_data.data.empty
-        ), "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, (
+            "Data not loaded. Please load the data first."
+        )
 
         dot_product = np.einsum(
             "ijk,ijk->ij", self.unit_magnetic_field, self.cartesian_coords
@@ -388,9 +386,9 @@ class LossConeFitter:
             np.ndarray: The normalized flux for the specified energy bin and
                 measurement chunk.
         """
-        assert (
-            not self.er_data.data.empty
-        ), "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, (
+            "Data not loaded. Please load the data first."
+        )
 
         index = measurement_chunk * config.SWEEP_ROWS + energy_bin
 
@@ -441,9 +439,9 @@ class LossConeFitter:
         Returns:
             np.ndarray: The 2D normalized flux distribution.
         """
-        assert (
-            not self.er_data.data.empty
-        ), "Data not loaded. Please load the data first."
+        assert not self.er_data.data.empty, (
+            "Data not loaded. Please load the data first."
+        )
 
         if self.normalization_mode == "ratio":
             # Per-energy normalization: divide each energy by its own incident flux
@@ -459,7 +457,9 @@ class LossConeFitter:
             s = measurement_chunk * config.SWEEP_ROWS
             e = min((measurement_chunk + 1) * config.SWEEP_ROWS, len(self.er_data.data))
 
-            flux_2d = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[s:e]
+            flux_2d = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[
+                s:e
+            ]
             pitches_2d = self.pitch_angle.pitch_angles[s:e]
 
             nE, nPitch = flux_2d.shape
@@ -530,13 +530,17 @@ class LossConeFitter:
             s = measurement_chunk * config.SWEEP_ROWS
             e = min((measurement_chunk + 1) * config.SWEEP_ROWS, len(self.er_data.data))
 
-            flux_2d = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[s:e]
+            flux_2d = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[
+                s:e
+            ]
             pitches_2d = self.pitch_angle.pitch_angles[s:e]
 
             # Find maximum incident flux across all energies
             incident_mask = pitches_2d < 90
             incident_flux_vals = flux_2d[incident_mask]
-            incident_flux_vals = incident_flux_vals[incident_flux_vals > 0]  # Remove zeros/negatives
+            incident_flux_vals = incident_flux_vals[
+                incident_flux_vals > 0
+            ]  # Remove zeros/negatives
 
             if len(incident_flux_vals) == 0:
                 return np.full((config.SWEEP_ROWS, config.CHANNELS), np.nan)
@@ -679,7 +683,7 @@ class LossConeFitter:
 
         bounds = [
             (-2000.0, 2000.0),  # U_surface
-            (0.1, 1.1),         # bs_over_bm
+            (0.1, 1.1),  # bs_over_bm
             (self.beam_amp_min, self.beam_amp_max),  # beam_amp
         ]
 
@@ -691,7 +695,7 @@ class LossConeFitter:
             atol=1e-3,
             tol=1e-3,
             workers=1,  # Single-threaded for reproducibility
-            updating='deferred',  # Faster convergence
+            updating="deferred",  # Faster convergence
         )
 
         if not result.success:

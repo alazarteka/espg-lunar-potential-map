@@ -13,13 +13,17 @@ import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.linalg import LinAlgError, lstsq
 from scipy.special import sph_harm_y
 
+if TYPE_CHECKING:
+    import scipy.sparse
 
-def _sph_harm(m: int, l: int, phi, theta):
+
+def _sph_harm(m: int, l: int, phi, theta):  # noqa: E741
     """Evaluate spherical harmonics using SciPy's sph_harm_y (θ=colat, φ=azimuth)."""
     return sph_harm_y(l, m, theta, phi)
 
@@ -53,9 +57,6 @@ class HarmonicCoefficients:
     n_samples: int
     spatial_coverage: float  # fraction of bins with data
     rms_residual: float  # RMS fit residual
-
-
-
 
 
 def _discover_npz(cache_dir: Path) -> list[Path]:
@@ -814,7 +815,6 @@ def save_temporal_coefficients(
 
     times = np.array([r.time for r in results], dtype="datetime64[ns]")
     lmax = results[0].lmax
-    n_coeffs = _harmonic_coefficient_count(lmax)
 
     coeffs = np.array([r.coeffs for r in results], dtype=np.complex128)
     n_samples = np.array([r.n_samples for r in results], dtype=np.int32)
@@ -832,6 +832,3 @@ def save_temporal_coefficients(
         rms_residuals=rms,
     )
     logging.info("Saved temporal coefficients to %s", output_path)
-
-
-

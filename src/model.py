@@ -1,4 +1,3 @@
-
 import numpy as np
 
 ###########
@@ -103,9 +102,7 @@ def synth_losscone(
 
     # Calculate x = B_s/B_m * (1 + U_surface / E - U_spacecraft)
     # (nParams, 1, 1) * (1 + (nParams, 1, 1) / (1, nE, 1)) -> (nParams, nE, 1)
-    x = bs_over_bm * (
-        1.0 + U_surface / np.maximum(E_safe_exp - U_spacecraft, EPS)
-    )
+    x = bs_over_bm * (1.0 + U_surface / np.maximum(E_safe_exp - U_spacecraft, EPS))
 
     model = np.broadcast_to(
         background, (n_params, pitch_grid.shape[0], pitch_grid.shape[1])

@@ -70,8 +70,11 @@ target-version = "py312"
 select = ["E", "F", "W", "B", "I", "UP", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
-    "scripts/**/*.py" = ["E501"]
+"scripts/**/*.py" = ["E501"]
 "notebooks/**/*.ipynb" = ["E501"]
+# E741: 'l' is standard notation for spherical harmonic degree
+"src/temporal/coefficients.py" = ["E741"]
+"src/temporal/reconstruction.py" = ["E741"]
 
 [tool.mypy]
 python_version = "3.12"
