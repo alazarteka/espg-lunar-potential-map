@@ -325,14 +325,24 @@ def _build_temporal_derivative_matrix(
     delta_hours: np.ndarray,
     lmax: int,
     rotation_angles: np.ndarray | None = None,
+    max_lag: int = 1,
+    decay_factor: float = 0.5,
 ) -> scipy.sparse.csr_matrix:
     """
     Build finite-difference operator for temporal derivatives.
 
-    Returns sparse matrix D of shape:
-        ((n_windows-1)*n_coeffs, n_windows*n_coeffs)
+    Supports multi-scale regularization: for each lag k in [1, max_lag], adds
+    constraint rows connecting window i to window i+k with weight decay_factor^(k-1).
 
-    Encoding: D @ a_stacked ≈ [(a_2 - a_1)/Δt_1, ..., (a_N - a_{N-1})/Δt_{N-1}]
+    Args:
+        delta_hours: Time deltas between consecutive windows (n_windows-1,)
+        lmax: Maximum spherical harmonic degree
+        rotation_angles: Per-gap rotation angles for co-rotating frame (optional)
+        max_lag: Maximum lag to include (1 = adjacent only, 2 = also skip-one, etc.)
+        decay_factor: Weight decay per lag step (weight_k = decay_factor^(k-1))
+
+    Returns:
+        Sparse matrix D where minimizing ||D @ a||^2 encourages temporal smoothness.
     """
     from scipy.sparse import bmat, diags, eye
 
@@ -342,26 +352,47 @@ def _build_temporal_derivative_matrix(
         raise ValueError(
             "delta_hours must contain at least one entry for temporal coupling"
         )
-    if rotation_angles is not None and rotation_angles.shape != delta_hours.shape:
-        raise ValueError("rotation_angles must match delta_hours shape")
+    if max_lag < 1:
+        raise ValueError("max_lag must be at least 1")
 
-    safe_delta = np.clip(delta_hours, np.finfo(np.float64).eps, None)
-    inv_delta = 1.0 / safe_delta
-    n_windows = safe_delta.size + 1
+    n_windows = delta_hours.size + 1
     n_coeffs = _harmonic_coefficient_count(lmax)
     identity = eye(n_coeffs, dtype=np.complex128, format="csr")
 
+    # Precompute cumulative time deltas and rotation angles for each window pair
+    cumulative_delta = np.zeros((n_windows, n_windows), dtype=np.float64)
+    for i in range(n_windows):
+        for j in range(i + 1, n_windows):
+            cumulative_delta[i, j] = np.sum(delta_hours[i:j])
+
     row_blocks = []
-    for i in range(n_windows - 1):
-        row = [None] * n_windows
-        row[i] = -inv_delta[i] * identity
-        if rotation_angles is None:
-            rot = identity
-        else:
-            diag = _z_rotation_diagonal(lmax, rotation_angles[i])
-            rot = diags(diag, offsets=0, format="csr")
-        row[i + 1] = inv_delta[i] * rot
-        row_blocks.append(row)
+    for lag in range(1, max_lag + 1):
+        weight = decay_factor ** (lag - 1)
+
+        for i in range(n_windows - lag):
+            j = i + lag
+            dt = cumulative_delta[i, j]
+            if dt <= 0:
+                continue
+
+            # Compute rotation for this pair
+            if rotation_angles is None:
+                rot = identity
+            else:
+                # Sum rotation angles from i to j-1
+                total_angle = np.sum(rotation_angles[i:j])
+                rot_diag = _z_rotation_diagonal(lmax, total_angle)
+                rot = diags(rot_diag, offsets=0, format="csr")
+
+            # Build row: -weight/dt at position i, +weight*rot/dt at position j
+            row = [None] * n_windows
+            scale = weight / dt
+            row[i] = -scale * identity
+            row[j] = scale * rot
+            row_blocks.append(row)
+
+    if not row_blocks:
+        raise ValueError("No temporal coupling rows generated")
 
     return bmat(row_blocks, format="csr")
 
@@ -470,6 +501,8 @@ def _fit_coupled_windows(
     degree_weights: np.ndarray | None = None,
     co_rotate: bool = False,
     rotation_period_hours: float | None = None,
+    max_lag: int = 1,
+    decay_factor: float = 0.5,
 ) -> list[HarmonicCoefficients]:
     """
     Fit all windows jointly with temporal continuity constraint.
@@ -609,6 +642,8 @@ def _fit_coupled_windows(
         delta_hours,
         lmax,
         rotation_angles=rotation_angles,
+        max_lag=max_lag,
+        decay_factor=decay_factor,
     )
     if temporal_lambda > 0.0:
         R_temporal = np.sqrt(temporal_lambda) * D_temporal
@@ -684,6 +719,8 @@ def compute_temporal_harmonics(
     co_rotate: bool = False,
     rotation_period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS,
     spatial_weight_exponent: float | None = None,
+    max_lag: int = 1,
+    decay_factor: float = 0.5,
 ) -> list[HarmonicCoefficients]:
     """
     Compute time-dependent spherical harmonic coefficients a_lm(t).
@@ -702,6 +739,8 @@ def compute_temporal_harmonics(
         co_rotate: Rotate the temporal derivative into a solar co-rotating frame
         rotation_period_days: Period (days) used when co_rotate=True
         spatial_weight_exponent: Optional exponent for degree-weighted spatial damping
+        max_lag: Maximum lag for multi-scale temporal regularization (1=adjacent only)
+        decay_factor: Weight decay per lag step (weight_k = decay^(k-1))
 
     Returns:
         List of HarmonicCoefficients, one per valid time window.
@@ -760,6 +799,8 @@ def compute_temporal_harmonics(
             degree_weights=degree_weights,
             co_rotate=co_rotate,
             rotation_period_hours=rotation_period_days * 24.0,
+            max_lag=max_lag,
+            decay_factor=decay_factor,
         )
     else:
         logging.info("Using independent window fitting (no temporal coupling)")

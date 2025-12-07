@@ -99,6 +99,18 @@ def parse_args() -> argparse.Namespace:
         help="Rotate temporal derivative into a solar co-rotating frame",
     )
     parser.add_argument(
+        "--max-lag",
+        type=int,
+        default=1,
+        help="Max temporal lag for multi-scale regularization (1=adjacent, 5=±5 windows)",
+    )
+    parser.add_argument(
+        "--decay-factor",
+        type=float,
+        default=0.5,
+        help="Weight decay per lag step (0.5 = half weight per additional lag)",
+    )
+    parser.add_argument(
         "--spatial-weight-exponent",
         type=float,
         default=None,
@@ -170,6 +182,8 @@ def main() -> int:
             co_rotate=args.co_rotate,
             rotation_period_days=args.rotation_period_days,
             spatial_weight_exponent=args.spatial_weight_exponent,
+            max_lag=args.max_lag,
+            decay_factor=args.decay_factor,
         )
     except Exception as exc:
         logging.exception("Failed to compute temporal harmonics: %s", exc)
