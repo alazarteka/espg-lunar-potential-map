@@ -116,9 +116,9 @@ def synth_losscone(
     ac_rad = np.arcsin(np.sqrt(x_clipped))
     ac_deg = np.degrees(ac_rad)  # (nParams, nE, 1)
 
-    # Mask: pitch <= 180 - ac
-    # (1, nE, nPitch) <= (nParams, nE, 1) -> (nParams, nE, nPitch)
-    mask = pitch_grid_exp <= (180.0 - ac_deg)
+    # Mask: pitch >= ac
+    # (1, nE, nPitch) >= (nParams, nE, 1) -> (nParams, nE, nPitch)
+    mask = pitch_grid_exp >= ac_deg
 
     # Apply mask only where energies are valid
     final_mask = mask & valid_E_exp

@@ -404,9 +404,8 @@ class LossConeFitter:
         if len(self.pitch_angle.pitch_angles) == 0:
             return np.full(config.CHANNELS, np.nan)
         angles = self.pitch_angle.pitch_angles[index]
-        incident_mask = angles < 90
-        # TODO: Check reconsider the reflected mask
-        # reflected_mask = ~incident_mask
+        incident_mask = angles > 90
+        # Reflected mask is angles <= 90
 
         # Check if the electron flux is valid
         if not incident_mask.any():
@@ -470,7 +469,7 @@ class LossConeFitter:
                 pitch_row = pitches_2d[row]
                 flux_row = flux_2d[row]
 
-                incident_mask = pitch_row < 90.0
+                incident_mask = pitch_row > 90.0
                 reflected_mask = ~incident_mask
 
                 incident_idx = np.nonzero(incident_mask)[0]
@@ -535,7 +534,7 @@ class LossConeFitter:
             pitches_2d = self.pitch_angle.pitch_angles[s:e]
 
             # Find maximum incident flux across all energies
-            incident_mask = pitches_2d < 90
+            incident_mask = pitches_2d > 90
             incident_flux_vals = flux_2d[incident_mask]
             incident_flux_vals = incident_flux_vals[incident_flux_vals > 0]  # Remove zeros/negatives
 

@@ -36,7 +36,7 @@ def reference_synth_losscone(
         else:
             ac = math.degrees(math.asin(math.sqrt(x)))
 
-        mask = pitch_grid[i] <= 180 - ac
+        mask = pitch_grid[i] >= ac
         model[i, mask] = 1.0
 
     # Optional narrow beam
@@ -118,18 +118,20 @@ def test_model_equivalence_edge_cases():
     
     # Case 1: U_surface makes x > 1 (closed loss cone)
     # x = bs/bm * (1 + dU/E)
-    # Try bs/bm=1.0, dU=0 -> x=1 -> ac=90 -> mask: pitch <= 90.
-    # If pitch is 0, model should be 1.
+    # Try bs/bm=1.0, dU=0 -> x=1 -> ac=90 -> mask: pitch >= 90.
+    # If pitch is 180, model should be 1.
     
     ref = reference_synth_losscone(energy_grid, pitch_grid, 0.0, 1.0)
     vec = synth_losscone(energy_grid, pitch_grid, 0.0, U_spacecraft=0.0, bs_over_bm=1.0)
     np.testing.assert_allclose(ref, vec)
 
     # Case 2: U_surface makes x < 0 (full loss cone)
-    # x < 0 -> ac=0 -> mask: pitch <= 180.
+    # x < 0 -> ac=0 -> mask: pitch >= 0.
     # All 1s.
     vec = synth_losscone(energy_grid, pitch_grid, -200.0, U_spacecraft=0.0, bs_over_bm=1.0)
-    np.testing.assert_allclose(ref, vec)
+    # ref was from Case 1 (Background), vec is now Full (1.0). They are different.
+    expected = np.ones_like(vec)
+    np.testing.assert_allclose(vec, expected)
 
 
 def test_model_batch_equivalence():
