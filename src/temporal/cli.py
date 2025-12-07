@@ -57,6 +57,18 @@ def parse_args() -> argparse.Namespace:
         help="Maximum spherical harmonic degree",
     )
     parser.add_argument(
+        "--fit-mode",
+        choices=["window", "basis"],
+        default="window",
+        help="Fitting mode: 'window' (per-window) or 'basis' (temporal basis expansion)",
+    )
+    parser.add_argument(
+        "--temporal-basis",
+        type=str,
+        default="constant,synodic",
+        help="Comma-separated temporal basis functions (for --fit-mode basis)",
+    )
+    parser.add_argument(
         "--window-hours",
         type=float,
         default=24.0,
@@ -155,6 +167,91 @@ def main() -> int:
         logging.error("--lmax must be non-negative")
         return 1
 
+    # Dispatch based on fit mode
+    if args.fit_mode == "basis":
+        return _main_basis_mode(args)
+    else:
+        return _main_window_mode(args)
+
+
+def _main_basis_mode(args: argparse.Namespace) -> int:
+    """Run temporal basis fitting mode."""
+    from .basis import fit_temporal_basis, reconstruct_at_times, save_basis_result
+    from .coefficients import _discover_npz, _load_all_data
+
+    logging.info("Using temporal basis fitting mode")
+    logging.info("Basis specification: %s", args.temporal_basis)
+
+    # Load all data
+    cache_dir = args.cache_dir
+    start_ts = args.start.astype("datetime64[s]")
+    end_ts_exclusive = (args.end + np.timedelta64(1, "D")).astype("datetime64[s]")
+
+    try:
+        files = _discover_npz(cache_dir)
+        logging.info("Found %d NPZ files", len(files))
+        utc, lat, lon, potential = _load_all_data(files, start_ts, end_ts_exclusive)
+        logging.info("Loaded %d measurements", utc.size)
+    except Exception as exc:
+        logging.exception("Failed to load data: %s", exc)
+        return 1
+
+    if utc.size == 0:
+        logging.error("No measurements found in date range")
+        return 1
+
+    # Fit temporal basis
+    try:
+        result = fit_temporal_basis(
+            utc=utc,
+            lat=lat,
+            lon=lon,
+            potential=potential,
+            lmax=args.lmax,
+            basis_spec=args.temporal_basis,
+            l2_penalty=args.regularize_l2,
+        )
+    except Exception as exc:
+        logging.exception("Failed to fit temporal basis: %s", exc)
+        return 1
+
+    # Reconstruct at window midpoints for compatibility with visualization
+    window_hours = args.window_hours
+    n_windows = int((end_ts_exclusive - start_ts) / np.timedelta64(int(window_hours * 3600), "s"))
+    times = np.array([
+        start_ts + np.timedelta64(int((i + 0.5) * window_hours * 3600), "s")
+        for i in range(n_windows)
+    ])
+
+    results = reconstruct_at_times(result, times, reference_time=start_ts)
+
+    # Save in compatible format
+    try:
+        save_temporal_coefficients(results, args.output)
+    except Exception as exc:
+        logging.exception("Failed to save results: %s", exc)
+        return 1
+
+    # Print summary
+    print("\n" + "=" * 60)
+    print("Temporal Basis Fitting Summary")
+    print("=" * 60)
+    print(f"Date range      : {args.start} → {args.end}")
+    print(f"Fit mode        : temporal basis")
+    print(f"Bases           : {result.basis_names}")
+    print(f"Max degree      : lmax = {args.lmax}")
+    print(f"Total samples   : {result.n_samples}")
+    print(f"Parameters      : {len(result.basis_names)} × {_harmonic_coefficient_count(args.lmax)} = {len(result.basis_names) * _harmonic_coefficient_count(args.lmax)}")
+    print(f"RMS residual    : {result.rms_residual:.2f} V")
+    print(f"Output windows  : {len(results)}")
+    print(f"\nSaved to: {args.output}")
+    print("=" * 60)
+
+    return 0
+
+
+def _main_window_mode(args: argparse.Namespace) -> int:
+    """Run per-window fitting mode (original behavior)."""
     if args.window_hours <= 0:
         logging.error("--window-hours must be positive")
         return 1
@@ -207,6 +304,7 @@ def main() -> int:
     print("Time-Dependent Spherical Harmonic Summary")
     print("=" * 60)
     print(f"Date range      : {args.start} → {args.end}")
+    print(f"Fit mode        : per-window")
     print(f"Time windows    : {len(results)}")
     print(f"Window duration : {args.window_hours:.1f} hours")
     print(f"Max degree      : lmax = {args.lmax}")
