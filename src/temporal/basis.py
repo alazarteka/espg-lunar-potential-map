@@ -67,27 +67,141 @@ def _make_sidereal_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[Basi
     ]
 
 
+def _make_synodic2_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> list[BasisFunction]:
+    """Create 2nd harmonic (2ω) cosine and sine bases at twice the synodic frequency."""
+    period_hours = period_days * 24.0 / 2.0  # Half the period = double the frequency
+    return [
+        BasisFunction(
+            name="synodic2_cos",
+            func=lambda t, p=period_hours: np.cos(2 * np.pi * t / p),
+        ),
+        BasisFunction(
+            name="synodic2_sin",
+            func=lambda t, p=period_hours: np.sin(2 * np.pi * t / p),
+        ),
+    ]
+
+
+def _make_synodic3_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> list[BasisFunction]:
+    """Create 3rd harmonic (3ω) cosine and sine bases at triple the synodic frequency."""
+    period_hours = period_days * 24.0 / 3.0  # Third the period = triple the frequency
+    return [
+        BasisFunction(
+            name="synodic3_cos",
+            func=lambda t, p=period_hours: np.cos(2 * np.pi * t / p),
+        ),
+        BasisFunction(
+            name="synodic3_sin",
+            func=lambda t, p=period_hours: np.sin(2 * np.pi * t / p),
+        ),
+    ]
+
+
+def _make_synodic4_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> list[BasisFunction]:
+    """Create 4th harmonic (4ω) cosine and sine bases at 4x the synodic frequency."""
+    period_hours = period_days * 24.0 / 4.0
+    return [
+        BasisFunction(
+            name="synodic4_cos",
+            func=lambda t, p=period_hours: np.cos(2 * np.pi * t / p),
+        ),
+        BasisFunction(
+            name="synodic4_sin",
+            func=lambda t, p=period_hours: np.sin(2 * np.pi * t / p),
+        ),
+    ]
+
+
+def _make_sidereal2_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[BasisFunction]:
+    """Create 2nd harmonic cosine and sine bases at twice the sidereal frequency."""
+    period_hours = period_days * 24.0 / 2.0
+    return [
+        BasisFunction(
+            name="sidereal2_cos",
+            func=lambda t, p=period_hours: np.cos(2 * np.pi * t / p),
+        ),
+        BasisFunction(
+            name="sidereal2_sin",
+            func=lambda t, p=period_hours: np.sin(2 * np.pi * t / p),
+        ),
+    ]
+
+
+def _make_sidereal3_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[BasisFunction]:
+    """Create 3rd harmonic cosine and sine bases at triple the sidereal frequency."""
+    period_hours = period_days * 24.0 / 3.0
+    return [
+        BasisFunction(
+            name="sidereal3_cos",
+            func=lambda t, p=period_hours: np.cos(2 * np.pi * t / p),
+        ),
+        BasisFunction(
+            name="sidereal3_sin",
+            func=lambda t, p=period_hours: np.sin(2 * np.pi * t / p),
+        ),
+    ]
+
+
+def _make_sidereal4_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[BasisFunction]:
+    """Create 4th harmonic cosine and sine bases at 4x the sidereal frequency."""
+    period_hours = period_days * 24.0 / 4.0
+    return [
+        BasisFunction(
+            name="sidereal4_cos",
+            func=lambda t, p=period_hours: np.cos(2 * np.pi * t / p),
+        ),
+        BasisFunction(
+            name="sidereal4_sin",
+            func=lambda t, p=period_hours: np.sin(2 * np.pi * t / p),
+        ),
+    ]
+
+
 # Available basis function factories (for parsing user input)
 AVAILABLE_BASES: dict[str, Callable[[], list[BasisFunction]]] = {
     "constant": lambda: [BasisFunction("constant", lambda t: np.ones_like(t))],
     "linear": lambda: [BasisFunction("linear", lambda t: t / max(t.max(), 1.0))],
     "synodic": _make_synodic_basis,
+    "synodic2": _make_synodic2_basis,
+    "synodic3": _make_synodic3_basis,
+    "synodic4": _make_synodic4_basis,
     "sidereal": _make_sidereal_basis,
+    "sidereal2": _make_sidereal2_basis,
+    "sidereal3": _make_sidereal3_basis,
+    "sidereal4": _make_sidereal4_basis,
 }
 
 
 def _get_basis_func_by_name(name: str) -> Callable[[np.ndarray], np.ndarray]:
     """Get a basis function by its expanded name (e.g., 'synodic_cos')."""
     synodic_hours = DEFAULT_SYNODIC_PERIOD_DAYS * 24.0
+    synodic2_hours = DEFAULT_SYNODIC_PERIOD_DAYS * 24.0 / 2.0
+    synodic3_hours = DEFAULT_SYNODIC_PERIOD_DAYS * 24.0 / 3.0
+    synodic4_hours = DEFAULT_SYNODIC_PERIOD_DAYS * 24.0 / 4.0
     sidereal_hours = SIDEREAL_PERIOD_DAYS * 24.0
+    sidereal2_hours = SIDEREAL_PERIOD_DAYS * 24.0 / 2.0
+    sidereal3_hours = SIDEREAL_PERIOD_DAYS * 24.0 / 3.0
+    sidereal4_hours = SIDEREAL_PERIOD_DAYS * 24.0 / 4.0
     
     EXPANDED_BASES = {
         "constant": lambda t: np.ones_like(t),
         "linear": lambda t: t / max(t.max(), 1.0),
         "synodic_cos": lambda t: np.cos(2 * np.pi * t / synodic_hours),
         "synodic_sin": lambda t: np.sin(2 * np.pi * t / synodic_hours),
+        "synodic2_cos": lambda t: np.cos(2 * np.pi * t / synodic2_hours),
+        "synodic2_sin": lambda t: np.sin(2 * np.pi * t / synodic2_hours),
+        "synodic3_cos": lambda t: np.cos(2 * np.pi * t / synodic3_hours),
+        "synodic3_sin": lambda t: np.sin(2 * np.pi * t / synodic3_hours),
+        "synodic4_cos": lambda t: np.cos(2 * np.pi * t / synodic4_hours),
+        "synodic4_sin": lambda t: np.sin(2 * np.pi * t / synodic4_hours),
         "sidereal_cos": lambda t: np.cos(2 * np.pi * t / sidereal_hours),
         "sidereal_sin": lambda t: np.sin(2 * np.pi * t / sidereal_hours),
+        "sidereal2_cos": lambda t: np.cos(2 * np.pi * t / sidereal2_hours),
+        "sidereal2_sin": lambda t: np.sin(2 * np.pi * t / sidereal2_hours),
+        "sidereal3_cos": lambda t: np.cos(2 * np.pi * t / sidereal3_hours),
+        "sidereal3_sin": lambda t: np.sin(2 * np.pi * t / sidereal3_hours),
+        "sidereal4_cos": lambda t: np.cos(2 * np.pi * t / sidereal4_hours),
+        "sidereal4_sin": lambda t: np.sin(2 * np.pi * t / sidereal4_hours),
     }
     if name not in EXPANDED_BASES:
         raise ValueError(f"Unknown expanded basis name: {name}")
