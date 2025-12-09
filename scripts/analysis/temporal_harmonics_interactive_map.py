@@ -36,6 +36,8 @@ def create_interactive_sphere(
     n_interp_frames: int = 100,
     resolution: int = 91,
     output_path: Path | None = None,
+    cmin: float | None = None,
+    cmax: float | None = None,
 ) -> go.Figure:
     """
     Create interactive 3D sphere with temporal animation.
@@ -47,6 +49,8 @@ def create_interactive_sphere(
         n_interp_frames: Number of interpolated frames for smooth animation
         resolution: Number of latitude steps (longitude will be 2x)
         output_path: Optional path to save HTML file
+        cmin: Optional minimum color scale value (V)
+        cmax: Optional maximum color scale value (V)
     """
     n_windows = len(times)
     n_lat = resolution
@@ -81,7 +85,7 @@ def create_interactive_sphere(
     lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
     x, y, z = latlon_to_xyz(lat_grid, lon_grid)
 
-    # Determine global color scale from all frames
+    # Determine global color scale from all frames (or use overrides)
     print("Computing global color range...")
     all_potentials = []
     for i in range(min(20, n_interp_frames)):  # Sample to save time
@@ -90,8 +94,8 @@ def create_interactive_sphere(
         )
         all_potentials.append(pot)
 
-    vmin = np.percentile(np.concatenate([p.ravel() for p in all_potentials]), 1)
-    vmax = np.percentile(np.concatenate([p.ravel() for p in all_potentials]), 99)
+    vmin = cmin if cmin is not None else np.percentile(np.concatenate([p.ravel() for p in all_potentials]), 1)
+    vmax = cmax if cmax is not None else np.percentile(np.concatenate([p.ravel() for p in all_potentials]), 99)
 
     print(f"Color scale: {vmin:.0f} to {vmax:.0f} V")
 
@@ -281,6 +285,18 @@ def parse_args() -> argparse.Namespace:
         default=91,
         help="Latitude resolution (higher = smoother but slower)",
     )
+    parser.add_argument(
+        "--cmin",
+        type=float,
+        default=None,
+        help="Minimum color scale value (V). Auto-detected if not specified.",
+    )
+    parser.add_argument(
+        "--cmax",
+        type=float,
+        default=None,
+        help="Maximum color scale value (V). Auto-detected if not specified.",
+    )
     return parser.parse_args()
 
 
@@ -314,6 +330,8 @@ def main() -> int:
         n_interp_frames=args.frames,
         resolution=args.resolution,
         output_path=args.output,
+        cmin=args.cmin,
+        cmax=args.cmax,
     )
 
     print(
