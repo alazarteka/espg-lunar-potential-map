@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 from scipy.stats.qmc import LatinHypercube, scale
+from tqdm import tqdm
 
 from src import config
 from src.model import synth_losscone
@@ -729,7 +730,9 @@ class LossConeFitter:
         n_chunks = len(self.er_data.data) // config.SWEEP_ROWS
         results = np.zeros((n_chunks, 5))
 
-        for i in range(n_chunks):
+        for i in tqdm(
+            range(n_chunks), desc="Fitting chunks", unit="chunk", dynamic_ncols=True
+        ):
             U_surface, bs_over_bm, beam_amp, chi2 = self._fit_surface_potential(i)
             results[i] = [U_surface, bs_over_bm, beam_amp, chi2, i]
 
