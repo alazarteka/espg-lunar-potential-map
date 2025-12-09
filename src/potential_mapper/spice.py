@@ -36,3 +36,7 @@ def load_spice_files() -> None:
         except Exception as e:
             logging.error(f"Error loading SPICE file {spice_file}: {e}")
             raise
+
+    # Suppress SPICE error output to stderr - let Python handle errors
+    spice.erract("SET", 10, "RETURN")
+    spice.errprt("SET", 10, "NONE")

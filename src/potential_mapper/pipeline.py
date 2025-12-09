@@ -25,9 +25,14 @@ from src.utils.units import ureg
 
 def _init_worker_spice():
     """Initialize SPICE kernels in worker process for thread-safety."""
+    import spiceypy as spice
+
     from src.potential_mapper.spice import load_spice_files
 
     load_spice_files()
+    # Suppress SPICE error output to stderr - let Python handle errors
+    spice.erract("SET", 10, "RETURN")
+    spice.errprt("SET", 10, "NONE")
 
 
 def spacecraft_potential_worker(
@@ -520,7 +525,9 @@ def process_merged_data(
         if chunks:
             num_workers = max(1, multiprocessing.cpu_count() - 1)
 
-            with multiprocessing.Pool(processes=num_workers) as pool:
+            with multiprocessing.Pool(
+                processes=num_workers, initializer=_init_worker_spice
+            ) as pool:
                 results_iter = pool.imap(fit_worker, chunks)
                 for chunk_idx, chunk_res in enumerate(
                     tqdm(

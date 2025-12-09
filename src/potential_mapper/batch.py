@@ -219,9 +219,9 @@ def _parse_args() -> argparse.Namespace:
         "--day", type=int, default=None, help="Optional day filter (1-31)"
     )
     parser.add_argument(
-        "--no-parallel",
+        "--parallel",
         action="store_true",
-        help="Disable parallel fitting (use sequential)",
+        help="Enable parallel fitting (experimental, may cause hangs)",
     )
     parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing output file"
@@ -248,7 +248,7 @@ def main() -> int:
         year=args.year,
         month=args.month,
         day=args.day,
-        use_parallel=not args.no_parallel,
+        use_parallel=args.parallel,
         overwrite=args.overwrite,
     )
 
