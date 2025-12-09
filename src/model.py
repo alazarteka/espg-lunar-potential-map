@@ -4,9 +4,7 @@ import numpy as np
 # Constants
 ###########
 
-EPS = 1e-12  # Small epsilon to avoid division by zero
 DEFAULT_BACKGROUND = 0.05  # Small non-zero value outside loss cone (match config)
-e_0 = 1.602e-19  # Elementary charge in Coulombs
 
 
 def synth_losscone(
@@ -74,6 +72,12 @@ def synth_losscone(
         beam_width_eV.size,
         background.size,
     )
+
+    from src import config
+
+    # Local import avoids circular dependency:
+    # src.config -> src.utils -> src.flux -> src.model
+    EPS = config.MODEL_EPS
 
     # Reshape params to (nParams, 1, 1) for broadcasting
     U_surface = U_surface.reshape(-1, 1, 1)
