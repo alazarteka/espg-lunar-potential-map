@@ -47,6 +47,11 @@ def spacecraft_potential_worker(
     Returns:
         Tuple of (spec_no, row_indices, potential_value)
     """
+    import warnings
+
+    # Suppress RuntimeWarnings (e.g. from geometry.py) to avoid interfering with tqdm
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
+
     from src.spacecraft_potential import calculate_potential
 
     spec_no, rows_df = args
@@ -112,7 +117,11 @@ def _spacecraft_potential_per_row(er_data: ERData, n_rows: int) -> np.ndarray:
     unique_specs = np.unique(spec_values)
 
     for spec_value in tqdm(
-        unique_specs, desc="Calculating SC Potential", unit="spec", leave=False
+        unique_specs,
+        desc="Calculating SC Potential",
+        unit="spec",
+        leave=False,
+        dynamic_ncols=True,
     ):
         if isinstance(spec_value, numbers.Real) and np.isnan(spec_value):
             continue
@@ -204,7 +213,9 @@ def _spacecraft_potential_per_row_parallel(
     )
 
     # Execute in parallel with SPICE initialization per worker
-    with multiprocessing.Pool(
+    # Use 'spawn' context to ensure thread-safety for SPICE (avoid global state corruption)
+    ctx = multiprocessing.get_context("spawn")
+    with ctx.Pool(
         processes=num_workers, initializer=_init_worker_spice
     ) as pool:
         # Use imap_unordered for better memory efficiency
@@ -222,6 +233,7 @@ def _spacecraft_potential_per_row_parallel(
             desc="SC Potential (parallel)",
             unit="spec",
             leave=False,
+            dynamic_ncols=True,
         ):
             if potential_value is not None and np.isfinite(potential_value):
                 potentials[row_indices] = potential_value
@@ -525,7 +537,9 @@ def process_merged_data(
         if chunks:
             num_workers = max(1, multiprocessing.cpu_count() - 1)
 
-            with multiprocessing.Pool(
+            # Use 'spawn' context to ensure thread-safety for SPICE
+            ctx = multiprocessing.get_context("spawn")
+            with ctx.Pool(
                 processes=num_workers, initializer=_init_worker_spice
             ) as pool:
                 results_iter = pool.imap(fit_worker, chunks)
@@ -535,6 +549,7 @@ def process_merged_data(
                         total=len(chunks),
                         desc="Fitting chunks",
                         unit="chunk",
+                        dynamic_ncols=True,
                     )
                 ):
                     row_offset = chunk_idx * rows_per_chunk
