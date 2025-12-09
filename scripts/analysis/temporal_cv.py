@@ -77,18 +77,35 @@ def run_cv(
     test_fraction: float = 0.25,
     seed: int = 42,
 ) -> dict:
-    """Run cross-validation and return metrics."""
+    """Run cross-validation and return metrics.
+    
+    NOTE: Splits by SPECTRUM GROUPS (every 15 rows) to avoid data leakage.
+    Each spectrum has 15 energy bins with the same fitted potential,
+    so we keep these together when splitting train/test.
+    """
     np.random.seed(seed)
-    n = len(potential)
-    n_test = int(test_fraction * n)
-    n_train = n - n_test
+    
+    # Group rows by spectrum (every 15 rows is one spectrum)
+    ROWS_PER_SPECTRUM = 15
+    n_spectra = len(potential) // ROWS_PER_SPECTRUM
+    n_spectra_test = int(test_fraction * n_spectra)
+    n_spectra_train = n_spectra - n_spectra_test
+    
+    logging.info(
+        "Splitting by spectra (15 rows each): %d spectra (%d train, %d test)",
+        n_spectra, n_spectra_train, n_spectra_test
+    )
 
     results = {}
 
-    # --- Random holdout ---
-    perm = np.random.permutation(n)
-    train_idx = perm[:n_train]
-    test_idx = perm[n_train:]
+    # --- Random holdout BY SPECTRUM GROUP ---
+    perm = np.random.permutation(n_spectra)
+    train_spectra = set(perm[:n_spectra_train])
+    
+    # Map back to row indices
+    train_mask = np.array([i // ROWS_PER_SPECTRUM in train_spectra for i in range(len(potential))])
+    train_idx = np.where(train_mask)[0]
+    test_idx = np.where(~train_mask)[0]
 
     train_result = fit_temporal_basis(
         utc[train_idx], lat[train_idx], lon[train_idx], potential[train_idx],
@@ -111,13 +128,17 @@ def run_cv(
         "naive_rms": rms_naive,
         "skill": 1 - rms_test / rms_naive,
         "r_squared": 1 - (rms_test**2 / rms_naive**2),
-        "n_train": n_train,
-        "n_test": n_test,
+        "n_train": len(train_idx),
+        "n_test": len(test_idx),
+        "n_spectra_train": n_spectra_train,
+        "n_spectra_test": n_spectra_test,
     }
 
-    # --- Temporal split ---
-    train_idx = np.arange(n_train)
-    test_idx = np.arange(n_train, n)
+    # --- Temporal split (by row order, which is time-ordered) ---
+    n = len(potential)
+    n_train_temporal = int((1 - test_fraction) * n)
+    train_idx = np.arange(n_train_temporal)
+    test_idx = np.arange(n_train_temporal, n)
 
     train_result = fit_temporal_basis(
         utc[train_idx], lat[train_idx], lon[train_idx], potential[train_idx],
@@ -139,8 +160,8 @@ def run_cv(
         "naive_rms": rms_naive,
         "skill": 1 - rms_test / rms_naive,
         "r_squared": 1 - (rms_test**2 / rms_naive**2),
-        "n_train": n_train,
-        "n_test": n_test,
+        "n_train": len(train_idx),
+        "n_test": len(test_idx),
     }
 
     return results
