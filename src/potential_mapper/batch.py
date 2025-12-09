@@ -25,7 +25,15 @@ from src.potential_mapper.spice import load_spice_files
 
 
 def _to_unicode(arr) -> np.ndarray:
-    """Convert array to Unicode string array."""
+    """
+    Convert array to Unicode string array.
+
+    Args:
+        arr: Input array-like object.
+
+    Returns:
+        np.ndarray: Array of Unicode strings (U64).
+    """
     if arr is None:
         return np.array([], dtype="U1")
     return np.asarray(arr, dtype="U64")
@@ -36,6 +44,13 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
     Prepare NPZ payload from merged ERData and PotentialResults.
 
     Creates both row-level and spectrum-level aggregated data.
+
+    Args:
+        er_data: The loaded ERData object.
+        results: The processing results.
+
+    Returns:
+        dict[str, np.ndarray]: Dictionary suitable for np.savez.
     """
     df = er_data.data.reset_index(drop=True)
     n_rows = len(df)
@@ -88,7 +103,16 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
 
 
 def _write_npz_atomic(out_path: Path, payload: dict[str, np.ndarray]) -> None:
-    """Write NPZ file atomically using temporary file and rename."""
+    """
+    Write NPZ file atomically using temporary file and rename.
+
+    Args:
+        out_path: Destination path for the NPZ file.
+        payload: Dictionary of arrays to save.
+
+    Returns:
+        None
+    """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         dir=out_path.parent, suffix=".tmp", delete=False
@@ -101,7 +125,17 @@ def _write_npz_atomic(out_path: Path, payload: dict[str, np.ndarray]) -> None:
 
 
 def _build_output_filename(year: int | None, month: int | None, day: int | None) -> str:
-    """Build output filename based on date filters."""
+    """
+    Build output filename based on date filters.
+
+    Args:
+        year: Year filter (optional).
+        month: Month filter (optional).
+        day: Day filter (optional).
+
+    Returns:
+        str: The constructed filename.
+    """
     parts = []
     if year is not None:
         parts.append(f"{year}")
@@ -128,15 +162,15 @@ def run_batch(
     Run batch processing with merged data loading.
 
     Args:
-        output_dir: Directory to save output NPZ file
-        year: Optional year filter
-        month: Optional month filter (1-12)
-        day: Optional day filter (1-31)
-        use_parallel: Whether to use parallel fitting (default: True)
-        overwrite: Whether to overwrite existing output file
+        output_dir (Path): Directory to save output NPZ file.
+        year (int | None): Optional year filter.
+        month (int | None): Optional month filter (1-12).
+        day (int | None): Optional day filter (1-31).
+        use_parallel (bool): Whether to use parallel fitting (default: True).
+        overwrite (bool): Whether to overwrite existing output file.
 
     Returns:
-        Exit code (0 for success, 1 for failure)
+        int: Exit code (0 for success, 1 for failure).
     """
     start = datetime.now()
 
@@ -199,7 +233,12 @@ def run_batch(
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """
+    Parse command-line arguments.
+
+    Returns:
+        argparse.Namespace: Parsed arguments.
+    """
     parser = argparse.ArgumentParser(
         prog="python -m src.potential_mapper.batch",
         description="Batch process potential mapper with merged data loading.",

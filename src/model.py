@@ -23,15 +23,23 @@ def synth_losscone(
     """
     Build a loss-cone model that never returns NaN/Inf.
 
-    Supports broadcasting for vectorized LHS:
-    - energy_grid: (nE,)
-    - pitch_grid: (nE, nPitch)
-    - U_surface: scalar or (nParams,) - lunar surface potential in volts
-    - bs_over_bm: scalar or (nParams,)
+    Supports broadcasting for vectorized LHS.
+
+    Args:
+        energy_grid: Energy grid values (nE,).
+        pitch_grid: Pitch angle grid values (nE, nPitch).
+        U_surface: Lunar surface potential in volts. Scalar or (nParams,).
+        U_spacecraft: Spacecraft potential in volts. Scalar or (nE,) or (nParams, nE).
+        bs_over_bm: Magnetic field ratio. Scalar or (nParams,).
+        beam_width_eV: Width of the beam in eV. Scalar or (nParams,).
+        beam_amp: Amplitude of the beam. Scalar or (nParams,).
+        beam_pitch_sigma_deg: Sigma of the beam pitch in degrees. Scalar or (nParams,).
+        background: Background level. Scalar or (nParams,).
 
     Returns:
-    - If params are scalar: (nE, nPitch)
-    - If params are arrays: (nParams, nE, nPitch)
+        np.ndarray: Model flux values.
+            - If params are scalar: (nE, nPitch)
+            - If params are arrays: (nParams, nE, nPitch)
     """
     # Ensure inputs are arrays
     energy_grid = np.asarray(energy_grid)
@@ -144,6 +152,19 @@ def synth_losscone(
 
 
 def _chi2(params, energies, pitches, data, eps):
+    """
+    Compute chi-squared error between data and model.
+
+    Args:
+        params: Tuple of (U_surface, bs_over_bm).
+        energies: Energy grid values.
+        pitches: Pitch angle grid values.
+        data: Observed data values.
+        eps: Small epsilon to avoid log(0).
+
+    Returns:
+        float: Chi-squared error value.
+    """
     U_surface, bs_over_bm = params
     model = synth_losscone(energies, pitches, U_surface, bs_over_bm)
 

@@ -14,25 +14,19 @@ __all__ = ["select_flux_day_file"]
 def select_flux_day_file(year: int, month: int, day: int) -> Path:
     """Return the first ER flux file matching a given date.
 
-    Parameters
-    ----------
-    year, month, day
-        Date tokens passed to :meth:`DataLoader.discover_flux_files`.
-
-    Returns
-    -------
-    pathlib.Path
-        Path to the first matching flux file.
-
-    Notes
-    -----
     Emits a warning if multiple files satisfy the filters; callers should
     inspect the returned path if deterministic selection matters.
 
-    Raises
-    ------
-    FileNotFoundError
-        If no files match the requested date.
+    Args:
+        year: Year of the data.
+        month: Month of the data.
+        day: Day of the data.
+
+    Returns:
+        Path: Path to the first matching flux file.
+
+    Raises:
+        FileNotFoundError: If no files match the requested date.
     """
 
     from src.potential_mapper.pipeline import DataLoader

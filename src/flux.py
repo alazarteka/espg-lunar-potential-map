@@ -180,7 +180,7 @@ class ERData:
 
 class PitchAngle:
     """
-    Initialize the PitchAngle class with the ER data and theta values.
+    Calculate and store pitch angles from Electron Reflectometer (ER) data.
 
     Data rows with invalid B-field are retained; all such rows are flagged via
     valid_mask and their derived quantities are NaN. Down-stream algorithms
@@ -288,6 +288,14 @@ class PitchAngle:
 
 
 class LossConeFitter:
+    """
+    Fit surface potential and magnetic field ratio using loss cone analysis.
+
+    This class handles the normalization of electron flux data, generation of
+    synthetic loss cone models, and fitting of these models to the observed data
+    to estimate the lunar surface potential.
+    """
+
     def __init__(
         self,
         er_data: ERData,
@@ -737,6 +745,14 @@ class LossConeFitter:
 
 
 class FluxData:
+    """
+    Orchestrate the processing of flux data (Deprecated).
+
+    This class serves as a wrapper around ERData, PitchAngle, and LossConeFitter
+    to maintain backward compatibility with older scripts. New code should prefer
+    using the specialized classes directly.
+    """
+
     def __init__(self, er_data_file: str, thetas: str):
         """
         Initialize the FluxData class as an orchestrator using the new class structure.

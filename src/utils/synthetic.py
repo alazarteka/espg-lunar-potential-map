@@ -20,11 +20,10 @@ __all__ = [
 def prepare_phis() -> tuple[list[float], np.ndarray]:
     """Prepare mock instrument viewing angles and solid angles.
 
-    Returns
-    -------
-    list[float], np.ndarray
-        Tuple of azimuth angles (degrees) and solid angles (sr) for all
-        instrument channels, matching the structure expected by `ERData`.
+    Returns:
+        tuple[list[float], np.ndarray]:
+            Tuple of azimuth angles (degrees) and solid angles (sr) for all
+            instrument channels, matching the structure expected by `ERData`.
     """
 
     phis: list[float] = []
@@ -64,7 +63,17 @@ def prepare_flux(
     kappa: float = 5.0,
     theta: float = 1.1e5,
 ):
-    """Prepare a theoretical omnidirectional particle flux."""
+    """
+    Prepare a theoretical omnidirectional particle flux.
+
+    Args:
+        density: Density in particles/m^3.
+        kappa: Kappa parameter.
+        theta: Thermal speed in m/s.
+
+    Returns:
+        tuple: (omnidirectional_particle_flux, energy_centers)
+    """
 
     params = KappaParams(
         density=density * ureg.particle / ureg.meter**3,
@@ -85,7 +94,17 @@ def prepare_synthetic_er(
     kappa: float = 5.0,
     theta: float = 1.1e5,
 ) -> ERData:
-    """Construct a synthetic `ERData` instance for deterministic tests."""
+    """
+    Construct a synthetic `ERData` instance for deterministic tests.
+
+    Args:
+        density: Density in particles/m^3.
+        kappa: Kappa parameter.
+        theta: Thermal speed in m/s.
+
+    Returns:
+        ERData: A synthetic ERData object.
+    """
 
     phis, _solid_angles = prepare_phis()
     omnidirectional_particle_flux, energy_centers = prepare_flux(

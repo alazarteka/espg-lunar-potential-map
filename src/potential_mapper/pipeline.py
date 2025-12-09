@@ -232,7 +232,18 @@ def _spacecraft_potential_per_row_parallel(
 def _apply_fit_results(
     fit_results: np.ndarray, proj_potential: np.ndarray, row_offset: int, n_total: int
 ) -> None:
-    """Map fitter outputs back onto per-row projected potential array."""
+    """
+    Map fitter outputs back onto per-row projected potential array.
+
+    Args:
+        fit_results: Array of fit results.
+        proj_potential: Array of projected potentials to update.
+        row_offset: Row offset for this chunk.
+        n_total: Total number of rows.
+
+    Returns:
+        None
+    """
 
     rows_per_sweep = config.SWEEP_ROWS
     if fit_results.size == 0:
@@ -564,7 +575,15 @@ def process_lp_file(file_path: Path) -> PotentialResults:
 
 
 def _concat_results(results: list[PotentialResults]) -> PotentialResults:
-    """Concatenate fields from multiple PotentialResults objects (row-wise)."""
+    """
+    Concatenate fields from multiple PotentialResults objects (row-wise).
+
+    Args:
+        results: List of PotentialResults objects.
+
+    Returns:
+        PotentialResults: Concatenated results.
+    """
 
     def cat(attr: str):
         return np.concatenate([getattr(r, attr) for r in results])

@@ -17,7 +17,18 @@ from .coefficients import (
 
 
 def _parse_iso_date(value: str) -> np.datetime64:
-    """Parse YYYY-MM-DD into numpy datetime64."""
+    """
+    Parse YYYY-MM-DD into numpy datetime64.
+
+    Args:
+        value: Input string in YYYY-MM-DD format.
+
+    Returns:
+        np.datetime64: Parsed date (unit 'D').
+
+    Raises:
+        argparse.ArgumentTypeError: If format is invalid.
+    """
     try:
         datetime.strptime(value, "%Y-%m-%d")
         return np.datetime64(value, "D")
@@ -175,7 +186,15 @@ def main() -> int:
 
 
 def _main_basis_mode(args: argparse.Namespace) -> int:
-    """Run temporal basis fitting mode."""
+    """
+    Run temporal basis fitting mode.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        int: Exit code.
+    """
     from .basis import fit_temporal_basis, reconstruct_at_times, save_basis_result
     from .coefficients import _discover_npz, _load_all_data
 
@@ -217,11 +236,15 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
 
     # Reconstruct at window midpoints for compatibility with visualization
     window_hours = args.window_hours
-    n_windows = int((end_ts_exclusive - start_ts) / np.timedelta64(int(window_hours * 3600), "s"))
-    times = np.array([
-        start_ts + np.timedelta64(int((i + 0.5) * window_hours * 3600), "s")
-        for i in range(n_windows)
-    ])
+    n_windows = int(
+        (end_ts_exclusive - start_ts) / np.timedelta64(int(window_hours * 3600), "s")
+    )
+    times = np.array(
+        [
+            start_ts + np.timedelta64(int((i + 0.5) * window_hours * 3600), "s")
+            for i in range(n_windows)
+        ]
+    )
 
     results = reconstruct_at_times(result, times, reference_time=start_ts)
 
@@ -241,7 +264,9 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
     print(f"Bases           : {result.basis_names}")
     print(f"Max degree      : lmax = {args.lmax}")
     print(f"Total samples   : {result.n_samples}")
-    print(f"Parameters      : {len(result.basis_names)} × {_harmonic_coefficient_count(args.lmax)} = {len(result.basis_names) * _harmonic_coefficient_count(args.lmax)}")
+    print(
+        f"Parameters      : {len(result.basis_names)} × {_harmonic_coefficient_count(args.lmax)} = {len(result.basis_names) * _harmonic_coefficient_count(args.lmax)}"
+    )
     print(f"RMS residual    : {result.rms_residual:.2f} V")
     print(f"Output windows  : {len(results)}")
     print(f"\nSaved to: {args.output}")
@@ -251,7 +276,15 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
 
 
 def _main_window_mode(args: argparse.Namespace) -> int:
-    """Run per-window fitting mode (original behavior)."""
+    """
+    Run per-window fitting mode (original behavior).
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        int: Exit code.
+    """
     if args.window_hours <= 0:
         logging.error("--window-hours must be positive")
         return 1

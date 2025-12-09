@@ -11,6 +11,9 @@ def load_spice_files() -> None:
 
     Safe to call multiple times in a process; relies on SPICE to deduplicate
     loaded kernels. Raises FileNotFoundError if directory or files are missing.
+
+    Returns:
+        None
     """
     spice_dir = config.SPICE_KERNELS_DIR
     if not spice_dir.exists():

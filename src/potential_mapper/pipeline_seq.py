@@ -21,7 +21,16 @@ from src.utils.units import ureg
 
 
 def _spacecraft_potential_per_row(er_data: ERData, n_rows: int) -> np.ndarray:
-    """Return spacecraft potential per ER row by spec_no grouping."""
+    """
+    Return spacecraft potential per ER row by spec_no grouping.
+
+    Args:
+        er_data: The ERData object.
+        n_rows: Total number of rows.
+
+    Returns:
+        np.ndarray: Array of spacecraft potentials per row.
+    """
 
     from src.spacecraft_potential import calculate_potential
 
@@ -299,7 +308,15 @@ def process_lp_file(file_path: Path) -> PotentialResults:
 
 
 def _concat_results(results: list[PotentialResults]) -> PotentialResults:
-    """Concatenate fields from multiple PotentialResults objects (row-wise)."""
+    """
+    Concatenate fields from multiple PotentialResults objects (row-wise).
+
+    Args:
+        results: List of PotentialResults objects.
+
+    Returns:
+        PotentialResults: Concatenated results.
+    """
 
     def cat(attr: str):
         return np.concatenate([getattr(r, attr) for r in results])

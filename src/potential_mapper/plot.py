@@ -20,6 +20,14 @@ def plot_map(
     - Adds moon map background if `config.MOON_MAP_FILE` exists under DATA_DIR.
     - Filters by finite potentials; optional day/night filtering via `illumination`.
     - Returns (Figure, Axes); caller decides to show/save.
+
+    Args:
+        results: Potential results to plot.
+        ax: Optional existing axes to plot on.
+        illumination: 'day' or 'night' filter (optional).
+
+    Returns:
+        tuple[plt.Figure, plt.Axes]: The figure and axes objects.
     """
     fig: plt.Figure
     axes: plt.Axes

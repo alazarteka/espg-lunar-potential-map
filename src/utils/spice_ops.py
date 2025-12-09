@@ -89,8 +89,14 @@ def get_j2000_iau_moon_transform_matrix(time: float) -> np.ndarray:
 
 def get_lp_position_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
     """
-    Batch version of get_lp_position_wrt_moon.
-    Returns (N, 3) array. Rows with errors are NaN.
+    Get the position of the Lunar Prospector at multiple times with respect to the Moon.
+
+    Args:
+        times: Array of ephemeris times (seconds past J2000).
+
+    Returns:
+        np.ndarray: Position vectors in IAU_MOON frame (km) with shape (N, 3).
+                    Rows with errors contain NaNs.
     """
     n = len(times)
     positions = np.full((n, 3), np.nan)
@@ -111,8 +117,14 @@ def get_lp_position_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
 
 def get_lp_vector_to_sun_in_lunar_frame_batch(times: np.ndarray) -> np.ndarray:
     """
-    Batch version of get_lp_vector_to_sun_in_lunar_frame.
-    Returns (N, 3) array. Rows with errors are NaN.
+    Get vectors from Lunar Prospector to the Sun in lunar frame for multiple times.
+
+    Args:
+        times: Array of ephemeris times (seconds past J2000).
+
+    Returns:
+        np.ndarray: Vectors from LP to Sun in IAU_MOON frame (km) with shape (N, 3).
+                    Rows with errors contain NaNs.
     """
     n = len(times)
     vectors = np.full((n, 3), np.nan)
@@ -130,8 +142,14 @@ def get_lp_vector_to_sun_in_lunar_frame_batch(times: np.ndarray) -> np.ndarray:
 
 def get_sun_vector_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
     """
-    Batch version of get_sun_vector_wrt_moon.
-    Returns (N, 3) array. Rows with errors are NaN.
+    Get position vectors of the Sun with respect to the Moon for multiple times.
+
+    Args:
+        times: Array of ephemeris times (seconds past J2000).
+
+    Returns:
+        np.ndarray: Vectors from Moon to Sun in IAU_MOON frame (km) with shape (N, 3).
+                    Rows with errors contain NaNs.
     """
     n = len(times)
     vectors = np.full((n, 3), np.nan)
@@ -149,8 +167,14 @@ def get_sun_vector_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
 
 def get_j2000_iau_moon_transform_matrix_batch(times: np.ndarray) -> np.ndarray:
     """
-    Batch version of get_j2000_iau_moon_transform_matrix.
-    Returns (N, 3, 3) array. Rows with errors are NaN.
+    Get transformation matrices from J2000 to IAU_MOON frame for multiple times.
+
+    Args:
+        times: Array of ephemeris times (seconds past J2000).
+
+    Returns:
+        np.ndarray: Transformation matrices with shape (N, 3, 3).
+                    Rows with errors contain NaNs.
     """
     n = len(times)
     mats = np.full((n, 3, 3), np.nan)

@@ -7,10 +7,10 @@ def list_files(directory: str) -> list[str]:
     List all files in the specified directory.
 
     Args:
-        directory: Path to the directory to list
+        directory: Path to the directory to list.
 
     Returns:
-        List of filenames in the directory
+        list[str]: List of filenames in the directory.
     """
     try:
         files = os.listdir(directory)
@@ -25,10 +25,10 @@ def list_folder_files(directory: str) -> list[str]:
     List all subdirectories in the specified directory.
 
     Args:
-        directory: Path to the directory to list
+        directory: Path to the directory to list.
 
     Returns:
-        List of subdirectory names in the directory
+        list[str]: List of subdirectory names in the directory.
     """
     try:
         files = os.listdir(directory)

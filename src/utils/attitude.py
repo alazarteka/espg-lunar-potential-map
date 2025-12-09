@@ -42,13 +42,13 @@ def get_current_ra_dec(
     Get the current right ascension and declination at a given time.
 
     Args:
-        time: Ephemeris time to query
-        et_spin: Array of ephemeris times for attitude data
-        ra_vals: Array of right ascension values
-        dec_vals: Array of declination values
+        time: Ephemeris time to query.
+        et_spin: Array of ephemeris times for attitude data.
+        ra_vals: Array of right ascension values.
+        dec_vals: Array of declination values.
 
     Returns:
-        Tuple of (ra, dec) values, or (None, None) if error
+        tuple[float | None, float | None]: Tuple of (ra, dec) values, or (None, None) if error.
     """
     idx = bisect_right(et_spin, time)
 
