@@ -10,6 +10,7 @@ from matplotlib.colors import LogNorm
 import src.config as config
 from src.flux import ERData, PitchAngle
 from src.utils.flux_files import select_flux_day_file
+from src.visualization import style
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,6 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=str, default=None, help="Path to save PNG")
     parser.add_argument("-d", "--display", action="store_true", default=False)
     parser.add_argument("-v", "--verbose", action="store_true", default=False)
+    parser.add_argument("--title", type=str, default=None, help="Override plot title")
     return parser.parse_args()
 
 
@@ -77,12 +79,8 @@ def main() -> None:
     # Plot
     fig, ax = plt.subplots(figsize=(5, 8), constrained_layout=True)
 
-    # Black background and high-contrast styling
-    fig.patch.set_facecolor("black")
-    ax.set_facecolor("black")
-    for s in ax.spines.values():
-        s.set_color("white")
-    ax.tick_params(colors="white")
+    # Apply unified paper style (white background, grid, fonts)
+    style.apply_paper_style(ax)
 
     # Robust log scaling: percentile-based vmin/vmax on positive flux
     pos = flux_sorted[flux_sorted > 0]
@@ -106,18 +104,23 @@ def main() -> None:
     )
     cbar = fig.colorbar(sc, ax=ax)
     cbar.set_label(
-        "Flux [particles cm$^{-2}$ s$^{-1}$ sr$^{-1}$ eV$^{-1}$]", color="white"
+        "Flux [particles cm$^{-2}$ s$^{-1}$ sr$^{-1}$ eV$^{-1}$]",
+        fontsize=style.FONT_SIZE_LABEL
     )
-    cbar.ax.yaxis.set_tick_params(color="white")
-    plt.setp(plt.getp(cbar.ax.axes, "yticklabels"), color="white")
+    cbar.ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
 
     ax.set_xscale("log")
-    ax.set_xlabel("Energy (eV)", color="white")
-    ax.set_ylabel("Pitch angle (deg)", color="white")
-    ax.set_title(
-        f"Flux vs Energy/Pitch — {args.year:04d}-{args.month:02d}-{args.day:02d} spec {args.spec_no}",
-        color="white",
-    )
+    ax.set_xlabel("Energy (eV)", fontsize=style.FONT_SIZE_LABEL)
+    ax.set_ylabel("Pitch angle (deg)", fontsize=style.FONT_SIZE_LABEL)
+
+    if args.title:
+        title = args.title
+    else:
+        title = (
+            f"Flux vs Energy/Pitch — {args.year:04d}-{args.month:02d}-{args.day:02d} "
+            f"spec {args.spec_no}"
+        )
+    ax.set_title(title, fontsize=style.FONT_SIZE_TITLE)
 
     if args.output:
         out_path = Path(args.output)

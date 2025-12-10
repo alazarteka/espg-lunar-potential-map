@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.temporal import load_temporal_coefficients, reconstruct_global_map
+from src.visualization import style, utils
 
 
 def create_harmonic_reconstruction_plot(
@@ -28,6 +29,7 @@ def create_harmonic_reconstruction_plot(
     output_path: Path,
     dpi: int,
     projection: str,
+    title: str | None = None,
 ) -> None:
     """
     Create reconstructed global map from spherical harmonic coefficients.
@@ -38,6 +40,7 @@ def create_harmonic_reconstruction_plot(
         output_path: Where to save the figure
         dpi: Resolution for output
         projection: Matplotlib projection ('rect' or 'mollweide')
+        title: Optional title override
     """
     print(f"Loading temporal coefficients from {coeff_file.name}...")
     dataset = load_temporal_coefficients(coeff_file)
@@ -74,28 +77,31 @@ def create_harmonic_reconstruction_plot(
         mesh = ax.pcolormesh(
             lon_rad, lat_rad, potential, shading="auto", cmap="viridis"
         )
-        ax.set_xlabel("Longitude", fontsize=12)
-        ax.set_ylabel("Latitude", fontsize=12)
-        ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
+        ax.set_xlabel("Longitude", fontsize=style.FONT_SIZE_LABEL)
+        ax.set_ylabel("Latitude", fontsize=style.FONT_SIZE_LABEL)
     else:  # rectangular
         fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True, dpi=dpi)
         mesh = ax.pcolormesh(lons, lats, potential, shading="auto", cmap="viridis")
-        ax.set_xlabel("Longitude (°)", fontsize=12)
-        ax.set_ylabel("Latitude (°)", fontsize=12)
+        ax.set_xlabel("Longitude (°)", fontsize=style.FONT_SIZE_LABEL)
+        ax.set_ylabel("Latitude (°)", fontsize=style.FONT_SIZE_LABEL)
         ax.set_xlim(-180, 180)
         ax.set_ylim(-90, 90)
         ax.set_aspect("equal")
-        ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
+
+    # Apply shared style
+    style.apply_paper_style(ax)
 
     # Add colorbar
     cbar = fig.colorbar(mesh, ax=ax, label="Φ_surface (V)")
 
     # Add title with timestamp
-    time_str = str(times[time_index])[:19]  # Trim to datetime only
-    ax.set_title(
-        f"Reconstructed Surface Potential (l_max={lmax}) at {time_str}",
-        fontsize=13,
-    )
+    if title:
+        plot_title = title
+    else:
+        time_str = str(times[time_index])[:19]  # Trim to datetime only
+        plot_title = f"Reconstructed Surface Potential (l_max={lmax}) at {time_str}"
+
+    ax.set_title(plot_title, fontsize=style.FONT_SIZE_TITLE)
 
     # Add statistics box
     valid_pot = potential[np.isfinite(potential)]
@@ -104,15 +110,7 @@ def create_harmonic_reconstruction_plot(
         f"Median: {np.median(valid_pot):.1f} V\n"
         f"Max: {np.max(valid_pot):.1f} V"
     )
-    ax.text(
-        0.02,
-        0.98,
-        textstr,
-        transform=ax.transAxes,
-        fontsize=9,
-        verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
-    )
+    utils.add_stats_box(ax, textstr, loc="upper left")
 
     # Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -157,6 +155,12 @@ def parse_args() -> argparse.Namespace:
         default=150,
         help="Output resolution",
     )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="Override plot title",
+    )
     return parser.parse_args()
 
 
@@ -173,6 +177,7 @@ def main() -> int:
         args.output,
         args.dpi,
         args.projection,
+        title=args.title,
     )
     return 0
 

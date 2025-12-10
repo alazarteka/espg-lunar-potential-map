@@ -3,81 +3,15 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterable
-from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+from src.visualization import loaders, style, utils
+
 # Default cache root mirrors the batch runner's output
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
-
-
-def _parse_iso_date(value: str) -> np.datetime64:
-    try:
-        dt = datetime.strptime(value, "%Y-%m-%d")
-    except ValueError as exc:
-        msg = "Dates must be provided as YYYY-MM-DD"
-        raise argparse.ArgumentTypeError(msg) from exc
-    return np.datetime64(dt.date())
-
-
-def _discover_npz(cache_dir: Path) -> list[Path]:
-    if not cache_dir.exists():
-        raise FileNotFoundError(f"Cache directory {cache_dir} does not exist")
-    return sorted(p for p in cache_dir.rglob("*.npz") if p.is_file())
-
-
-def _load_rows(
-    files: Iterable[Path],
-    start_ts: np.datetime64,
-    end_ts_exclusive: np.datetime64,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    lats: list[np.ndarray] = []
-    lons: list[np.ndarray] = []
-    potentials: list[np.ndarray] = []
-
-    start_str = str(start_ts.astype("datetime64[s]"))
-    end_str = str(end_ts_exclusive.astype("datetime64[s]"))
-
-    for path in files:
-        with np.load(path) as data:
-            utc = data["rows_utc"]  # dtype <U64
-            proj_lat = data["rows_projection_latitude"]
-            proj_lon = data["rows_projection_longitude"]
-            proj_pot = data["rows_projected_potential"]
-
-            if utc.size == 0:
-                continue
-
-            valid_time = utc != ""
-            if not np.any(valid_time):
-                continue
-
-            mask = valid_time & (utc >= start_str) & (utc < end_str)
-            if not np.any(mask):
-                continue
-
-            finite_mask = (
-                np.isfinite(proj_lat) & np.isfinite(proj_lon) & np.isfinite(proj_pot)
-            )
-            mask &= finite_mask
-            if not np.any(mask):
-                continue
-
-            lats.append(proj_lat[mask])
-            lons.append(proj_lon[mask])
-            potentials.append(proj_pot[mask])
-
-    if not lats:
-        return (np.array([]), np.array([]), np.array([]))
-
-    return (
-        np.concatenate(lats),
-        np.concatenate(lons),
-        np.concatenate(potentials),
-    )
 
 
 def _sample_rows(
@@ -121,16 +55,23 @@ def _plot_sphere(
     sphere_x = np.outer(np.sin(phi), np.cos(theta))
     sphere_y = np.outer(np.sin(phi), np.sin(theta))
     sphere_z = np.outer(np.cos(phi), np.ones_like(theta))
+
+    # Use shared grid style where applicable (wireframe isn't exactly a grid but close)
     ax.plot_wireframe(
-        sphere_x, sphere_y, sphere_z, color="lightgray", linewidth=0.3, alpha=0.3
+        sphere_x, sphere_y, sphere_z,
+        color="lightgray",
+        linewidth=style.GRID_STYLE["linewidth"],
+        alpha=style.GRID_STYLE["alpha"]
     )
 
     ax.set_box_aspect([1, 1, 1])
     ax.set_axis_off()
-    ax.set_title(title)
+
+    ax.set_title(title, fontsize=style.FONT_SIZE_TITLE)
 
     cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("Surface potential Φ_surface (V)")
+    cbar.set_label("Surface potential Φ_surface (V)", fontsize=style.FONT_SIZE_LABEL)
+    cbar.ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
 
     return fig, ax
 
@@ -142,13 +83,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--start",
         required=True,
-        type=_parse_iso_date,
+        type=utils.parse_iso_date,
         help="Start date (YYYY-MM-DD, inclusive)",
     )
     parser.add_argument(
         "--end",
         required=True,
-        type=_parse_iso_date,
+        type=utils.parse_iso_date,
         help="End date (YYYY-MM-DD, inclusive)",
     )
     parser.add_argument(
@@ -197,6 +138,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Show the plot interactively",
     )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="Override plot title",
+    )
     return parser.parse_args()
 
 
@@ -206,11 +153,14 @@ def main() -> int:
     if args.end < args.start:
         raise SystemExit("--end must be >= --start")
 
-    start_ts = args.start.astype("datetime64[s]")
-    end_ts_exclusive = (args.end + np.timedelta64(1, "D")).astype("datetime64[s]")
-
-    files = _discover_npz(args.cache_dir)
-    lat, lon, pot = _load_rows(files, start_ts, end_ts_exclusive)
+    # Use shared loader
+    try:
+        lat, lon, pot, _ = loaders.load_measurements(
+            args.cache_dir, args.start, args.end
+        )
+    except FileNotFoundError:
+        print("No cached rows found in the requested date range.")
+        return 1
 
     if lat.size == 0:
         print("No cached rows found in the requested date range.")
@@ -218,7 +168,11 @@ def main() -> int:
 
     lat, lon, pot = _sample_rows(lat, lon, pot, args.sample, args.seed)
 
-    title = f"Φ_surface {str(args.start)} → {str(args.end)} | rows={pot.size:n}"
+    if args.title:
+        title = args.title
+    else:
+        title = f"Φ_surface {str(args.start)} → {str(args.end)} | rows={pot.size:n}"
+
     fig, _ = _plot_sphere(
         lat=lat,
         lon=lon,
