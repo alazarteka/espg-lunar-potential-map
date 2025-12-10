@@ -2,103 +2,24 @@
 """
 Create surface measurement projection plot for paper.
 
-Shows raw footprint measurements as scatter points on lunar surface.
+Plots cached potential measurements on a global Equirectangular map.
 
 Example:
-    # Single day
     uv run python scripts/plots/plot_measurements_paper.py \\
         --date 1998-04-15 \\
-        --output plots/publish/surface_measurements_19980415.png
-
-    # Date range (combined)
-    uv run python scripts/plots/plot_measurements_paper.py \\
-        --start 1998-04-01 \\
-        --end 1998-04-30 \\
-        --output plots/publish/surface_measurements_april1998.png
+        --output plots/publish/measurements_map.png
 """
 
 from __future__ import annotations
 
 import argparse
-from datetime import date, datetime, timedelta
+from datetime import date
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-
-def _parse_iso_date(value: str) -> date:
-    """Parse YYYY-MM-DD string into a Python date."""
-    try:
-        return datetime.strptime(value, "%Y-%m-%d").date()
-    except ValueError as exc:
-        msg = "Dates must be provided as YYYY-MM-DD"
-        raise argparse.ArgumentTypeError(msg) from exc
-
-
-def _date_range(start_day: date, end_day: date) -> list[date]:
-    """Inclusive list of days between start_day and end_day."""
-    if end_day < start_day:
-        raise ValueError("--end must be >= --start")
-    span = (end_day - start_day).days
-    return [start_day + timedelta(days=offset) for offset in range(span + 1)]
-
-
-def load_measurements(
-    cache_dir: Path, start_day: date, end_day: date
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Load measurement footprints for date range.
-
-    Returns:
-        lats: Footprint latitudes
-        lons: Footprint longitudes
-        potentials: Surface potentials
-        in_sun: Illumination flags
-    """
-    days = _date_range(start_day, end_day)
-    pattern_list = [f"3D{day.strftime('%y%m%d')}.npz" for day in days]
-
-    files = []
-    for pattern in pattern_list:
-        matches = list(cache_dir.rglob(pattern))
-        if matches:
-            files.append(matches[0])
-
-    if not files:
-        raise FileNotFoundError(
-            f"No cache files found for {start_day} to {end_day} in {cache_dir}"
-        )
-
-    print(f"Found {len(files)} files for {start_day} to {end_day}")
-
-    all_lats = []
-    all_lons = []
-    all_pots = []
-    all_sun = []
-
-    for npz_file in files:
-        print(f"Loading {npz_file.name}...")
-        with np.load(npz_file) as data:
-            lats = data["rows_projection_latitude"]
-            lons = data["rows_projection_longitude"]
-            pots = data["rows_projected_potential"]
-            in_sun = data["rows_projection_in_sun"]
-
-            # Filter valid measurements
-            valid = np.isfinite(lats) & np.isfinite(lons) & np.isfinite(pots)
-
-            all_lats.append(lats[valid])
-            all_lons.append(lons[valid])
-            all_pots.append(pots[valid])
-            all_sun.append(in_sun[valid])
-
-    return (
-        np.concatenate(all_lats),
-        np.concatenate(all_lons),
-        np.concatenate(all_pots),
-        np.concatenate(all_sun),
-    )
+from src.visualization import loaders, style, utils
 
 
 def create_measurements_plot(
@@ -108,6 +29,7 @@ def create_measurements_plot(
     output_path: Path,
     point_size: float,
     dpi: int,
+    title: str | None = None,
 ) -> None:
     """
     Create surface measurement projection plot.
@@ -119,14 +41,19 @@ def create_measurements_plot(
         output_path: Where to save the figure
         point_size: Scatter point size
         dpi: Resolution for output
+        title: Optional title override
     """
     # Load data
-    lats, lons, potentials, in_sun = load_measurements(cache_dir, start_day, end_day)
+    lats, lons, potentials, in_sun = loaders.load_measurements(
+        cache_dir, start_day, end_day
+    )
 
     print(f"\nLoaded {len(lats)} valid measurements")
     print(f"  Sunlit: {np.sum(in_sun)}")
     print(f"  Shadowed: {np.sum(~in_sun)}")
-    print(f"  Potential range: {np.min(potentials):.1f}V to {np.max(potentials):.1f}V")
+    print(
+        f"  Potential range: {np.min(potentials):.1f}V to {np.max(potentials):.1f}V"
+    )
 
     # Create figure
     fig, ax = plt.subplots(figsize=(12, 6), constrained_layout=True, dpi=dpi)
@@ -144,24 +71,29 @@ def create_measurements_plot(
         rasterized=True,
     )
 
-    # Optional: highlight sunlit points
-    # ax.scatter(lons[in_sun], lats[in_sun], s=point_size*2,
-    #            facecolors='none', edgecolors='white', linewidths=0.5)
+    # Apply shared style
+    style.apply_paper_style(ax)
 
-    # Formatting
-    ax.set_xlabel("Longitude (°)", fontsize=12)
-    ax.set_ylabel("Latitude (°)", fontsize=12)
+    # Formatting overrides
+    ax.set_xlabel("Longitude (°)", fontsize=style.FONT_SIZE_LABEL)
+    ax.set_ylabel("Latitude (°)", fontsize=style.FONT_SIZE_LABEL)
     ax.set_xlim(-180, 180)
     ax.set_ylim(-90, 90)
     ax.set_aspect("equal")
-    ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
 
     # Title
-    if start_day == end_day:
-        date_str = start_day.strftime("%Y-%m-%d")
+    if title:
+        plot_title = title
     else:
-        date_str = f"{start_day.strftime('%Y-%m-%d')} to {end_day.strftime('%Y-%m-%d')}"
-    ax.set_title(f"Surface Potential Measurements ({date_str})", fontsize=13)
+        if start_day == end_day:
+            date_str = start_day.strftime("%Y-%m-%d")
+        else:
+            date_str = (
+                f"{start_day.strftime('%Y-%m-%d')} to {end_day.strftime('%Y-%m-%d')}"
+            )
+        plot_title = f"Surface Potential Measurements ({date_str})"
+
+    ax.set_title(plot_title, fontsize=style.FONT_SIZE_TITLE)
 
     # Colorbar
     cbar = fig.colorbar(scatter, ax=ax, label="Φ_surface (V)")
@@ -173,15 +105,7 @@ def create_measurements_plot(
         f"Median: {np.median(potentials):.1f} V\n"
         f"Max: {np.max(potentials):.1f} V"
     )
-    ax.text(
-        0.02,
-        0.98,
-        textstr,
-        transform=ax.transAxes,
-        fontsize=9,
-        verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
-    )
+    utils.add_stats_box(ax, textstr, loc="upper left")
 
     # Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -198,19 +122,19 @@ def parse_args() -> argparse.Namespace:
     # Option 1: Single date
     parser.add_argument(
         "--date",
-        type=_parse_iso_date,
+        type=utils.parse_iso_date,
         help="Single date to plot (YYYY-MM-DD)",
     )
 
     # Option 2: Date range
     parser.add_argument(
         "--start",
-        type=_parse_iso_date,
+        type=utils.parse_iso_date,
         help="Start date (YYYY-MM-DD)",
     )
     parser.add_argument(
         "--end",
-        type=_parse_iso_date,
+        type=utils.parse_iso_date,
         help="End date (YYYY-MM-DD)",
     )
 
@@ -237,6 +161,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=150,
         help="Output resolution",
+    )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="Override plot title",
     )
     return parser.parse_args()
 
@@ -265,6 +195,7 @@ def main() -> int:
         args.output,
         args.point_size,
         args.dpi,
+        title=args.title,
     )
     return 0
 

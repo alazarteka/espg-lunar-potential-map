@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
@@ -13,75 +12,10 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 import src.config as config
+from src.visualization import loaders, style, utils
 
 # Default cache directory mirrors the batch runner output
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
-
-
-def _parse_iso_date(value: str) -> np.datetime64:
-    try:
-        dt = datetime.strptime(value, "%Y-%m-%d")
-    except ValueError as exc:
-        msg = "Dates must be provided as YYYY-MM-DD"
-        raise argparse.ArgumentTypeError(msg) from exc
-    return np.datetime64(dt.date())
-
-
-def _discover_npz(cache_dir: Path) -> list[Path]:
-    if not cache_dir.exists():
-        raise FileNotFoundError(f"Cache directory {cache_dir} does not exist")
-    return sorted(p for p in cache_dir.rglob("*.npz") if p.is_file())
-
-
-def _load_rows(
-    files: Iterable[Path],
-    start_ts: np.datetime64,
-    end_ts_exclusive: np.datetime64,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    lats: list[np.ndarray] = []
-    lons: list[np.ndarray] = []
-    potentials: list[np.ndarray] = []
-
-    start_str = str(start_ts.astype("datetime64[s]"))
-    end_str = str(end_ts_exclusive.astype("datetime64[s]"))
-
-    for path in files:
-        with np.load(path) as data:
-            utc = data["rows_utc"]
-            proj_lat = data["rows_projection_latitude"]
-            proj_lon = data["rows_projection_longitude"]
-            proj_pot = data["rows_projected_potential"]
-
-            if utc.size == 0:
-                continue
-
-            valid_time = utc != ""
-            if not np.any(valid_time):
-                continue
-
-            mask = valid_time & (utc >= start_str) & (utc < end_str)
-            if not np.any(mask):
-                continue
-
-            finite_mask = (
-                np.isfinite(proj_lat) & np.isfinite(proj_lon) & np.isfinite(proj_pot)
-            )
-            mask &= finite_mask
-            if not np.any(mask):
-                continue
-
-            lats.append(proj_lat[mask])
-            lons.append(proj_lon[mask])
-            potentials.append(proj_pot[mask])
-
-    if not lats:
-        return (np.array([]), np.array([]), np.array([]))
-
-    return (
-        np.concatenate(lats),
-        np.concatenate(lons),
-        np.concatenate(potentials),
-    )
 
 
 def _sample_rows(
@@ -420,13 +354,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--start",
         required=True,
-        type=_parse_iso_date,
+        type=utils.parse_iso_date,
         help="Start date (YYYY-MM-DD, inclusive)",
     )
     parser.add_argument(
         "--end",
         required=True,
-        type=_parse_iso_date,
+        type=utils.parse_iso_date,
         help="End date (YYYY-MM-DD, inclusive)",
     )
     parser.add_argument(
@@ -524,6 +458,12 @@ def parse_args() -> argparse.Namespace:
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Logging verbosity",
     )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="Override plot title",
+    )
     return parser.parse_args()
 
 
@@ -534,11 +474,15 @@ def main() -> int:
     if args.end < args.start:
         raise SystemExit("--end must be >= --start")
 
-    start_ts = args.start.astype("datetime64[s]")
-    end_ts_exclusive = (args.end + np.timedelta64(1, "D")).astype("datetime64[s]")
+    # Use shared loader
+    try:
+        lat, lon, pot, _ = loaders.load_measurements(
+            args.cache_dir, args.start, args.end
+        )
+    except FileNotFoundError:
+        print("No cached rows found in the requested date range.")
+        return 1
 
-    files = _discover_npz(args.cache_dir)
-    lat, lon, pot = _load_rows(files, start_ts, end_ts_exclusive)
     if lat.size == 0:
         print("No cached rows found in the requested date range.")
         return 1
@@ -548,7 +492,11 @@ def main() -> int:
     cmin = args.min_pot if args.min_pot is not None else None
     cmax = args.max_pot if args.max_pot is not None else None
 
-    title = f"Φ_surface {str(args.start)} → {str(args.end)} | rows={pot.size:n}"
+    if args.title:
+        title = args.title
+    else:
+        title = f"Φ_surface {str(args.start)} → {str(args.end)} | rows={pot.size:n}"
+
     texture_scale = 1.0
     if args.animate or args.mp4_output is not None:
         if args.animation_frames > 60:
