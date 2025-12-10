@@ -9,6 +9,14 @@ COLOR_TERMINATOR = "red"
 COLOR_SUBSOLAR = "orange"
 COLOR_ANTISOLAR = "navy"
 
+# Colormaps - semantic categories
+CMAP_MEASUREMENT = "viridis"  # Fluxes, voltages, harmonic reconstructions
+CMAP_MAGNITUDE = "plasma"     # Engineering power, potential magnitudes
+CMAP_RESIDUAL = "RdBu_r"      # Residuals, errors (diverging, centered at 0)
+
+# Alias for backwards compatibility
+CMAP_DEFAULT = CMAP_MEASUREMENT
+
 # Font Sizes
 FONT_SIZE_TITLE = 13
 FONT_SIZE_LABEL = 12

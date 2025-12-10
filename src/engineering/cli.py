@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from ..temporal.dataset import load_temporal_coefficients
+from ..visualization import style
 from .analysis import DEFAULT_CURRENT_DENSITY, compute_global_stats, extract_site_stats
 from .sites import SITES_OF_INTEREST
 
@@ -65,7 +66,7 @@ def plot_global_map(
     title: str,
     label: str,
     output_path: Path,
-    cmap: str = "viridis",
+    cmap: str = style.CMAP_MAGNITUDE,
 ) -> None:
     """Helper to plot and save a global map."""
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -74,12 +75,13 @@ def plot_global_map(
     # data is (lat, lon), lat is -90 to 90
 
     im = ax.pcolormesh(lon, lat, data, shading="auto", cmap=cmap)
-    fig.colorbar(im, ax=ax, label=label)
+    cbar = fig.colorbar(im, ax=ax, label=label)
+    cbar.ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
 
-    ax.set_xlabel("Longitude (deg)")
-    ax.set_ylabel("Latitude (deg)")
-    ax.set_title(title)
-    ax.grid(True, alpha=0.3, linestyle="--")
+    ax.set_xlabel("Longitude (deg)", fontsize=style.FONT_SIZE_LABEL)
+    ax.set_ylabel("Latitude (deg)", fontsize=style.FONT_SIZE_LABEL)
+    ax.set_title(title, fontsize=style.FONT_SIZE_TITLE)
+    style.apply_paper_style(ax)
 
     # Aspect ratio
     ax.set_aspect("equal")
