@@ -20,26 +20,26 @@ import logging
 import sys
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 import spiceypy as spice
-from tqdm import tqdm
 from scipy.stats import binned_statistic, binned_statistic_2d
+from tqdm import tqdm
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from src.potential_mapper.spice import load_spice_files
+from src.temporal.basis import _get_basis_func_by_name, fit_temporal_basis
 from src.temporal.coefficients import (
     DEFAULT_CACHE_DIR,
-    _load_all_data,
-    _discover_npz,
     _build_harmonic_design,
+    _discover_npz,
     _harmonic_coefficient_count,
+    _load_all_data,
 )
-from src.temporal.basis import fit_temporal_basis, _get_basis_func_by_name
-from src.potential_mapper.spice import load_spice_files
 from src.utils.spice_ops import get_sun_vector_wrt_moon_batch
+from src.visualization import style
 
 
 def latlon_to_vector(lat, lon):
@@ -185,7 +185,7 @@ def analyze_residuals(
     env = classify_environment(et, sza)
 
     # Create output directory
-    out_dir = Path("artifacts/analysis/residuals")
+    out_dir = args.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Global Residual Map
@@ -209,10 +209,15 @@ def analyze_residuals(
         vmin=-np.nanpercentile(np.abs(residual), 95),
         vmax=np.nanpercentile(np.abs(residual), 95)
     )
-    plt.colorbar(im, ax=ax1, label='Mean Residual (V)')
-    ax1.set_xlabel('Longitude (deg)')
-    ax1.set_ylabel('Latitude (deg)')
-    ax1.set_title(f'Mean Residual Map (Obs - Model)\n{args.start} to {args.end}')
+    cbar1 = plt.colorbar(im, ax=ax1, label='Mean Residual (V)')
+    cbar1.ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
+    ax1.set_xlabel('Longitude (deg)', fontsize=style.FONT_SIZE_LABEL)
+    ax1.set_ylabel('Latitude (deg)', fontsize=style.FONT_SIZE_LABEL)
+    style.apply_paper_style(ax1)
+    if args.title_map:
+        ax1.set_title(args.title_map, fontsize=style.FONT_SIZE_TITLE)
+    else:
+        ax1.set_title(f'Mean Residual Map (Obs - Model)\n{args.start} to {args.end}', fontsize=style.FONT_SIZE_TITLE)
     fig1.savefig(out_dir / "residual_map_mean.png", dpi=150)
     plt.close(fig1)
 
@@ -232,11 +237,14 @@ def analyze_residuals(
     ax2.axhline(0, color='k', linestyle='--', alpha=0.5)
     ax2.axvline(90, color='r', linestyle='--', label='Terminator')
 
-    ax2.set_xlabel('Solar Zenith Angle (deg)')
-    ax2.set_ylabel('Residual (V)')
-    ax2.set_title('Residual vs SZA')
+    ax2.set_xlabel('Solar Zenith Angle (deg)', fontsize=style.FONT_SIZE_LABEL)
+    ax2.set_ylabel('Residual (V)', fontsize=style.FONT_SIZE_LABEL)
+    if args.title_sza:
+        ax2.set_title(args.title_sza, fontsize=style.FONT_SIZE_TITLE)
+    else:
+        ax2.set_title('Residual vs SZA', fontsize=style.FONT_SIZE_TITLE)
     ax2.legend()
-    ax2.grid(True, alpha=0.3)
+    style.apply_paper_style(ax2)
     fig2.savefig(out_dir / "residual_vs_sza.png", dpi=150)
     plt.close(fig2)
 
@@ -258,9 +266,13 @@ def analyze_residuals(
 
     if data_groups:
         ax3.boxplot(data_groups, labels=labels, showfliers=False)
-        ax3.set_ylabel('Residual (V)')
-        ax3.set_title('Residual Distribution by Plasma Environment')
-        ax3.grid(True, axis='y', alpha=0.3)
+        ax3.set_ylabel('Residual (V)', fontsize=style.FONT_SIZE_LABEL)
+        if args.title_env:
+            ax3.set_title(args.title_env, fontsize=style.FONT_SIZE_TITLE)
+        else:
+            ax3.set_title('Residual Distribution by Plasma Environment', fontsize=style.FONT_SIZE_TITLE)
+        style.apply_paper_style(ax3, grid=False)
+        ax3.grid(True, axis='y', **style.GRID_STYLE)
         ax3.axhline(0, color='k', linestyle='--', alpha=0.5)
     else:
         ax3.text(0.5, 0.5, "No environment data classified", ha='center')
@@ -271,8 +283,8 @@ def analyze_residuals(
     # Summary text
     summary_path = out_dir / "residual_summary.txt"
     with open(summary_path, "w") as f:
-        f.write(f"Residual Analysis Summary\n")
-        f.write(f"=========================\n")
+        f.write("Residual Analysis Summary\n")
+        f.write("=========================\n")
         f.write(f"Date Range: {args.start} to {args.end}\n")
         f.write(f"Model: lmax={args.lmax}, basis={args.temporal_basis}\n")
         f.write(f"Total Points: {len(residual)}\n")
@@ -298,7 +310,11 @@ def main() -> int:
     parser.add_argument("--temporal-basis", default="constant,synodic", help="Basis spec")
     parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE_DIR)
     parser.add_argument("--l2-penalty", type=float, default=100.0)
+    parser.add_argument("--output-dir", type=Path, default=Path("artifacts/analysis/residuals"), help="Output directory for plots")
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--title-map", type=str, default=None, help="Override title for residual map plot")
+    parser.add_argument("--title-sza", type=str, default=None, help="Override title for SZA plot")
+    parser.add_argument("--title-env", type=str, default=None, help="Override title for environment plot")
 
     args = parser.parse_args()
 

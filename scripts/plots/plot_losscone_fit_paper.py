@@ -22,6 +22,7 @@ import numpy as np
 from src import config
 from src.flux import ERData, LossConeFitter, PitchAngle
 from src.model import synth_losscone
+from src.visualization import style, utils
 
 
 def interpolate_to_regular_grid(
@@ -90,6 +91,7 @@ def create_losscone_comparison_plot(
     background: float,
     incident_flux_stat: str,
     dpi: int = 150,
+    title: str | None = None,
 ) -> None:
     """
     Create side-by-side comparison of measured vs model loss-cone.
@@ -105,6 +107,7 @@ def create_losscone_comparison_plot(
         background: Model background outside the loss cone
         incident_flux_stat: Statistic for incident flux ("mean" or "max")
         dpi: Resolution for output
+        title: Optional override for the figure suptitle
     """
     print(f"Loading {er_file.name}...")
     er_data = ERData(str(er_file))
@@ -228,12 +231,12 @@ def create_losscone_comparison_plot(
         shading="auto",
     )
     ax1.plot(energies, loss_cone_angle, "w-", linewidth=2, label="Loss Cone")
-    ax1.set_xlabel("Energy (eV)")
-    ax1.set_ylabel("Pitch Angle (°)")
-    ax1.set_title("Observed Electron Flux")
+    ax1.set_xlabel("Energy (eV)", fontsize=style.FONT_SIZE_LABEL)
+    ax1.set_ylabel("Pitch Angle (°)", fontsize=style.FONT_SIZE_LABEL)
+    ax1.set_title("Observed Electron Flux", fontsize=style.FONT_SIZE_TITLE)
     ax1.set_xscale("log")
     ax1.set_ylim(0, 180)
-    ax1.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
+    style.apply_paper_style(ax1)
 
     # Plot model
     im2 = ax2.pcolormesh(
@@ -246,16 +249,18 @@ def create_losscone_comparison_plot(
         vmax=1,
     )
     ax2.plot(energies, loss_cone_angle, "w-", linewidth=2, label="Loss Cone")
-    ax2.set_xlabel("Energy (eV)")
-    ax2.set_ylabel("Pitch Angle (°)")
-    ax2.set_title("Model Fit")
+    ax2.set_xlabel("Energy (eV)", fontsize=style.FONT_SIZE_LABEL)
+    ax2.set_ylabel("Pitch Angle (°)", fontsize=style.FONT_SIZE_LABEL)
+    ax2.set_title("Model Fit", fontsize=style.FONT_SIZE_TITLE)
     ax2.set_xscale("log")
     ax2.set_ylim(0, 180)
-    ax2.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
+    style.apply_paper_style(ax2)
 
     # Add colorbars
     cbar1 = fig.colorbar(im1, ax=ax1, label="log₁₀(Flux) [#/cm²/s/sr/eV]")
+    cbar1.ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
     cbar2 = fig.colorbar(im2, ax=ax2, label="Normalized Flux")
+    cbar2.ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
 
     # Add text box with fit parameters
     textstr = (
@@ -265,16 +270,11 @@ def create_losscone_comparison_plot(
         f"bg = {fitter.background:.3f}, inc={incident_flux_stat}\n"
         f"χ² = {chi2:.2f}"
     )
-    ax2.text(
-        0.98,
-        0.02,
-        textstr,
-        transform=ax2.transAxes,
-        fontsize=9,
-        verticalalignment="bottom",
-        horizontalalignment="right",
-        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
-    )
+    utils.add_stats_box(ax2, textstr, loc="lower right")
+
+    # Add figure title if provided
+    if title:
+        fig.suptitle(title, fontsize=style.FONT_SIZE_TITLE + 1, y=1.02)
 
     # Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -355,6 +355,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Use Halekas Figure 5 settings (USC=+11V, ratio normalization, fixed beam amp=1)",
     )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="Override figure title",
+    )
     return parser.parse_args()
 
 
@@ -387,6 +393,7 @@ def main() -> int:
         args.background,
         args.incident_flux_stat,
         args.dpi,
+        title=args.title,
     )
     return 0
 

@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.temporal import load_temporal_coefficients, reconstruct_global_map
+from src.visualization import style, utils
 
 
 def create_multiday_reconstruction_plot(
@@ -37,6 +38,7 @@ def create_multiday_reconstruction_plot(
     projection: str,
     vmin: float | None = None,
     vmax: float | None = None,
+    title: str | None = None,
 ) -> None:
     """
     Create 2x3 grid of reconstructed maps from spherical harmonic coefficients.
@@ -49,6 +51,7 @@ def create_multiday_reconstruction_plot(
         projection: Matplotlib projection ('rect' or 'mollweide')
         vmin: Minimum value for colorbar (auto if None)
         vmax: Maximum value for colorbar (auto if None)
+        title: Optional override for the figure title
     """
     if len(time_indices) != 6:
         raise ValueError(f"Expected 6 time indices, got {len(time_indices)}")
@@ -125,9 +128,8 @@ def create_multiday_reconstruction_plot(
                 vmin=vmin,
                 vmax=vmax,
             )
-            ax.set_xlabel("Longitude", fontsize=10)
-            ax.set_ylabel("Latitude", fontsize=10)
-            ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
+            ax.set_xlabel("Longitude", fontsize=style.FONT_SIZE_LABEL - 2)
+            ax.set_ylabel("Latitude", fontsize=style.FONT_SIZE_LABEL - 2)
         else:  # rectangular
             mesh = ax.pcolormesh(
                 lons,
@@ -138,16 +140,18 @@ def create_multiday_reconstruction_plot(
                 vmin=vmin,
                 vmax=vmax,
             )
-            ax.set_xlabel("Longitude (°)", fontsize=10)
-            ax.set_ylabel("Latitude (°)", fontsize=10)
+            ax.set_xlabel("Longitude (°)", fontsize=style.FONT_SIZE_LABEL - 2)
+            ax.set_ylabel("Latitude (°)", fontsize=style.FONT_SIZE_LABEL - 2)
             ax.set_xlim(-180, 180)
             ax.set_ylim(-90, 90)
             ax.set_aspect("equal")
-            ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
+
+        # Apply shared style
+        style.apply_paper_style(ax)
 
         # Add title with timestamp
         time_str = str(time)[:10]  # Just the date
-        ax.set_title(f"{time_str}", fontsize=11, pad=5)
+        ax.set_title(f"{time_str}", fontsize=style.FONT_SIZE_TITLE - 2, pad=5)
 
         # Add statistics in corner
         valid_pot = potential[np.isfinite(potential)]
@@ -156,15 +160,7 @@ def create_multiday_reconstruction_plot(
             f"Med: {np.median(valid_pot):.1f}V\n"
             f"Max: {np.max(valid_pot):.1f}V"
         )
-        ax.text(
-            0.02,
-            0.98,
-            textstr,
-            transform=ax.transAxes,
-            fontsize=7,
-            verticalalignment="top",
-            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.7),
-        )
+        utils.add_stats_box(ax, textstr, loc="upper left")
 
     # Add shared colorbar
     cbar = fig.colorbar(
@@ -177,12 +173,12 @@ def create_multiday_reconstruction_plot(
     )
 
     # Add overall title
-    month_str = str(times[0])[:7]  # YYYY-MM
-    fig.suptitle(
-        f"Reconstructed Surface Potential (l_max={lmax}) - {month_str}",
-        fontsize=14,
-        y=0.98,
-    )
+    if title:
+        fig_title = title
+    else:
+        month_str = str(times[0])[:7]  # YYYY-MM
+        fig_title = f"Reconstructed Surface Potential (l_max={lmax}) - {month_str}"
+    fig.suptitle(fig_title, fontsize=style.FONT_SIZE_TITLE + 1, y=0.98)
 
     # Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -261,6 +257,12 @@ def parse_args() -> argparse.Namespace:
         default=150,
         help="Output resolution",
     )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="Override figure title",
+    )
     return parser.parse_args()
 
 
@@ -295,6 +297,7 @@ def main() -> int:
         args.projection,
         args.vmin,
         args.vmax,
+        title=args.title,
     )
     return 0
 
