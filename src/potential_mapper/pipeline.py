@@ -25,14 +25,9 @@ from src.utils.units import ureg
 
 def _init_worker_spice():
     """Initialize SPICE kernels in worker process for thread-safety."""
-    import spiceypy as spice
-
     from src.potential_mapper.spice import load_spice_files
 
     load_spice_files()
-    # Suppress SPICE error output to stderr - let Python handle errors
-    spice.erract("SET", 10, "RETURN")
-    spice.errprt("SET", 10, "NONE")
 
 
 def spacecraft_potential_worker(
