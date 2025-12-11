@@ -1,6 +1,12 @@
 # ESPG Lunar Potential Map – Documentation
 
-User-facing documentation for the command-line interfaces.
+User-facing documentation for the command-line interfaces and technical details.
+
+## Technical Documentation
+
+*   **[Functionality & Architecture](FUNCTIONALITY.md)**: High-level overview of the system, modules, and data flow.
+*   **[Physics & Algorithms](PHYSICS.md)**: Detailed explanation of the physical models (Loss Cone, Kappa, Spacecraft Charging) and assumptions.
+*   **[Plotting & Scripts](PLOTTING.md)**: Guide to the visualization scripts in `scripts/plots/`.
 
 ## CLI Reference
 
@@ -25,6 +31,7 @@ uv run python -m src.potential_mapper --year 1998 --month 1 --day 15 -d
 uv run python -m src.potential_mapper.batch --year 1998 --month 1
 ```
 
-## Archived Documentation
+## Experimental & Archive
 
-Previous documentation (analysis notes, technical deep-dives) is preserved in [`old/`](old/).
+*   **[Experimental Notes](experimental/)**: Documentation of experiments (e.g., normalization studies) and decisions made during development.
+*   **[Old Docs](old/)**: Archived analysis notes and technical deep-dives.
