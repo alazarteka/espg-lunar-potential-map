@@ -20,6 +20,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import PathCollection
 
+from src.visualization import style
+
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 DEFAULT_OUTPUT_DIR = Path("artifacts/plots/daily_measurements")
 
@@ -266,12 +268,13 @@ def _configure_polar_axes(ax: plt.Axes, hemisphere: str) -> None:
     ax.set_xticks(np.deg2rad(np.arange(0, 360, 60)))
     ax.set_xticklabels(["0°", "60°E", "120°E", "180°", "120°W", "60°W"])
     ax.set_yticks([0.0, 30.0, 60.0, 90.0])
+    ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
     if hemisphere == "north":
         ax.set_yticklabels(["90°N", "60°N", "30°N", "Equator"])
-        ax.set_title("Northern Hemisphere Measurements")
+        ax.set_title("Northern Hemisphere", fontsize=style.FONT_SIZE_LABEL)
     else:
         ax.set_yticklabels(["90°S", "60°S", "30°S", "Equator"])
-        ax.set_title("Southern Hemisphere Measurements")
+        ax.set_title("Southern Hemisphere", fontsize=style.FONT_SIZE_LABEL)
 
 
 def _create_base_figure(
@@ -295,7 +298,7 @@ def _create_base_figure(
         frame.north_offsets[:, 0],
         frame.north_offsets[:, 1],
         c=frame.north_potentials,
-        cmap="viridis",
+        cmap=style.CMAP_MEASUREMENT,
         vmin=vmin,
         vmax=vmax,
         s=POINT_SIZE_POLAR,
@@ -307,7 +310,7 @@ def _create_base_figure(
         frame.south_offsets[:, 0],
         frame.south_offsets[:, 1],
         c=frame.south_potentials,
-        cmap="viridis",
+        cmap=style.CMAP_MEASUREMENT,
         vmin=vmin,
         vmax=vmax,
         s=POINT_SIZE_POLAR,
@@ -319,7 +322,7 @@ def _create_base_figure(
         frame.global_offsets[:, 0],
         frame.global_offsets[:, 1],
         c=frame.global_potentials,
-        cmap="viridis",
+        cmap=style.CMAP_MEASUREMENT,
         vmin=vmin,
         vmax=vmax,
         s=POINT_SIZE_GLOBAL,
@@ -359,21 +362,23 @@ def _create_base_figure(
 
     ax_global.set_xlim(-180, 180)
     ax_global.set_ylim(-90, 90)
-    ax_global.set_xlabel("Longitude (°)")
-    ax_global.set_ylabel("Latitude (°)")
-    ax_global.set_title("Global Surface Measurements")
-    ax_global.grid(True, linestyle="--", linewidth=0.4, alpha=0.4)
+    ax_global.set_xlabel("Longitude (°)", fontsize=style.FONT_SIZE_LABEL)
+    ax_global.set_ylabel("Latitude (°)", fontsize=style.FONT_SIZE_LABEL)
+    ax_global.set_title("Global View", fontsize=style.FONT_SIZE_LABEL)
+    style.apply_paper_style(ax_global)
 
-    fig.colorbar(
+    cbar = fig.colorbar(
         scatter_global,
         ax=(ax_north, ax_south, ax_global),
         label=r"$U_{\mathrm{surface}}$ (V)",
         fraction=0.046,
         pad=0.02,
     )
+    cbar.ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
 
     title = fig.suptitle(
-        f"Lunar Surface Potential Measurements — {frame.label} (n={frame.count})"
+        f"Lunar Surface Potential Measurements — {frame.label} (n={frame.count})",
+        fontsize=style.FONT_SIZE_TITLE,
     )
 
     return fig, {
@@ -601,11 +606,20 @@ def main(argv: Iterable[str] | None = None) -> int:
     if args.input is not None:
         if not args.input.exists():
             raise FileNotFoundError(f"Input file {args.input} not found")
-        # Filter to start_day when using batch file with --input.
-        points = _load_measurements(args.input, filter_date=start_day)
+        # Iterate through date range, filtering each day from the batch file.
+        days = _date_range(start_day, end_day)
+        if args.limit_frames is not None and args.limit_frames > 0:
+            days = days[: args.limit_frames]
         rng = np.random.default_rng(args.seed) if args.sample else None
-        points = _sample_measurements(points, args.sample, rng)
-        frames = [_frame_from_points(start_day, points)]
+        frames: list[FrameData] = []
+        for day in days:
+            try:
+                points = _load_measurements(args.input, filter_date=day)
+            except RuntimeError as exc:
+                print(f"Skipping {day:%Y-%m-%d}: {exc}")
+                continue
+            points = _sample_measurements(points, args.sample, rng)
+            frames.append(_frame_from_points(day, points))
     else:
         days = _date_range(start_day, end_day)
         if args.limit_frames is not None and args.limit_frames > 0:
