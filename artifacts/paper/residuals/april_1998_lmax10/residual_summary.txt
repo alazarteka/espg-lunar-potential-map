@@ -1,0 +1,12 @@
+Residual Analysis Summary
+=========================
+Date Range: 1998-04-01 to 1998-04-30
+Model: lmax=10, basis=constant,synodic,synodic2,synodic3
+Total Points: 136224
+Global RMS Residual: 567.62 V
+
+By Environment:
+  Solar Wind: Mean=-7.51, Std=589.16, N=48226
+  Wake: Mean=-7.58, Std=575.58, N=46358
+  Plasma Sheet: Mean=-0.71, Std=506.52, N=29495
+  Lobes: Mean=-15.77, Std=589.25, N=12145

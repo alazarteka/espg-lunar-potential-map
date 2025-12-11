@@ -1,0 +1,7 @@
+Site,Lat,Lon,Mean |U| (V),P95 |U| (V),Frac >1kV,Mean Power (mW/m^2),Assessment
+Apollo 11,0.67,23.47,434.0,1109.3,0.10,0.43,Low Resource / Low Risk
+Apollo 16,-8.97,15.5,373.2,1012.1,0.07,0.37,Low Resource / Low Risk
+Tycho,-43.3,-11.2,862.1,1702.3,0.40,0.86,High Risk / Variable
+Aristarchus,23.7,-47.4,802.1,1692.1,0.43,0.80,High Risk / Variable
+South Pole,-90.0,0.0,1563.5,1717.7,1.00,1.56,High Resource
+Reiner Gamma,7.5,-59.0,872.8,1674.0,0.47,0.87,High Risk / Variable
