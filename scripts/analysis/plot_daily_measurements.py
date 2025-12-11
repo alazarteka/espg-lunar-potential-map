@@ -110,8 +110,17 @@ class FrameData:
     global_sun_offsets: np.ndarray
 
 
-def _load_measurements(path: Path) -> MeasurementPoints:
-    """Load projected surface measurements from cache."""
+def _load_measurements(path: Path, filter_date: date | None = None) -> MeasurementPoints:
+    """Load projected surface measurements from cache.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the NPZ cache file.
+    filter_date : date, optional
+        If provided, only measurements from this date are included.
+        Uses the ``rows_utc`` field (ISO datetime strings) for filtering.
+    """
     with np.load(path) as data:
         potentials = data["rows_projected_potential"].astype(np.float64)
         latitudes = data["rows_projection_latitude"].astype(np.float64)
@@ -121,6 +130,18 @@ def _load_measurements(path: Path) -> MeasurementPoints:
             in_sun = np.zeros_like(potentials, dtype=bool)
         else:
             in_sun = in_sun.astype(bool)
+
+        # Apply date filter if requested
+        if filter_date is not None and "rows_utc" in data:
+            utc_strings = data["rows_utc"]
+            date_prefix = filter_date.strftime("%Y-%m-%d")
+            date_mask = np.array(
+                [str(ts).startswith(date_prefix) for ts in utc_strings], dtype=bool
+            )
+            potentials = potentials[date_mask]
+            latitudes = latitudes[date_mask]
+            longitudes = longitudes[date_mask]
+            in_sun = in_sun[date_mask]
 
     mask = np.isfinite(potentials) & np.isfinite(latitudes) & np.isfinite(longitudes)
     if not np.any(mask):
@@ -346,7 +367,7 @@ def _create_base_figure(
     fig.colorbar(
         scatter_global,
         ax=(ax_north, ax_south, ax_global),
-        label="Φ_surface (V)",
+        label=r"$U_{\mathrm{surface}}$ (V)",
         fraction=0.046,
         pad=0.02,
     )
@@ -580,8 +601,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     if args.input is not None:
         if not args.input.exists():
             raise FileNotFoundError(f"Input file {args.input} not found")
-        # Treat explicit input as a single-day render.
-        points = _load_measurements(args.input)
+        # Filter to start_day when using batch file with --input.
+        points = _load_measurements(args.input, filter_date=start_day)
         rng = np.random.default_rng(args.seed) if args.sample else None
         points = _sample_measurements(points, args.sample, rng)
         frames = [_frame_from_points(start_day, points)]
