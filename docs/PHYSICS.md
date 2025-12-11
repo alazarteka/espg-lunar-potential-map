@@ -107,7 +107,31 @@ $$ f(v) = n \left(\frac{m}{2\pi \kappa E_{th}}\right)^{3/2} \frac{\Gamma(\kappa+
 *   **Fitted Parameters**: Density ($n$), Kappa ($\kappa$), Thermal Velocity ($v_{th}$ or Temperature $T$).
 *   **Instrument Response**: The model includes convolution with the instrument's energy response function (Gaussian in log-energy).
 
-## 5. Validation & Reproduction Notes
+## 5. Temporal Reconstruction
+
+To generate global maps from sparse orbital tracks, the surface potential is modeled as a time-varying field using Spherical Harmonics ($Y_{lm}$) and temporal basis functions ($T_k$).
+
+### 5.1 Model
+
+$$ \Phi(\theta, \phi, t) = \sum_{l=0}^{L_{max}} \sum_{m=-l}^{l} a_{lm}(t) Y_{lm}(\theta, \phi) $$
+
+The coefficients $a_{lm}(t)$ are expanded in a temporal basis:
+
+$$ a_{lm}(t) = \sum_{k} b_{lmk} T_k(t) $$
+
+### 5.2 Temporal Basis Functions
+
+The project supports various basis functions ($T_k$) to capture periodic variations (e.g., lunar day/night cycle):
+*   **Constant**: $\Phi_0$
+*   **Synodic**: Harmonics of the lunar synodic period (~29.5 days).
+    *   $\cos(n \omega_{syn} t)$, $\sin(n \omega_{syn} t)$
+*   **Sidereal**: Harmonics of the lunar sidereal period (~27.3 days).
+
+### 5.3 Reconstruction
+
+The coefficients $b_{lmk}$ are solved via regularized least-squares fitting to the aggregate set of instantaneous potential measurements.
+
+## 6. Validation & Reproduction Notes
 
 The project aims to reproduce results from *Halekas et al. (2008)*.
 

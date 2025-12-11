@@ -17,27 +17,58 @@ The `scripts/plots/` directory contains tools for visualizing data, model fits, 
     ```
 
 ### 2. `plot_timeseries_potential.py`
-*   **Purpose**: Plots the time evolution of Spacecraft and Surface potentials.
-*   **Output**: Stacked time-series plots.
+*   **Purpose**: Reconstructs surface potential time-series at specific lunar locations.
+*   **Output**: Time-series plots of surface potential ($V$) vs Time.
 *   **Key Features**:
-    *   Visualizes correlation between potentials and other parameters.
-    *   Useful for identifying charging events (e.g., crossing the terminator, entering the wake).
+    *   Uses spherical harmonic coefficients ($C_{lm}(t)$) to evaluate potential at any lat/lon.
+    *   Supports plotting multiple locations simultaneously.
+    *   Useful for analyzing temporal variability at fixed surface points.
+*   **Usage**:
+    ```bash
+    uv run python scripts/plots/plot_timeseries_potential.py --input artifacts/harmonics.npz --lat 0 45 --lon 0 90 --output timeseries.png
+    ```
 
-### 3. `plot_harmonic_reconstruction_paper.py` & `_multiday.py`
-*   **Purpose**: Visualizes the results of the Spherical Harmonic temporal reconstruction.
-*   **Output**: Global maps (Mollweide or Orthographic projection) of the lunar potential.
+### 3. `plot_harmonic_reconstruction_paper.py`
+*   **Purpose**: Visualizes a single global map reconstruction from spherical harmonics.
+*   **Output**: Global map (Rectangular or Mollweide) of surface potential at a specific time snapshot.
 *   **Key Features**:
-    *   Compares reconstructed maps with raw data tracks.
-    *   Visualizes the global structure of the electric field.
+    *   Reconstructs the global field from coefficients for a single time index.
+    *   Shows global structure of the electric field.
+*   **Usage**:
+    ```bash
+    uv run python scripts/plots/plot_harmonic_reconstruction_paper.py --input artifacts/harmonics.npz --time-index 10 --output map.png
+    ```
 
-### 4. `plot_measurements_paper.py`
-*   **Purpose**: General plotting of raw measurement distributions.
-*   **Output**: Histograms or scatter plots of key quantities (Flux, Energy).
+### 4. `plot_harmonic_reconstruction_multiday.py`
+*   **Purpose**: Visualizes the evolution of the global potential map.
+*   **Output**: A 2x3 grid of global maps corresponding to different times.
+*   **Key Features**:
+    *   Auto-selects or accepts manual time indices.
+    *   Uses a shared colorbar for direct comparison across time.
+*   **Usage**:
+    ```bash
+    uv run python scripts/plots/plot_harmonic_reconstruction_multiday.py --input artifacts/harmonics.npz --auto-select --output grid.png
+    ```
+
+### 5. `plot_terminator_profile_paper.py`
+*   **Purpose**: Analyzes the transition of surface potential across the terminator.
+*   **Output**: Plot of Surface Potential vs Solar Zenith Angle (SZA).
+*   **Key Features**:
+    *   Bins data by SZA to show trends (Dayside ~positive, Nightside ~negative).
+    *   Highlights the terminator region ($88^\circ - 92^\circ$).
+    *   Displays Sunlit vs Shadowed statistics.
+
+### 6. `plot_measurements_paper.py`
+*   **Purpose**: Visualizes the spatial distribution of raw measurements.
+*   **Output**: Global map scatter plot of measurement points.
+*   **Key Features**:
+    *   Filters by date range.
+    *   Useful for showing orbital coverage.
 
 ## Common Arguments
 
 Most plotting scripts support:
-*   `--input`: Path to data file.
+*   `--input`: Path to data file (TAB, NPZ, or Cache Directory).
 *   `--output`: Path to save the figure.
 *   `--title`: Override the default figure title.
 *   `--dpi`: Resolution (default 150 or 300).
