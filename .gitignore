@@ -90,3 +90,5 @@ artifacts/reports/terminator_charge_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].m
 # =============================================================================
 todos/
 .coverage
+coverage.json
+htmlcov/
