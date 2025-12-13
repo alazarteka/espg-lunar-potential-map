@@ -441,8 +441,10 @@ class Kappa:
         Fit the kappa distribution parameters (kappa and theta) to the data.
 
         Args:
-            n_starts (int): Number of random starts for the optimization.
-            use_fast (bool): Whether to use the fast objective function.
+            n_starts: Number of random starts for the optimization.
+            use_fast: Whether to use the fast objective function.
+            use_weights: Whether to use weights in the calculation.
+            use_convolution: Whether to use energy response convolution.
 
         Returns:
             FitResults | None: The fit results, or None if the fit fails.
@@ -534,9 +536,9 @@ class Kappa:
         use_convolution: bool = True,
     ) -> tuple[FitResults, float] | tuple[None, None]:
         """
-        Fit parameters and estimate spacecraft potential U following
-        the illumination-dependent logic used in spacecraft_potential:
+        Fit parameters and estimate spacecraft potential U.
 
+        Follows the illumination-dependent logic used in spacecraft_potential:
         - Sunlight (dayside):
             1) Fit κ on unshifted data
             2) Compute electron current density Je from the fit
@@ -549,10 +551,16 @@ class Kappa:
             2) Solve Je(U) + Ji(U) − Jsee(U) = 0 for U via brentq
             3) Map κ temperature to ambient at U, build corrected params and return
 
+        Args:
+            n_starts: Number of random starts.
+            use_fast: Use fast objective function.
+            use_weights: Use weights in optimization.
+            use_convolution: Use energy response convolution.
+
         Returns:
-            (FitResults, float) | (None, None): Best-fit (possibly corrected)
-            parameters and spacecraft potential U [V], or (None, None) if
-            fitting fails or geometry unavailable.
+            tuple[FitResults, float] | tuple[None, None]:
+                - (FitResults, U) where U is spacecraft potential in Volts.
+                - (None, None) if fitting fails.
         """
         if not self.is_data_valid:
             raise ValueError(

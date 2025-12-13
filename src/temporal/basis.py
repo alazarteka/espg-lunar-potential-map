@@ -37,7 +37,9 @@ class BasisFunction:
     func: Callable[[np.ndarray], np.ndarray]
 
 
-def _make_synodic_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> list[BasisFunction]:
+def _make_synodic_basis(
+    period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS,
+) -> list[BasisFunction]:
     """Create cosine and sine bases at the synodic period."""
     period_hours = period_days * 24.0
     return [
@@ -52,7 +54,9 @@ def _make_synodic_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> lis
     ]
 
 
-def _make_sidereal_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[BasisFunction]:
+def _make_sidereal_basis(
+    period_days: float = SIDEREAL_PERIOD_DAYS,
+) -> list[BasisFunction]:
     """Create cosine and sine bases at the sidereal period."""
     period_hours = period_days * 24.0
     return [
@@ -67,7 +71,9 @@ def _make_sidereal_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[Basi
     ]
 
 
-def _make_synodic2_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> list[BasisFunction]:
+def _make_synodic2_basis(
+    period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS,
+) -> list[BasisFunction]:
     """Create 2nd harmonic (2ω) cosine and sine bases at twice the synodic frequency."""
     period_hours = period_days * 24.0 / 2.0  # Half the period = double the frequency
     return [
@@ -82,7 +88,9 @@ def _make_synodic2_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> li
     ]
 
 
-def _make_synodic3_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> list[BasisFunction]:
+def _make_synodic3_basis(
+    period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS,
+) -> list[BasisFunction]:
     """Create 3rd harmonic (3ω) cosine and sine bases at triple the synodic frequency."""
     period_hours = period_days * 24.0 / 3.0  # Third the period = triple the frequency
     return [
@@ -97,7 +105,9 @@ def _make_synodic3_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> li
     ]
 
 
-def _make_synodic4_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> list[BasisFunction]:
+def _make_synodic4_basis(
+    period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS,
+) -> list[BasisFunction]:
     """Create 4th harmonic (4ω) cosine and sine bases at 4x the synodic frequency."""
     period_hours = period_days * 24.0 / 4.0
     return [
@@ -112,7 +122,9 @@ def _make_synodic4_basis(period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS) -> li
     ]
 
 
-def _make_sidereal2_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[BasisFunction]:
+def _make_sidereal2_basis(
+    period_days: float = SIDEREAL_PERIOD_DAYS,
+) -> list[BasisFunction]:
     """Create 2nd harmonic cosine and sine bases at twice the sidereal frequency."""
     period_hours = period_days * 24.0 / 2.0
     return [
@@ -127,7 +139,9 @@ def _make_sidereal2_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[Bas
     ]
 
 
-def _make_sidereal3_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[BasisFunction]:
+def _make_sidereal3_basis(
+    period_days: float = SIDEREAL_PERIOD_DAYS,
+) -> list[BasisFunction]:
     """Create 3rd harmonic cosine and sine bases at triple the sidereal frequency."""
     period_hours = period_days * 24.0 / 3.0
     return [
@@ -142,7 +156,9 @@ def _make_sidereal3_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[Bas
     ]
 
 
-def _make_sidereal4_basis(period_days: float = SIDEREAL_PERIOD_DAYS) -> list[BasisFunction]:
+def _make_sidereal4_basis(
+    period_days: float = SIDEREAL_PERIOD_DAYS,
+) -> list[BasisFunction]:
     """Create 4th harmonic cosine and sine bases at 4x the sidereal frequency."""
     period_hours = period_days * 24.0 / 4.0
     return [
@@ -182,7 +198,7 @@ def _get_basis_func_by_name(name: str) -> Callable[[np.ndarray], np.ndarray]:
     sidereal2_hours = SIDEREAL_PERIOD_DAYS * 24.0 / 2.0
     sidereal3_hours = SIDEREAL_PERIOD_DAYS * 24.0 / 3.0
     sidereal4_hours = SIDEREAL_PERIOD_DAYS * 24.0 / 4.0
-    
+
     EXPANDED_BASES = {
         "constant": lambda t: np.ones_like(t),
         "linear": lambda t: t / max(t.max(), 1.0),
@@ -227,7 +243,9 @@ def parse_basis_spec(spec: str) -> list[BasisFunction]:
     return basis_funcs
 
 
-def build_temporal_design(t_hours: np.ndarray, bases: list[BasisFunction]) -> np.ndarray:
+def build_temporal_design(
+    t_hours: np.ndarray, bases: list[BasisFunction]
+) -> np.ndarray:
     """
     Build temporal design matrix.
 
@@ -321,7 +339,9 @@ def fit_temporal_basis(
 
     logging.info(
         "Solving system: %d equations, %d unknowns (%.1f MB dense)",
-        N, K * n_coeffs, N * K * n_coeffs * 16 / 1e6,
+        N,
+        K * n_coeffs,
+        N * K * n_coeffs * 16 / 1e6,
     )
 
     if l2_penalty > 0.0:
@@ -378,7 +398,9 @@ def reconstruct_at_times(
 
     results = []
     for t in times:
-        t_hours = (t - reference_time).astype("timedelta64[s]").astype(np.float64) / 3600.0
+        t_hours = (t - reference_time).astype("timedelta64[s]").astype(
+            np.float64
+        ) / 3600.0
 
         # Evaluate basis functions at this time
         T_k = np.array([func(np.array([t_hours]))[0] for func in basis_funcs])

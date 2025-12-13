@@ -29,7 +29,7 @@ All dependencies are managed through UV and specified in `pyproject.toml`.
 ├── artifacts/              # Generated outputs (plots, reports, caches)
 │   ├── plots/              # Figures, animations, HTML exports
 │   ├── reports/            # Generated analysis summaries
-│   └── potential_cache/    # Default output for NPZ caches (was data/potential_cache)
+│   └── potential_cache/    # Default output for NPZ caches
 ├── scratch/                # Ad-hoc scratch space for experiments (gitignored)
 ├── data/                   # Processed data (created/populated by src/data_acquisition.py)
 │   └── spice_kernels/      # SPICE kernel files
@@ -40,21 +40,38 @@ All dependencies are managed through UV and specified in `pyproject.toml`.
     ├── flux.py             # ER flux + loss-cone fitting
     ├── kappa.py            # Kappa distribution fitting utilities
     ├── model.py            # Core modeling components
+    ├── spacecraft_potential.py # Spacecraft charging estimation
+    ├── physics/            # Physics calculations
+    │   ├── charging.py     # Current density calculations
+    │   ├── jucurve.py      # J-U curve logic
+    │   └── kappa.py        # Kappa distribution math
     ├── potential_mapper/   # Modular potential mapping package
     │   ├── __init__.py
     │   ├── __main__.py     # Enables `python -m src.potential_mapper`
     │   ├── cli.py          # CLI argument parsing and entrypoint
     │   ├── pipeline.py     # File discovery, processing, orchestration
+    │   ├── batch.py        # Batch processing
     │   ├── coordinates.py  # Frame transforms, projections, intersections
     │   ├── plot.py         # Plotting utilities
-    │   └── results.py      # Typed results container
+    │   ├── results.py      # Typed results container
+    │   └── spice.py        # SPICE kernel loading
+    ├── temporal/           # Time-dependent spherical harmonic analysis
+    │   ├── basis.py        # Temporal basis functions
+    │   ├── coefficients.py # Harmonic coefficient fitting
+    │   ├── dataset.py      # Data loading/saving
+    │   └── reconstruction.py # Global map reconstruction
     └── utils/              # Utility functions module
         ├── __init__.py
-        ├── attitude.py
-        ├── coordinates.py
-        ├── file_ops.py
-        ├── geometry.py
-        └── spice_ops.py
+        ├── attitude.py     # Attitude data handling
+        ├── coordinates.py  # Coordinate transformations
+        ├── energy.py       # Energy binning
+        ├── file_ops.py     # File system operations
+        ├── flux_files.py   # Flux file selection
+        ├── geometry.py     # Ray-sphere intersections
+        ├── spice_lock.py   # SPICE kernel locking
+        ├── spice_ops.py    # SPICE operations
+        ├── synthetic.py    # Synthetic data generation
+        └── units.py        # Unit definitions
 ```
 
 Generated plots and reports now live under `artifacts/`; use `scratch/` for ad-hoc runs
@@ -88,6 +105,11 @@ and exploratory outputs that should stay out of version control.
     uv run python -m src.data_acquisition
     ```
 
+## Documentation
+
+The codebase is documented using Google Style Python Docstrings. Each public function, class, and method includes a docstring describing its purpose, arguments, and return values.
+
+To explore the documentation, you can use Python's built-in `help()` function or read the source code directly.
 
 ## Data
 
@@ -98,89 +120,64 @@ and exploratory outputs that should stay out of version control.
 
 ## Usage
 
-After setting up and downloading data, run the desired module using UV. For example:
+After setting up and downloading data, run the desired module using UV.
+
+### Potential Mapper
+
+Run the potential mapper to process ER data and generate surface potential maps:
 
 ```bash
-# Run the potential mapper
 uv run python -m src.potential_mapper
+```
 
-# Start Jupyter Lab for interactive analysis
+### Temporal Analysis
+
+Compute time-dependent spherical harmonic coefficients:
+
+```bash
+uv run python -m src.temporal --start 1998-01-01 --end 1999-01-01 --output artifacts/temporal_coeffs.npz
+```
+
+### Interactive Analysis
+
+Start Jupyter Lab or Notebook for interactive analysis:
+
+```bash
 uv run jupyter lab
-
-# Start Jupyter Notebook
+# or
 uv run jupyter notebook
+```
 
-# Run tests (if available)
+### Testing
+
+Run the test suite to ensure everything is working correctly:
+
+```bash
 uv run pytest
 ```
 
 ### Batch potential cache generation
 
-The batch runner in `scripts/dev/potential_mapper_batch.py` processes ER files and
+The batch runner in `src/potential_mapper/batch.py` processes ER files and
 writes per-file NPZ caches under `artifacts/potential_cache/`. Each cache contains
 row-aligned spacecraft and surface potentials along with spectrum rollups.
 
 ```bash
 # Compute caches for a single day (writes to artifacts/potential_cache by default)
-uv run python scripts/dev/potential_mapper_batch.py \
-  --year 1998 --month 9 --day 16 --limit 1 --workers 1
+uv run python -m src.potential_mapper.batch \
+  --year 1998 --month 9 --day 16 --overwrite
 ```
 
 Key options:
-- `--year/--month/--day`: filter ER files by tokenised date.
-- `--limit`: stop after processing the first *N* files (useful for quick checks).
-- `--output-dir`: target directory for NPZ artefacts.
-
-The command loads SPICE kernels as needed and is CPU-heavy; consider reducing the
-sample size (via `--limit`) when iterating locally.
+- `--year/--month/--day`: filter ER files by date.
+- `--output-dir`: target directory for NPZ artifacts.
+- `--parallel`: enable parallel processing.
 
 ### Visualising cached potentials
 
-Two analysis CLIs load the cached NPZ artefacts for plotting:
+Scripts in `scripts/analysis/` can be used to visualize the output.
 
-```bash
-# Static Matplotlib sphere projection
-uv run python scripts/analysis/potential_map_matplotlib_sphere.py \
-  --start 1998-09-16 --end 1998-09-16 \
-  --cache-dir artifacts/potential_cache --sample 5000 --output artifacts/plots/1998-09-16.png
-
-# Interactive Plotly globe with optional animation/MP4 export
-uv run python scripts/analysis/potential_map_plotly_static.py \
-  --start 1998-09-16 --end 1998-09-16 \
-  --cache-dir artifacts/potential_cache --sample 5000 \
-  --output artifacts/plots/1998-09-16.html --animate
-```
-
-For large animations, prefer modest sampling (`--sample`) and frame counts. MP4
-export requires Kaleido plus `imageio[ffmpeg]`; ensure Chrome/Chromium is
-available for Kaleido on headless systems.
-
-### Validating spacecraft potential outputs
-
-Cached files expose `rows_spacecraft_potential` and
-`rows_projected_potential`. Inspect a representative NPZ to confirm the pipeline
-is debiasing the loss-cone fits with the spacecraft charging term:
-
-```bash
-uv run python - <<'PY'
-import numpy as np
-from pathlib import Path
-path = Path('artifacts/potential_cache/1998/244_273SEP/3D980916.npz')
-with np.load(path) as data:
-    sc = data['rows_spacecraft_potential']
-    proj = data['rows_projected_potential']
-    print(f"rows={sc.size}")
-    print(f"spacecraft phi range: {np.nanmin(sc):.2f} -> {np.nanmax(sc):.2f} V")
-    finite_proj = np.isfinite(proj)
-    print(f"surface phi samples: {finite_proj.sum()} / {proj.size}")
-PY
-```
-
-The example above reports approximately -74 V to +39 V spacecraft potentials and
-strong negative surface potentials for the September 16, 1998 pass, indicating
-the median spacecraft bias is being removed before fitting ΔU.
-
-### Development
+## Development
 
 ```bash
 # Add new dependencies

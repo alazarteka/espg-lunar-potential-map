@@ -71,7 +71,18 @@ def _load_all_data(
     start_ts: np.datetime64,
     end_ts_exclusive: np.datetime64,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Load all measurements in the time range."""
+    """
+    Load all measurements in the time range.
+
+    Args:
+        files: List of NPZ file paths.
+        start_ts: Start timestamp (inclusive).
+        end_ts_exclusive: End timestamp (exclusive).
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+            (utc, lat, lon, potential) arrays.
+    """
     utc_parts: list[np.ndarray] = []
     lat_parts: list[np.ndarray] = []
     lon_parts: list[np.ndarray] = []
@@ -153,7 +164,8 @@ def _partition_into_windows(
         start_anchor: Optional reference timestamp (UTC). Window starts snap to
                       this anchor instead of the first measurement time.
 
-    Yields TimeWindow objects with spatially-contiguous measurements.
+    Yields:
+        TimeWindow: Spatially-contiguous measurements for a time window.
     """
     if utc.size == 0:
         return
@@ -408,7 +420,16 @@ def _fit_window_harmonics(
     """
     Fit spherical harmonics to a single time window.
 
-    Returns None if the window lacks sufficient spatial coverage.
+    Args:
+        window: TimeWindow object containing data.
+        lmax: Maximum spherical harmonic degree.
+        l2_penalty: L2 regularization penalty.
+        min_samples: Minimum number of samples required.
+        min_coverage: Minimum spatial coverage required.
+        degree_weights: Optional degree-dependent weights.
+
+    Returns:
+        HarmonicCoefficients | None: Fitted coefficients or None if requirements met.
     """
     if window.lat.size < min_samples:
         logging.debug(
@@ -511,6 +532,22 @@ def _fit_coupled_windows(
         [X_block      ]       [Φ    ]
         [√λ_s * I     ] @ a = [0    ]
         [√λ_t * D_t   ]       [0    ]
+
+    Args:
+        windows: List of time windows.
+        lmax: Maximum spherical harmonic degree.
+        spatial_lambda: Spatial regularization strength.
+        temporal_lambda: Temporal regularization strength.
+        min_samples: Minimum samples per window.
+        min_coverage: Minimum coverage per window.
+        degree_weights: Degree weights.
+        co_rotate: Whether to co-rotate the temporal derivative.
+        rotation_period_hours: Rotation period in hours.
+        max_lag: Max lag for temporal derivative.
+        decay_factor: Decay factor for temporal weights.
+
+    Returns:
+        list[HarmonicCoefficients]: List of fitted coefficients.
     """
     from scipy.sparse import block_diag, csr_matrix, diags, vstack
     from scipy.sparse.linalg import lsqr

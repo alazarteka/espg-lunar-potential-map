@@ -27,9 +27,6 @@ def solid_angle_from_thetas(base_dir: Path) -> None:
     """
     Save the solid angle for a given latitude in degrees.
 
-    Args:
-        base_dir (Path): Path to the directory where the solid angles will be saved.
-
     We could not find a file in the PDS that contains this information in a
     format we can use, so we hardcode the values for the four latitudes.
 
@@ -37,6 +34,12 @@ def solid_angle_from_thetas(base_dir: Path) -> None:
     The values can be found in the "Parameters" section.
 
     The formatting is identical to the one used in the thetas.tab file.
+
+    Args:
+        base_dir: Path to the directory where the solid angles will be saved.
+
+    Returns:
+        None
     """
 
     latitude_to_area = {
@@ -64,11 +67,27 @@ class DataManager:
     """
 
     def __init__(self, base_dir: str, base_url: str):
+        """
+        Initialize the DataManager.
+
+        Args:
+            base_dir: The local base directory where files will be saved.
+            base_url: The remote base URL to scrape and download files from.
+        """
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.base_url = base_url.rstrip("/")
 
     def ensure_dir(self, *subdirs) -> Path:
+        """
+        Ensure that the specified subdirectory exists locally.
+
+        Args:
+            *subdirs: Variable length argument list of subdirectory names.
+
+        Returns:
+            Path: The path to the ensured directory.
+        """
         path = self.base_dir.joinpath(*subdirs)
         path.mkdir(parents=True, exist_ok=True)
         return path
@@ -76,6 +95,12 @@ class DataManager:
     def list_remote_dirs(self, remote_path: str = "") -> list[str]:
         """
         Return a list of subdirectory names under base_url/remote_path/.
+
+        Args:
+            remote_path: The relative remote path to list directories from. Defaults to root.
+
+        Returns:
+            list[str]: A list of subdirectory names (relative paths).
         """
         url = f"{self.base_url}/{remote_path.rstrip('/')}/"
         logger.debug(f"Listing remote directories at {url}")
@@ -97,7 +122,14 @@ class DataManager:
         self, remote_path: str, ext: str = config.EXT_TAB
     ) -> list[str]:
         """
-        Return filenames under base_url/remote_path/ matching ext.
+        Return filenames under base_url/remote_path/ matching the extension.
+
+        Args:
+            remote_path: The relative remote path to list files from.
+            ext: The file extension to filter by (default: config.EXT_TAB).
+
+        Returns:
+            list[str]: A list of filenames matching the extension.
         """
         url = f"{self.base_url}/{remote_path.rstrip('/')}/"
         logger.debug(f"Listing remote files at {url}")
@@ -115,7 +147,18 @@ class DataManager:
         self, url: str, dest: Path, chunk_size: int = config.CHUNK_SIZE_BYTES
     ) -> Path:
         """
-        Stream-download a file if not already present.
+        Stream-download a file if it is not already present locally.
+
+        Args:
+            url: The URL of the file to download.
+            dest: The local destination path.
+            chunk_size: The chunk size for streaming the download (default: config.CHUNK_SIZE_BYTES).
+
+        Returns:
+            Path: The path to the downloaded file.
+
+        Raises:
+            Exception: If the download fails.
         """
         dest = Path(dest)
         temp_dest = dest.with_suffix(dest.suffix + ".part")
@@ -149,6 +192,13 @@ class DataManager:
     ) -> list[Path]:
         """
         Download all files with the given extension in base_url/remote_path/.
+
+        Args:
+            remote_path: The relative remote path to download files from.
+            ext: The file extension to filter by (default: config.EXT_TAB).
+
+        Returns:
+            list[Path]: A list of paths to the downloaded files.
         """
         files = self.list_remote_files(remote_path, ext)
         local_dir = self.ensure_dir(*remote_path.split("/"))
@@ -168,6 +218,13 @@ class DataManager:
         """
         Collect all download tasks across all years and julian days without downloading.
         This allows for better parallelization.
+
+        Args:
+            years: A list of year directory names.
+            ext: The file extension to filter by (default: config.EXT_TAB).
+
+        Returns:
+            list[tuple[str, Path]]: A list of tuples containing (url, destination_path).
         """
         all_tasks = []
 
@@ -198,6 +255,14 @@ class DataManager:
     ) -> None:
         """
         Download multiple (url, dest) pairs in parallel.
+
+        Args:
+            urls_and_dests: A list of tuples containing (url, destination_path).
+            max_workers: The maximum number of worker threads (default: config.MAX_DOWNLOAD_WORKERS).
+            folder_desc: Description for the progress bar.
+
+        Returns:
+            None
         """
         # Filter out already existing files
         remaining_tasks = [

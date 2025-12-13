@@ -133,16 +133,17 @@ def calculate_shaded_currents(
         - Ji: collected ion current density [A m^-2]
 
     Args:
-        - spacecraft_potential: Trial U [V], expected negative in shade.
-        - uncorrected_fit: κ-fit on the unshifted spectrum.
-        - energy_grid: Energy grid [eV] for the integrals.
-        - sey_E_m: SEE peak energy [eV] for Sternglass yield.
-        - sey_delta_m: SEE peak yield (dimensionless) for Sternglass yield.
+        spacecraft_potential: Trial U [V], expected negative in shade.
+        uncorrected_fit: κ-fit on the unshifted spectrum.
+        energy_grid: Energy grid [eV] for the integrals.
+        sey_E_m: SEE peak energy [eV] for Sternglass yield.
+        sey_delta_m: SEE peak yield (dimensionless) for Sternglass yield.
 
     Returns:
-        - Je: collected electron current density [A m^-2]
-        - Jsee: secondary-electron emission current density [A m^-2]
-        - Ji: collected ion current density [A m^-2]
+        tuple[float, float, float]:
+            - Je: collected electron current density [A m^-2]
+            - Jsee: secondary-electron emission current density [A m^-2]
+            - Ji: collected ion current density [A m^-2]
     """
 
     density_magnitude, kappa, theta_uncorrected_m_per_s = (
@@ -221,6 +222,16 @@ def current_balance(
 
     Root at F(U)=0 defines the floating potential in shade. Positive F favors
     less-negative U; negative F favors more-negative U.
+
+    Args:
+        spacecraft_potential: Trial potential U [V].
+        uncorrected_fit: Uncorrected fit results.
+        energy_grid: Energy grid for integration.
+        sey_E_m: SEE peak energy parameter.
+        sey_delta_m: SEE peak yield parameter.
+
+    Returns:
+        float: The net current density [A m^-2].
     """
     Je, Jsee, Ji = calculate_shaded_currents(
         spacecraft_potential=spacecraft_potential,
@@ -252,26 +263,31 @@ def calculate_potential(
 
     Branches on illumination using Sun–Moon geometry:
         - Daylight: compute U from JU curve, pre-shift energies by −U (in eV), refit,
-        and return corrected κ and U (>0 V).
+          and return corrected κ and U (>0 V).
         - Shade: build F(U)=Je+Ji−Jsee and solve with Brent for U<0 V; return ambient
-        κ (with θ mapped at the solved U) and U.
+          κ (with θ mapped at the solved U) and U.
 
     Args:
-        - er_data: Electron spectrometer dataset containing time and energy columns.
-        - spec_no: Spectrum index to evaluate.
-        - E_min_ev/E_max_ev/n_steps: Energy grid [eV] and resolution for integrals.
-        - spacecraft_potential_low/high: Initial bracket for nightside U [V].
-        - sey_E_m/sey_delta_m: SEE calibration parameters (Sternglass model).
+        er_data: Electron spectrometer dataset containing time and energy columns.
+        spec_no: Spectrum index to evaluate.
+        E_min_ev: Minimum energy for grid [eV].
+        E_max_ev: Maximum energy for grid [eV].
+        n_steps: Number of steps in energy grid.
+        spacecraft_potential_low: Lower bound for nightside U search [V].
+        spacecraft_potential_high: Upper bound for nightside U search [V].
+        sey_E_m: SEE peak energy calibration parameter.
+        sey_delta_m: SEE peak yield calibration parameter.
 
     Returns:
-        - (KappaParams, U[volt]) on success; None on failure (e.g., poor κ fit or
-        unbracketed root in shade).
+        tuple[KappaParams, VoltageType] | None:
+            - (KappaParams, U[volt]) on success.
+            - None on failure (e.g., poor κ fit or unbracketed root in shade).
 
     Notes:
         - Day branch mutates `er_data.data[ENERGY_COLUMN]` during pre-shift to refit;
-        consider copying/restoring upstream if this side effect is undesirable.
+          consider copying/restoring upstream if this side effect is undesirable.
         - Uses a private `_prepare_data()` on the fitter; a public helper may be
-        preferable if the interface evolves.
+          preferable if the interface evolves.
     """
     fitter = Kappa(er_data, spec_no)
 

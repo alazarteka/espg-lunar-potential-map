@@ -181,7 +181,12 @@ def project_magnetic_fields(
     """
     Project ER-frame magnetic field vectors into IAU_MOON frame as unit vectors.
 
-    Returns an array of shape (N, 3) in IAU_MOON coordinates.
+    Args:
+        flux_data: Flux data object.
+        coordinate_arrays: Pre-computed coordinate arrays.
+
+    Returns:
+        np.ndarray: Array of shape (N, 3) in IAU_MOON coordinates.
     """
     magnetic_field = flux_data.data[config.MAG_COLS].to_numpy(dtype=float)
     finite_mask = np.isfinite(magnetic_field).all(axis=1)
@@ -210,7 +215,12 @@ def find_surface_intersection(
     """
     Compute ray–sphere intersections for LP positions along projected B-field.
 
-    Returns (points, mask) from get_intersections_or_none_batch.
+    Args:
+        coordinate_arrays: Coordinate arrays containing LP positions.
+        projected_magnetic_field: Projected magnetic field vectors.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: (points, mask) from get_intersections_or_none_batch.
     """
     intersections = get_intersections_or_none_batch(
         pos=coordinate_arrays.lp_positions,
