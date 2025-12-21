@@ -1,3 +1,8 @@
+# TODO: Add physics validation tests:
+# - Verify 0.25 isotropic factor (∫cos(θ)dΩ/4π = 1/4)
+# - Test linear scaling with density: J(2n) = 2*J(n)
+# - Compare to analytic Maxwellian limit (κ→∞)
+
 import numpy as np
 import pytest
 
