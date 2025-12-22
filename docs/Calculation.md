@@ -309,11 +309,27 @@ Validated by:
 
 ### Loss-Cone Model
 
-**TODO:** Document physics source for loss-cone angle formula:
-```python
-x = bs_over_bm * (1.0 + U_surface / E)
-ac = arcsin(sqrt(x))
+**Source:** [Halekas 2008](https://doi.org/10.1029/2008JA013194), paragraph 37
+
+Loss cone angle formula:
 ```
+sin²(αc) = (BS/BM) × (1 + e·UM/E)
+```
+
+where:
+- BS = magnetic field at spacecraft
+- BM = magnetic field at Moon surface
+- UM = lunar surface potential
+- E = electron energy
+
+**Naming convention:** The code parameter `bs_over_bm` uses 's' for spacecraft and 'm' for Moon, matching the paper. This is BS/BM = B_spacecraft/B_surface, NOT B_surface/B_measurement.
+
+**Extension:** The code accounts for spacecraft potential:
+```python
+x = bs_over_bm × (1 + U_surface / (E - U_spacecraft))
+```
+
+The secondary electron beam component is modeled as a Gaussian in energy centered at |U_surface| with angular concentration near pitch = 180°.
 
 ---
 
@@ -325,6 +341,6 @@ ac = arcsin(sqrt(x))
 | J-U curve | ✅ | Ground truth from Halekas 2008 |
 | Charging currents | ⚠️ | Cross-tested, but 0.25 factor not validated |
 | Ray-sphere intersection | ⚠️ | Basic cases only |
-| Loss-cone model | ❌ | Only self-consistency (vectorized vs loop) |
+| Loss-cone model | ⚠️ | Source documented (Halekas 2008 ¶37), but no ground truth test |
 | Spherical harmonics | ❌ | No direct tests |
 | Coordinate transforms | ❌ | Test file empty |
