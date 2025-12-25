@@ -173,8 +173,9 @@ def compute_kappa_chi2_batch_torch(
 
     # Apply response matrix if provided
     if response_matrix is not None:
-        # model_flux: (N, P, E) @ W.T: (E, E) -> (N, P, E)
-        model_flux = torch.einsum('npe,ef->npf', model_flux, response_matrix)
+        # W @ model_flux: response_matrix[f,e] * model_flux[n,p,e] -> convolved[n,p,f]
+        # This matches CPU: W @ flux where W[i,j] maps input energy j to output i
+        model_flux = torch.einsum('fe,npe->npf', response_matrix, model_flux)
 
     # Log-space comparison
     log_model = torch.log(model_flux + eps)

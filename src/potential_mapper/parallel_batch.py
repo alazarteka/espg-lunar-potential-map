@@ -117,21 +117,26 @@ def process_single_day(
             use_torch=use_torch,
         )
 
-        # Save results
+        # Extract UTC timestamps from source data (needed for temporal reconstruction)
+        utc_col = config.UTC_COLUMN if config.UTC_COLUMN in er_data.data.columns else config.TIME_COLUMN
+        rows_utc = er_data.data[utc_col].to_numpy(dtype=str)
+
+        # Save results with rows_* prefix to match temporal loader expectations
         output_file = output_dir / f"potential_{year:04d}_{mm:02d}_{dd:02d}.npz"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         np.savez_compressed(
             output_file,
-            # Row-level arrays from PotentialResults
-            spacecraft_latitude=results.spacecraft_latitude,
-            spacecraft_longitude=results.spacecraft_longitude,
-            projection_latitude=results.projection_latitude,
-            projection_longitude=results.projection_longitude,
-            spacecraft_potential=results.spacecraft_potential,
-            projected_potential=results.projected_potential,
-            spacecraft_in_sun=results.spacecraft_in_sun,
-            projection_in_sun=results.projection_in_sun,
+            # Row-level arrays with rows_* prefix for temporal/coefficients.py
+            rows_utc=rows_utc,
+            rows_spacecraft_latitude=results.spacecraft_latitude,
+            rows_spacecraft_longitude=results.spacecraft_longitude,
+            rows_projection_latitude=results.projection_latitude,
+            rows_projection_longitude=results.projection_longitude,
+            rows_spacecraft_potential=results.spacecraft_potential,
+            rows_projected_potential=results.projected_potential,
+            rows_spacecraft_in_sun=results.spacecraft_in_sun,
+            rows_projection_in_sun=results.projection_in_sun,
         )
 
         elapsed = time.time() - start_time

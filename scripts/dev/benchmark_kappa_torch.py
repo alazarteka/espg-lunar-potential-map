@@ -76,7 +76,8 @@ def benchmark_scipy(er_data: ERData, n_spectra: int, n_starts: int = 10):
             if not kappa.is_data_valid:
                 continue
 
-            fit = kappa.fit(n_starts=n_starts, use_fast=True)
+            # use_weights=False for fair comparison with torch (which uses uniform weights)
+            fit = kappa.fit(n_starts=n_starts, use_fast=True, use_weights=False)
             if fit is not None:
                 results.append({
                     'spec_no': spec_no,
