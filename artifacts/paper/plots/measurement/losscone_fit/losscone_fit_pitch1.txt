@@ -1,0 +1,7 @@
+UTC: 925397048.0
+U_surface = -144.6 V
+Bₛ/Bₘ = 0.999
+Beam amp = 20.288
+USC = 11.0 V (ratio)
+bg = 0.050, inc=mean
+χ² = 499.41

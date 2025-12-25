@@ -1,0 +1,35 @@
+
+======================================================================
+Temporal Basis Cross-Validation Results
+======================================================================
+Date range     : 1998-07-01 → 1998-07-31
+Basis          : constant,synodic,synodic2,synodic3
+lmax           : 10
+L2 penalty     : 100.0
+Test fraction  : 25%
+----------------------------------------------------------------------
+
+RANDOM HOLDOUT:
+  Train/Test split : 103,410 / 34,482
+  Train RMS        : 654.60 V
+  Test RMS         : 712.79 V
+  Overfit ratio    : 1.089
+  Naive RMS        : 768.28 V
+  Skill (vs naive) : +7.2%
+  R²               : 0.139
+
+TEMPORAL HOLDOUT:
+  Train/Test split : 103,419 / 34,473
+  Train RMS        : 635.81 V
+  Test RMS         : 1157.89 V
+  Overfit ratio    : 1.821
+  Naive RMS        : 834.04 V
+  Skill (vs naive) : -38.8%
+  R²               : -0.927
+
+======================================================================
+INTERPRETATION:
+  ✓ Random holdout: Good generalization (overfit ratio < 1.1)
+  ⚠ Temporal split: Cannot predict unseen time/longitude regions
+    (This is expected due to LP's 13°/day longitude drift)
+======================================================================

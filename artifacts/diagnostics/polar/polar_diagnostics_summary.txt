@@ -1,0 +1,76 @@
+======================================================================
+POLAR POTENTIAL DIAGNOSTICS SUMMARY
+======================================================================
+
+Latitude threshold: |lat| > 75.0°
+Total measurements: 61,694
+Fitter bounds: [-2000, 2000] V
+
+======================================================================
+CRITICAL: FITTER BOUND SATURATION ANALYSIS
+======================================================================
+
+  Exactly at -2000 V:   12,966 ( 21.0%)
+  Exactly at +2000 V:       95 (  0.2%)
+  Near -2000 V (±1V):   13,412 ( 21.7%)
+  Near +2000 V (±1V):      110 (  0.2%)
+  TOTAL BOUND-HITTERS: 13,522 ( 21.9%)
+
+>>> THESE ARE NOT REAL MEASUREMENTS - THEY ARE FITTER FAILURES <<<
+
+======================================================================
+RAW STATISTICS (INCLUDING BOUND-HITTERS)
+======================================================================
+
+  Min:        -2000.0 V
+  P5:         -2000.0 V
+  P25:        -1988.7 V
+  Median:     -1406.5 V
+  P75:         -663.6 V
+  P95:         -368.7 V
+  Max:         2000.0 V
+
+======================================================================
+CLEAN STATISTICS (AFTER REMOVING BOUND-HITTERS)
+======================================================================
+
+  Valid measurements: 48,172 (78.1% of total)
+  Min:        -1999.0 V
+  P5:         -1985.3 V
+  P25:        -1702.5 V
+  Median:     -1002.6 V
+  P75:         -582.9 V
+  P95:         -346.0 V
+  Max:         1995.3 V
+  Mean:       -1104.2 V
+  Std:          596.9 V
+
+======================================================================
+DIAGNOSIS
+======================================================================
+
+  ⚠️  SEVERE BOUND SATURATION: 21.7% of fits hit -2000V floor
+
+  The 'persistent polar kV' feature is DRIVEN BY FITTER FAILURES, not physics.
+
+  Evidence:
+    • 12,966 fits exactly at -2000V (hard cap)
+    • P25 raw = -1989V (stacked near bound)
+    • Clean median = -1003V (much less extreme)
+
+  Halekas (2008) sanity check:
+    • Tail lobes: ~-100V
+    • Plasma sheet: -200V to -1kV
+    • Wake edges: ~-200V
+    • SEP events: up to ~-4kV (rare)
+
+  Your clean median (-1003V) is more consistent with
+  plasma sheet / wake conditions than the raw median.
+
+  RECOMMENDED ACTIONS:
+    1. Treat bound-hitters as INVALID/CENSORED (U ≤ -2000V, not U = -2000V)
+    2. Recompute harmonic fits excluding bound-hitters
+    3. Inspect spectra at bound-hits to understand failure mode
+    4. Consider widening fitter bounds or flagging unconstrained fits
+
+======================================================================

@@ -1,0 +1,7 @@
+Site,Lat,Lon,Mean |U| (V),P95 |U| (V),Frac >1kV,Mean Power (mW/m^2),Assessment
+Apollo 11,0.67,23.47,434.0,1109.3,0.10,27616.93,High Resource
+Apollo 16,-8.97,15.5,373.2,1012.1,0.07,23751.80,High Resource
+Tycho,-43.3,-11.2,862.1,1702.3,0.40,54864.07,High Resource
+Aristarchus,23.7,-47.4,802.1,1692.1,0.43,51048.16,High Resource
+South Pole,-90.0,0.0,1563.5,1717.7,1.00,99502.45,High Resource
+Reiner Gamma,7.5,-59.0,872.8,1674.0,0.47,55545.50,High Resource
