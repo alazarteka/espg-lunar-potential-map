@@ -123,6 +123,7 @@ def run_batch(
     day: int | None = None,
     use_parallel: bool = True,
     overwrite: bool = False,
+    use_torch: bool = False,
 ) -> int:
     """
     Run batch processing with merged data loading.
@@ -134,6 +135,7 @@ def run_batch(
         day: Optional day filter (1-31)
         use_parallel: Whether to use parallel fitting (default: True)
         overwrite: Whether to overwrite existing output file
+        use_torch: Use PyTorch-accelerated fitter (~5x faster)
 
     Returns:
         Exit code (0 for success, 1 for failure)
@@ -175,8 +177,8 @@ def run_batch(
 
     # Process merged data
     try:
-        logging.info(f"Processing merged data (parallel={use_parallel})...")
-        results = process_merged_data(er_data, use_parallel=use_parallel)
+        logging.info(f"Processing merged data (parallel={use_parallel}, torch={use_torch})...")
+        results = process_merged_data(er_data, use_parallel=use_parallel, use_torch=use_torch)
     except Exception as e:
         logging.exception(f"Failed to process merged data: {e}")
         return 1
@@ -224,6 +226,11 @@ def _parse_args() -> argparse.Namespace:
         help="Enable parallel fitting (experimental, may cause hangs)",
     )
     parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Use PyTorch-accelerated fitter (~5x faster). Requires: uv sync --extra gpu",
+    )
+    parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing output file"
     )
     parser.add_argument(
@@ -250,6 +257,7 @@ def main() -> int:
         day=args.day,
         use_parallel=args.parallel,
         overwrite=args.overwrite,
+        use_torch=args.fast,
     )
 
 

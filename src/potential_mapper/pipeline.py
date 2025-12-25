@@ -10,6 +10,12 @@ from tqdm import tqdm
 
 import src.config as config
 from src.flux import ERData, LossConeFitter
+
+try:
+    from src.model_torch import LossConeFitterTorch, HAS_TORCH
+except ImportError:
+    HAS_TORCH = False
+    LossConeFitterTorch = None  # type: ignore[misc, assignment]
 from src.potential_mapper import plot as plot_mod
 from src.potential_mapper.coordinates import (
     CoordinateArrays,
@@ -385,7 +391,7 @@ def load_all_data(files: list[Path]) -> ERData:
 
 
 def process_merged_data(
-    er_data: ERData, *, use_parallel: bool = False
+    er_data: ERData, *, use_parallel: bool = False, use_torch: bool = False
 ) -> PotentialResults:
     """
     Process the merged ER dataset.
@@ -393,12 +399,13 @@ def process_merged_data(
     Steps:
     1. Load attitude and calculate coordinates (vectorized).
     2. Calculate spacecraft potential (parallel if use_parallel=True).
-    3. Run surface potential fitting (parallel if use_parallel=True).
+    3. Run surface potential fitting (parallel or torch-accelerated).
     4. Assemble results.
 
     Args:
         er_data: Merged ERData object
         use_parallel: Enable multiprocessing for SC and surface potential (default: False)
+        use_torch: Use PyTorch-accelerated fitter (~5x faster, default: False)
 
     Returns:
         PotentialResults with all computed fields
@@ -508,9 +515,26 @@ def process_merged_data(
     rows_per_sweep = config.SWEEP_ROWS
     sweeps_per_chunk = 100
     rows_per_chunk = sweeps_per_chunk * rows_per_sweep
-    chunked = use_parallel and can_chunk and n > rows_per_chunk
+    # Torch mode uses its own vectorization, so don't use parallel chunking
+    chunked = use_parallel and can_chunk and n > rows_per_chunk and not use_torch
 
-    if not chunked:
+    if use_torch:
+        # PyTorch-accelerated fitter (~5x faster)
+        if not HAS_TORCH or LossConeFitterTorch is None:
+            raise ImportError(
+                "PyTorch is required for --fast mode. "
+                "Install with: uv sync --extra gpu"
+            )
+        logging.info("Running surface potential fitting (PyTorch-accelerated)...")
+        fitter = LossConeFitterTorch(
+            er_data,
+            theta_path,
+            spacecraft_potential=sc_potential,
+            device="cpu",
+        )
+        fit_mat = fitter.fit_surface_potential()
+        _apply_fit_results(fit_mat, proj_potential, row_offset=0, n_total=n)
+    elif not chunked:
         logging.info("Running surface potential fitting (sequential)...")
         fitter = LossConeFitter(
             er_data,
