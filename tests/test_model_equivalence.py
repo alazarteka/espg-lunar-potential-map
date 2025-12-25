@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from src import config
-from src.model import synth_losscone
+from src.model import synth_losscone, synth_losscone_batch
 
 
 def reference_synth_losscone(
@@ -62,9 +62,9 @@ def reference_synth_losscone(
 
 
 @pytest.mark.parametrize("seed", [42, 123, 999])
-def test_model_equivalence_randomized(seed):
+def test_single_vs_reference_randomized(seed):
     """
-    Compare vectorized implementation against reference implementation
+    Compare single-input synth_losscone against reference implementation
     with randomized inputs.
     """
     np.random.seed(seed)
@@ -124,8 +124,8 @@ def test_model_equivalence_randomized(seed):
     )
 
 
-def test_model_equivalence_edge_cases():
-    """Test specific edge cases."""
+def test_single_vs_reference_edge_cases():
+    """Test single-input synth_losscone against reference for edge cases."""
     n_energy = 5
     n_pitch = 10
     energy_grid = np.array([100.0] * n_energy)
@@ -149,9 +149,10 @@ def test_model_equivalence_edge_cases():
     np.testing.assert_allclose(ref, vec)
 
 
-def test_model_batch_equivalence():
+def test_batch_vs_single():
     """
-    Test that batch processing produces the same results as individual calls.
+    Test that synth_losscone_batch produces the same results as
+    looped synth_losscone calls.
     """
     np.random.seed(42)
     n_energy = 15
@@ -164,37 +165,37 @@ def test_model_batch_equivalence():
     U_surfaces = np.random.uniform(-100, 0, n_batch)
     bs_over_bms = np.random.uniform(0.1, 0.9, n_batch)
     beam_amps = np.random.uniform(0, 10, n_batch)
-    beam_width = 10.0
+    beam_widths = np.full(n_batch, 10.0)
     beam_pitch_sigma = 10.0
 
-    # Run batch
-    batch_result = synth_losscone(
+    # Run batch version
+    batch_result = synth_losscone_batch(
         energy_grid,
         pitch_grid,
         U_surfaces,
         U_spacecraft=0.0,
         bs_over_bm=bs_over_bms,
-        beam_width_eV=beam_width,
+        beam_width_eV=beam_widths,
         beam_amp=beam_amps,
         beam_pitch_sigma_deg=beam_pitch_sigma,
     )
 
-    # Run individual
+    # Compare against looped single calls
     for i in range(n_batch):
-        individual_result = synth_losscone(
+        single_result = synth_losscone(
             energy_grid,
             pitch_grid,
             U_surfaces[i],
             U_spacecraft=0.0,
             bs_over_bm=bs_over_bms[i],
-            beam_width_eV=beam_width,
+            beam_width_eV=beam_widths[i],
             beam_amp=beam_amps[i],
             beam_pitch_sigma_deg=beam_pitch_sigma,
         )
 
         np.testing.assert_allclose(
             batch_result[i],
-            individual_result,
+            single_result,
             rtol=1e-10,
             atol=1e-10,
             err_msg=f"Batch mismatch at index {i}",

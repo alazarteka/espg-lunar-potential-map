@@ -6,7 +6,7 @@ from scipy.stats.qmc import LatinHypercube, scale
 from tqdm import tqdm
 
 from src import config
-from src.model import synth_losscone
+from src.model import synth_losscone, synth_losscone_batch
 from src.utils.units import ureg
 
 logger = logging.getLogger(__name__)
@@ -622,8 +622,7 @@ class LossConeFitter:
         )
 
         # Evaluate models in batch: (N_samples, nE, nPitch)
-        # Note: synth_losscone handles broadcasting
-        models = synth_losscone(
+        models = synth_losscone_batch(
             energy_grid=energies,
             pitch_grid=pitches,
             U_surface=lhs_U_surface,

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from src import config
-from src.model import synth_losscone
+from src.model import synth_losscone, synth_losscone_batch
 
 
 def test_lhs_chi2_batch_matches_sequential():
@@ -53,8 +53,8 @@ def test_lhs_chi2_batch_matches_sequential():
     lhs_beam_amp = np.random.uniform(0, 5, n_samples)
     lhs_beam_width = np.maximum(np.abs(lhs_U_surface) * 0.2, config.EPS)
 
-    # VECTORIZED PATH (current implementation)
-    models_batch = synth_losscone(
+    # VECTORIZED PATH (batch implementation)
+    models_batch = synth_losscone_batch(
         energies,
         pitches,
         lhs_U_surface,
@@ -135,7 +135,7 @@ def test_lhs_vectorization_with_edge_cases():
     lhs_beam_width = np.maximum(np.abs(lhs_U_surface) * 0.2, config.EPS)
 
     # Batch
-    models_batch = synth_losscone(
+    models_batch = synth_losscone_batch(
         energies,
         pitches,
         lhs_U_surface,
@@ -198,7 +198,7 @@ def test_lhs_vectorization_randomized(seed):
     beam_pitch_sigma = np.random.uniform(5, 20)
 
     # Batch
-    models_batch = synth_losscone(
+    models_batch = synth_losscone_batch(
         energies,
         pitches,
         lhs_U_surface,
@@ -262,7 +262,7 @@ def test_beam_width_broadcasting():
     beam_widths = np.abs(U_surfaces) * 0.2  # Different widths for each sample
 
     # Batch call
-    models_batch = synth_losscone(
+    models_batch = synth_losscone_batch(
         energies,
         pitches,
         U_surfaces,
