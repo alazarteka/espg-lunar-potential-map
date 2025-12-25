@@ -123,24 +123,15 @@ def process_single_day(
 
         np.savez_compressed(
             output_file,
-            # Row-level arrays
-            rows_spec_no=results.rows_spec_no,
-            rows_utc=results.rows_utc,
-            rows_time=results.rows_time,
-            rows_spacecraft_latitude=results.rows_spacecraft_latitude,
-            rows_spacecraft_longitude=results.rows_spacecraft_longitude,
-            rows_projection_latitude=results.rows_projection_latitude,
-            rows_projection_longitude=results.rows_projection_longitude,
-            rows_spacecraft_potential=results.rows_spacecraft_potential,
-            rows_projected_potential=results.rows_projected_potential,
-            rows_spacecraft_in_sun=results.rows_spacecraft_in_sun,
-            rows_projection_in_sun=results.rows_projection_in_sun,
-            # Spectrum-level summary
-            spec_spec_no=results.spec_spec_no,
-            spec_time_start=results.spec_time_start,
-            spec_time_end=results.spec_time_end,
-            spec_has_fit=results.spec_has_fit,
-            spec_row_count=results.spec_row_count,
+            # Row-level arrays from PotentialResults
+            spacecraft_latitude=results.spacecraft_latitude,
+            spacecraft_longitude=results.spacecraft_longitude,
+            projection_latitude=results.projection_latitude,
+            projection_longitude=results.projection_longitude,
+            spacecraft_potential=results.spacecraft_potential,
+            projected_potential=results.projected_potential,
+            spacecraft_in_sun=results.spacecraft_in_sun,
+            projection_in_sun=results.projection_in_sun,
         )
 
         elapsed = time.time() - start_time
