@@ -22,6 +22,12 @@ import numpy as np
 from src import config
 from src.flux import ERData, LossConeFitter, PitchAngle
 from src.model import synth_losscone
+
+try:
+    from src.model_torch import LossConeFitterTorch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
 from src.visualization import style, utils
 
 
@@ -92,6 +98,7 @@ def create_losscone_comparison_plot(
     incident_flux_stat: str,
     dpi: int = 150,
     title: str | None = None,
+    use_torch: bool = False,
 ) -> None:
     """
     Create side-by-side comparison of measured vs model loss-cone.
@@ -117,16 +124,30 @@ def create_losscone_comparison_plot(
     spacecraft_potential = np.full(len(er_data.data), usc)
 
     # Create fitter with spacecraft potential correction
-    fitter = LossConeFitter(
-        er_data,
-        str(theta_file),
-        pitch_angle,
-        spacecraft_potential,
-        normalization_mode=normalization,
-        beam_amp_fixed=fixed_beam_amp,
-        loss_cone_background=background,
-        incident_flux_stat=incident_flux_stat,
-    )
+    if use_torch and HAS_TORCH:
+        print("Using PyTorch-accelerated fitter (~5x faster)")
+        fitter = LossConeFitterTorch(
+            er_data,
+            str(theta_file),
+            pitch_angle,
+            spacecraft_potential,
+            normalization_mode=normalization,
+            beam_amp_fixed=fixed_beam_amp,
+            loss_cone_background=background,
+            incident_flux_stat=incident_flux_stat,
+            device="cpu",
+        )
+    else:
+        fitter = LossConeFitter(
+            er_data,
+            str(theta_file),
+            pitch_angle,
+            spacecraft_potential,
+            normalization_mode=normalization,
+            beam_amp_fixed=fixed_beam_amp,
+            loss_cone_background=background,
+            incident_flux_stat=incident_flux_stat,
+        )
 
     # Validate and find the spectrum
     min_spec_no = er_data.data.iloc[0][config.SPEC_NO_COLUMN]
@@ -152,7 +173,10 @@ def create_losscone_comparison_plot(
 
     # Fit the specified spectrum
     print(f"Fitting spectrum {spec_no}...")
-    U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(spec_no)
+    if use_torch and HAS_TORCH:
+        U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential_torch(spec_no)
+    else:
+        U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(spec_no)
     # U_surface, bs_bm, beam_amp, chi2 = -160.0, 0.975, 0.5, 1.23  # Example fixed values for paper plot
 
     # chunk_data already retrieved above
@@ -361,6 +385,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override figure title",
     )
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Use PyTorch-accelerated fitter (~5x faster)",
+    )
     return parser.parse_args()
 
 
@@ -394,6 +423,7 @@ def main() -> int:
         args.incident_flux_stat,
         args.dpi,
         title=args.title,
+        use_torch=args.fast,
     )
     return 0
 
