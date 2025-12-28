@@ -16,7 +16,22 @@ DEFAULT_CURRENT_DENSITY = 1e-6
 
 @dataclass(slots=True)
 class GlobalStats:
-    """Global statistical maps."""
+    """Global statistical maps over the analysis period.
+
+    Attributes:
+        latitudes: 1D array of latitude values (degrees).
+        longitudes: 1D array of longitude values (degrees).
+        mean_potential: Mean |potential| map (V) [shape: (lat, lon)].
+        p95_potential: 95th percentile |potential| map (V).
+        frac_500V: Fraction of time |potential| > 500V (0-1).
+            Available for threshold analysis; not currently in CLI output.
+        frac_1kV: Fraction of time |potential| > 1kV (0-1).
+        frac_2kV: Fraction of time |potential| > 2kV (0-1).
+            Available for threshold analysis; not currently in CLI output.
+        mean_power: Mean power density map (W/m^2).
+        p95_power: 95th percentile power density (W/m^2).
+            Available for peak analysis; not currently in CLI output.
+    """
 
     latitudes: np.ndarray
     longitudes: np.ndarray
@@ -31,7 +46,22 @@ class GlobalStats:
 
 @dataclass(slots=True)
 class SiteStats:
-    """Statistics for a specific site."""
+    """Statistics for a specific site over the analysis period.
+
+    Attributes:
+        site: The Site object with name, coordinates, and description.
+        mean_potential: Mean |potential| at site (V).
+        p95_potential: 95th percentile |potential| at site (V).
+        frac_500V: Fraction of time |potential| > 500V (0-1).
+            Available for threshold analysis; not currently in CLI output.
+        frac_1kV: Fraction of time |potential| > 1kV (0-1).
+        frac_2kV: Fraction of time |potential| > 2kV (0-1).
+            Available for threshold analysis; not currently in CLI output.
+        mean_power: Mean power density at site (W/m^2).
+        p95_power: 95th percentile power density at site (W/m^2).
+            Available for peak analysis; not currently in CLI output.
+        risk_assessment: Qualitative risk/resource classification string.
+    """
 
     site: Site
     mean_potential: float

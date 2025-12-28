@@ -22,22 +22,16 @@ except ImportError:
     HAS_TORCH = False
     Tensor = None  # type: ignore[misc, assignment]
 
+from src.utils.optimization import (
+    BatchedDifferentialEvolution,
+    get_torch_device,
+)
+
 # Small epsilon to avoid division by zero
 EPS = 1e-12
 
 # Default flux value outside loss cone
 DEFAULT_BACKGROUND = 0.05
-
-
-def _get_device(device: str | None = None) -> torch.device:
-    """Get the appropriate torch device."""
-    if device is not None:
-        return torch.device(device)
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
 
 
 def synth_losscone_batch_torch(
@@ -198,204 +192,8 @@ def compute_chi2_batch_torch(
     return chi2
 
 
-class GPUDifferentialEvolution:
-    """
-    GPU-resident Differential Evolution optimizer.
-
-    Keeps the entire population on GPU and performs all operations
-    without CPU-GPU transfers during iteration.
-    """
-
-    def __init__(
-        self,
-        bounds: list[tuple[float, float]],
-        popsize: int = 50,
-        mutation: float = 0.5,
-        crossover: float = 0.9,
-        maxiter: int = 1000,
-        atol: float = 1e-3,
-        seed: int = 42,
-        device: str | None = None,
-        dtype: torch.dtype = torch.float64,
-    ):
-        """
-        Initialize DE optimizer.
-
-        Args:
-            bounds: List of (min, max) tuples for each parameter
-            popsize: Population size
-            mutation: Mutation factor F in [0, 2]
-            crossover: Crossover probability CR in [0, 1]
-            maxiter: Maximum iterations
-            atol: Absolute tolerance for convergence
-            seed: Random seed
-            device: Torch device ('cuda', 'cpu', or None for auto)
-            dtype: Data type (torch.float32 or torch.float64)
-        """
-        self.bounds = bounds
-        self.n_params = len(bounds)
-        self.popsize = popsize
-        self.mutation = mutation
-        self.crossover = crossover
-        self.maxiter = maxiter
-        self.atol = atol
-        self.device = _get_device(device)
-        self.seed = seed
-        self.dtype = dtype
-
-        torch.manual_seed(seed)
-        if self.device.type == "cuda":
-            torch.cuda.manual_seed(seed)
-
-        # Convert bounds to tensors
-        self.lower = torch.tensor(
-            [b[0] for b in bounds], device=self.device, dtype=self.dtype
-        )
-        self.upper = torch.tensor(
-            [b[1] for b in bounds], device=self.device, dtype=self.dtype
-        )
-
-    def _init_population(self, lhs_samples: Tensor | None = None) -> Tensor:
-        """
-        Initialize population within bounds using Latin Hypercube Sampling.
-
-        Args:
-            lhs_samples: Optional pre-computed LHS samples to seed population
-        """
-        if lhs_samples is not None and lhs_samples.size(0) >= self.popsize:
-            # Use provided LHS samples
-            pop = lhs_samples[:self.popsize].to(device=self.device, dtype=self.dtype)
-        else:
-            # Generate quasi-random samples using Sobol sequence for better coverage
-            # This provides better space-filling than pure random
-            try:
-                from torch.quasirandom import SobolEngine
-                sobol = SobolEngine(dimension=self.n_params, scramble=True, seed=self.seed)
-                pop = sobol.draw(self.popsize).to(device=self.device, dtype=self.dtype)
-            except ImportError:
-                # Fallback to stratified random sampling
-                pop = torch.zeros(self.popsize, self.n_params, device=self.device, dtype=self.dtype)
-                for i in range(self.n_params):
-                    # Stratified sampling: divide [0,1] into popsize bins
-                    bins = torch.linspace(0, 1, self.popsize + 1, device=self.device, dtype=self.dtype)
-                    for j in range(self.popsize):
-                        pop[j, i] = bins[j] + torch.rand(1, device=self.device, dtype=self.dtype) * (bins[j+1] - bins[j])
-                    # Shuffle to break correlation
-                    perm = torch.randperm(self.popsize, device=self.device)
-                    pop[:, i] = pop[perm, i]
-
-        # Scale to bounds
-        pop = self.lower + pop * (self.upper - self.lower)
-        return pop
-
-    def _mutate(self, population: Tensor, best_idx: int, fitness: Tensor) -> Tensor:
-        """DE/best/1 mutation strategy (matches scipy default)."""
-        pop_size = population.size(0)
-        best = population[best_idx]
-
-        # Generate random indices for mutation, excluding self and ensuring distinct
-        # Vectorized approach: generate 3 random values per individual, use argsort
-        rand_vals = torch.rand(pop_size, pop_size, device=self.device)
-        # Set diagonal to inf so self is never selected
-        rand_vals.fill_diagonal_(float('inf'))
-        # Get indices of 2 smallest random values (excluding self)
-        _, sorted_indices = rand_vals.sort(dim=1)
-        r0_idx = sorted_indices[:, 0]
-        r1_idx = sorted_indices[:, 1]
-
-        r0 = population[r0_idx]
-        r1 = population[r1_idx]
-
-        # Mutant vector: best + F * (r0 - r1)
-        mutant = best.unsqueeze(0) + self.mutation * (r0 - r1)
-
-        # Clip to bounds
-        mutant = torch.clamp(mutant, self.lower, self.upper)
-
-        return mutant
-
-    def _crossover(self, population: Tensor, mutant: Tensor) -> Tensor:
-        """Binomial crossover."""
-        pop_size, n_params = population.shape
-
-        # Random crossover mask
-        cross_mask = torch.rand(pop_size, n_params, device=self.device) < self.crossover
-
-        # Ensure at least one parameter from mutant
-        j_rand = torch.randint(0, n_params, (pop_size,), device=self.device)
-        for i in range(pop_size):
-            cross_mask[i, j_rand[i]] = True
-
-        trial = torch.where(cross_mask, mutant, population)
-        return trial
-
-    def optimize(
-        self,
-        objective_fn,
-        x0: Tensor | None = None,
-    ) -> tuple[Tensor, float, int]:
-        """
-        Run DE optimization.
-
-        Args:
-            objective_fn: Function that takes (pop_size, n_params) tensor
-                         and returns (pop_size,) fitness values
-            x0: Optional initial best guess to seed population
-
-        Returns:
-            best_params: (n_params,) best solution found
-            best_fitness: scalar best fitness value
-            n_iterations: number of iterations run
-        """
-        # Initialize population
-        population = self._init_population()
-
-        # Seed with initial guess if provided
-        if x0 is not None:
-            population[0] = x0.to(self.device)
-
-        # Evaluate initial population
-        fitness = objective_fn(population)
-
-        best_idx = torch.argmin(fitness).item()
-        best_fitness = fitness[best_idx].item()
-        best_params = population[best_idx].clone()
-
-        prev_best = best_fitness
-
-        for iteration in range(self.maxiter):
-            # Mutation
-            mutant = self._mutate(population, best_idx, fitness)
-
-            # Crossover
-            trial = self._crossover(population, mutant)
-
-            # Evaluate trial vectors
-            trial_fitness = objective_fn(trial)
-
-            # Selection: keep better of trial or original
-            improved = trial_fitness < fitness
-            population = torch.where(
-                improved.unsqueeze(-1), trial, population
-            )
-            fitness = torch.where(improved, trial_fitness, fitness)
-
-            # Update best
-            current_best_idx = torch.argmin(fitness).item()
-            current_best_fitness = fitness[current_best_idx].item()
-
-            if current_best_fitness < best_fitness:
-                best_fitness = current_best_fitness
-                best_params = population[current_best_idx].clone()
-                best_idx = current_best_idx
-
-            # Check convergence
-            if abs(prev_best - best_fitness) < self.atol and iteration > 10:
-                break
-
-            prev_best = best_fitness
-
-        return best_params, best_fitness, iteration + 1
+# Use shared BatchedDifferentialEvolution for backwards compatibility
+GPUDifferentialEvolution = BatchedDifferentialEvolution
 
 
 class LossConeFitterTorch:
@@ -447,7 +245,7 @@ class LossConeFitterTorch:
             pitch_angle if pitch_angle is not None else PitchAngle(er_data, thetas)
         )
         self.spacecraft_potential = spacecraft_potential
-        self.device = _get_device(device)
+        self.device = get_torch_device(device)
 
         # Set dtype
         if dtype == "float32":
@@ -595,7 +393,7 @@ class LossConeFitterTorch:
 
         # Bounds
         bounds = [
-            (-1000.0, 1000.0),  # U_surface (narrower than DE bounds)
+            (-2000.0, 2000.0),  # U_surface
             (0.1, 1.1),  # bs_over_bm
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]

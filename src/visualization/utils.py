@@ -1,7 +1,7 @@
 """Shared plotting utilities."""
 
 import argparse
-from datetime import datetime, date
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from src.visualization.style import BBOX_STYLE, FONT_SIZE_TEXT
@@ -43,3 +43,11 @@ def parse_iso_date(value: str) -> date:
     except ValueError as exc:
         msg = "Dates must be provided as YYYY-MM-DD"
         raise argparse.ArgumentTypeError(msg) from exc
+
+
+def date_range(start_day: date, end_day: date) -> list[date]:
+    """Inclusive list of days between start_day and end_day."""
+    if end_day < start_day:
+        raise ValueError("end must be >= start")
+    span = (end_day - start_day).days
+    return [start_day + timedelta(days=offset) for offset in range(span + 1)]

@@ -11,12 +11,17 @@ from scipy.stats import qmc
 
 from src import config
 from src.flux import ERData, PitchAngle
-from src.physics.charging import electron_current_density_magnitude
+from src.physics.charging import (
+    electron_current_density_magnitude,
+    sternglass_secondary_yield,
+)
 from src.physics.jucurve import U_from_J
 from src.physics.kappa import (
     KappaParams,
     omnidirectional_flux_fast,
     omnidirectional_flux_magnitude,
+    temperature_ev_to_theta,
+    theta_to_temperature_ev,
     velocity_from_energy,
 )
 from src.utils.geometry import get_intersection_or_none
@@ -319,6 +324,13 @@ class Kappa:
     ) -> np.ndarray:
         """
         Build a log-energy response matrix for instrumental energy resolution effects.
+
+        This implements a Gaussian convolution in log-energy space to account for
+        finite instrumental energy resolution. The sigma is computed from the
+        relative energy width using: s = asinh(0.5 * width) / sqrt(2 * ln(2))
+
+        Note: A PyTorch equivalent exists in kappa_torch.build_response_matrix_torch
+        for GPU acceleration. Both share the same physics formula.
 
         Args:
             energy_centers: Central energy values for each energy bin
@@ -627,40 +639,9 @@ class Kappa:
             return original_fit, U
 
         # Nightside branch: root solve Je(U) + Ji(U) − Jsee(U) = 0
-        density_mag, kappa, theta_uc = original_fit.params.to_tuple()
+        density_mag, kappa_val, theta_uc = original_fit.params.to_tuple()
 
-        def theta_to_temperature_ev(theta: float, kappa: float) -> float:
-            prefactor = 0.5 * kappa / (kappa - 1.5)
-            return (
-                prefactor
-                * theta
-                * theta
-                * config.ELECTRON_MASS_MAGNITUDE
-                / config.ELECTRON_CHARGE_MAGNITUDE
-            )
-
-        def temperature_ev_to_theta(temperature_ev: float, kappa: float) -> float:
-            prefactor = 2.0 * (kappa - 1.5) / kappa
-            return math.sqrt(
-                prefactor
-                * config.ELECTRON_CHARGE_MAGNITUDE
-                * temperature_ev
-                / config.ELECTRON_MASS_MAGNITUDE
-            )
-
-        def sternglass_secondary_yield(
-            E_imp: np.ndarray, E_m: float, delta_m: float
-        ) -> np.ndarray:
-            out = (
-                7.4
-                * delta_m
-                * (E_imp / E_m)
-                * np.exp(-2.0 * np.sqrt(np.maximum(E_imp, 0.0) / E_m))
-            )
-            out[E_imp <= 0.0] = 0.0
-            return out
-
-        temperature_uc = theta_to_temperature_ev(theta_uc, kappa)
+        temperature_uc = theta_to_temperature_ev(theta_uc, kappa_val)
         E_min_ev, E_max_ev, n_steps = 1.0, 2e4, 401
         energy_grid = np.geomspace(max(E_min_ev, 0.5), E_max_ev, n_steps)
 
@@ -669,14 +650,14 @@ class Kappa:
         def calc_currents(
             U: float, sey_E_m: float, sey_delta_m: float
         ) -> tuple[float, float, float]:
-            T_c = temperature_uc + U / (kappa - 1.5)
+            T_c = temperature_uc + U / (kappa_val - 1.5)
             if T_c <= 0.0:
                 BIG = 1e12
                 return 0.0, 0.0, BIG
-            theta_c = temperature_ev_to_theta(T_c, kappa)
+            theta_c = temperature_ev_to_theta(T_c, kappa_val)
             omni = omnidirectional_flux_magnitude(
                 density_mag=density_mag,
-                kappa=kappa,
+                kappa=kappa_val,
                 theta_mag=theta_c,
                 energy_mag=energy_grid,
             )
@@ -687,7 +668,9 @@ class Kappa:
             )
             Eimp = energy_grid[mask] - abs(U)
             Jsee = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
-                sternglass_secondary_yield(Eimp, E_m=sey_E_m, delta_m=sey_delta_m)
+                sternglass_secondary_yield(
+                    Eimp, peak_energy_ev=sey_E_m, peak_yield=sey_delta_m
+                )
                 * flux_to_sc[mask],
                 energy_grid[mask],
             )
@@ -729,11 +712,11 @@ class Kappa:
                 xtol=1e-3,
             )
         )
-        T_c = temperature_uc + U_star / (kappa - 1.5)
-        theta_c = temperature_ev_to_theta(T_c, kappa)
+        T_c = temperature_uc + U_star / (kappa_val - 1.5)
+        theta_c = temperature_ev_to_theta(T_c, kappa_val)
         corrected_params = KappaParams(
             density=density_mag * ureg.particle / ureg.meter**3,
-            kappa=kappa,
+            kappa=kappa_val,
             theta=theta_c * ureg.meter / ureg.second,
         )
         # Wrap into FitResults with original error/uncertainty since we did not refit

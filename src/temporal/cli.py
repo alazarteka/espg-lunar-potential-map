@@ -176,7 +176,7 @@ def main() -> int:
 
 def _main_basis_mode(args: argparse.Namespace) -> int:
     """Run temporal basis fitting mode."""
-    from .basis import fit_temporal_basis, reconstruct_at_times, save_basis_result
+    from .basis import fit_temporal_basis, reconstruct_at_times
     from .coefficients import _discover_npz, _load_all_data
 
     logging.info("Using temporal basis fitting mode")

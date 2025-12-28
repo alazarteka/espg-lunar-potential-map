@@ -24,6 +24,8 @@ except ImportError:
     HAS_TORCH = False
     Tensor = None  # type: ignore[misc, assignment]
 
+from src.utils.optimization import BatchedDifferentialEvolution
+
 
 # Physical constant: electron mass in eV·s²/m²
 ELECTRON_MASS_EV_S2_M2 = 5.685630e-12
@@ -126,6 +128,13 @@ def build_response_matrix_torch(
     """
     Build log-energy response matrix for instrumental resolution effects.
 
+    This implements a Gaussian convolution in log-energy space to account for
+    finite instrumental energy resolution. The sigma is computed from the
+    relative energy width using: s = asinh(0.5 * width) / sqrt(2 * ln(2))
+
+    Note: A NumPy/Numba equivalent exists in kappa.Kappa.build_log_energy_response_matrix
+    for CPU execution. Both share the same physics formula.
+
     Args:
         energy: (E,) energy centers [eV]
         energy_window_width_relative: relative energy resolution (FWHM/E)
@@ -191,210 +200,8 @@ def compute_kappa_chi2_batch_torch(
     return chi2
 
 
-class KappaDifferentialEvolution:
-    """
-    Batched Differential Evolution for Kappa fitting.
-
-    Optimizes kappa parameters for N spectra simultaneously,
-    with P candidates per spectrum.
-    """
-
-    def __init__(
-        self,
-        bounds: list[tuple[float, float]],
-        n_spectra: int,
-        popsize: int = 30,
-        mutation: float = 0.8,
-        crossover: float = 0.9,
-        maxiter: int = 100,
-        atol: float = 0.01,
-        seed: int = 42,
-        device: str = "cpu",
-        dtype: torch.dtype = torch.float64,
-    ):
-        """
-        Initialize batched DE optimizer.
-
-        Args:
-            bounds: [(min, max), ...] for each parameter
-            n_spectra: Number of spectra to optimize in parallel
-            popsize: Population size per spectrum
-            mutation: DE mutation factor F
-            crossover: DE crossover probability CR
-            maxiter: Maximum iterations
-            atol: Convergence tolerance
-            seed: Random seed
-            device: torch device
-            dtype: torch dtype
-        """
-        self.bounds = bounds
-        self.n_params = len(bounds)
-        self.n_spectra = n_spectra
-        self.popsize = popsize
-        self.mutation = mutation
-        self.crossover = crossover
-        self.maxiter = maxiter
-        self.atol = atol
-        self.device = torch.device(device)
-        self.dtype = dtype
-
-        torch.manual_seed(seed)
-
-        # Convert bounds to tensors
-        self.lower = torch.tensor(
-            [b[0] for b in bounds], device=self.device, dtype=self.dtype
-        )
-        self.upper = torch.tensor(
-            [b[1] for b in bounds], device=self.device, dtype=self.dtype
-        )
-
-    def _init_population(self) -> Tensor:
-        """
-        Initialize population using Sobol sequence.
-
-        Returns:
-            (N, P, n_params) initial population
-        """
-        N, P = self.n_spectra, self.popsize
-
-        try:
-            from torch.quasirandom import SobolEngine
-            sobol = SobolEngine(dimension=self.n_params, scramble=True)
-            # Generate P samples for each of N spectra
-            # For simplicity, use same initial samples for all spectra
-            unit_samples = sobol.draw(P).to(device=self.device, dtype=self.dtype)
-            # Broadcast to (N, P, n_params)
-            unit_samples = unit_samples.unsqueeze(0).expand(N, -1, -1)
-        except ImportError:
-            unit_samples = torch.rand(N, P, self.n_params, device=self.device, dtype=self.dtype)
-
-        # Scale to bounds
-        pop = self.lower + unit_samples * (self.upper - self.lower)
-        return pop
-
-    def _mutate(self, population: Tensor, best: Tensor) -> Tensor:
-        """
-        DE/best/1 mutation.
-
-        Args:
-            population: (N, P, n_params) current population
-            best: (N, n_params) best solution per spectrum
-
-        Returns:
-            (N, P, n_params) mutant vectors
-        """
-        N, P, D = population.shape
-
-        # Random indices for r0, r1 (excluding self)
-        # For simplicity, just use random pairs
-        idx = torch.randint(0, P, (N, P, 2), device=self.device)
-
-        r0 = torch.gather(population, 1, idx[:, :, 0:1].expand(-1, -1, D))
-        r1 = torch.gather(population, 1, idx[:, :, 1:2].expand(-1, -1, D))
-
-        # mutant = best + F * (r0 - r1)
-        best_exp = best.unsqueeze(1).expand(-1, P, -1)
-        mutant = best_exp + self.mutation * (r0 - r1)
-
-        # Clip to bounds
-        mutant = torch.clamp(mutant, self.lower, self.upper)
-
-        return mutant
-
-    def _crossover(self, population: Tensor, mutant: Tensor) -> Tensor:
-        """
-        Binomial crossover.
-
-        Args:
-            population: (N, P, n_params) current population
-            mutant: (N, P, n_params) mutant vectors
-
-        Returns:
-            (N, P, n_params) trial vectors
-        """
-        N, P, D = population.shape
-
-        # Crossover mask
-        mask = torch.rand(N, P, D, device=self.device) < self.crossover
-
-        # Ensure at least one parameter from mutant
-        j_rand = torch.randint(0, D, (N, P), device=self.device)
-        for i in range(D):
-            mask[:, :, i] = mask[:, :, i] | (j_rand == i)
-
-        trial = torch.where(mask, mutant, population)
-        return trial
-
-    def optimize(
-        self,
-        objective_fn,
-    ) -> tuple[Tensor, Tensor, int]:
-        """
-        Run batched DE optimization.
-
-        Args:
-            objective_fn: Function (N, P, n_params) -> (N, P) fitness
-
-        Returns:
-            best_params: (N, n_params) best solution per spectrum
-            best_fitness: (N,) best fitness per spectrum
-            n_iterations: iterations run
-        """
-        N, P = self.n_spectra, self.popsize
-
-        # Initialize
-        population = self._init_population()  # (N, P, n_params)
-        fitness = objective_fn(population)     # (N, P)
-
-        # Track best per spectrum
-        best_idx = torch.argmin(fitness, dim=1)  # (N,)
-        best_fitness = fitness.gather(1, best_idx.unsqueeze(1)).squeeze(1)  # (N,)
-        best_params = population.gather(
-            1, best_idx.view(N, 1, 1).expand(-1, -1, self.n_params)
-        ).squeeze(1)  # (N, n_params)
-
-        prev_best = best_fitness.clone()
-
-        for iteration in range(self.maxiter):
-            # Mutation
-            mutant = self._mutate(population, best_params)
-
-            # Crossover
-            trial = self._crossover(population, mutant)
-
-            # Evaluate trials
-            trial_fitness = objective_fn(trial)
-
-            # Selection: keep better of trial or original (per individual)
-            improved = trial_fitness < fitness
-            population = torch.where(
-                improved.unsqueeze(-1), trial, population
-            )
-            fitness = torch.where(improved, trial_fitness, fitness)
-
-            # Update best
-            current_best_idx = torch.argmin(fitness, dim=1)
-            current_best_fitness = fitness.gather(1, current_best_idx.unsqueeze(1)).squeeze(1)
-
-            # Update where improved
-            improved_mask = current_best_fitness < best_fitness
-            best_fitness = torch.where(improved_mask, current_best_fitness, best_fitness)
-
-            new_best_params = population.gather(
-                1, current_best_idx.view(N, 1, 1).expand(-1, -1, self.n_params)
-            ).squeeze(1)
-            best_params = torch.where(
-                improved_mask.unsqueeze(-1), new_best_params, best_params
-            )
-
-            # Check convergence (average improvement across spectra)
-            improvement = torch.abs(prev_best - best_fitness).mean()
-            if improvement < self.atol and iteration > 10:
-                break
-
-            prev_best = best_fitness.clone()
-
-        return best_params, best_fitness, iteration + 1
+# Use shared BatchedDifferentialEvolution for backwards compatibility
+KappaDifferentialEvolution = BatchedDifferentialEvolution
 
 
 class KappaFitterTorch:

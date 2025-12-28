@@ -24,6 +24,8 @@ from pathlib import Path
 import numpy as np
 
 from src import config
+from src.potential_mapper.date_utils import MONTH_INT_TO_ABBREV, parse_3d_filename
+from src.potential_mapper.logging_utils import setup_logging
 
 
 def discover_day_files(year: int, month: int | None = None) -> list[Path]:
@@ -49,12 +51,7 @@ def discover_day_files(year: int, month: int | None = None) -> list[Path]:
         # Filter by month if specified
         if month is not None:
             # Subdirs are like "091_120APR" - need to check month
-            month_names = {
-                1: "JAN", 2: "FEB", 3: "MAR", 4: "APR",
-                5: "MAY", 6: "JUN", 7: "JUL", 8: "AUG",
-                9: "SEP", 10: "OCT", 11: "NOV", 12: "DEC"
-            }
-            if month_names.get(month, "") not in subdir.name:
+            if MONTH_INT_TO_ABBREV.get(month, "") not in subdir.name:
                 continue
 
         # Find all .TAB files in this subdir
@@ -97,11 +94,7 @@ def process_single_day(
         load_spice_files()
 
         # Parse date from filename (e.g., 3D980415.TAB -> 1998-04-15)
-        fname = day_file.stem  # 3D980415
-        yy = int(fname[2:4])
-        mm = int(fname[4:6])
-        dd = int(fname[6:8])
-        year = 1900 + yy if yy > 50 else 2000 + yy
+        year, mm, dd = parse_3d_filename(day_file.name)
 
         # Load data for this day
         er_data = ERData(str(day_file))
@@ -191,11 +184,7 @@ def run_parallel_batch(
     if not overwrite:
         to_process = []
         for day_file in day_files:
-            fname = day_file.stem
-            yy = int(fname[2:4])
-            mm = int(fname[4:6])
-            dd = int(fname[6:8])
-            yr = 1900 + yy if yy > 50 else 2000 + yy
+            yr, mm, dd = parse_3d_filename(day_file.name)
             output_file = output_dir / f"potential_{yr:04d}_{mm:02d}_{dd:02d}.npz"
             if output_file.exists():
                 logging.info(f"Skipping {day_file.name} (already processed)")
@@ -299,11 +288,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    setup_logging(args.verbose)
 
     return run_parallel_batch(
         year=args.year,

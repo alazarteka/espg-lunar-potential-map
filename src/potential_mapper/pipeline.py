@@ -35,7 +35,11 @@ from src.potential_mapper.coordinates import (
     find_surface_intersection,
     project_magnetic_fields,
 )
-from src.potential_mapper.results import PotentialResults
+from src.potential_mapper.date_utils import (
+    MONTH_ABBREV_TO_NUM,
+    NUM_STR_TO_MONTH_ABBREV,
+)
+from src.potential_mapper.results import PotentialResults, _concat_results
 from src.utils.attitude import load_attitude_data
 from src.utils.geometry import get_intersections_or_none_batch
 from src.utils.units import ureg
@@ -493,22 +497,8 @@ def _apply_fit_results(
 class DataLoader:
     """Discover ER files and load auxiliary attitude/theta data."""
 
-    MONTH_TO_NUM = {
-        "JAN": "01",
-        "FEB": "02",
-        "MAR": "03",
-        "APR": "04",
-        "MAY": "05",
-        "JUN": "06",
-        "JUL": "07",
-        "AUG": "08",
-        "SEP": "09",
-        "OCT": "10",
-        "NOV": "11",
-        "DEC": "12",
-    }
-
-    NUM_TO_MONTH = {v: k for k, v in MONTH_TO_NUM.items()}
+    MONTH_TO_NUM = MONTH_ABBREV_TO_NUM
+    NUM_TO_MONTH = NUM_STR_TO_MONTH_ABBREV
 
     @staticmethod
     def discover_flux_files(
@@ -837,24 +827,6 @@ def process_lp_file(file_path: Path) -> PotentialResults:
     logging.debug(f"Processing LP file: {file_path}")
     er_data = ERData(str(file_path))
     return process_merged_data(er_data, use_parallel=False)
-
-
-def _concat_results(results: list[PotentialResults]) -> PotentialResults:
-    """Concatenate fields from multiple PotentialResults objects (row-wise)."""
-
-    def cat(attr: str):
-        return np.concatenate([getattr(r, attr) for r in results])
-
-    return PotentialResults(
-        spacecraft_latitude=cat("spacecraft_latitude"),
-        spacecraft_longitude=cat("spacecraft_longitude"),
-        projection_latitude=cat("projection_latitude"),
-        projection_longitude=cat("projection_longitude"),
-        spacecraft_potential=cat("spacecraft_potential"),
-        projected_potential=cat("projected_potential"),
-        spacecraft_in_sun=cat("spacecraft_in_sun"),
-        projection_in_sun=cat("projection_in_sun"),
-    )
 
 
 def run(args: argparse.Namespace) -> int:

@@ -755,20 +755,6 @@ class FluxData:
         # Expose data for backward compatibility
         self.data = self.er_data.data
 
-    def load_data(self):
-        """
-        Load the ER data from the specified file.
-        Deprecated: Data loading is now handled by ERData class.
-        """
-        pass
-
-    def process_data(self):
-        """
-        Process the loaded data to calculate coordinates and pitch angles.
-        Deprecated: Data processing is now handled by PitchAngle class.
-        """
-        pass
-
     def get_normalized_flux(
         self, energy_bin: int, measurement_chunk: int
     ) -> np.ndarray:

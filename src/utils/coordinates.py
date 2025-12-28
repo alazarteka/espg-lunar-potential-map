@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 
 
@@ -48,6 +50,11 @@ def lat_lon_to_cartesian(lat_long: np.ndarray) -> np.ndarray:
     Returns:
         Array of shape (N, 3) with Cartesian coordinates [x, y, z]
     """
+    warnings.warn(
+        "lat_lon_to_cartesian is deprecated and will be removed in a future version",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     lat_rad = np.deg2rad(lat_long[:, 0])
     lon_rad = np.deg2rad(lat_long[:, 1])
 

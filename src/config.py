@@ -33,6 +33,7 @@ LUNAR_RADIUS_KM: float = 1737.400  # average radius of the Moon in kilometers
 LUNAR_RADIUS: LengthType = 1737.400 * ureg.kilometer  # average radius of the Moon
 ELECTRON_MASS: MassType = scipy.constants.electron_mass * ureg.kilogram  # electron
 ELECTRON_MASS_MAGNITUDE: float = scipy.constants.electron_mass  # electron mass in kg
+ELECTRON_MASS_EV_S2_M2: float = 5.685630e-12  # Electron mass in eV*s^2/m^2 units (for energy-velocity conversion)
 ELECTRON_CHARGE: ChargeType = (
     scipy.constants.e * ureg.coulomb
 )  # elementary charge in Coulombs
@@ -41,6 +42,7 @@ ELECTRON_CHARGE_MAGNITUDE: float = (
 )  # Charge of an electron in Coulombs
 BOLTZMANN_CONSTANT_MAGNITUDE: float = scipy.constants.Boltzmann  # Unit J/K
 PROTON_MASS_MAGNITUDE: float = scipy.constants.proton_mass  # Unit kg
+CM2_TO_M2: float = 1e-4  # cm^2 to m^2 conversion factor
 
 # ========== File extensions ==========
 EXT_TAB = ".TAB"  # ER data file extension

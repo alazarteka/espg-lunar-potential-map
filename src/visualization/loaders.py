@@ -1,19 +1,48 @@
 """Data loading utilities for visualization."""
 
-from datetime import date, timedelta, datetime
+from datetime import date
 from pathlib import Path
+
 import numpy as np
 import spiceypy as spice
 
 from src.potential_mapper.spice import load_spice_files
 from src.utils import spice_ops
 
-def _date_range(start_day: date, end_day: date) -> list[date]:
-    """Inclusive list of days between start_day and end_day."""
-    if end_day < start_day:
-        raise ValueError("end must be >= start")
-    span = (end_day - start_day).days
-    return [start_day + timedelta(days=offset) for offset in range(span + 1)]
+from .utils import date_range
+
+
+def _discover_date_files(
+    cache_dir: Path, start_day: date, end_day: date
+) -> list[Path]:
+    """Find NPZ cache files matching the date range.
+
+    Args:
+        cache_dir: Directory to search.
+        start_day: Start date (inclusive).
+        end_day: End date (inclusive).
+
+    Returns:
+        List of matching file paths, sorted by date.
+
+    Raises:
+        FileNotFoundError: If no matching files found.
+    """
+    days = date_range(start_day, end_day)
+    pattern_list = [f"3D{day.strftime('%y%m%d')}.npz" for day in days]
+
+    files = []
+    for pattern in pattern_list:
+        matches = list(cache_dir.rglob(pattern))
+        if matches:
+            files.append(matches[0])
+
+    if not files:
+        raise FileNotFoundError(
+            f"No cache files found for date range {start_day} to {end_day} in {cache_dir}"
+        )
+
+    return files
 
 
 def load_measurements(
@@ -28,19 +57,7 @@ def load_measurements(
         potentials: Surface potential array
         in_sun: Boolean array (True if sunlit)
     """
-    days = _date_range(start_day, end_day)
-    pattern_list = [f"3D{day.strftime('%y%m%d')}.npz" for day in days]
-
-    files = []
-    for pattern in pattern_list:
-        matches = list(cache_dir.rglob(pattern))
-        if matches:
-            files.append(matches[0])
-
-    if not files:
-        raise FileNotFoundError(
-            f"No cache files found for date range {start_day} to {end_day} in {cache_dir}"
-        )
+    files = _discover_date_files(cache_dir, start_day, end_day)
 
     all_lats = []
     all_lons = []
@@ -86,19 +103,7 @@ def load_date_range_data_with_sza(
         potentials: Surface potentials (V)
         in_sun: Boolean array for illumination
     """
-    days = _date_range(start_day, end_day)
-    pattern_list = [f"3D{day.strftime('%y%m%d')}.npz" for day in days]
-
-    files = []
-    for pattern in pattern_list:
-        matches = list(cache_dir.rglob(pattern))
-        if matches:
-            files.append(matches[0])
-
-    if not files:
-        raise FileNotFoundError(
-            f"No cache files found for date range {start_day} to {end_day} in {cache_dir}"
-        )
+    files = _discover_date_files(cache_dir, start_day, end_day)
 
     # Load SPICE kernels
     load_spice_files()
