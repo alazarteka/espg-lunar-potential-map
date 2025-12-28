@@ -28,11 +28,16 @@ from scipy.optimize import brentq
 from src import config
 from src.flux import ERData
 from src.kappa import FitResults, Kappa
-from src.physics.charging import electron_current_density_magnitude
+from src.physics.charging import (
+    electron_current_density_magnitude,
+    sternglass_secondary_yield,
+)
 from src.physics.jucurve import U_from_J
 from src.physics.kappa import (
     KappaParams,
     omnidirectional_flux_magnitude,
+    temperature_ev_to_theta,
+    theta_to_temperature_ev,
 )
 from src.utils.geometry import get_intersection_or_none
 from src.utils.spice_ops import (
@@ -45,75 +50,6 @@ from src.utils.units import (
 )
 
 CM2_TO_M2_FACTOR = 1.0e4  # unit conversion: cm^-2 → m^-2
-
-
-def theta_to_temperature_ev(theta: float, kappa: float) -> float:
-    """
-    Helper function to convert the thermal spread parameter theta to electron
-    temperature in eV.
-
-    Args:
-        theta (float): The thermal spread parameter in m/s.
-        kappa (float): The kappa parameter.
-
-    Returns:
-        float: The electron temperature in eV.
-    """
-    prefactor = 0.5 * kappa / (kappa - 1.5)
-    return (
-        prefactor
-        * theta
-        * theta
-        * config.ELECTRON_MASS_MAGNITUDE
-        / config.ELECTRON_CHARGE_MAGNITUDE
-    )
-
-
-def temperature_ev_to_theta(temperature_ev: float, kappa: float) -> float:
-    """
-    Helper function to convert electron temperature in eV to the thermal
-    spread parameter theta.
-
-    Args:
-        temperature_ev (float): The electron temperature in eV.
-        kappa (float): The kappa parameter.
-
-    Returns:
-        float: The thermal spread parameter theta.
-    """
-    prefactor = 2.0 * (kappa - 1.5) / kappa
-    return math.sqrt(
-        prefactor
-        * config.ELECTRON_CHARGE_MAGNITUDE
-        * temperature_ev
-        / config.ELECTRON_MASS_MAGNITUDE
-    )
-
-
-def sternglass_secondary_yield(
-    impact_energy_ev: np.ndarray,
-    peak_energy_ev: float = 500,
-    peak_yield: float = 1.5,
-) -> np.ndarray:
-    """
-    Calculates the Sternglass secondary electron yield.
-
-    Args:
-        impact_energy_ev (np.ndarray): The impact energy at the surface in eV.
-        peak_energy_ev (float): The energy where the yield peaks in eV.
-        peak_yield (float): The maximum number of secondaries per incident primary.
-
-    Returns:
-        np.ndarray: The Sternglass secondary electron yield.
-    """
-    out = (
-        7.4
-        * peak_yield
-        * (impact_energy_ev / peak_energy_ev)
-        * np.exp(-2.0 * np.sqrt(np.maximum(impact_energy_ev, 0.0) / peak_energy_ev))
-    )
-    out[impact_energy_ev <= 0.0] = 0.0
-    return out
 
 
 def calculate_shaded_currents(

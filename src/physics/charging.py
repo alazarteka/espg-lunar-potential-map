@@ -5,6 +5,43 @@ import src.config as config
 from src.physics.kappa import KappaParams, omnidirectional_flux_magnitude
 from src.utils.units import CurrentDensityType, EnergyType, ureg
 
+
+def sternglass_secondary_yield(
+    impact_energy_ev: np.ndarray,
+    peak_energy_ev: float = 500.0,
+    peak_yield: float = 1.5,
+) -> np.ndarray:
+    """
+    Calculate the Sternglass secondary electron yield.
+
+    The Sternglass model describes secondary electron emission (SEE) from surfaces
+    bombarded by primary electrons. The yield depends on the impact energy
+    following an empirical formula that accounts for the penetration depth
+    and secondary electron escape probability.
+
+    Args:
+        impact_energy_ev: The impact energy at the surface in eV (array).
+        peak_energy_ev: The energy where the yield peaks in eV (default 500).
+        peak_yield: The maximum number of secondaries per incident primary
+            (default 1.5, typical for lunar regolith).
+
+    Returns:
+        The Sternglass secondary electron yield (same shape as impact_energy_ev).
+
+    Notes:
+        - For E <= 0, the yield is 0 (no impact, no secondaries)
+        - The formula is: delta = 7.4 * delta_m * (E/E_m) * exp(-2 * sqrt(E/E_m))
+        - This peaks at E = E_m with value approximately delta_m
+    """
+    out = (
+        7.4
+        * peak_yield
+        * (impact_energy_ev / peak_energy_ev)
+        * np.exp(-2.0 * np.sqrt(np.maximum(impact_energy_ev, 0.0) / peak_energy_ev))
+    )
+    out[impact_energy_ev <= 0.0] = 0.0
+    return out
+
 ELECTRON_CHARGE_mag = (
     config.ELECTRON_CHARGE.magnitude
 )  # Charge of an electron in Coulombs

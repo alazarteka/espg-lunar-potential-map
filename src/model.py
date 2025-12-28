@@ -272,20 +272,3 @@ def synth_losscone(
         background=np.array([background]),
     )
     return result[0]
-
-
-def _chi2(params, energies, pitches, data, eps):
-    """Chi-squared cost function for loss-cone fitting."""
-    U_surface, bs_over_bm = params
-    model = synth_losscone(
-        energy_grid=energies,
-        pitch_grid=pitches,
-        U_surface=U_surface,
-        bs_over_bm=bs_over_bm,
-    )
-
-    if not np.all(np.isfinite(model)) or (model <= 0).all():
-        return 1e30  # Pathological model penalty
-
-    diff = np.log(data + eps) - np.log(model + eps)
-    return np.sum(diff * diff)

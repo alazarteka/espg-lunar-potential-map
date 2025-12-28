@@ -398,3 +398,52 @@ def omnidirectional_flux_fast(
         * ureg.particle
         / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
     )
+
+
+def theta_to_temperature_ev(theta: float, kappa: float) -> float:
+    """
+    Convert the thermal spread parameter theta to electron temperature in eV.
+
+    For a kappa distribution, the relationship between theta (characteristic speed)
+    and temperature is:
+        T = (kappa / (kappa - 3/2)) * (m_e * theta^2) / (2 * q_e)
+
+    Args:
+        theta: The thermal spread parameter in m/s.
+        kappa: The kappa parameter (must be > 1.5).
+
+    Returns:
+        The electron temperature in eV.
+    """
+    prefactor = 0.5 * kappa / (kappa - 1.5)
+    return (
+        prefactor
+        * theta
+        * theta
+        * config.ELECTRON_MASS_MAGNITUDE
+        / config.ELECTRON_CHARGE_MAGNITUDE
+    )
+
+
+def temperature_ev_to_theta(temperature_ev: float, kappa: float) -> float:
+    """
+    Convert electron temperature in eV to the thermal spread parameter theta.
+
+    For a kappa distribution, the relationship between temperature and theta
+    (characteristic speed) is:
+        theta = sqrt(2 * (kappa - 3/2) / kappa * q_e * T / m_e)
+
+    Args:
+        temperature_ev: The electron temperature in eV.
+        kappa: The kappa parameter (must be > 1.5).
+
+    Returns:
+        The thermal spread parameter theta in m/s.
+    """
+    prefactor = 2.0 * (kappa - 1.5) / kappa
+    return math.sqrt(
+        prefactor
+        * config.ELECTRON_CHARGE_MAGNITUDE
+        * temperature_ev
+        / config.ELECTRON_MASS_MAGNITUDE
+    )
