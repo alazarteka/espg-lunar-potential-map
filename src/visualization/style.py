@@ -14,7 +14,8 @@ CMAP_MEASUREMENT = "viridis"  # Fluxes, voltages, harmonic reconstructions
 CMAP_MAGNITUDE = "plasma"     # Engineering power, potential magnitudes
 CMAP_RESIDUAL = "RdBu_r"      # Residuals, errors (diverging, centered at 0)
 
-# Alias for backwards compatibility
+# Alias for backwards compatibility - allows scripts that imported CMAP_DEFAULT
+# to continue working after the semantic colormap refactor (CMAP_MEASUREMENT, etc.)
 CMAP_DEFAULT = CMAP_MEASUREMENT
 
 # Font Sizes
@@ -36,7 +37,8 @@ BBOX_STYLE = {
     "alpha": 0.8,
 }
 
-# Dark Mode Theme (for flux plots)
+# Reserved for future dark mode support in flux visualization plots.
+# Not yet integrated but available for custom scripts.
 DARK_THEME: dict[str, Any] = {
     "facecolor": "black",
     "text_color": "white",

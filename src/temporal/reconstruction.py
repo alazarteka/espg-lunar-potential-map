@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.special import sph_harm_y
 
-
-def _sph_harm(m: int, l: int, phi, theta):
-    """Evaluate spherical harmonics with explicit argument order."""
-    return sph_harm_y(l, m, theta, phi)
+from ._harmonics import _sph_harm
 
 
 def format_timestamp(ts: np.datetime64) -> str:

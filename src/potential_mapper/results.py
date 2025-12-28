@@ -25,3 +25,21 @@ class PotentialResults:
     projected_potential: np.ndarray
     spacecraft_in_sun: np.ndarray
     projection_in_sun: np.ndarray
+
+
+def _concat_results(results: list[PotentialResults]) -> PotentialResults:
+    """Concatenate fields from multiple PotentialResults objects (row-wise)."""
+
+    def cat(attr: str):
+        return np.concatenate([getattr(r, attr) for r in results])
+
+    return PotentialResults(
+        spacecraft_latitude=cat("spacecraft_latitude"),
+        spacecraft_longitude=cat("spacecraft_longitude"),
+        projection_latitude=cat("projection_latitude"),
+        projection_longitude=cat("projection_longitude"),
+        spacecraft_potential=cat("spacecraft_potential"),
+        projected_potential=cat("projected_potential"),
+        spacecraft_in_sun=cat("spacecraft_in_sun"),
+        projection_in_sun=cat("projection_in_sun"),
+    )

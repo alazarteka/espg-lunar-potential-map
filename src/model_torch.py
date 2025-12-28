@@ -595,7 +595,7 @@ class LossConeFitterTorch:
 
         # Bounds
         bounds = [
-            (-1000.0, 1000.0),  # U_surface (narrower than DE bounds)
+            (-2000.0, 2000.0),  # U_surface
             (0.1, 1.1),  # bs_over_bm
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]

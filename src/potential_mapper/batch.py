@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 
 import src.config as config
+from src.potential_mapper.logging_utils import setup_logging
 from src.potential_mapper.pipeline import DataLoader, load_all_data, process_merged_data
 from src.potential_mapper.results import PotentialResults
 from src.potential_mapper.spice import load_spice_files
@@ -244,11 +245,7 @@ def main() -> int:
     args = _parse_args()
 
     # Configure logging
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    setup_logging(args.verbose)
 
     return run_batch(
         output_dir=args.output_dir,

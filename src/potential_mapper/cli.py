@@ -1,6 +1,6 @@
 import argparse
-import logging
 
+from src.potential_mapper.logging_utils import setup_logging
 from src.potential_mapper.pipeline import run
 from src.potential_mapper.spice import load_spice_files
 
@@ -62,10 +62,7 @@ def parse_arguments() -> argparse.Namespace:
 def main():
     args = parse_arguments()
 
-    LOG_LEVEL = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(
-        level=LOG_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    setup_logging(args.verbose)
 
     # Load SPICE kernels once up front
     load_spice_files()
