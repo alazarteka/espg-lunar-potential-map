@@ -1,4 +1,5 @@
 import logging
+import warnings
 from bisect import bisect_right
 from typing import Any
 
@@ -113,6 +114,11 @@ def get_time_range(flux_data: Any) -> tuple[str, str]:
     Returns:
         Tuple of (start_time, end_time) as strings, or ("", "") if error
     """
+    warnings.warn(
+        "get_time_range is deprecated and will be removed in a future version",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if flux_data.data is None:
         logging.error("Flux data is not loaded.")
         return "", ""

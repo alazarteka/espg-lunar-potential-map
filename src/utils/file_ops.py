@@ -1,5 +1,6 @@
 import logging
 import os
+import warnings
 
 
 def list_files(directory: str) -> list[str]:
@@ -12,6 +13,11 @@ def list_files(directory: str) -> list[str]:
     Returns:
         List of filenames in the directory
     """
+    warnings.warn(
+        "list_files is deprecated and will be removed in a future version",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     try:
         files = os.listdir(directory)
         return [f for f in files if os.path.isfile(os.path.join(directory, f))]
@@ -30,6 +36,11 @@ def list_folder_files(directory: str) -> list[str]:
     Returns:
         List of subdirectory names in the directory
     """
+    warnings.warn(
+        "list_folder_files is deprecated and will be removed in a future version",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     try:
         files = os.listdir(directory)
         return [f for f in files if os.path.isdir(os.path.join(directory, f))]

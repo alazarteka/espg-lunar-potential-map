@@ -222,6 +222,78 @@ def omnidirectional_flux(
     )
 
 
+def _create_energy_grid(energy_ranges: EnergyType, n_samples: int) -> EnergyType:
+    """
+    Create a geomspace energy grid for each energy range.
+
+    Args:
+        energy_ranges (Energy): Energy bounds for integration.
+        n_samples (int): Number of samples to use for each range.
+
+    Returns:
+        Energy: Energy grid in electron volts.
+    """
+    energy_grid = (
+        np.geomspace(
+            energy_ranges[:, 0].to(ureg.electron_volt).magnitude,
+            energy_ranges[:, 1].to(ureg.electron_volt).magnitude,
+            num=n_samples,
+            axis=1,
+        )
+        * ureg.electron_volt
+    )
+    if __debug__:
+        if not isinstance(energy_grid, Quantity) or not energy_grid.is_compatible_with(
+            ureg.electron_volt
+        ):
+            raise TypeError("energy_grid must be a pint Quantity (Energy)")
+
+    return energy_grid
+
+
+def _integrate_flux_simpson(
+    flux_values: OmnidirectionalFluxType, energy_grid: EnergyType
+) -> IntegratedFluxType:
+    """
+    Integrate omnidirectional flux over an energy grid using Simpson's rule.
+
+    Args:
+        flux_values (OmnidirectionalFlux): Flux values to integrate.
+        energy_grid (Energy): Energy grid for integration.
+
+    Returns:
+        IntegratedFlux: Integrated omnidirectional flux.
+    """
+    if __debug__:
+        if not isinstance(flux_values, Quantity) or not flux_values.is_compatible_with(
+            ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
+        ):
+            raise TypeError(
+                "flux_values must be a pint Quantity (Omnidirectional Flux)"
+            )
+
+    integrated_flux = (
+        simpson(
+            flux_values.to(
+                ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
+            ).magnitude,
+            energy_grid.to(ureg.electron_volt).magnitude,
+            axis=1,
+        )
+        * ureg.particle
+        / (ureg.centimeter**2 * ureg.second)
+    )
+    if __debug__:
+        if not isinstance(
+            integrated_flux, Quantity
+        ) or not integrated_flux.is_compatible_with(
+            ureg.particle / (ureg.centimeter**2 * ureg.second)
+        ):
+            raise TypeError("integrated_flux must be a pint Quantity (IntegratedFlux)")
+
+    return integrated_flux
+
+
 def omnidirectional_flux_integrated(
     parameters: KappaParams, energy_ranges: EnergyType, n_samples: int = 101
 ) -> IntegratedFluxType:
@@ -253,50 +325,9 @@ def omnidirectional_flux_integrated(
         "n_samples must be an odd positive integer"
     )
 
-    energy_grid = (
-        np.geomspace(
-            energy_ranges[:, 0].to(ureg.electron_volt).magnitude,
-            energy_ranges[:, 1].to(ureg.electron_volt).magnitude,
-            num=n_samples,
-            axis=1,
-        )
-        * ureg.electron_volt
-    )
-    if __debug__:
-        if not isinstance(energy_grid, Quantity) or not energy_grid.is_compatible_with(
-            ureg.electron_volt
-        ):
-            raise TypeError("energy_grid must be a pint Quantity (Energy)")
-
+    energy_grid = _create_energy_grid(energy_ranges, n_samples)
     flux_values = omnidirectional_flux(parameters, energy_grid)
-    if __debug__:
-        if not isinstance(flux_values, Quantity) or not flux_values.is_compatible_with(
-            ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
-        ):
-            raise TypeError(
-                "flux_values must be a pint Quantity (Omnidirectional Flux)"
-            )
-
-    integrated_flux = (
-        simpson(
-            flux_values.to(
-                ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
-            ).magnitude,
-            energy_grid.to(ureg.electron_volt).magnitude,
-            axis=1,
-        )
-        * ureg.particle
-        / (ureg.centimeter**2 * ureg.second)
-    )
-    if __debug__:
-        if not isinstance(
-            integrated_flux, Quantity
-        ) or not integrated_flux.is_compatible_with(
-            ureg.particle / (ureg.centimeter**2 * ureg.second)
-        ):
-            raise TypeError("integrated_flux must be a pint Quantity (IntegratedFlux)")
-
-    return integrated_flux
+    return _integrate_flux_simpson(flux_values, energy_grid)
 
 
 @jit(nopython=True, cache=True)
@@ -306,6 +337,12 @@ def _gamma_ratio(kappa: float) -> float:
     return math.gamma(kappa + 1) / (
         math.pow(math.pi * kappa, 1.5) * math.gamma(kappa - 0.5)
     )
+
+
+# Numba JIT constants - must be literal values due to nopython mode constraints.
+# Canonical values are defined in config.py (ELECTRON_MASS_EV_S2_M2, CM2_TO_M2).
+_ELECTRON_MASS_EV_S2_M2: float = 5.685630e-12  # eV*s^2/m^2
+_CM2_TO_M2: float = 1e-4  # cm^2 to m^2 conversion
 
 
 @jit(nopython=True, cache=True, fastmath=True)
@@ -327,9 +364,7 @@ def omnidirectional_flux_magnitude(
     Returns:
         Omnidirectional flux magnitude in particles/(cm^2 s eV)
     """
-    ELECTRON_MASS_EV_S2_M2 = 5.685630e-12
-
-    velocity_mag = np.sqrt(2.0 * energy_mag / ELECTRON_MASS_EV_S2_M2)
+    velocity_mag = np.sqrt(2.0 * energy_mag / _ELECTRON_MASS_EV_S2_M2)
 
     prefactor = _gamma_ratio(kappa)
     core = density_mag / (theta_mag * theta_mag * theta_mag)  # More efficient than **3
@@ -339,9 +374,9 @@ def omnidirectional_flux_magnitude(
     distribution_mag = prefactor * core * tail
 
     velocity_sq = velocity_mag * velocity_mag
-    directional_flux_mag = distribution_mag * velocity_sq / ELECTRON_MASS_EV_S2_M2
+    directional_flux_mag = distribution_mag * velocity_sq / _ELECTRON_MASS_EV_S2_M2
 
-    return 4.0 * math.pi * 1e-4 * directional_flux_mag
+    return 4.0 * math.pi * _CM2_TO_M2 * directional_flux_mag
 
 
 def omnidirectional_flux_fast(

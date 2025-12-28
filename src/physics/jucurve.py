@@ -24,6 +24,9 @@ class JUCoefficients:
     D: float = 60.0  # V        (paper says D = 60 V)
 
 
+DEFAULT_JU_COEFFICIENTS = JUCoefficients()
+
+
 def J_of_U(U: float, coefficients: JUCoefficients | None = None):
     """
     Calculate the current density from the spacecraft J for a given electric
@@ -39,8 +42,7 @@ def J_of_U(U: float, coefficients: JUCoefficients | None = None):
     Returns:
         float: The current density in A/m^2.
     """
-    if coefficients is None:
-        coefficients = JUCoefficients()
+    coefficients = coefficients or DEFAULT_JU_COEFFICIENTS
     return coefficients.A * math.exp(-U / coefficients.B) + coefficients.C * math.exp(
         -U / coefficients.D
     )
@@ -64,8 +66,7 @@ def U_from_J(
     Returns:
         float: The electric potential U in volts.
     """
-    if coefficients is None:
-        coefficients = JUCoefficients()
+    coefficients = coefficients or DEFAULT_JU_COEFFICIENTS
 
     def f(U):
         return J_of_U(U, coefficients) - J_target
@@ -90,8 +91,7 @@ def J_of_U_ref(
     Returns:
         Current density with units (A/m²).
     """
-    if coefficients is None:
-        coefficients = JUCoefficients()
+    coefficients = coefficients or DEFAULT_JU_COEFFICIENTS
 
     U_V = U.to(ureg.volt).magnitude
     A = coefficients.A * ureg.ampere / ureg.meter**2
@@ -120,8 +120,7 @@ def U_from_J_ref(
     Returns:
         Spacecraft potential with units (V).
     """
-    if coefficients is None:
-        coefficients = JUCoefficients()
+    coefficients = coefficients or DEFAULT_JU_COEFFICIENTS
 
     J_target_mag = J_target.to(ureg.ampere / ureg.meter**2).magnitude
     U_min_mag = U_min.to(ureg.volt).magnitude
