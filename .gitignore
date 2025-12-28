@@ -70,12 +70,12 @@ figures/
 results/
 gitingest/
 potential_timeseries*.html
-artifacts/plots/
-artifacts/potential_cache/
-artifacts/temporal_coeffs/
-artifacts/reports/monthly/
-artifacts/reports/terminator_charge_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].json
-artifacts/reports/terminator_charge_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md
+
+# =============================================================================
+# Artifacts (gitinclude pattern - ignore all, whitelist what to track)
+# =============================================================================
+artifacts/*
+!artifacts/.gitkeep
 
 # =============================================================================
 # Temporary Files
