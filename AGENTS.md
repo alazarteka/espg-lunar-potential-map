@@ -40,8 +40,8 @@ Use UV with Python 3.12.
 
 ## Coding Style & Naming Conventions
 
-- Python 3.12, 4-space indent, Black line length 88 (`pyproject.toml`).
-- Ruff rules: `E,F,W,B,I`; keep imports sorted; prefer explicit exports.
+- Python 3.12, 4-space indent, Ruff line length 88 (`pyproject.toml`).
+- Ruff rules: `E,F,W,B,I,UP,SIM`; keep imports sorted; prefer explicit exports.
 - Type hints required where practical; `mypy` configured with `pint` plugin.
 - Names: modules/functions `snake_case`; classes `PascalCase`; constants `UPPER_SNAKE_CASE` (see `src/config.py").
 - Units: use `src.utils.units` quantities for physical values.
@@ -56,7 +56,7 @@ Use UV with Python 3.12.
 
 - Commit messages: Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `style:`, `test:`, `chore:`) with optional scope, e.g., `feat(physics): ...`.
 - PRs must include: clear description, linked issues, rationale, before/after plots if applicable, and reproduction steps.
-- Pre-merge checklist: `ruff`, `black`, `mypy`, `pytest` all pass; update README/docs if behavior or interfaces change; do not commit large data or notebook outputs.
+- Pre-merge checklist: `ruff`, `mypy`, `pytest` all pass; update README/docs if behavior or interfaces change; do not commit large data or notebook outputs.
 
 ## Security & Configuration Tips (Optional)
 
