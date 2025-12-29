@@ -5,6 +5,9 @@ from dataclasses import dataclass
 import numpy as np
 import spiceypy as spice
 from numba import jit
+
+# NumPy 1.x/2.x compatibility: trapezoid was added in NumPy 2.0
+_trapezoid = getattr(np, "trapezoid", np.trapz)
 from pint import Quantity
 from scipy.optimize import brentq, minimize
 from scipy.stats import qmc
@@ -663,11 +666,11 @@ class Kappa:
             )
             flux_to_sc = 0.25 * omni * CM2_TO_M2
             mask = energy_grid >= abs(U)
-            Je = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
+            Je = config.ELECTRON_CHARGE_MAGNITUDE * _trapezoid(
                 flux_to_sc[mask], energy_grid[mask]
             )
             Eimp = energy_grid[mask] - abs(U)
-            Jsee = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
+            Jsee = config.ELECTRON_CHARGE_MAGNITUDE * _trapezoid(
                 sternglass_secondary_yield(
                     Eimp, peak_energy_ev=sey_E_m, peak_yield=sey_delta_m
                 )

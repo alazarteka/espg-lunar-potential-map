@@ -551,6 +551,159 @@ class LossConeFitter:
 
         return norm2d
 
+    def build_norm2d_batch(self, chunk_indices: list[int]) -> np.ndarray:
+        """
+        Build normalized 2D flux distributions for multiple chunks at once.
+
+        Vectorized implementation for significant speedup over calling
+        build_norm2d() in a loop.
+
+        Args:
+            chunk_indices: List of measurement chunk indices to process
+
+        Returns:
+            np.ndarray: Shape (n_chunks, SWEEP_ROWS, CHANNELS) normalized flux.
+                        Invalid chunks are filled with NaN.
+        """
+        if not chunk_indices:
+            return np.zeros((0, config.SWEEP_ROWS, config.CHANNELS), dtype=np.float64)
+
+        n_chunks = len(chunk_indices)
+        n_rows = len(self.er_data.data)
+        nE = config.SWEEP_ROWS
+        nP = config.CHANNELS
+
+        # Load all flux and pitch data once
+        flux_all = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)
+        pitches_all = self.pitch_angle.pitch_angles
+
+        # Build index arrays for all chunks
+        chunk_indices_arr = np.array(chunk_indices, dtype=np.int64)
+        start_indices = chunk_indices_arr * nE
+        valid_chunks = start_indices < n_rows
+
+        # Pre-allocate output
+        result = np.full((n_chunks, nE, nP), np.nan, dtype=np.float64)
+
+        if not valid_chunks.any():
+            return result
+
+        # Get valid chunk data
+        valid_chunk_idx = np.where(valid_chunks)[0]
+
+        if self.normalization_mode == "ratio":
+            # Fully vectorized per-energy normalization
+            for i in valid_chunk_idx:
+                chunk_idx = chunk_indices[i]
+                s = chunk_idx * nE
+                e = min(s + nE, n_rows)
+                actual_rows = e - s
+
+                flux_chunk = flux_all[s:e]  # (actual_rows, nP)
+                pitch_chunk = pitches_all[s:e]  # (actual_rows, nP)
+
+                # Incident mask per row
+                incident_mask = pitch_chunk < 90.0  # (actual_rows, nP)
+
+                # Valid flux mask
+                valid_flux = np.isfinite(flux_chunk) & (flux_chunk > 0)
+
+                # Combined mask for valid incident flux
+                valid_incident = incident_mask & valid_flux  # (actual_rows, nP)
+
+                # Compute normalization factor per row using masked operations
+                # Replace non-incident values with NaN for aggregation
+                flux_for_norm = np.where(valid_incident, flux_chunk, np.nan)
+
+                if self.incident_flux_stat == "mean":
+                    # nanmean per row
+                    norm_factors = np.nanmean(flux_for_norm, axis=1)  # (actual_rows,)
+                else:
+                    # nanmax per row
+                    norm_factors = np.nanmax(flux_for_norm, axis=1)  # (actual_rows,)
+
+                # Handle rows with no valid incident flux
+                norm_factors = np.where(
+                    np.isfinite(norm_factors) & (norm_factors > 0),
+                    norm_factors,
+                    np.nan
+                )
+                norm_factors = np.maximum(norm_factors, config.EPS)
+
+                # Normalize: flux / norm_factor (broadcast over columns)
+                result[i, :actual_rows, :] = flux_chunk / norm_factors[:, np.newaxis]
+
+        elif self.normalization_mode == "global":
+            # Vectorized global normalization
+            for i in valid_chunk_idx:
+                chunk_idx = chunk_indices[i]
+                s = chunk_idx * nE
+                e = min(s + nE, n_rows)
+                actual_rows = e - s
+
+                flux_chunk = flux_all[s:e]
+                pitch_chunk = pitches_all[s:e]
+
+                # Incident mask
+                incident_mask = pitch_chunk < 90.0
+                valid_flux = np.isfinite(flux_chunk) & (flux_chunk > 0)
+                valid_incident = incident_mask & valid_flux
+
+                # Get max incident flux
+                incident_vals = flux_chunk[valid_incident]
+                if len(incident_vals) == 0:
+                    continue
+
+                global_norm = np.max(incident_vals)
+                result[i, :actual_rows, :] = flux_chunk / max(global_norm, config.EPS)
+
+        elif self.normalization_mode == "ratio_rescaled":
+            # Per-energy ratio then global rescale
+            for i in valid_chunk_idx:
+                chunk_idx = chunk_indices[i]
+                s = chunk_idx * nE
+                e = min(s + nE, n_rows)
+                actual_rows = e - s
+
+                flux_chunk = flux_all[s:e]
+                pitch_chunk = pitches_all[s:e]
+
+                incident_mask = pitch_chunk < 90.0
+                valid_flux = np.isfinite(flux_chunk) & (flux_chunk > 0)
+                valid_incident = incident_mask & valid_flux
+
+                flux_for_norm = np.where(valid_incident, flux_chunk, np.nan)
+
+                if self.incident_flux_stat == "mean":
+                    norm_factors = np.nanmean(flux_for_norm, axis=1)
+                else:
+                    norm_factors = np.nanmax(flux_for_norm, axis=1)
+
+                norm_factors = np.where(
+                    np.isfinite(norm_factors) & (norm_factors > 0),
+                    norm_factors,
+                    np.nan
+                )
+                norm_factors = np.maximum(norm_factors, config.EPS)
+
+                chunk_result = flux_chunk / norm_factors[:, np.newaxis]
+
+                # Global rescale
+                finite_vals = chunk_result[np.isfinite(chunk_result)]
+                if len(finite_vals) > 0:
+                    global_max = np.max(finite_vals)
+                    if global_max > 0:
+                        chunk_result = chunk_result / global_max
+
+                result[i, :actual_rows, :] = chunk_result
+
+        else:  # ratio2 - complex pairwise normalization
+            # Fall back to per-chunk for ratio2
+            for i in valid_chunk_idx:
+                result[i] = self.build_norm2d(chunk_indices[i])
+
+        return result
+
     def _fit_surface_potential(
         self, measurement_chunk: int
     ) -> tuple[float, float, float]:

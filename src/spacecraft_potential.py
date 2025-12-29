@@ -25,6 +25,9 @@ import numpy as np
 import spiceypy as spice
 from scipy.optimize import brentq
 
+# NumPy 1.x/2.x compatibility: trapezoid was added in NumPy 2.0
+_trapezoid = getattr(np, "trapezoid", np.trapz)
+
 from src import config
 from src.flux import ERData
 from src.kappa import FitResults, Kappa
@@ -110,14 +113,14 @@ def calculate_shaded_currents(
     flux_to_spacecraft = 0.25 * omnidirectional_flux * CM2_TO_M2_FACTOR
 
     energy_above_barrier = energy_grid >= abs(spacecraft_potential)
-    Je = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
+    Je = config.ELECTRON_CHARGE_MAGNITUDE * _trapezoid(
         flux_to_spacecraft[energy_above_barrier],
         energy_grid[energy_above_barrier],
     )
 
     # Calculating Jsee
     impact_energy_ev = energy_grid[energy_above_barrier] - abs(spacecraft_potential)
-    Jsee = config.ELECTRON_CHARGE_MAGNITUDE * np.trapezoid(
+    Jsee = config.ELECTRON_CHARGE_MAGNITUDE * _trapezoid(
         sternglass_secondary_yield(
             impact_energy_ev=impact_energy_ev,
             peak_energy_ev=sey_E_m,

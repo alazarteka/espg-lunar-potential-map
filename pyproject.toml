@@ -21,7 +21,7 @@ classifiers = [
 ]
 requires-python = ">=3.12, <3.14"
 dependencies = [
-    "numpy>=2.0.0",
+    "numpy>=1.24.0",  # >=2.0 preferred, but 1.x needed for PyTorch 2.2 legacy GPU
     "pandas>=2.2.0",
     "scipy>=1.15.0",
     "matplotlib>=3.10.0",
@@ -44,7 +44,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7.0.0", "ruff>=0.8.0", "mypy>=1.0.0"]
 test = ["pytest>=7.0.0", "pytest-cov>=4.0.0"]
-gpu = ["torch>=2.0.0"]  # Use CPU backend; CUDA needs compute capability 7.0+ (RTX 20xx+)
+gpu = ["torch>=2.0.0"]  # Modern GPU (compute capability 7.0+, RTX 20xx+)
+gpu-legacy = ["torch>=2.2.0,<2.3.0", "numpy<2"]  # Legacy GPU with CUDA 11.8 (GTX 10xx)
 
 [project.urls]
 Homepage = "https://github.com/alazarteka/espg-lunar-potential-map"
@@ -52,6 +53,10 @@ Repository = "https://github.com/alazarteka/espg-lunar-potential-map"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[tool.uv]
+# For legacy GPU support (GTX 10xx), use: uv sync --extra gpu-legacy
+extra-index-url = ["https://download.pytorch.org/whl/cu118"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
