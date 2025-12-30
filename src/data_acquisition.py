@@ -47,7 +47,7 @@ def solid_angle_from_thetas(base_dir: Path) -> None:
     }
 
     thetas = np.loadtxt(base_dir / config.THETA_FILE, dtype=float)
-    solid_angles = list(map(lambda x: latitude_to_area[abs(x)], thetas))
+    solid_angles = [latitude_to_area[abs(x)] for x in thetas]
     np.savetxt(
         base_dir / config.SOLID_ANGLES_FILE, solid_angles, fmt="%.6f", delimiter=" "
     )
@@ -215,21 +215,20 @@ class DataManager:
             existing,
         )
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            with tqdm(
-                total=len(remaining_tasks), desc=folder_desc, unit="file"
-            ) as pbar:
-                futures = [
-                    executor.submit(self.download_file, url, dest)
-                    for url, dest in remaining_tasks
-                ]
-                for future in as_completed(futures):
-                    try:
-                        future.result()
-                    except Exception as e:
-                        logger.error(f"Download failed: {e}")
-                    finally:
-                        pbar.update(1)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor, tqdm(
+            total=len(remaining_tasks), desc=folder_desc, unit="file"
+        ) as pbar:
+            futures = [
+                executor.submit(self.download_file, url, dest)
+                for url, dest in remaining_tasks
+            ]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"Download failed: {e}")
+                finally:
+                    pbar.update(1)
 
 
 if __name__ == "__main__":

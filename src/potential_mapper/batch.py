@@ -15,14 +15,17 @@ import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 import src.config as config
 from src.potential_mapper.logging_utils import setup_logging
 from src.potential_mapper.pipeline import DataLoader, load_all_data, process_merged_data
-from src.potential_mapper.results import PotentialResults
 from src.potential_mapper.spice import load_spice_files
+
+if TYPE_CHECKING:
+    from src.potential_mapper.results import PotentialResults
 
 
 def _to_unicode(arr) -> np.ndarray:
@@ -178,8 +181,12 @@ def run_batch(
 
     # Process merged data
     try:
-        logging.info(f"Processing merged data (parallel={use_parallel}, torch={use_torch})...")
-        results = process_merged_data(er_data, use_parallel=use_parallel, use_torch=use_torch)
+        logging.info(
+            f"Processing merged data (parallel={use_parallel}, torch={use_torch})..."
+        )
+        results = process_merged_data(
+            er_data, use_parallel=use_parallel, use_torch=use_torch
+        )
     except Exception as e:
         logging.exception(f"Failed to process merged data: {e}")
         return 1

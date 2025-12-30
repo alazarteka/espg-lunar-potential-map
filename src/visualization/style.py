@@ -11,8 +11,8 @@ COLOR_ANTISOLAR = "navy"
 
 # Colormaps - semantic categories
 CMAP_MEASUREMENT = "viridis"  # Fluxes, voltages, harmonic reconstructions
-CMAP_MAGNITUDE = "plasma"     # Engineering power, potential magnitudes
-CMAP_RESIDUAL = "RdBu_r"      # Residuals, errors (diverging, centered at 0)
+CMAP_MAGNITUDE = "plasma"  # Engineering power, potential magnitudes
+CMAP_RESIDUAL = "RdBu_r"  # Residuals, errors (diverging, centered at 0)
 
 # Alias for backwards compatibility - allows scripts that imported CMAP_DEFAULT
 # to continue working after the semantic colormap refactor (CMAP_MEASUREMENT, etc.)

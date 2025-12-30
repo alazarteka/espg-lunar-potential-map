@@ -4,8 +4,8 @@ from pathlib import Path
 
 __all__ = [
     "MONTH_ABBREV_TO_NUM",
-    "NUM_STR_TO_MONTH_ABBREV",
     "MONTH_INT_TO_ABBREV",
+    "NUM_STR_TO_MONTH_ABBREV",
     "parse_3d_filename",
 ]
 
@@ -31,10 +31,7 @@ MONTH_ABBREV_TO_NUM = {
 NUM_STR_TO_MONTH_ABBREV = {
     num_str: abbrev for abbrev, num_str in MONTH_ABBREV_TO_NUM.items()
 }
-MONTH_INT_TO_ABBREV = {
-    month_num: abbrev
-    for month_num, abbrev in enumerate(_MONTH_ABBREVS, start=1)
-}
+MONTH_INT_TO_ABBREV = dict(enumerate(_MONTH_ABBREVS, start=1))
 
 
 def parse_3d_filename(filename: str) -> tuple[int, int, int]:

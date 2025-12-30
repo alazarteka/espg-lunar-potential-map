@@ -11,8 +11,8 @@ from src.physics.kappa import KappaParams, omnidirectional_flux
 from src.utils.units import ureg
 
 __all__ = [
-    "prepare_phis",
     "prepare_flux",
+    "prepare_phis",
     "prepare_synthetic_er",
 ]
 

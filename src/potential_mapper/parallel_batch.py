@@ -81,6 +81,7 @@ def process_single_day(
         Tuple of (output_path, elapsed_seconds, status)
     """
     import time
+
     start_time = time.time()
 
     try:
@@ -111,7 +112,11 @@ def process_single_day(
         )
 
         # Extract UTC timestamps from source data (needed for temporal reconstruction)
-        utc_col = config.UTC_COLUMN if config.UTC_COLUMN in er_data.data.columns else config.TIME_COLUMN
+        utc_col = (
+            config.UTC_COLUMN
+            if config.UTC_COLUMN in er_data.data.columns
+            else config.TIME_COLUMN
+        )
         rows_utc = er_data.data[utc_col].to_numpy(dtype=str)
 
         # Save results with rows_* prefix to match temporal loader expectations
@@ -165,7 +170,12 @@ def run_parallel_batch(
     start_time = datetime.now()
 
     if output_dir is None:
-        output_dir = Path(__file__).parent.parent.parent / "artifacts" / "potential_cache" / "daily"
+        output_dir = (
+            Path(__file__).parent.parent.parent
+            / "artifacts"
+            / "potential_cache"
+            / "daily"
+        )
 
     if max_workers is None:
         max_workers = os.cpu_count() or 4
@@ -173,7 +183,9 @@ def run_parallel_batch(
     # Discover day files
     day_files = discover_day_files(year, month)
     if not day_files:
-        logging.error(f"No day files found for {year}" + (f"-{month:02d}" if month else ""))
+        logging.error(
+            f"No day files found for {year}" + (f"-{month:02d}" if month else "")
+        )
         return 1
 
     logging.info(f"Found {len(day_files)} day files to process")
@@ -213,7 +225,9 @@ def run_parallel_batch(
                 results.append((day_file, output_path, elapsed, status))
 
                 if status == "success":
-                    logging.info(f"✓ {day_file.name} -> {output_path.name} ({elapsed:.1f}s)")
+                    logging.info(
+                        f"✓ {day_file.name} -> {output_path.name} ({elapsed:.1f}s)"
+                    )
                 else:
                     logging.warning(f"✗ {day_file.name}: {status}")
             except Exception as e:
@@ -278,7 +292,8 @@ def parse_args() -> argparse.Namespace:
         help="Overwrite existing output files",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose logging",
     )

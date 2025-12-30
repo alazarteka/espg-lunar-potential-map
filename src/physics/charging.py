@@ -42,6 +42,7 @@ def sternglass_secondary_yield(
     out[impact_energy_ev <= 0.0] = 0.0
     return out
 
+
 ELECTRON_CHARGE_mag = (
     config.ELECTRON_CHARGE.magnitude
 )  # Charge of an electron in Coulombs

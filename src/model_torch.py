@@ -91,7 +91,9 @@ def synth_losscone_batch_torch(
         beam_amp = beam_amp.to(device=device, dtype=dtype)
 
     if background is None:
-        background = torch.full((n_params,), DEFAULT_BACKGROUND, device=device, dtype=dtype)
+        background = torch.full(
+            (n_params,), DEFAULT_BACKGROUND, device=device, dtype=dtype
+        )
     else:
         background = background.to(device=device, dtype=dtype)
 
@@ -114,11 +116,13 @@ def synth_losscone_batch_torch(
 
     # Handle U_spacecraft: scalar -> (1,1,1), array(nE,) -> (1,nE,1)
     if isinstance(U_spacecraft, (int, float)):
-        U_spacecraft_t = torch.tensor(
-            U_spacecraft, device=device, dtype=dtype
-        ).view(1, 1, 1)
+        U_spacecraft_t = torch.tensor(U_spacecraft, device=device, dtype=dtype).view(
+            1, 1, 1
+        )
     else:
-        U_spacecraft_t = U_spacecraft.to(device=device, dtype=dtype).unsqueeze(0).unsqueeze(-1)
+        U_spacecraft_t = (
+            U_spacecraft.to(device=device, dtype=dtype).unsqueeze(0).unsqueeze(-1)
+        )
 
     # Compute loss cone angle using Halekas 2008 formula
     # sin²(αc) = (BS/BM) × (1 + UM / (E - U_spacecraft))
@@ -137,7 +141,9 @@ def synth_losscone_batch_torch(
     # Add secondary electron beam if enabled
     has_beam = (beam_width_eV > 0).any() and (beam_amp > 0).any()
     if has_beam:
-        beam_center = torch.clamp(torch.abs(U_surface - U_spacecraft_t), min=beam_width_eV)
+        beam_center = torch.clamp(
+            torch.abs(U_surface - U_spacecraft_t), min=beam_width_eV
+        )
         beam_width_safe = torch.clamp(beam_width_eV, min=EPS)
         energy_profile = beam_amp * torch.exp(
             -0.5 * ((E_exp - beam_center) / beam_width_safe) ** 2
@@ -186,8 +192,10 @@ def compute_chi2_batch_torch(
     data_mask_exp = data_mask.unsqueeze(0)  # (1, nE, nPitch)
 
     # Compute diff only where mask is True
-    diff = torch.where(data_mask_exp, log_data_exp - log_model, torch.zeros_like(log_model))
-    chi2 = (diff ** 2).sum(dim=(1, 2))
+    diff = torch.where(
+        data_mask_exp, log_data_exp - log_model, torch.zeros_like(log_model)
+    )
+    chi2 = (diff**2).sum(dim=(1, 2))
 
     return chi2
 
@@ -241,7 +249,9 @@ def synth_losscone_multi_chunk_torch(
         beam_amp = torch.zeros(N_chunks, n_pop, device=device, dtype=dtype)
 
     if background is None:
-        background = torch.full((N_chunks, n_pop), DEFAULT_BACKGROUND, device=device, dtype=dtype)
+        background = torch.full(
+            (N_chunks, n_pop), DEFAULT_BACKGROUND, device=device, dtype=dtype
+        )
 
     # Reshape for broadcasting:
     # U_surface: (N, P) -> (N, P, 1, 1)
@@ -289,7 +299,9 @@ def synth_losscone_multi_chunk_torch(
     # Add secondary electron beam if enabled
     has_beam = (beam_width_exp > 0).any() and (beam_amp_exp > 0).any()
     if has_beam:
-        beam_center = torch.clamp(torch.abs(U_surface_exp - U_spacecraft_exp), min=beam_width_exp)
+        beam_center = torch.clamp(
+            torch.abs(U_surface_exp - U_spacecraft_exp), min=beam_width_exp
+        )
         beam_width_safe = torch.clamp(beam_width_exp, min=EPS)
         energy_profile = beam_amp_exp * torch.exp(
             -0.5 * ((E_exp - beam_center) / beam_width_safe) ** 2
@@ -337,8 +349,10 @@ def compute_chi2_multi_chunk_torch(
     data_mask_exp = data_mask.unsqueeze(1)
 
     # Compute diff only where mask is True
-    diff = torch.where(data_mask_exp, log_data_exp - log_model, torch.zeros_like(log_model))
-    chi2 = (diff ** 2).sum(dim=(2, 3))  # Sum over (E, A) -> (N, P)
+    diff = torch.where(
+        data_mask_exp, log_data_exp - log_model, torch.zeros_like(log_model)
+    )
+    chi2 = (diff**2).sum(dim=(2, 3))  # Sum over (E, A) -> (N, P)
 
     return chi2
 
@@ -408,7 +422,9 @@ class LossConeFitterTorch:
         elif dtype == "float16":
             self.dtype = torch.float16
         else:
-            raise ValueError(f"dtype must be 'float32', 'float64', or 'float16', got {dtype}")
+            raise ValueError(
+                f"dtype must be 'float32', 'float64', or 'float16', got {dtype}"
+            )
 
         self.beam_width_factor = config.LOSS_CONE_BEAM_WIDTH_FACTOR
         self.beam_amp_min = config.LOSS_CONE_BEAM_AMP_MIN
@@ -439,13 +455,16 @@ class LossConeFitterTorch:
         """Get or create cached CPU fitter for normalization."""
         if self._cpu_fitter is None:
             from src.flux import LossConeFitter
+
             self._cpu_fitter = LossConeFitter(
                 self.er_data,
                 str(self.config.DATA_DIR / self.config.THETA_FILE),
                 self.pitch_angle,
                 self.spacecraft_potential,
                 self.normalization_mode,
-                beam_amp_fixed=self.beam_amp_min if self.beam_amp_min == self.beam_amp_max else None,
+                beam_amp_fixed=self.beam_amp_min
+                if self.beam_amp_min == self.beam_amp_max
+                else None,
                 incident_flux_stat=self.incident_flux_stat,
                 loss_cone_background=self.background,
             )
@@ -484,7 +503,9 @@ class LossConeFitterTorch:
             return np.nan, np.nan, np.nan, np.nan
         e = min(e, max_rows)
 
-        energies = self.er_data.data[self.config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[s:e]
+        energies = self.er_data.data[self.config.ENERGY_COLUMN].to_numpy(
+            dtype=np.float64
+        )[s:e]
         pitches = self.pitch_angle.pitch_angles[s:e]
         spacecraft_slice = (
             self.spacecraft_potential[s:e]
@@ -507,7 +528,9 @@ class LossConeFitterTorch:
         data_mask_t = torch.tensor(data_mask, device=self.device, dtype=torch.bool)
 
         if isinstance(spacecraft_slice, np.ndarray):
-            spacecraft_t = torch.tensor(spacecraft_slice, device=self.device, dtype=self.dtype)
+            spacecraft_t = torch.tensor(
+                spacecraft_slice, device=self.device, dtype=self.dtype
+            )
         else:
             spacecraft_t = float(spacecraft_slice)
 
@@ -556,12 +579,17 @@ class LossConeFitterTorch:
         # Phase 1: LHS grid search (matches CPU implementation)
         n_lhs = 400
         from torch.quasirandom import SobolEngine
+
         sobol = SobolEngine(dimension=3, scramble=True, seed=42)
         lhs_unit = sobol.draw(n_lhs).to(device=self.device, dtype=self.dtype)
 
         # Scale to bounds
-        lower = torch.tensor([b[0] for b in bounds], device=self.device, dtype=self.dtype)
-        upper = torch.tensor([b[1] for b in bounds], device=self.device, dtype=self.dtype)
+        lower = torch.tensor(
+            [b[0] for b in bounds], device=self.device, dtype=self.dtype
+        )
+        upper = torch.tensor(
+            [b[1] for b in bounds], device=self.device, dtype=self.dtype
+        )
         lhs_samples = lower + lhs_unit * (upper - lower)
 
         # Evaluate all LHS samples at once (GPU batch)
@@ -592,7 +620,7 @@ class LossConeFitterTorch:
         )
 
         # Run optimization seeded with best LHS point
-        best_params, best_chi2, n_iter = de.optimize(objective, x0=x0)
+        best_params, best_chi2, _n_iter = de.optimize(objective, x0=x0)
 
         # Use LHS result if DE didn't improve
         if best_lhs_chi2 < best_chi2:
@@ -601,7 +629,9 @@ class LossConeFitterTorch:
 
         U_surface = best_params[0].item()
         bs_over_bm = float(np.clip(best_params[1].item(), 0.1, 1.1))
-        beam_amp = float(np.clip(best_params[2].item(), self.beam_amp_min, self.beam_amp_max))
+        beam_amp = float(
+            np.clip(best_params[2].item(), self.beam_amp_min, self.beam_amp_max)
+        )
 
         return U_surface, bs_over_bm, beam_amp, best_chi2
 
@@ -660,7 +690,9 @@ class LossConeFitterTorch:
         norm2d_all = cpu_fitter.build_norm2d_batch(chunk_indices)  # (n_chunks, nE, nP)
 
         # Pre-load all energy and pitch data
-        energy_all = self.er_data.data[self.config.ENERGY_COLUMN].to_numpy(dtype=np.float64)
+        energy_all = self.er_data.data[self.config.ENERGY_COLUMN].to_numpy(
+            dtype=np.float64
+        )
         pitch_all = self.pitch_angle.pitch_angles
 
         # Filter to valid chunks
@@ -696,7 +728,9 @@ class LossConeFitterTorch:
             if actual_rows < nE:
                 pad_rows = nE - actual_rows
                 energies = np.pad(energies, (0, pad_rows), constant_values=np.nan)
-                pitches = np.pad(pitches, ((0, pad_rows), (0, 0)), constant_values=np.nan)
+                pitches = np.pad(
+                    pitches, ((0, pad_rows), (0, 0)), constant_values=np.nan
+                )
                 norm2d = np.pad(norm2d, ((0, pad_rows), (0, 0)), constant_values=np.nan)
 
             data_mask = np.isfinite(norm2d) & (norm2d > 0)
@@ -708,7 +742,9 @@ class LossConeFitterTorch:
                 sc_pot = self.spacecraft_potential[s:e].copy()
                 # Pad to nE if needed
                 if actual_rows < nE:
-                    sc_pot = np.pad(sc_pot, (0, nE - actual_rows), constant_values=np.nan)
+                    sc_pot = np.pad(
+                        sc_pot, (0, nE - actual_rows), constant_values=np.nan
+                    )
             else:
                 sc_pot = np.zeros(nE)
 
@@ -733,9 +769,7 @@ class LossConeFitterTorch:
         norm2d_t = torch.tensor(
             np.stack(norm2d_list), device=self.device, dtype=self.dtype
         )
-        mask_t = torch.tensor(
-            np.stack(mask_list), device=self.device, dtype=torch.bool
-        )
+        mask_t = torch.tensor(np.stack(mask_list), device=self.device, dtype=torch.bool)
         sc_pot_t = torch.tensor(
             np.array(sc_pot_list), device=self.device, dtype=self.dtype
         )
@@ -777,11 +811,16 @@ class LossConeFitterTorch:
 
         # Generate LHS samples (same for all chunks)
         from torch.quasirandom import SobolEngine
+
         sobol = SobolEngine(dimension=3, scramble=True, seed=42)
         lhs_unit = sobol.draw(n_lhs).to(device=self.device, dtype=self.dtype)
 
-        lower = torch.tensor([b[0] for b in bounds], device=self.device, dtype=self.dtype)
-        upper = torch.tensor([b[1] for b in bounds], device=self.device, dtype=self.dtype)
+        lower = torch.tensor(
+            [b[0] for b in bounds], device=self.device, dtype=self.dtype
+        )
+        upper = torch.tensor(
+            [b[1] for b in bounds], device=self.device, dtype=self.dtype
+        )
         lhs_samples = lower + lhs_unit * (upper - lower)  # (n_lhs, 3)
 
         # Expand to (N_chunks, n_lhs, 3)
@@ -816,7 +855,9 @@ class LossConeFitterTorch:
         chi2 = compute_chi2_multi_chunk_torch(models, norm2d, data_mask)  # (N, n_lhs)
 
         # Penalize invalid
-        chi2 = torch.where(torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device))
+        chi2 = torch.where(
+            torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
+        )
 
         # Find best per chunk
         best_idx = torch.argmin(chi2, dim=1)  # (N,)
@@ -898,7 +939,9 @@ class LossConeFitterTorch:
             )
 
             chi2 = compute_chi2_multi_chunk_torch(models, norm2d, data_mask)
-            chi2 = torch.where(torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device))
+            chi2 = torch.where(
+                torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
+            )
 
             return chi2
 
@@ -982,14 +1025,15 @@ class LossConeFitterTorch:
             for i, chunk_idx in enumerate(valid_indices):
                 U_surface = final_params_np[i, 0]
                 bs_over_bm = float(np.clip(final_params_np[i, 1], 0.1, 1.1))
-                beam_amp = float(np.clip(
-                    final_params_np[i, 2], self.beam_amp_min, self.beam_amp_max
-                ))
+                beam_amp = float(
+                    np.clip(final_params_np[i, 2], self.beam_amp_min, self.beam_amp_max)
+                )
                 chi2 = final_chi2_np[i]
 
                 results[chunk_idx] = [U_surface, bs_over_bm, beam_amp, chi2, chunk_idx]
 
         return results
+
 
 # Backwards compatibility alias
 LossConeFitterGPU = LossConeFitterTorch

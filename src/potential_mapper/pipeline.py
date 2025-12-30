@@ -12,22 +12,23 @@ import src.config as config
 from src.flux import ERData, LossConeFitter
 
 try:
-    from src.model_torch import LossConeFitterTorch, HAS_TORCH
+    from src.model_torch import HAS_TORCH, LossConeFitterTorch
 except ImportError:
     HAS_TORCH = False
     LossConeFitterTorch = None  # type: ignore[misc, assignment]
 
 try:
     from src.kappa_torch import KappaFitterTorch
+
     HAS_KAPPA_TORCH = True
 except ImportError:
     HAS_KAPPA_TORCH = False
     KappaFitterTorch = None  # type: ignore[misc, assignment]
 
-from src.kappa import Kappa, FitResults
-from src.physics.kappa import KappaParams
+from src.kappa import FitResults, Kappa
 from src.physics.charging import electron_current_density_magnitude
 from src.physics.jucurve import U_from_J
+from src.physics.kappa import KappaParams
 from src.potential_mapper import plot as plot_mod
 from src.potential_mapper.coordinates import (
     CoordinateArrays,
@@ -39,7 +40,7 @@ from src.potential_mapper.date_utils import (
     MONTH_ABBREV_TO_NUM,
     NUM_STR_TO_MONTH_ABBREV,
 )
-from src.potential_mapper.results import PotentialResults, _concat_results
+from src.potential_mapper.results import PotentialResults
 from src.utils.attitude import load_attitude_data
 from src.utils.geometry import get_intersections_or_none_batch
 from src.utils.units import ureg
@@ -232,9 +233,7 @@ def _spacecraft_potential_per_row_parallel(
     # Execute in parallel with SPICE initialization per worker
     # Use 'spawn' context to ensure thread-safety for SPICE (avoid global state corruption)
     ctx = multiprocessing.get_context("spawn")
-    with ctx.Pool(
-        processes=num_workers, initializer=_init_worker_spice
-    ) as pool:
+    with ctx.Pool(processes=num_workers, initializer=_init_worker_spice) as pool:
         # Use imap_unordered for better memory efficiency
         # Chunksize: distribute work in reasonable batches
         chunksize = max(1, len(tasks) // (num_workers * 4))
@@ -342,10 +341,10 @@ def _spacecraft_potential_per_row_torch(
         Array of spacecraft potentials per row
     """
     from scipy.optimize import brentq
+
     from src.spacecraft_potential import (
-        theta_to_temperature_ev,
-        temperature_ev_to_theta,
         current_balance,
+        theta_to_temperature_ev,
     )
 
     potentials = np.full(n_rows, np.nan)
@@ -357,7 +356,7 @@ def _spacecraft_potential_per_row_torch(
 
     # Prepare batch data
     logging.info("Preparing batch data for Kappa fitting...")
-    energy, flux_data, density_estimates, valid_spec_nos, first_row_indices = (
+    energy, flux_data, density_estimates, valid_spec_nos, _first_row_indices = (
         _prepare_kappa_batch_data(er_data)
     )
 
@@ -380,13 +379,15 @@ def _spacecraft_potential_per_row_torch(
     # Compute spacecraft potential for each spectrum
     spec_values = er_data.data[config.SPEC_NO_COLUMN].to_numpy()
 
-    for i, spec_no in enumerate(tqdm(
-        valid_spec_nos,
-        desc="Computing SC Potential",
-        unit="spec",
-        leave=False,
-        dynamic_ncols=True,
-    )):
+    for i, spec_no in enumerate(
+        tqdm(
+            valid_spec_nos,
+            desc="Computing SC Potential",
+            unit="spec",
+            leave=False,
+            dynamic_ncols=True,
+        )
+    ):
         mask_idx = np.flatnonzero(spec_values == spec_no)
         if mask_idx.size == 0:
             continue
@@ -417,10 +418,11 @@ def _spacecraft_potential_per_row_torch(
                 potential_value = float(spacecraft_potential)
             else:
                 # Night: solve current balance equation
-                temperature_ev = theta_to_temperature_ev(theta, kappa)
+                theta_to_temperature_ev(theta, kappa)
 
                 # Create a FitResults-like object for the current_balance function
                 from src.utils.units import ureg
+
                 params = KappaParams(
                     density=density * ureg.particle / ureg.meter**3,
                     kappa=kappa,
@@ -438,13 +440,22 @@ def _spacecraft_potential_per_row_torch(
 
                 # Bracket search
                 U_low, U_high = -1500.0, 0.0
-                balance_low = current_balance(U_low, fit_result, energy_grid, 500.0, 1.5)
-                balance_high = current_balance(U_high, fit_result, energy_grid, 500.0, 1.5)
+                balance_low = current_balance(
+                    U_low, fit_result, energy_grid, 500.0, 1.5
+                )
+                balance_high = current_balance(
+                    U_high, fit_result, energy_grid, 500.0, 1.5
+                )
 
                 bracket_expansions = 0
-                while np.sign(balance_low) == np.sign(balance_high) and bracket_expansions < 10:
+                while (
+                    np.sign(balance_low) == np.sign(balance_high)
+                    and bracket_expansions < 10
+                ):
                     U_low *= 1.5
-                    balance_low = current_balance(U_low, fit_result, energy_grid, 500.0, 1.5)
+                    balance_low = current_balance(
+                        U_low, fit_result, energy_grid, 500.0, 1.5
+                    )
                     bracket_expansions += 1
 
                 if np.isnan(balance_low) or np.isnan(balance_high):
@@ -754,8 +765,7 @@ def process_merged_data(
         # PyTorch-accelerated fitter (~5x faster)
         if not HAS_TORCH or LossConeFitterTorch is None:
             raise ImportError(
-                "PyTorch is required for --fast mode. "
-                "Install with: uv sync --extra gpu"
+                "PyTorch is required for --fast mode. Install with: uv sync --extra gpu"
             )
         logging.info("Running surface potential fitting (PyTorch-accelerated)...")
         fitter = LossConeFitterTorch(
@@ -857,7 +867,7 @@ def run(args: argparse.Namespace) -> int:
         return 1
 
     if args.output or args.display:
-        fig, ax = plot_mod.plot_map(agg, illumination=args.illumination)
+        fig, _ax = plot_mod.plot_map(agg, illumination=args.illumination)
         if args.output:
             out_path = Path(args.output)
             out_path.parent.mkdir(parents=True, exist_ok=True)

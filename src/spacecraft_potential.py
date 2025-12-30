@@ -19,7 +19,6 @@ Conventions
 See docs/analysis/spacecraft_potential_analysis.md for a deeper discussion.
 """
 
-import math
 
 import numpy as np
 import spiceypy as spice

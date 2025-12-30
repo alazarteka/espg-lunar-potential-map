@@ -12,8 +12,8 @@ from src.potential_mapper.results import PotentialResults, _concat_results
 
 __all__ = [
     "DataLoader",
-    "_spacecraft_potential_per_row",
     "_concat_results",
+    "_spacecraft_potential_per_row",
     "process_lp_file",
     "run",
 ]
@@ -48,7 +48,7 @@ def run(args: argparse.Namespace) -> int:
     agg = _concat_results(results) if len(results) > 1 else results[0]
 
     if args.output or args.display:
-        fig, ax = plot_mod.plot_map(agg, illumination=args.illumination)
+        fig, _ax = plot_mod.plot_map(agg, illumination=args.illumination)
         if args.output:
             out_path = Path(args.output)
             out_path.parent.mkdir(parents=True, exist_ok=True)

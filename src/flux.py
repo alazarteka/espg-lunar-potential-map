@@ -157,7 +157,7 @@ class ERData:
         energies = self.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)
         energies = energies[:, None] * ureg.electron_volt  # Reshape for broadcasting
         integration_time = (
-            np.array(list(map(lambda x: 1 / config.BINS_BY_LATITUDE[x], thetas)))
+            np.array([1 / config.BINS_BY_LATITUDE[x] for x in thetas])
             * config.ACCUMULATION_TIME
         )
         integration_time = integration_time[None, :]  # Reshape for broadcasting
@@ -624,9 +624,7 @@ class LossConeFitter:
 
                 # Handle rows with no valid incident flux
                 norm_factors = np.where(
-                    np.isfinite(norm_factors) & (norm_factors > 0),
-                    norm_factors,
-                    np.nan
+                    np.isfinite(norm_factors) & (norm_factors > 0), norm_factors, np.nan
                 )
                 norm_factors = np.maximum(norm_factors, config.EPS)
 
@@ -680,9 +678,7 @@ class LossConeFitter:
                     norm_factors = np.nanmax(flux_for_norm, axis=1)
 
                 norm_factors = np.where(
-                    np.isfinite(norm_factors) & (norm_factors > 0),
-                    norm_factors,
-                    np.nan
+                    np.isfinite(norm_factors) & (norm_factors > 0), norm_factors, np.nan
                 )
                 norm_factors = np.maximum(norm_factors, config.EPS)
 

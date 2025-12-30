@@ -10,11 +10,11 @@ from src.engineering.analysis import (
 from src.engineering.sites import SITES_OF_INTEREST, Site
 
 __all__ = [
-    "compute_global_stats",
     "DEFAULT_CURRENT_DENSITY",
-    "extract_site_stats",
-    "GlobalStats",
-    "SiteStats",
-    "Site",
     "SITES_OF_INTEREST",
+    "GlobalStats",
+    "Site",
+    "SiteStats",
+    "compute_global_stats",
+    "extract_site_stats",
 ]

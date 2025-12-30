@@ -102,9 +102,7 @@ def _compute_beam(
     )
 
     if beam_pitch_sigma_deg > 0:
-        pitch_profile = np.exp(
-            -0.5 * ((pitch - 180.0) / beam_pitch_sigma_deg) ** 2
-        )
+        pitch_profile = np.exp(-0.5 * ((pitch - 180.0) / beam_pitch_sigma_deg) ** 2)
     else:
         pitch_profile = 1.0
 
@@ -204,8 +202,13 @@ def synth_losscone_batch(
     # Add secondary electron beam if enabled
     if np.any(beam_width_eV > 0) and np.any(beam_amp > 0):
         beam = _compute_beam(
-            E_exp, pitch_exp, U_surface, U_spacecraft,
-            beam_amp, beam_width_eV, beam_pitch_sigma_deg
+            E_exp,
+            pitch_exp,
+            U_surface,
+            U_spacecraft,
+            beam_amp,
+            beam_width_eV,
+            beam_pitch_sigma_deg,
         )
         model += beam
 

@@ -13,7 +13,7 @@ from .kappa import (
 
 __all__ = [
     "KappaParams",
-    "kappa_distribution",
     "directional_flux",
+    "kappa_distribution",
     "omnidirectional_flux",
 ]
