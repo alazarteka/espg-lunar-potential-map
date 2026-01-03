@@ -426,7 +426,12 @@ class LossConeFitterTorch:
                 f"dtype must be 'float32', 'float64', or 'float16', got {dtype}"
             )
 
-        self.beam_width_factor = config.LOSS_CONE_BEAM_WIDTH_FACTOR
+        # Surface potential bounds from config
+        self.u_surface_min = config.LOSS_CONE_U_SURFACE_MIN
+        self.u_surface_max = config.LOSS_CONE_U_SURFACE_MAX
+
+        # Beam parameters - use fixed width (not scaling with |U|)
+        self.beam_width_ev = config.LOSS_CONE_BEAM_WIDTH_EV
         self.beam_amp_min = config.LOSS_CONE_BEAM_AMP_MIN
         self.beam_amp_max = config.LOSS_CONE_BEAM_AMP_MAX
         if beam_amp_fixed is not None:
@@ -541,11 +546,8 @@ class LossConeFitterTorch:
             bs_over_bm = params[:, 1]
             beam_amp = params[:, 2]
 
-            # Compute beam widths
-            beam_width = torch.clamp(
-                torch.abs(U_surface) * self.beam_width_factor,
-                min=self.config.EPS,
-            )
+            # Use fixed beam width (not scaling with |U_surface|)
+            beam_width = torch.full_like(U_surface, self.beam_width_ev)
 
             # Evaluate models
             models = synth_losscone_batch_torch(
@@ -569,9 +571,9 @@ class LossConeFitterTorch:
 
             return chi2
 
-        # Bounds
+        # Bounds - U_surface capped at detection threshold
         bounds = [
-            (-2000.0, 2000.0),  # U_surface
+            (self.u_surface_min, self.u_surface_max),  # U_surface
             (0.1, 1.1),  # bs_over_bm
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]
@@ -602,8 +604,8 @@ class LossConeFitterTorch:
 
         # Phase 2: DE refinement starting from best LHS point
         de_bounds = [
-            (-2000.0, 2000.0),  # Wider bounds for DE exploration
-            (0.1, 1.1),
+            (self.u_surface_min, self.u_surface_max),  # U_surface
+            (0.1, 1.1),  # bs_over_bm
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]
 
@@ -802,9 +804,9 @@ class LossConeFitterTorch:
         """
         N_chunks = energies.size(0)
 
-        # Bounds
+        # Bounds - U_surface capped at detection threshold
         bounds = [
-            (-2000.0, 2000.0),  # U_surface
+            (self.u_surface_min, self.u_surface_max),  # U_surface
             (0.1, 1.1),  # bs_over_bm
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]
@@ -831,11 +833,8 @@ class LossConeFitterTorch:
         bs_over_bm = lhs_expanded[:, :, 1]
         beam_amp = lhs_expanded[:, :, 2]
 
-        # Compute beam widths
-        beam_width = torch.clamp(
-            torch.abs(U_surface) * self.beam_width_factor,
-            min=self.config.EPS,
-        )
+        # Use fixed beam width (not scaling with |U_surface|)
+        beam_width = torch.full_like(U_surface, self.beam_width_ev)
 
         # Evaluate all models at once
         # sc_potential is (N, nE) per-row, model broadcasts appropriately
@@ -901,9 +900,10 @@ class LossConeFitterTorch:
         """
         N_chunks = energies.size(0)
 
+        # Bounds - U_surface capped at detection threshold
         bounds = [
-            (-2000.0, 2000.0),
-            (0.1, 1.1),
+            (self.u_surface_min, self.u_surface_max),  # U_surface
+            (0.1, 1.1),  # bs_over_bm
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]
 
@@ -921,10 +921,8 @@ class LossConeFitterTorch:
             bs_over_bm = params[:, :, 1]
             beam_amp = params[:, :, 2]
 
-            beam_width = torch.clamp(
-                torch.abs(U_surface) * self.beam_width_factor,
-                min=self.config.EPS,
-            )
+            # Use fixed beam width (not scaling with |U_surface|)
+            beam_width = torch.full_like(U_surface, self.beam_width_ev)
 
             models = synth_losscone_multi_chunk_torch(
                 energies,

@@ -292,61 +292,86 @@ class TestApplyFitResults:
 
     def test_applies_valid_results(self):
         """Valid fit results are applied to proj_potential array."""
-        proj_potential = np.full(config.SWEEP_ROWS * 2, np.nan)
-        
+        n = config.SWEEP_ROWS * 2
+        proj_potential = np.full(n, np.nan)
+        bs_over_bm = np.full(n, np.nan)
+        beam_amp = np.full(n, np.nan)
+        fit_chi2 = np.full(n, np.nan)
+
         # Fit result: [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
         fit_results = np.array([
             [-10.0, 0.5, 1.0, config.FIT_ERROR_THRESHOLD / 2, 0],
         ])
-        
+
         pipeline._apply_fit_results(
-            fit_results, proj_potential, row_offset=0, n_total=len(proj_potential)
+            fit_results, proj_potential, bs_over_bm, beam_amp, fit_chi2,
+            row_offset=0, n_total=n
         )
-        
+
         # First SWEEP_ROWS should have the value
         assert np.allclose(proj_potential[:config.SWEEP_ROWS], -10.0)
+        assert np.allclose(bs_over_bm[:config.SWEEP_ROWS], 0.5)
+        assert np.allclose(beam_amp[:config.SWEEP_ROWS], 1.0)
         # Second SWEEP_ROWS should still be NaN (no result for chunk 1)
         assert np.all(np.isnan(proj_potential[config.SWEEP_ROWS:]))
 
     def test_skips_high_chi2_results(self):
-        """Results with chi2 > threshold are skipped."""
-        proj_potential = np.full(config.SWEEP_ROWS, np.nan)
-        
+        """Results with chi2 > threshold are skipped for U_surface but params stored."""
+        n = config.SWEEP_ROWS
+        proj_potential = np.full(n, np.nan)
+        bs_over_bm = np.full(n, np.nan)
+        beam_amp = np.full(n, np.nan)
+        fit_chi2 = np.full(n, np.nan)
+
         fit_results = np.array([
             [-10.0, 0.5, 1.0, config.FIT_ERROR_THRESHOLD * 2, 0],  # High chi2
         ])
-        
+
         pipeline._apply_fit_results(
-            fit_results, proj_potential, row_offset=0, n_total=len(proj_potential)
+            fit_results, proj_potential, bs_over_bm, beam_amp, fit_chi2,
+            row_offset=0, n_total=n
         )
-        
-        # Should remain NaN because chi2 exceeds threshold
+
+        # U_surface should remain NaN because chi2 exceeds threshold
         assert np.all(np.isnan(proj_potential))
+        # But fit params should still be stored
+        assert np.allclose(bs_over_bm, 0.5)
+        assert np.allclose(fit_chi2, config.FIT_ERROR_THRESHOLD * 2)
 
     def test_skips_nan_results(self):
         """NaN fit results are skipped."""
-        proj_potential = np.full(config.SWEEP_ROWS, np.nan)
-        
+        n = config.SWEEP_ROWS
+        proj_potential = np.full(n, np.nan)
+        bs_over_bm = np.full(n, np.nan)
+        beam_amp = np.full(n, np.nan)
+        fit_chi2 = np.full(n, np.nan)
+
         fit_results = np.array([
             [np.nan, 0.5, 1.0, 0.1, 0],
         ])
-        
+
         pipeline._apply_fit_results(
-            fit_results, proj_potential, row_offset=0, n_total=len(proj_potential)
+            fit_results, proj_potential, bs_over_bm, beam_amp, fit_chi2,
+            row_offset=0, n_total=n
         )
-        
+
         assert np.all(np.isnan(proj_potential))
 
     def test_empty_fit_results(self):
         """Empty fit_results is handled gracefully."""
-        proj_potential = np.full(config.SWEEP_ROWS, np.nan)
-        
+        n = config.SWEEP_ROWS
+        proj_potential = np.full(n, np.nan)
+        bs_over_bm = np.full(n, np.nan)
+        beam_amp = np.full(n, np.nan)
+        fit_chi2 = np.full(n, np.nan)
+
         fit_results = np.array([]).reshape(0, 5)
-        
+
         # Should not raise
         pipeline._apply_fit_results(
-            fit_results, proj_potential, row_offset=0, n_total=len(proj_potential)
+            fit_results, proj_potential, bs_over_bm, beam_amp, fit_chi2,
+            row_offset=0, n_total=n
         )
-        
+
         assert np.all(np.isnan(proj_potential))
 

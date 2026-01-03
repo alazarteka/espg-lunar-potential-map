@@ -325,6 +325,9 @@ def _spacecraft_potential_per_row_torch(
     er_data: ERData,
     n_rows: int,
     is_day: np.ndarray | None = None,
+    electron_temp_out: np.ndarray | None = None,
+    electron_dens_out: np.ndarray | None = None,
+    kappa_out: np.ndarray | None = None,
 ) -> np.ndarray:
     """
     Return spacecraft potential per ER row using PyTorch-accelerated Kappa fitting.
@@ -336,6 +339,9 @@ def _spacecraft_potential_per_row_torch(
         er_data: ERData containing all spectra
         n_rows: Total number of rows
         is_day: (n_rows,) boolean array indicating daytime rows (optional)
+        electron_temp_out: Optional output array to fill with electron temperature [eV]
+        electron_dens_out: Optional output array to fill with electron density [m^-3]
+        kappa_out: Optional output array to fill with kappa parameter values
 
     Returns:
         Array of spacecraft potentials per row
@@ -399,6 +405,17 @@ def _spacecraft_potential_per_row_torch(
         kappa = kappa_vals[i]
         theta = theta_vals[i]  # m/s
         density = density_estimates[i]  # particles/m³
+
+        # Convert theta to electron temperature in eV
+        Te_ev = theta_to_temperature_ev(theta, kappa)
+
+        # Store kappa parameters if output arrays provided
+        if electron_temp_out is not None:
+            electron_temp_out[mask_idx] = Te_ev
+        if electron_dens_out is not None:
+            electron_dens_out[mask_idx] = density
+        if kappa_out is not None:
+            kappa_out[mask_idx] = kappa
 
         # Determine day/night
         row_idx = mask_idx[0]
@@ -483,26 +500,36 @@ def _spacecraft_potential_per_row_torch(
 
 
 def _apply_fit_results(
-    fit_results: np.ndarray, proj_potential: np.ndarray, row_offset: int, n_total: int
+    fit_results: np.ndarray,
+    proj_potential: np.ndarray,
+    bs_over_bm: np.ndarray,
+    beam_amp: np.ndarray,
+    fit_chi2: np.ndarray,
+    row_offset: int,
+    n_total: int,
 ) -> None:
-    """Map fitter outputs back onto per-row projected potential array."""
+    """Map fitter outputs back onto per-row arrays."""
 
     rows_per_sweep = config.SWEEP_ROWS
     if fit_results.size == 0:
         return
 
-    for U_surface, _bs, _beam_amp, chi2, chunk_idx in fit_results:
+    for U_surface, bs, amp, chi2, chunk_idx in fit_results:
         chunk_idx = int(chunk_idx)
-        if not np.isfinite(U_surface) or not np.isfinite(chi2):
-            continue
-        if chi2 > config.FIT_ERROR_THRESHOLD:
-            continue
-
         row_start = row_offset + chunk_idx * rows_per_sweep
         row_end = min(row_start + rows_per_sweep, n_total)
         if row_start >= n_total:
             break
-        proj_potential[row_start:row_end] = float(U_surface)
+
+        # Always store fit parameters (even if chi2 is high)
+        bs_over_bm[row_start:row_end] = float(bs)
+        beam_amp[row_start:row_end] = float(amp)
+        fit_chi2[row_start:row_end] = float(chi2)
+
+        # Only store U_surface if fit quality is acceptable
+        if np.isfinite(U_surface) and np.isfinite(chi2):
+            if chi2 <= config.FIT_ERROR_THRESHOLD:
+                proj_potential[row_start:row_end] = float(U_surface)
 
 
 class DataLoader:
@@ -718,6 +745,11 @@ def process_merged_data(
         proj_in_sun_masked = dots > 0
         proj_in_sun[mask] = proj_in_sun_masked
 
+    # Kappa/plasma parameters - will be filled by torch path if available
+    electron_temp = np.full(n, np.nan)
+    electron_dens = np.full(n, np.nan)
+    kappa_vals_arr = np.full(n, np.nan)
+
     # Spacecraft potential
     logging.info("Calculating spacecraft potential...")
     if use_torch:
@@ -730,7 +762,10 @@ def process_merged_data(
         else:
             try:
                 sc_potential = _spacecraft_potential_per_row_torch(
-                    er_data, n, is_day=sc_in_sun
+                    er_data, n, is_day=sc_in_sun,
+                    electron_temp_out=electron_temp,
+                    electron_dens_out=electron_dens,
+                    kappa_out=kappa_vals_arr,
                 )
             except Exception as e:
                 logging.warning(
@@ -751,6 +786,9 @@ def process_merged_data(
     # Surface Potential Fitting
     theta_path = str(config.DATA_DIR / config.THETA_FILE)
     proj_potential = np.full(n, np.nan)
+    bs_over_bm_arr = np.full(n, np.nan)
+    beam_amp_arr = np.full(n, np.nan)
+    fit_chi2_arr = np.full(n, np.nan)
 
     # If the dataset is small, or ERData has been monkeypatched without
     # from_dataframe (as in some tests), fall back to sequential fitting.
@@ -772,10 +810,14 @@ def process_merged_data(
             er_data,
             theta_path,
             spacecraft_potential=sc_potential,
-            device="cpu",
+            device=None,  # Auto-detect: CUDA if available, else CPU
         )
-        fit_mat = fitter.fit_surface_potential()
-        _apply_fit_results(fit_mat, proj_potential, row_offset=0, n_total=n)
+        # Use batched processing for ~100x speedup on GPU
+        fit_mat = fitter.fit_surface_potential_batched(batch_size=100)
+        _apply_fit_results(
+            fit_mat, proj_potential, bs_over_bm_arr, beam_amp_arr, fit_chi2_arr,
+            row_offset=0, n_total=n
+        )
     elif not chunked:
         logging.info("Running surface potential fitting (sequential)...")
         fitter = LossConeFitter(
@@ -784,7 +826,10 @@ def process_merged_data(
             spacecraft_potential=sc_potential,
         )
         fit_mat = fitter.fit_surface_potential()
-        _apply_fit_results(fit_mat, proj_potential, row_offset=0, n_total=n)
+        _apply_fit_results(
+            fit_mat, proj_potential, bs_over_bm_arr, beam_amp_arr, fit_chi2_arr,
+            row_offset=0, n_total=n
+        )
     else:
         logging.info("Starting parallel surface potential fitting...")
 
@@ -814,9 +859,13 @@ def process_merged_data(
                     )
                 ):
                     row_offset = chunk_idx * rows_per_chunk
-                    _apply_fit_results(chunk_res, proj_potential, row_offset, n_total=n)
+                    _apply_fit_results(
+                        chunk_res, proj_potential, bs_over_bm_arr, beam_amp_arr,
+                        fit_chi2_arr, row_offset, n_total=n
+                    )
 
-    return PotentialResults(
+    # Build results object
+    results = PotentialResults(
         spacecraft_latitude=spacecraft_lat,
         spacecraft_longitude=spacecraft_lon,
         projection_latitude=proj_lat,
@@ -825,7 +874,18 @@ def process_merged_data(
         projected_potential=proj_potential,
         spacecraft_in_sun=sc_in_sun,
         projection_in_sun=proj_in_sun,
+        bs_over_bm=bs_over_bm_arr,
+        beam_amp=beam_amp_arr,
+        fit_chi2=fit_chi2_arr,
+        electron_temperature=electron_temp,
+        electron_density=electron_dens,
+        kappa_value=kappa_vals_arr,
     )
+
+    # Classify plasma environments based on electron temperature
+    results.classify_environments()
+
+    return results
 
 
 def process_lp_file(file_path: Path) -> PotentialResults:

@@ -329,7 +329,12 @@ class LossConeFitter:
         )
         self.spacecraft_potential = spacecraft_potential
 
-        self.beam_width_factor = config.LOSS_CONE_BEAM_WIDTH_FACTOR
+        # Surface potential bounds from config
+        self.u_surface_min = config.LOSS_CONE_U_SURFACE_MIN
+        self.u_surface_max = config.LOSS_CONE_U_SURFACE_MAX
+
+        # Beam parameters - use fixed width (not scaling with |U|)
+        self.beam_width_ev = config.LOSS_CONE_BEAM_WIDTH_EV
         self.beam_amp_min = config.LOSS_CONE_BEAM_AMP_MIN
         self.beam_amp_max = config.LOSS_CONE_BEAM_AMP_MAX
         if beam_amp_fixed is not None:
@@ -358,9 +363,12 @@ class LossConeFitter:
         Returns:
             np.ndarray: The Latin Hypercube sample.
         """
-        # Generate a Latin Hypercube sample across U_surface, B_s/B_m, and beam amplitude
-        lower_bounds = np.array([-1000.0, 0.1, self.beam_amp_min], dtype=float)
-        upper_bounds = np.array([1000.0, 1.1, self.beam_amp_max], dtype=float)
+        # Generate a Latin Hypercube sample across U_surface, B_s/B_m, beam amplitude.
+        # Use narrower LHS range than full bounds for initial sampling efficiency.
+        u_lhs_min = max(self.u_surface_min, -1000.0)
+        u_lhs_max = min(self.u_surface_max, 0.0)  # Focus on negative potentials
+        lower_bounds = np.array([u_lhs_min, 0.1, self.beam_amp_min], dtype=float)
+        upper_bounds = np.array([u_lhs_max, 1.1, self.beam_amp_max], dtype=float)
         if upper_bounds[2] <= lower_bounds[2]:
             upper_bounds[2] = lower_bounds[2] + 1e-12
         sampler = LatinHypercube(
@@ -764,11 +772,8 @@ class LossConeFitter:
         lhs_bs_over_bm = self.lhs[:, 1]
         lhs_beam_amp = self.lhs[:, 2]
 
-        # Calculate beam widths for all samples
-        # beam_width = max(abs(U_surface) * factor, EPS)
-        lhs_beam_width = np.maximum(
-            np.abs(lhs_U_surface) * self.beam_width_factor, config.EPS
-        )
+        # Use fixed beam width (not scaling with |U_surface| to prevent runaway)
+        lhs_beam_width = np.full_like(lhs_U_surface, self.beam_width_ev)
 
         # Evaluate models in batch: (N_samples, nE, nPitch)
         models = synth_losscone_batch(
@@ -802,7 +807,8 @@ class LossConeFitter:
         def chi2_scalar(params):
             U_surface, bs_over_bm, beam_amp = params
             beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
-            beam_width = max(abs(U_surface) * self.beam_width_factor, config.EPS)
+            # Use fixed beam width (not scaling with |U_surface|)
+            beam_width = self.beam_width_ev
             model = synth_losscone(
                 energy_grid=energies,
                 pitch_grid=pitches,
@@ -830,8 +836,10 @@ class LossConeFitter:
         # More robust than LHS + Nelder-Mead for avoiding local minima
         from scipy.optimize import differential_evolution
 
+        # Use constrained bounds: U_surface capped at detection threshold (~+20V)
+        # because electron reflectometry cannot measure positive potentials reliably
         bounds = [
-            (-2000.0, 2000.0),  # U_surface
+            (self.u_surface_min, self.u_surface_max),  # U_surface
             (0.1, 1.1),  # bs_over_bm
             (self.beam_amp_min, self.beam_amp_max),  # beam_amp
         ]
