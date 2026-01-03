@@ -1,5 +1,7 @@
 # ESPG Lunar Potential Map
 
+> **Note:** `CLAUDE.md` is a symlink to this file. When modifying or committing, target `AGENTS.md` directly.
+
 ## Project Overview
 
 This project maps the lunar surface electrostatic potential using physics-based models. It processes SPICE kernel data, applies temporal reconstruction techniques, and generates potential maps accounting for plasma interactions and surface properties.
@@ -37,6 +39,27 @@ Use UV with Python 3.12.
 - Format: `uv run ruff format src tests`
 - Type check: `uv run mypy src`
 - Pre-commit: `pre-commit run --all-files`
+
+## GPU Acceleration
+
+This project has GPU-accelerated paths for compute-intensive operations. **Always check script flags and use GPU acceleration when available.**
+
+Key flags:
+- `--fast`: Enable PyTorch GPU acceleration (auto-detects dtype and batch size)
+- Requires GPU extra: `uv sync --extra gpu`
+
+Examples:
+```bash
+# Batch potential mapping (ALWAYS use --fast on GPU machines)
+uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4
+
+# GPU batch size sweep for tuning
+uv run python scripts/profiling/gpu_batch_sweep.py
+```
+
+The GPU path auto-detects:
+- **dtype**: float16 on modern GPUs (Volta+), float32 on older GPUs/CPU
+- **batch_size**: Calculated from available VRAM
 
 ## Coding Style & Naming Conventions
 
