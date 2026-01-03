@@ -34,6 +34,57 @@ EPS = 1e-12
 DEFAULT_BACKGROUND = 0.05
 
 
+def _auto_detect_dtype(device: "torch.device") -> "torch.dtype":
+    """
+    Auto-detect optimal dtype for the given device.
+
+    Returns float16 on modern CUDA GPUs (Volta+, compute 7.0+) which have
+    tensor cores for fast half-precision. Returns float32 for older GPUs
+    and CPU where float16 would be slower.
+    """
+    if not HAS_TORCH:
+        raise ImportError("PyTorch is required")
+
+    if device.type == "cuda":
+        props = torch.cuda.get_device_properties(device)
+        # Volta+ (compute 7.0+) has tensor cores for fast float16
+        if props.major >= 7:
+            return torch.float16
+        return torch.float32
+    return torch.float32  # CPU: float32 is fastest
+
+
+def _auto_detect_batch_size(device: "torch.device", dtype: "torch.dtype") -> int:
+    """
+    Auto-detect optimal batch size based on available VRAM.
+
+    Uses empirical formula from GPU sweep testing:
+    - ~5 MB/chunk for float16
+    - ~10 MB/chunk for float32
+    - ~20 MB/chunk for float64
+
+    Uses 50% of VRAM for batching to leave room for other tensors.
+    """
+    if not HAS_TORCH:
+        return 100  # Fallback
+
+    if device.type != "cuda":
+        return 50  # Conservative for CPU
+
+    try:
+        vram_mb = torch.cuda.get_device_properties(device).total_memory / 1024 / 1024
+
+        # Empirical: ~5 MB/chunk for float16, scales with dtype
+        bytes_per_elem = {torch.float16: 2, torch.float32: 4, torch.float64: 8}
+        mb_per_chunk = 5.0 * bytes_per_elem.get(dtype, 4) / 2  # base is float16
+
+        # Use 50% of VRAM for batching (leave room for other tensors)
+        batch_size = int(vram_mb * 0.5 / mb_per_chunk)
+        return max(25, min(batch_size, 1000))  # Clamp to reasonable range
+    except Exception:
+        return 100  # Fallback if detection fails
+
+
 def synth_losscone_batch_torch(
     energy_grid: Tensor,
     pitch_grid: Tensor,
@@ -320,11 +371,38 @@ def synth_losscone_multi_chunk_torch(
     return model
 
 
+def precompute_log_data_torch(
+    data: Tensor,
+    data_mask: Tensor,
+    eps: float = 1e-6,
+) -> tuple[Tensor, Tensor]:
+    """
+    Precompute log(data) and expanded mask for chi2 computation.
+
+    Call this once before LHS/DE phases to avoid redundant log() calls.
+
+    Args:
+        data: (N_chunks, nE, nPitch) observed normalized flux per chunk
+        data_mask: (N_chunks, nE, nPitch) boolean mask for valid data points
+        eps: small value to avoid log(0)
+
+    Returns:
+        log_data_exp: (N_chunks, 1, nE, nPitch) precomputed log(data), broadcast-ready
+        data_mask_exp: (N_chunks, 1, nE, nPitch) expanded mask
+    """
+    data_safe = torch.where(data_mask, data, torch.ones_like(data))
+    log_data = torch.log(data_safe + eps)
+    log_data_exp = log_data.unsqueeze(1)
+    data_mask_exp = data_mask.unsqueeze(1)
+    return log_data_exp, data_mask_exp
+
+
 def compute_chi2_multi_chunk_torch(
     models: Tensor,
     data: Tensor,
     data_mask: Tensor,
     eps: float = 1e-6,
+    log_data_precomputed: tuple[Tensor, Tensor] | None = None,
 ) -> Tensor:
     """
     Compute chi-squared for multiple chunks × multiple candidates.
@@ -334,19 +412,22 @@ def compute_chi2_multi_chunk_torch(
         data: (N_chunks, nE, nPitch) observed normalized flux per chunk
         data_mask: (N_chunks, nE, nPitch) boolean mask for valid data points
         eps: small value to avoid log(0)
+        log_data_precomputed: Optional (log_data_exp, data_mask_exp) from
+            precompute_log_data_torch(). If provided, skips redundant log(data).
 
     Returns:
         (N_chunks, n_pop) chi-squared values
     """
-    # data_safe: replace invalid with 1.0 to avoid log issues
-    data_safe = torch.where(data_mask, data, torch.ones_like(data))
-
     log_model = torch.log(models + eps)
-    log_data = torch.log(data_safe + eps)
 
-    # Broadcast data: (N, E, A) -> (N, 1, E, A)
-    log_data_exp = log_data.unsqueeze(1)
-    data_mask_exp = data_mask.unsqueeze(1)
+    if log_data_precomputed is not None:
+        log_data_exp, data_mask_exp = log_data_precomputed
+    else:
+        # Fallback: compute log_data inline (for backwards compatibility)
+        data_safe = torch.where(data_mask, data, torch.ones_like(data))
+        log_data = torch.log(data_safe + eps)
+        log_data_exp = log_data.unsqueeze(1)
+        data_mask_exp = data_mask.unsqueeze(1)
 
     # Compute diff only where mask is True
     diff = torch.where(
@@ -380,7 +461,7 @@ class LossConeFitterTorch:
         incident_flux_stat: str = "mean",
         loss_cone_background: float | None = None,
         device: str | None = None,
-        dtype: str = "float64",
+        dtype: str = "auto",
     ):
         """
         Initialize PyTorch-accelerated loss cone fitter.
@@ -395,9 +476,11 @@ class LossConeFitterTorch:
             incident_flux_stat: Statistic for incident flux ("mean" or "max")
             loss_cone_background: Background level outside loss cone
             device: Torch device ('cuda', 'cpu', or None for auto)
-            dtype: Data type ('float32', 'float64', or 'float16').
-                float32 recommended for GPU (good speed/precision balance).
-                float16 saves memory, enabling larger batch sizes (use batch_size=200).
+            dtype: Data type ('auto', 'float16', 'float32', or 'float64').
+                'auto' (default): float16 on modern GPUs (Volta+), float32 otherwise.
+                float16: fastest on modern GPUs, 4x less VRAM.
+                float32: good balance of speed and precision.
+                float64: maximum precision (slow).
         """
         if not HAS_TORCH:
             raise ImportError("PyTorch is required for GPU acceleration")
@@ -414,8 +497,10 @@ class LossConeFitterTorch:
         self.spacecraft_potential = spacecraft_potential
         self.device = get_torch_device(device)
 
-        # Set dtype
-        if dtype == "float32":
+        # Set dtype (auto-detect if not specified)
+        if dtype == "auto":
+            self.dtype = _auto_detect_dtype(self.device)
+        elif dtype == "float32":
             self.dtype = torch.float32
         elif dtype == "float64":
             self.dtype = torch.float64
@@ -423,7 +508,7 @@ class LossConeFitterTorch:
             self.dtype = torch.float16
         else:
             raise ValueError(
-                f"dtype must be 'float32', 'float64', or 'float16', got {dtype}"
+                f"dtype must be 'auto', 'float16', 'float32', or 'float64', got {dtype}"
             )
 
         # Surface potential bounds from config
@@ -804,6 +889,9 @@ class LossConeFitterTorch:
         """
         N_chunks = energies.size(0)
 
+        # Precompute log(data) once to avoid redundant computation in chi2
+        log_data_precomputed = precompute_log_data_torch(norm2d, data_mask)
+
         # Bounds - U_surface capped at detection threshold
         bounds = [
             (self.u_surface_min, self.u_surface_max),  # U_surface
@@ -850,8 +938,10 @@ class LossConeFitterTorch:
             background=torch.full_like(U_surface, self.background),
         )  # (N, n_lhs, nE, nPitch)
 
-        # Compute chi2 for all
-        chi2 = compute_chi2_multi_chunk_torch(models, norm2d, data_mask)  # (N, n_lhs)
+        # Compute chi2 for all (using precomputed log_data)
+        chi2 = compute_chi2_multi_chunk_torch(
+            models, norm2d, data_mask, log_data_precomputed=log_data_precomputed
+        )  # (N, n_lhs)
 
         # Penalize invalid
         chi2 = torch.where(
@@ -900,6 +990,9 @@ class LossConeFitterTorch:
         """
         N_chunks = energies.size(0)
 
+        # Precompute log(data) once to avoid redundant computation in chi2
+        log_data_precomputed = precompute_log_data_torch(norm2d, data_mask)
+
         # Bounds - U_surface capped at detection threshold
         bounds = [
             (self.u_surface_min, self.u_surface_max),  # U_surface
@@ -936,7 +1029,10 @@ class LossConeFitterTorch:
                 background=torch.full_like(U_surface, self.background),
             )
 
-            chi2 = compute_chi2_multi_chunk_torch(models, norm2d, data_mask)
+            chi2 = compute_chi2_multi_chunk_torch(
+                models, norm2d, data_mask,
+                log_data_precomputed=log_data_precomputed
+            )
             chi2 = torch.where(
                 torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
             )
@@ -964,7 +1060,7 @@ class LossConeFitterTorch:
         return best_params, best_chi2, n_iter
 
     def fit_surface_potential_batched(
-        self, batch_size: int = 100, n_lhs: int = 400
+        self, batch_size: int | None = None, n_lhs: int = 400
     ) -> np.ndarray:
         """
         Fit surface potential for all chunks using batched GPU optimization.
@@ -973,13 +1069,18 @@ class LossConeFitterTorch:
         batch optimized simultaneously using multi-spectrum DE.
 
         Args:
-            batch_size: Number of chunks to process simultaneously (tune for VRAM)
+            batch_size: Number of chunks to process simultaneously. If None,
+                auto-detects based on available VRAM and dtype.
             n_lhs: Number of LHS samples for initial grid search
 
         Returns:
             Array with columns [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
         """
         from tqdm import tqdm
+
+        # Auto-detect batch size if not specified
+        if batch_size is None:
+            batch_size = _auto_detect_batch_size(self.device, self.dtype)
 
         n_chunks = len(self.er_data.data) // self.config.SWEEP_ROWS
         results = np.full((n_chunks, 5), np.nan)

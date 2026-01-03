@@ -30,6 +30,26 @@ from src.utils.optimization import BatchedDifferentialEvolution
 ELECTRON_MASS_EV_S2_M2 = 5.685630e-12
 
 
+def _auto_detect_dtype(device: "torch.device") -> "torch.dtype":
+    """
+    Auto-detect optimal dtype for the given device.
+
+    Returns float16 on modern CUDA GPUs (Volta+, compute 7.0+) which have
+    tensor cores for fast half-precision. Returns float32 for older GPUs
+    and CPU where float16 would be slower.
+    """
+    if not HAS_TORCH:
+        raise ImportError("PyTorch is required")
+
+    if device.type == "cuda":
+        props = torch.cuda.get_device_properties(device)
+        # Volta+ (compute 7.0+) has tensor cores for fast float16
+        if props.major >= 7:
+            return torch.float16
+        return torch.float32
+    return torch.float32  # CPU: float32 is fastest
+
+
 def _torch_lgamma(x: Tensor) -> Tensor:
     """Compute log-gamma function."""
     return torch.lgamma(x)
@@ -217,7 +237,7 @@ class KappaFitterTorch:
     def __init__(
         self,
         device: str = "cpu",
-        dtype: str = "float64",
+        dtype: str = "auto",
         popsize: int = 30,
         maxiter: int = 100,
         use_convolution: bool = True,
@@ -228,7 +248,8 @@ class KappaFitterTorch:
 
         Args:
             device: torch device
-            dtype: 'float32' or 'float64'
+            dtype: 'auto', 'float16', 'float32', or 'float64'.
+                'auto' (default): float16 on modern GPUs (Volta+), float32 otherwise.
             popsize: DE population size
             maxiter: DE max iterations
             use_convolution: Apply energy response matrix
@@ -238,7 +259,14 @@ class KappaFitterTorch:
             raise ImportError("PyTorch required for KappaFitterTorch")
 
         self.device = torch.device(device)
-        self.dtype = torch.float64 if dtype == "float64" else torch.float32
+        if dtype == "auto":
+            self.dtype = _auto_detect_dtype(self.device)
+        elif dtype == "float64":
+            self.dtype = torch.float64
+        elif dtype == "float32":
+            self.dtype = torch.float32
+        else:
+            self.dtype = torch.float16
         self.popsize = popsize
         self.maxiter = maxiter
         self.use_convolution = use_convolution

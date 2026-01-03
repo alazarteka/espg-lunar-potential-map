@@ -812,8 +812,8 @@ def process_merged_data(
             spacecraft_potential=sc_potential,
             device=None,  # Auto-detect: CUDA if available, else CPU
         )
-        # Use batched processing for ~100x speedup on GPU
-        fit_mat = fitter.fit_surface_potential_batched(batch_size=100)
+        # Use batched GPU processing (auto-detects dtype and batch_size)
+        fit_mat = fitter.fit_surface_potential_batched()
         _apply_fit_results(
             fit_mat, proj_potential, bs_over_bm_arr, beam_amp_arr, fit_chi2_arr,
             row_offset=0, n_total=n
