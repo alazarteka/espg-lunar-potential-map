@@ -38,7 +38,7 @@ dependencies = [
 [project.optional-dependencies]
 notebook = ["jupyter>=1.1.0", "ipykernel>=6.29.0", "ipython>=8.34.0"]
 export = ["imageio[ffmpeg]>=2.37.0", "kaleido>=1.1.0"]
-gpu = ["torch>=2.2.0"]  # GPU acceleration (CUDA 12+, RTX 20xx+)
+gpu = ["torch>=2.7.0"]  # GPU acceleration (CUDA 12.8, RTX 20xx+, including 50xx)
 gpu-legacy = ["torch>=2.2,<2.3"]  # CUDA 11.8 builds for GTX 10xx (sm_61)
 
 [dependency-groups]
@@ -61,17 +61,23 @@ packages = ["src"]
 
 [tool.uv]
 # GPU acceleration options:
-# - Modern GPU (RTX 20xx+): uv sync --extra gpu
+# - Modern GPU (RTX 20xx-50xx): uv sync --extra gpu
 # - Legacy GPU (GTX 10xx): uv sync --extra gpu-legacy
 index-strategy = "unsafe-best-match"
+required-environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
 
 [[tool.uv.index]]
 name = "pytorch-cu118"
 url = "https://download.pytorch.org/whl/cu118"
 
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-cu118", marker = "extra == 'gpu-legacy'" },
+    { index = "pytorch-cu128", marker = "extra == 'gpu'" },
+    { index = "pytorch-cu118", marker = "extra != 'gpu' and extra == 'gpu-legacy'" },
 ]
 
 [tool.pytest.ini_options]
