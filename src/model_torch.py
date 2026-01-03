@@ -191,12 +191,13 @@ def synth_losscone_batch_torch(
 
     # Add secondary electron beam if enabled
     has_beam = (beam_width_eV > 0).any() and (beam_amp > 0).any()
-    if has_beam:
-        beam_center = torch.clamp(
-            torch.abs(U_surface - U_spacecraft_t), min=beam_width_eV
-        )
+    has_accel = (U_spacecraft_t > U_surface).any()
+    if has_beam and has_accel:
+        delta_u = U_spacecraft_t - U_surface
+        accel_mask = (delta_u > 0).to(dtype=dtype)
+        beam_center = torch.maximum(delta_u, beam_width_eV)
         beam_width_safe = torch.clamp(beam_width_eV, min=EPS)
-        energy_profile = beam_amp * torch.exp(
+        energy_profile = beam_amp * accel_mask * torch.exp(
             -0.5 * ((E_exp - beam_center) / beam_width_safe) ** 2
         )
 
@@ -349,12 +350,13 @@ def synth_losscone_multi_chunk_torch(
 
     # Add secondary electron beam if enabled
     has_beam = (beam_width_exp > 0).any() and (beam_amp_exp > 0).any()
-    if has_beam:
-        beam_center = torch.clamp(
-            torch.abs(U_surface_exp - U_spacecraft_exp), min=beam_width_exp
-        )
+    has_accel = (U_spacecraft_exp > U_surface_exp).any()
+    if has_beam and has_accel:
+        delta_u = U_spacecraft_exp - U_surface_exp
+        accel_mask = (delta_u > 0).to(dtype=dtype)
+        beam_center = torch.maximum(delta_u, beam_width_exp)
         beam_width_safe = torch.clamp(beam_width_exp, min=EPS)
-        energy_profile = beam_amp_exp * torch.exp(
+        energy_profile = beam_amp_exp * accel_mask * torch.exp(
             -0.5 * ((E_exp - beam_center) / beam_width_safe) ** 2
         )
 

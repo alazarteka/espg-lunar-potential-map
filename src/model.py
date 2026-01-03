@@ -81,8 +81,9 @@ def _compute_beam(
     """
     Compute secondary electron beam component.
 
-    The beam is a Gaussian in energy centered at |U_surface - U_spacecraft|,
-    with angular concentration near pitch = 180°.
+    The beam is a Gaussian in energy centered at U_spacecraft - U_surface,
+    with angular concentration near pitch = 180°. If U_spacecraft <= U_surface,
+    the beam is suppressed (no acceleration of secondaries).
 
     Args:
         energy: Electron energies, shape (1, nE, 1)
@@ -96,8 +97,10 @@ def _compute_beam(
     Returns:
         Beam contribution, shape (nParams, nE, nPitch)
     """
-    beam_center = np.maximum(np.abs(U_surface - U_spacecraft), beam_width_eV)
-    energy_profile = beam_amp * np.exp(
+    delta_u = U_spacecraft - U_surface
+    accel_mask = (delta_u > 0).astype(float)
+    beam_center = np.maximum(delta_u, beam_width_eV)
+    energy_profile = beam_amp * accel_mask * np.exp(
         -0.5 * ((energy - beam_center) / np.maximum(beam_width_eV, EPS)) ** 2
     )
 

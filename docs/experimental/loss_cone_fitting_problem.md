@@ -157,12 +157,12 @@ for k in range(mid):
    - Some other energy-dependent normalization we haven't considered?
 
 ### 2. **Beam Model**
-   Our implementation centers the beam at energy `|U_surface|` with fixed width and amplitude.
+   Our implementation centers the beam at energy `U_spacecraft - U_surface` (clamped by beam width) and suppresses it when `U_spacecraft <= U_surface`.
 
    **Paper says:** "add an upward-going beam, centered at an electron energy of UM - USC"
 
    **Questions:**
-   - Should beam be at `|U_surface|` or `|U_surface| - U_spacecraft`?
+   - Should we include an emission-energy offset (few eV) in the beam center?
    - How should beam amplitude scale? Currently we fix it to 1.0 for paper mode
    - Paper doesn't mention fitting beam amplitude - should it be determined by physics?
 
