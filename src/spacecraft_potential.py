@@ -6,7 +6,7 @@ branching on illumination:
 
 - Sunlight (dayside): invert a JU (photoemission) curve using the κ-fit electron
   current, pre-shift energies by −U (in eV), refit, and return corrected κ and U.
-- Shade (nightside): solve current balance Je(U) + Ji(U) − Jsee(U) = 0 with a
+- Shade (nightside): solve current balance Ji(U) + Jsee(U) - Je(U) = 0 with a
   Sternglass-like SEE model and an OML-like ion current. The κ temperature is
   mapped from the uncorrected fit to the ambient value at the trial U.
 
@@ -155,7 +155,7 @@ def current_balance(
     sey_delta_m: float,
 ) -> float:
     """
-    Signed current balance F(U) = Ji(U) + Jsee(U) − Je(U) [A m^-2].
+    Signed current balance F(U) = Ji(U) + Jsee(U) - Je(U) [A m^-2].
 
     Root at F(U)=0 defines the floating potential in shade. Positive F favors
     less-negative U; negative F favors more-negative U.
@@ -170,7 +170,7 @@ def current_balance(
     # Currents in the balance are signed: electron collection removes charge from
     # the spacecraft (negative current), while ion collection and SEE are
     # positive contributions.  Expressed in magnitudes, the net current is
-    # Ji + Jsee − Je.
+    # Ji + Jsee - Je.
     return Ji + Jsee - Je
 
 
@@ -191,7 +191,7 @@ def calculate_potential(
     Branches on illumination using Sun–Moon geometry:
         - Daylight: compute U from JU curve, pre-shift energies by −U (in eV), refit,
         and return corrected κ and U (>0 V).
-        - Shade: build F(U)=Je+Ji−Jsee and solve with Brent for U<0 V; return ambient
+        - Shade: build F(U)=Ji+Jsee-Je and solve with Brent for U<0 V; return ambient
         κ (with θ mapped at the solved U) and U.
 
     Args:

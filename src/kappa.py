@@ -561,7 +561,7 @@ class Kappa:
 
         - Shade (nightside):
             1) Fit κ on unshifted data
-            2) Solve Je(U) + Ji(U) − Jsee(U) = 0 for U via brentq
+            2) Solve Ji(U) + Jsee(U) - Je(U) = 0 for U via brentq
             3) Map κ temperature to ambient at U, build corrected params and return
 
         Returns:
@@ -641,7 +641,7 @@ class Kappa:
             # Fall back to original if corrected fit degrades
             return original_fit, U
 
-        # Nightside branch: root solve Je(U) + Ji(U) − Jsee(U) = 0
+        # Nightside branch: root solve Ji(U) + Jsee(U) - Je(U) = 0
         density_mag, kappa_val, theta_uc = original_fit.params.to_tuple()
 
         temperature_uc = theta_to_temperature_ev(theta_uc, kappa_val)
@@ -689,7 +689,7 @@ class Kappa:
 
         def balance(U: float, E_m: float, delta_m: float) -> float:
             Je, Jsee, Ji = calc_currents(U, E_m, delta_m)
-            return Je + Ji - Jsee
+            return Ji + Jsee - Je
 
         sey_E_m, sey_delta_m = 500.0, 1.5
         U_low, U_high = -10.0, 10.0
