@@ -6,29 +6,67 @@ import numpy as np
 
 class PlasmaEnvironment(IntEnum):
     """
-    Plasma environment classification based on electron temperature.
+    Plasma environment classification based on electron temperature and illumination.
 
     Thresholds from Halekas et al. 2008 and GPT-5 Pro consultation:
     - UNKNOWN: No valid temperature measurement
-    - SOLAR_WIND: Te ~ 10-30 eV (typical solar wind)
-    - MAGNETOTAIL_LOBE: Te ~ 30-150 eV (magnetotail lobes, moderate charging)
+    - SOLAR_WIND: Te < 30 eV (typical upstream solar wind)
+    - MAGNETOSHEATH: Te 30-80 eV (shocked solar wind)
+    - TAIL_LOBES: Te 80-150 eV (magnetotail lobes, moderate charging)
     - PLASMA_SHEET: Te > 150 eV (plasma sheet, can cause extreme charging to -kV)
+    - WAKE: Nightside shadow (SZA > 90°), any Te (lunar wake region)
     """
 
     UNKNOWN = 0
     SOLAR_WIND = 1
-    MAGNETOTAIL_LOBE = 2
-    PLASMA_SHEET = 3
+    MAGNETOSHEATH = 2
+    TAIL_LOBES = 3
+    PLASMA_SHEET = 4
+    WAKE = 5
 
     @classmethod
     def from_temperature(cls, te_ev: float) -> "PlasmaEnvironment":
-        """Classify environment from electron temperature in eV."""
+        """Classify environment from electron temperature in eV (legacy method)."""
         if not np.isfinite(te_ev) or te_ev <= 0:
             return cls.UNKNOWN
         if te_ev < 30:
             return cls.SOLAR_WIND
+        if te_ev < 80:
+            return cls.MAGNETOSHEATH
         if te_ev < 150:
-            return cls.MAGNETOTAIL_LOBE
+            return cls.TAIL_LOBES
+        return cls.PLASMA_SHEET
+
+    @classmethod
+    def from_temperature_and_illumination(
+        cls, te_ev: float, projection_in_sun: bool
+    ) -> "PlasmaEnvironment":
+        """
+        Classify environment from electron temperature and illumination state.
+
+        Args:
+            te_ev: Electron temperature in eV
+            projection_in_sun: True if footprint is sunlit (SZA < 90°)
+
+        Returns:
+            PlasmaEnvironment classification
+
+        Classification priority:
+        1. Shadow (projection_in_sun=False) → WAKE
+        2. Temperature-based classification for sunlit regions
+        """
+        if not np.isfinite(te_ev) or te_ev <= 0:
+            return cls.UNKNOWN
+        # Shadow regions are classified as WAKE regardless of temperature
+        if not projection_in_sun:
+            return cls.WAKE
+        # Sunlit regions: temperature-based classification
+        if te_ev < 30:
+            return cls.SOLAR_WIND
+        if te_ev < 80:
+            return cls.MAGNETOSHEATH
+        if te_ev < 150:
+            return cls.TAIL_LOBES
         return cls.PLASMA_SHEET
 
 
@@ -60,7 +98,7 @@ class PotentialResults:
     Environment:
     - spacecraft_in_sun: True if LP→Sun line-of-sight does not intersect Moon.
     - projection_in_sun: True if surface normal · Moon→Sun > 0 at intersection.
-    - environment_class: PlasmaEnvironment classification (0=unknown, 1=SW, 2=lobe, 3=PS).
+    - environment_class: PlasmaEnvironment classification (0=unknown, 1=SW, 2=sheath, 3=lobes, 4=PS, 5=wake).
     """
 
     # Coordinates
@@ -109,9 +147,13 @@ class PotentialResults:
             self.environment_class = np.zeros(n, dtype=np.int8)
 
     def classify_environments(self) -> None:
-        """Classify plasma environment for each row based on electron temperature."""
-        for i, te in enumerate(self.electron_temperature):
-            self.environment_class[i] = PlasmaEnvironment.from_temperature(te)
+        """Classify plasma environment for each row based on temperature and illumination."""
+        for i, (te, in_sun) in enumerate(
+            zip(self.electron_temperature, self.projection_in_sun)
+        ):
+            self.environment_class[i] = PlasmaEnvironment.from_temperature_and_illumination(
+                te, bool(in_sun)
+            )
 
 
 def _concat_results(results: list[PotentialResults]) -> PotentialResults:
