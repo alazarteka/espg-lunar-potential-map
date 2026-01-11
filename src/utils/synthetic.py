@@ -11,9 +11,10 @@ from src.physics.kappa import KappaParams, omnidirectional_flux
 from src.utils.units import ureg
 
 __all__ = [
-    "prepare_phis",
     "prepare_flux",
+    "prepare_phis",
     "prepare_synthetic_er",
+    "prepare_synthetic_er_poisson",
 ]
 
 
@@ -116,3 +117,65 @@ def prepare_synthetic_er(
     synthetic_er_data[config.MAG_COLS] = np.random.rand(3)
 
     return ERData.from_dataframe(synthetic_er_data, "synthetic")
+
+
+def prepare_synthetic_er_poisson(
+    density: float = 1e10,
+    kappa: float = 5.0,
+    theta: float = 1e6,
+    seed: int | None = 42,
+    background_count: float = 0.0,
+) -> ERData:
+    """
+    Construct a synthetic ERData instance with Poisson noise in flux/counts.
+
+    This simulates Poisson counting statistics by sampling counts per channel
+    from the expected flux and then reconstructing the flux from those counts.
+    """
+
+    base = prepare_synthetic_er(density=density, kappa=kappa, theta=theta)
+    df = base.data.copy()
+
+    # Remove count columns so ERData can rebuild with updated flux.
+    for col in config.COUNT_COLS:
+        if col in df.columns:
+            df = df.drop(columns=[col])
+
+    # Compute expected counts per channel from the current flux.
+    flux_units = (
+        ureg.particle
+        / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
+    )
+    flux = df[config.FLUX_COLS].to_numpy(dtype=np.float64) * flux_units
+    energies = df[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[:, None]
+    energies = energies * ureg.electron_volt
+
+    thetas = np.loadtxt(config.DATA_DIR / config.THETA_FILE, dtype=np.float64)
+    integration_time = (
+        np.array([1 / config.BINS_BY_LATITUDE[x] for x in thetas])
+        * config.ACCUMULATION_TIME
+    )
+    integration_time = integration_time[None, :]
+
+    expected_counts = flux * config.GEOMETRIC_FACTOR * energies * integration_time
+    expected_counts_mag = expected_counts.to(ureg.particle).magnitude
+    expected_counts_mag = np.clip(expected_counts_mag, 0, None)
+    if background_count > 0:
+        expected_counts_mag = expected_counts_mag + background_count
+
+    rng = np.random.default_rng(seed)
+    noisy_counts = rng.poisson(expected_counts_mag).astype(np.float64)
+
+    # Reconstruct flux from Poisson-sampled counts.
+    denom = config.GEOMETRIC_FACTOR * energies * integration_time
+    flux_noisy = (noisy_counts * ureg.particle) / denom
+    df[config.FLUX_COLS] = flux_noisy.to(flux_units).magnitude
+
+    er = ERData.from_dataframe(df, "synthetic-poisson")
+
+    # Override count columns with Poisson totals to preserve noise statistics.
+    count_sum = noisy_counts.sum(axis=1)
+    er.data[config.COUNT_COLS[0]] = count_sum
+    er.data[config.COUNT_COLS[1]] = np.sqrt(count_sum)
+
+    return er

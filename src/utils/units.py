@@ -6,12 +6,14 @@ from pint import Quantity
 ureg = pint.UnitRegistry()
 # ureg.enable_contexts("numpy")
 
+
 def validate_quantity(value: Any, expected_unit: pint.Unit, name: str) -> Quantity:
     if not isinstance(value, Quantity) or not value.is_compatible_with(expected_unit):
         raise TypeError(
             f"{name} must be a pint Quantity compatible with {expected_unit}"
         )
     return value
+
 
 LengthType = Annotated[Quantity, ureg.meter]
 SpeedType = Annotated[Quantity, ureg.meter / ureg.second]
@@ -41,21 +43,21 @@ PhaseSpaceDensityType = Annotated[
 CurrentDensityType = Annotated[Quantity, ureg.ampere / ureg.meter**2]
 
 __all__ = [
-    "ureg",
-    "validate_quantity",
-    "LengthType",
-    "SpeedType",
-    "MassType",
-    "EnergyType",
-    "NumberDensityType",
-    "DimensionlessType",
+    "AngleType",
     "ChargeType",
+    "CurrentDensityType",
+    "DimensionlessType",
+    "EnergyType",
+    "FluxType",
+    "IntegratedFluxType",
+    "LengthType",
+    "MassType",
+    "NumberDensityType",
+    "OmnidirectionalFluxType",
+    "PhaseSpaceDensityType",
+    "SpeedType",
     "TimeType",
     "VoltageType",
-    "AngleType",
-    "FluxType",
-    "OmnidirectionalFluxType",
-    "IntegratedFluxType",
-    "PhaseSpaceDensityType",
-    "CurrentDensityType",
+    "ureg",
+    "validate_quantity",
 ]

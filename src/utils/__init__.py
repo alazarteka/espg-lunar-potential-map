@@ -37,31 +37,31 @@ from .synthetic import (
 
 # Re-export for backward compatibility
 __all__ = [
-    # File operations
-    "list_files",
-    "list_folder_files",
+    "build_scd_to_j2000",
+    "cartesian_to_lat_lon",
+    "get_current_ra_dec",
+    # Geometry
+    "get_intersection_or_none",
+    "get_j2000_iau_moon_transform_matrix",
     # SPICE operations
     "get_lp_position_wrt_moon",
     "get_lp_vector_to_sun_in_lunar_frame",
     "get_sun_vector_wrt_moon",
-    "get_j2000_iau_moon_transform_matrix",
-    # Coordinate transformations
-    "ra_dec_to_unit",
-    "cartesian_to_lat_lon",
+    "get_time_range",
     "lat_lon_to_cartesian",
-    "build_scd_to_j2000",
+    # File operations
+    "list_files",
+    "list_folder_files",
     # Attitude operations
     "load_attitude_data",
-    "get_current_ra_dec",
-    "get_time_range",
-    # Geometry
-    "get_intersection_or_none",
     # Energy helpers
     "make_relative_energy_bounds",
-    # Flux file helpers
-    "select_flux_day_file",
+    "prepare_flux",
     # Synthetic data helpers
     "prepare_phis",
-    "prepare_flux",
     "prepare_synthetic_er",
+    # Coordinate transformations
+    "ra_dec_to_unit",
+    # Flux file helpers
+    "select_flux_day_file",
 ]

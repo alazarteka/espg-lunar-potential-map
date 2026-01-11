@@ -19,7 +19,7 @@ except ImportError:
     Tensor = None  # type: ignore[misc, assignment]
 
 
-def get_torch_device(device: str | None = None) -> "torch.device":
+def get_torch_device(device: str | None = None) -> torch.device:
     """
     Get the appropriate torch device.
 
@@ -64,7 +64,7 @@ class BatchedDifferentialEvolution:
         atol: float = 1e-3,
         seed: int = 42,
         device: str | None = None,
-        dtype: "torch.dtype | None" = None,
+        dtype: torch.dtype | None = None,
     ):
         """
         Initialize DE optimizer.
@@ -138,11 +138,9 @@ class BatchedDifferentialEvolution:
                         0, 1, self.popsize + 1, device=self.device, dtype=self.dtype
                     )
                     for j in range(self.popsize):
-                        pop[j, i] = (
-                            bins[j]
-                            + torch.rand(1, device=self.device, dtype=self.dtype)
-                            * (bins[j + 1] - bins[j])
-                        )
+                        pop[j, i] = bins[j] + torch.rand(
+                            1, device=self.device, dtype=self.dtype
+                        ) * (bins[j + 1] - bins[j])
                     perm = torch.randperm(self.popsize, device=self.device)
                     pop[:, i] = pop[perm, i]
 
@@ -150,9 +148,12 @@ class BatchedDifferentialEvolution:
         pop = self.lower + pop * (self.upper - self.lower)
         return pop
 
-    def _init_population_multi(self) -> Tensor:
+    def _init_population_multi(self, x0: Tensor | None = None) -> Tensor:
         """
         Initialize population for multi-spectrum mode using Sobol sequence.
+
+        Args:
+            x0: Optional (n_spectra, n_params) initial best guesses to seed population
 
         Returns:
             (n_spectra, popsize, n_params) population tensor
@@ -164,7 +165,7 @@ class BatchedDifferentialEvolution:
 
             sobol = SobolEngine(dimension=self.n_params, scramble=True)
             unit_samples = sobol.draw(P).to(device=self.device, dtype=self.dtype)
-            unit_samples = unit_samples.unsqueeze(0).expand(N, -1, -1)
+            unit_samples = unit_samples.unsqueeze(0).expand(N, -1, -1).clone()
         except ImportError:
             unit_samples = torch.rand(
                 N, P, self.n_params, device=self.device, dtype=self.dtype
@@ -172,6 +173,11 @@ class BatchedDifferentialEvolution:
 
         # Scale to bounds
         pop = self.lower + unit_samples * (self.upper - self.lower)
+
+        # Seed first member of each population with x0 if provided
+        if x0 is not None:
+            pop[:, 0, :] = x0.to(self.device)
+
         return pop
 
     def _mutate_single(
@@ -214,9 +220,7 @@ class BatchedDifferentialEvolution:
         """Binomial crossover for single-spectrum mode."""
         pop_size, n_params = population.shape
 
-        cross_mask = (
-            torch.rand(pop_size, n_params, device=self.device) < self.crossover
-        )
+        cross_mask = torch.rand(pop_size, n_params, device=self.device) < self.crossover
 
         j_rand = torch.randint(0, n_params, (pop_size,), device=self.device)
         for i in range(pop_size):
@@ -249,7 +253,9 @@ class BatchedDifferentialEvolution:
         Args:
             objective_fn: For single-spectrum mode: (popsize, n_params) -> (popsize,)
                          For multi-spectrum mode: (n_spectra, popsize, n_params) -> (n_spectra, popsize)
-            x0: Optional initial best guess (single-spectrum mode only)
+            x0: Optional initial best guess
+                - Single-spectrum: (n_params,) tensor
+                - Multi-spectrum: (n_spectra, n_params) tensor
 
         Returns:
             best_params: (n_params,) or (n_spectra, n_params) best solution(s)
@@ -259,7 +265,7 @@ class BatchedDifferentialEvolution:
         if self.n_spectra == 1:
             return self._optimize_single(objective_fn, x0)
         else:
-            return self._optimize_multi(objective_fn)
+            return self._optimize_multi(objective_fn, x0)
 
     def _optimize_single(
         self,
@@ -307,11 +313,12 @@ class BatchedDifferentialEvolution:
     def _optimize_multi(
         self,
         objective_fn,
+        x0: Tensor | None = None,
     ) -> tuple[Tensor, Tensor, int]:
         """Run multi-spectrum DE optimization."""
-        N, P = self.n_spectra, self.popsize
+        N, _P = self.n_spectra, self.popsize
 
-        population = self._init_population_multi()
+        population = self._init_population_multi(x0)
         fitness = objective_fn(population)
 
         best_idx = torch.argmin(fitness, dim=1)
@@ -337,7 +344,9 @@ class BatchedDifferentialEvolution:
             ).squeeze(1)
 
             improved_mask = current_best_fitness < best_fitness
-            best_fitness = torch.where(improved_mask, current_best_fitness, best_fitness)
+            best_fitness = torch.where(
+                improved_mask, current_best_fitness, best_fitness
+            )
 
             new_best_params = population.gather(
                 1, current_best_idx.view(N, 1, 1).expand(-1, -1, self.n_params)

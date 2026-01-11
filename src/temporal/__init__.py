@@ -18,12 +18,12 @@ from .reconstruction import (
 
 __all__ = [
     "HarmonicCoefficients",
-    "TimeWindow",
     "TemporalDataset",
-    "compute_temporal_harmonics",
+    "TimeWindow",
     "compute_cell_edges",
     "compute_color_limits",
     "compute_potential_series",
+    "compute_temporal_harmonics",
     "format_timestamp",
     "load_temporal_coefficients",
     "main",

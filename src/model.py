@@ -62,7 +62,8 @@ def _compute_loss_cone_angle(
     # TODO: Review behavior when E < U_spacecraft (physically impossible case).
     # Current: clamp to EPS → x large negative → clips to 0 → full loss cone.
     # Alternative: let E_corrected go negative → x > 1 → clips to 1 → closed cone.
-    # The alternative may be more physically correct (no electrons at impossible energies).
+    # The alternative may be more physically correct (no electrons at impossible
+    # energies).
     E_corrected = np.maximum(energy - U_spacecraft, EPS)
     x = bs_over_bm * (1.0 + U_surface / E_corrected)
     x_clipped = np.clip(x, 0.0, 1.0)
@@ -81,8 +82,9 @@ def _compute_beam(
     """
     Compute secondary electron beam component.
 
-    The beam is a Gaussian in energy centered at |U_surface - U_spacecraft|,
-    with angular concentration near pitch = 180°.
+    The beam is a Gaussian in energy centered at U_spacecraft - U_surface,
+    with angular concentration near pitch = 180°. If U_spacecraft <= U_surface,
+    the beam is suppressed (no acceleration of secondaries).
 
     Args:
         energy: Electron energies, shape (1, nE, 1)
@@ -96,15 +98,15 @@ def _compute_beam(
     Returns:
         Beam contribution, shape (nParams, nE, nPitch)
     """
-    beam_center = np.maximum(np.abs(U_surface - U_spacecraft), beam_width_eV)
-    energy_profile = beam_amp * np.exp(
+    delta_u = U_spacecraft - U_surface
+    accel_mask = (delta_u > 0).astype(float)
+    beam_center = np.maximum(delta_u, beam_width_eV)
+    energy_profile = beam_amp * accel_mask * np.exp(
         -0.5 * ((energy - beam_center) / np.maximum(beam_width_eV, EPS)) ** 2
     )
 
     if beam_pitch_sigma_deg > 0:
-        pitch_profile = np.exp(
-            -0.5 * ((pitch - 180.0) / beam_pitch_sigma_deg) ** 2
-        )
+        pitch_profile = np.exp(-0.5 * ((pitch - 180.0) / beam_pitch_sigma_deg) ** 2)
     else:
         pitch_profile = 1.0
 
@@ -188,7 +190,7 @@ def synth_losscone_batch(
     if U_spacecraft.ndim == 0:
         U_spacecraft = U_spacecraft.reshape(1, 1, 1)
     else:
-        U_spacecraft = U_spacecraft[None, :, None]
+        U_spacecraft = U_spacecraft.reshape(1, -1, 1)
 
     # Compute loss cone angle
     ac_deg = _compute_loss_cone_angle(E_exp, U_surface, U_spacecraft, bs_over_bm)
@@ -204,8 +206,13 @@ def synth_losscone_batch(
     # Add secondary electron beam if enabled
     if np.any(beam_width_eV > 0) and np.any(beam_amp > 0):
         beam = _compute_beam(
-            E_exp, pitch_exp, U_surface, U_spacecraft,
-            beam_amp, beam_width_eV, beam_pitch_sigma_deg
+            E_exp,
+            pitch_exp,
+            U_surface,
+            U_spacecraft,
+            beam_amp,
+            beam_width_eV,
+            beam_pitch_sigma_deg,
         )
         model += beam
 

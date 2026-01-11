@@ -10,13 +10,22 @@ Currently in active development—major revisions ongoing.
 
 This project uses modern Python scientific computing libraries:
 
-- **Core Scientific:** `numpy`, `pandas`, `scipy`, `matplotlib`
+- **Core Scientific:** `numpy`, `pandas`, `scipy`, `matplotlib`, `numba`
 - **Space Science:** `spiceypy` (NASA SPICE toolkit)
-- **Data Processing:** `requests`, `beautifulsoup4`, `tqdm`
-- **Interactive Analysis:** `jupyter`, `plotly`, `ipython`
-- **Development:** `pytest`, `black`, `ruff`, `mypy`
+- **Data Processing:** `requests`, `beautifulsoup4`, `tqdm`, `pint`
+- **Visualization:** `plotly`, `tabulate`
 
-All dependencies are managed through UV and specified in `pyproject.toml`.
+Optional dependencies:
+- **Notebooks:** `jupyter`, `ipykernel`, `ipython` (install with `--extra notebook`)
+- **Export:** `imageio[ffmpeg]`, `kaleido` (install with `--extra export`)
+- **GPU Acceleration:** `torch` (install with `--extra gpu` or `--extra gpu-legacy`)
+
+Development tools:
+- **Testing:** `pytest`, `pytest-cov`
+- **Linting/Formatting:** `ruff`
+- **Type Checking:** `mypy`
+
+All dependencies are managed through [UV](https://docs.astral.sh/uv/) and specified in `pyproject.toml`.
 
 ## Project Structure
 
@@ -39,7 +48,9 @@ All dependencies are managed through UV and specified in `pyproject.toml`.
     ├── data_acquisition.py # Handles data and SPICE kernel acquisition
     ├── flux.py             # ER flux + loss-cone fitting
     ├── kappa.py            # Kappa distribution fitting utilities
+    ├── kappa_torch.py      # PyTorch-accelerated Kappa fitter
     ├── model.py            # Core modeling components
+    ├── model_torch.py      # PyTorch-accelerated loss-cone model
     ├── potential_mapper/   # Modular potential mapping package
     │   ├── __init__.py
     │   ├── __main__.py     # Enables `python -m src.potential_mapper`
@@ -54,6 +65,7 @@ All dependencies are managed through UV and specified in `pyproject.toml`.
         ├── coordinates.py
         ├── file_ops.py
         ├── geometry.py
+        ├── optimization.py # Batched differential evolution optimizer
         └── spice_ops.py
 ```
 
@@ -63,7 +75,7 @@ and exploratory outputs that should stay out of version control.
 ## Installation
 
 ### Prerequisites
-- Python 3.12 or later
+- Python 3.12 (required; 3.13 is not supported yet)
 - [UV package manager](https://docs.astral.sh/uv/)
 
 ### Setup
@@ -73,21 +85,93 @@ and exploratory outputs that should stay out of version control.
     curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
 
-2.  **Set up the project environment:**
+2.  **Clone and set up the project:**
     ```bash
-    # Clone the repository (if not already done)
-    git clone <repository-url>
+    git clone https://github.com/alazarteka/espg-lunar-potential-map.git
     cd espg-lunar-potential-map
-    
-    # Install dependencies and create virtual environment
+
+    # Install core dependencies
     uv sync
+
+    # Or install with development tools
+    uv sync --group dev
+
+    # Or install with notebook support
+    uv sync --extra notebook
+
+    # Or install everything (dev + notebooks + export)
+    uv sync --group dev --extra notebook --extra export
     ```
 
-3.  **Download necessary data:**
+3.  **GPU acceleration (optional):**
+    ```bash
+    # Modern GPU (RTX 20xx+, CUDA 12.x) - uses default PyPI torch
+    uv sync --extra gpu
+
+    # Legacy GPU (GTX 10xx, CUDA 11.8) - uses PyTorch cu118 index (Python 3.12 only)
+    uv sync --extra gpu-legacy
+    ```
+
+4.  **Download necessary data:**
     ```bash
     uv run python -m src.data_acquisition
     ```
 
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=src
+
+# Run tests excluding slow/CI-skipped tests
+uv run pytest -m "not skip_ci and not slow"
+
+# Run specific test file
+uv run pytest tests/test_model_torch.py -v
+```
+
+### Linting and Formatting
+
+```bash
+# Check for lint errors
+uv run ruff check src tests
+
+# Auto-fix fixable issues
+uv run ruff check src tests --fix
+
+# Check formatting
+uv run ruff format --check src tests
+
+# Apply formatting
+uv run ruff format src tests
+```
+
+### Type Checking
+
+```bash
+uv run mypy src
+```
+
+### Adding Dependencies
+
+```bash
+# Add a runtime dependency
+uv add package-name
+
+# Add to a dependency group (dev tools)
+uv add --group dev package-name
+
+# Add to an optional extra
+uv add --optional notebook package-name
+
+# Update all dependencies
+uv sync --upgrade
+```
 
 ## Data
 
@@ -104,13 +188,13 @@ After setting up and downloading data, run the desired module using UV. For exam
 # Run the potential mapper
 uv run python -m src.potential_mapper
 
-# Start Jupyter Lab for interactive analysis
+# Start Jupyter Lab for interactive analysis (requires --extra notebook)
 uv run jupyter lab
 
 # Start Jupyter Notebook
 uv run jupyter notebook
 
-# Run tests (if available)
+# Run tests
 uv run pytest
 ```
 
@@ -179,19 +263,3 @@ PY
 The example above reports approximately -74 V to +39 V spacecraft potentials and
 strong negative surface potentials for the September 16, 1998 pass, indicating
 the median spacecraft bias is being removed before fitting ΔU.
-
-### Development
-
-```bash
-# Add new dependencies
-uv add package-name
-
-# Add development dependencies
-uv add --dev pytest black ruff
-
-# Update dependencies
-uv sync --upgrade
-
-# Run with specific Python version
-uv run --python 3.12 python script.py
-```

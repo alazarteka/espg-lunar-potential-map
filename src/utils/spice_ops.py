@@ -105,6 +105,7 @@ def get_lp_position_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
     Batch version of get_lp_position_wrt_moon.
     Returns (N, 3) array. Rows with errors are NaN.
     """
+
     def compute(t: float) -> np.ndarray | None:
         try:
             pos, _ = spice.spkpos(LP, t, "J2000", "NONE", MOON)
@@ -121,6 +122,7 @@ def get_lp_vector_to_sun_in_lunar_frame_batch(times: np.ndarray) -> np.ndarray:
     Batch version of get_lp_vector_to_sun_in_lunar_frame.
     Returns (N, 3) array. Rows with errors are NaN.
     """
+
     def compute(t: float) -> np.ndarray | None:
         try:
             pos, _ = spice.spkpos(SUN, t, "J2000", "NONE", LP)
@@ -137,6 +139,7 @@ def get_sun_vector_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
     Batch version of get_sun_vector_wrt_moon.
     Returns (N, 3) array. Rows with errors are NaN.
     """
+
     def compute(t: float) -> np.ndarray | None:
         try:
             pos, _ = spice.spkpos(SUN, t, "J2000", "NONE", MOON)
@@ -153,6 +156,7 @@ def get_j2000_iau_moon_transform_matrix_batch(times: np.ndarray) -> np.ndarray:
     Batch version of get_j2000_iau_moon_transform_matrix.
     Returns (N, 3, 3) array. Rows with errors are NaN.
     """
+
     def compute(t: float) -> np.ndarray | None:
         try:
             return spice.pxform("J2000", "IAU_MOON", t)

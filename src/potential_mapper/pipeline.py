@@ -12,22 +12,23 @@ import src.config as config
 from src.flux import ERData, LossConeFitter
 
 try:
-    from src.model_torch import LossConeFitterTorch, HAS_TORCH
+    from src.model_torch import HAS_TORCH, LossConeFitterTorch
 except ImportError:
     HAS_TORCH = False
     LossConeFitterTorch = None  # type: ignore[misc, assignment]
 
 try:
     from src.kappa_torch import KappaFitterTorch
+
     HAS_KAPPA_TORCH = True
 except ImportError:
     HAS_KAPPA_TORCH = False
     KappaFitterTorch = None  # type: ignore[misc, assignment]
 
-from src.kappa import Kappa, FitResults
-from src.physics.kappa import KappaParams
+from src.kappa import FitResults, Kappa
 from src.physics.charging import electron_current_density_magnitude
 from src.physics.jucurve import U_from_J
+from src.physics.kappa import KappaParams
 from src.potential_mapper import plot as plot_mod
 from src.potential_mapper.coordinates import (
     CoordinateArrays,
@@ -39,7 +40,7 @@ from src.potential_mapper.date_utils import (
     MONTH_ABBREV_TO_NUM,
     NUM_STR_TO_MONTH_ABBREV,
 )
-from src.potential_mapper.results import PotentialResults, _concat_results
+from src.potential_mapper.results import PotentialResults
 from src.utils.attitude import load_attitude_data
 from src.utils.geometry import get_intersections_or_none_batch
 from src.utils.units import ureg
@@ -232,9 +233,7 @@ def _spacecraft_potential_per_row_parallel(
     # Execute in parallel with SPICE initialization per worker
     # Use 'spawn' context to ensure thread-safety for SPICE (avoid global state corruption)
     ctx = multiprocessing.get_context("spawn")
-    with ctx.Pool(
-        processes=num_workers, initializer=_init_worker_spice
-    ) as pool:
+    with ctx.Pool(processes=num_workers, initializer=_init_worker_spice) as pool:
         # Use imap_unordered for better memory efficiency
         # Chunksize: distribute work in reasonable batches
         chunksize = max(1, len(tasks) // (num_workers * 4))
@@ -326,6 +325,9 @@ def _spacecraft_potential_per_row_torch(
     er_data: ERData,
     n_rows: int,
     is_day: np.ndarray | None = None,
+    electron_temp_out: np.ndarray | None = None,
+    electron_dens_out: np.ndarray | None = None,
+    kappa_out: np.ndarray | None = None,
 ) -> np.ndarray:
     """
     Return spacecraft potential per ER row using PyTorch-accelerated Kappa fitting.
@@ -337,15 +339,18 @@ def _spacecraft_potential_per_row_torch(
         er_data: ERData containing all spectra
         n_rows: Total number of rows
         is_day: (n_rows,) boolean array indicating daytime rows (optional)
+        electron_temp_out: Optional output array to fill with electron temperature [eV]
+        electron_dens_out: Optional output array to fill with electron density [m^-3]
+        kappa_out: Optional output array to fill with kappa parameter values
 
     Returns:
         Array of spacecraft potentials per row
     """
     from scipy.optimize import brentq
+
     from src.spacecraft_potential import (
-        theta_to_temperature_ev,
-        temperature_ev_to_theta,
         current_balance,
+        theta_to_temperature_ev,
     )
 
     potentials = np.full(n_rows, np.nan)
@@ -357,7 +362,7 @@ def _spacecraft_potential_per_row_torch(
 
     # Prepare batch data
     logging.info("Preparing batch data for Kappa fitting...")
-    energy, flux_data, density_estimates, valid_spec_nos, first_row_indices = (
+    energy, flux_data, density_estimates, valid_spec_nos, _first_row_indices = (
         _prepare_kappa_batch_data(er_data)
     )
 
@@ -380,13 +385,15 @@ def _spacecraft_potential_per_row_torch(
     # Compute spacecraft potential for each spectrum
     spec_values = er_data.data[config.SPEC_NO_COLUMN].to_numpy()
 
-    for i, spec_no in enumerate(tqdm(
-        valid_spec_nos,
-        desc="Computing SC Potential",
-        unit="spec",
-        leave=False,
-        dynamic_ncols=True,
-    )):
+    for i, spec_no in enumerate(
+        tqdm(
+            valid_spec_nos,
+            desc="Computing SC Potential",
+            unit="spec",
+            leave=False,
+            dynamic_ncols=True,
+        )
+    ):
         mask_idx = np.flatnonzero(spec_values == spec_no)
         if mask_idx.size == 0:
             continue
@@ -398,6 +405,17 @@ def _spacecraft_potential_per_row_torch(
         kappa = kappa_vals[i]
         theta = theta_vals[i]  # m/s
         density = density_estimates[i]  # particles/m³
+
+        # Convert theta to electron temperature in eV
+        Te_ev = theta_to_temperature_ev(theta, kappa)
+
+        # Store kappa parameters if output arrays provided
+        if electron_temp_out is not None:
+            electron_temp_out[mask_idx] = Te_ev
+        if electron_dens_out is not None:
+            electron_dens_out[mask_idx] = density
+        if kappa_out is not None:
+            kappa_out[mask_idx] = kappa
 
         # Determine day/night
         row_idx = mask_idx[0]
@@ -417,10 +435,11 @@ def _spacecraft_potential_per_row_torch(
                 potential_value = float(spacecraft_potential)
             else:
                 # Night: solve current balance equation
-                temperature_ev = theta_to_temperature_ev(theta, kappa)
+                theta_to_temperature_ev(theta, kappa)
 
                 # Create a FitResults-like object for the current_balance function
                 from src.utils.units import ureg
+
                 params = KappaParams(
                     density=density * ureg.particle / ureg.meter**3,
                     kappa=kappa,
@@ -438,13 +457,22 @@ def _spacecraft_potential_per_row_torch(
 
                 # Bracket search
                 U_low, U_high = -1500.0, 0.0
-                balance_low = current_balance(U_low, fit_result, energy_grid, 500.0, 1.5)
-                balance_high = current_balance(U_high, fit_result, energy_grid, 500.0, 1.5)
+                balance_low = current_balance(
+                    U_low, fit_result, energy_grid, 500.0, 1.5
+                )
+                balance_high = current_balance(
+                    U_high, fit_result, energy_grid, 500.0, 1.5
+                )
 
                 bracket_expansions = 0
-                while np.sign(balance_low) == np.sign(balance_high) and bracket_expansions < 10:
+                while (
+                    np.sign(balance_low) == np.sign(balance_high)
+                    and bracket_expansions < 10
+                ):
                     U_low *= 1.5
-                    balance_low = current_balance(U_low, fit_result, energy_grid, 500.0, 1.5)
+                    balance_low = current_balance(
+                        U_low, fit_result, energy_grid, 500.0, 1.5
+                    )
                     bracket_expansions += 1
 
                 if np.isnan(balance_low) or np.isnan(balance_high):
@@ -472,26 +500,36 @@ def _spacecraft_potential_per_row_torch(
 
 
 def _apply_fit_results(
-    fit_results: np.ndarray, proj_potential: np.ndarray, row_offset: int, n_total: int
+    fit_results: np.ndarray,
+    proj_potential: np.ndarray,
+    bs_over_bm: np.ndarray,
+    beam_amp: np.ndarray,
+    fit_chi2: np.ndarray,
+    row_offset: int,
+    n_total: int,
 ) -> None:
-    """Map fitter outputs back onto per-row projected potential array."""
+    """Map fitter outputs back onto per-row arrays."""
 
     rows_per_sweep = config.SWEEP_ROWS
     if fit_results.size == 0:
         return
 
-    for U_surface, _bs, _beam_amp, chi2, chunk_idx in fit_results:
+    for U_surface, bs, amp, chi2, chunk_idx in fit_results:
         chunk_idx = int(chunk_idx)
-        if not np.isfinite(U_surface) or not np.isfinite(chi2):
-            continue
-        if chi2 > config.FIT_ERROR_THRESHOLD:
-            continue
-
         row_start = row_offset + chunk_idx * rows_per_sweep
         row_end = min(row_start + rows_per_sweep, n_total)
         if row_start >= n_total:
             break
-        proj_potential[row_start:row_end] = float(U_surface)
+
+        # Always store fit parameters (even if chi2 is high)
+        bs_over_bm[row_start:row_end] = float(bs)
+        beam_amp[row_start:row_end] = float(amp)
+        fit_chi2[row_start:row_end] = float(chi2)
+
+        # Only store U_surface if fit quality is acceptable
+        if np.isfinite(U_surface) and np.isfinite(chi2):
+            if chi2 <= config.FIT_ERROR_THRESHOLD:
+                proj_potential[row_start:row_end] = float(U_surface)
 
 
 class DataLoader:
@@ -707,6 +745,11 @@ def process_merged_data(
         proj_in_sun_masked = dots > 0
         proj_in_sun[mask] = proj_in_sun_masked
 
+    # Kappa/plasma parameters - will be filled by torch path if available
+    electron_temp = np.full(n, np.nan)
+    electron_dens = np.full(n, np.nan)
+    kappa_vals_arr = np.full(n, np.nan)
+
     # Spacecraft potential
     logging.info("Calculating spacecraft potential...")
     if use_torch:
@@ -719,7 +762,10 @@ def process_merged_data(
         else:
             try:
                 sc_potential = _spacecraft_potential_per_row_torch(
-                    er_data, n, is_day=sc_in_sun
+                    er_data, n, is_day=sc_in_sun,
+                    electron_temp_out=electron_temp,
+                    electron_dens_out=electron_dens,
+                    kappa_out=kappa_vals_arr,
                 )
             except Exception as e:
                 logging.warning(
@@ -740,6 +786,9 @@ def process_merged_data(
     # Surface Potential Fitting
     theta_path = str(config.DATA_DIR / config.THETA_FILE)
     proj_potential = np.full(n, np.nan)
+    bs_over_bm_arr = np.full(n, np.nan)
+    beam_amp_arr = np.full(n, np.nan)
+    fit_chi2_arr = np.full(n, np.nan)
 
     # If the dataset is small, or ERData has been monkeypatched without
     # from_dataframe (as in some tests), fall back to sequential fitting.
@@ -754,18 +803,21 @@ def process_merged_data(
         # PyTorch-accelerated fitter (~5x faster)
         if not HAS_TORCH or LossConeFitterTorch is None:
             raise ImportError(
-                "PyTorch is required for --fast mode. "
-                "Install with: uv sync --extra gpu"
+                "PyTorch is required for --fast mode. Install with: uv sync --extra gpu"
             )
         logging.info("Running surface potential fitting (PyTorch-accelerated)...")
         fitter = LossConeFitterTorch(
             er_data,
             theta_path,
             spacecraft_potential=sc_potential,
-            device="cpu",
+            device=None,  # Auto-detect: CUDA if available, else CPU
         )
-        fit_mat = fitter.fit_surface_potential()
-        _apply_fit_results(fit_mat, proj_potential, row_offset=0, n_total=n)
+        # Use batched GPU processing (auto-detects dtype and batch_size)
+        fit_mat = fitter.fit_surface_potential_batched()
+        _apply_fit_results(
+            fit_mat, proj_potential, bs_over_bm_arr, beam_amp_arr, fit_chi2_arr,
+            row_offset=0, n_total=n
+        )
     elif not chunked:
         logging.info("Running surface potential fitting (sequential)...")
         fitter = LossConeFitter(
@@ -774,7 +826,10 @@ def process_merged_data(
             spacecraft_potential=sc_potential,
         )
         fit_mat = fitter.fit_surface_potential()
-        _apply_fit_results(fit_mat, proj_potential, row_offset=0, n_total=n)
+        _apply_fit_results(
+            fit_mat, proj_potential, bs_over_bm_arr, beam_amp_arr, fit_chi2_arr,
+            row_offset=0, n_total=n
+        )
     else:
         logging.info("Starting parallel surface potential fitting...")
 
@@ -804,9 +859,13 @@ def process_merged_data(
                     )
                 ):
                     row_offset = chunk_idx * rows_per_chunk
-                    _apply_fit_results(chunk_res, proj_potential, row_offset, n_total=n)
+                    _apply_fit_results(
+                        chunk_res, proj_potential, bs_over_bm_arr, beam_amp_arr,
+                        fit_chi2_arr, row_offset, n_total=n
+                    )
 
-    return PotentialResults(
+    # Build results object
+    results = PotentialResults(
         spacecraft_latitude=spacecraft_lat,
         spacecraft_longitude=spacecraft_lon,
         projection_latitude=proj_lat,
@@ -815,7 +874,18 @@ def process_merged_data(
         projected_potential=proj_potential,
         spacecraft_in_sun=sc_in_sun,
         projection_in_sun=proj_in_sun,
+        bs_over_bm=bs_over_bm_arr,
+        beam_amp=beam_amp_arr,
+        fit_chi2=fit_chi2_arr,
+        electron_temperature=electron_temp,
+        electron_density=electron_dens,
+        kappa_value=kappa_vals_arr,
     )
+
+    # Classify plasma environments based on electron temperature
+    results.classify_environments()
+
+    return results
 
 
 def process_lp_file(file_path: Path) -> PotentialResults:
@@ -857,7 +927,7 @@ def run(args: argparse.Namespace) -> int:
         return 1
 
     if args.output or args.display:
-        fig, ax = plot_mod.plot_map(agg, illumination=args.illumination)
+        fig, _ax = plot_mod.plot_map(agg, illumination=args.illumination)
         if args.output:
             out_path = Path(args.output)
             out_path.parent.mkdir(parents=True, exist_ok=True)

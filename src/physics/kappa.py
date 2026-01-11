@@ -172,13 +172,12 @@ def directional_flux(parameters: KappaParams, energy: EnergyType) -> FluxType:
             raise TypeError("velocity must be a pint Quantity (Speed)")
 
     distribution = kappa_distribution(parameters, velocity)
-    if __debug__:
-        if not isinstance(
-            distribution, Quantity
-        ) or not distribution.is_compatible_with(
-            ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second) ** 3)
-        ):
-            raise TypeError("distribution must be a pint Quantity (PhaseSpaceDensity)")
+    if __debug__ and (not isinstance(
+        distribution, Quantity
+    ) or not distribution.is_compatible_with(
+        ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second) ** 3)
+    )):
+        raise TypeError("distribution must be a pint Quantity (PhaseSpaceDensity)")
 
     return (distribution * velocity**2 / config.ELECTRON_MASS).to(
         ureg.particle
@@ -211,11 +210,10 @@ def omnidirectional_flux(
     omnidirectional_flux_units = ureg.particle / (
         ureg.centimeter**2 * ureg.second * ureg.electron_volt * ureg.steradian
     )
-    if __debug__:
-        if not isinstance(
-            directional_flux_value, Quantity
-        ) or not directional_flux_value.is_compatible_with(omnidirectional_flux_units):
-            raise TypeError("directional_flux_value must be a pint Quantity (Flux)")
+    if __debug__ and (not isinstance(
+        directional_flux_value, Quantity
+    ) or not directional_flux_value.is_compatible_with(omnidirectional_flux_units)):
+        raise TypeError("directional_flux_value must be a pint Quantity (Flux)")
 
     return (4 * np.pi * ureg.steradian) * directional_flux_value.to(
         omnidirectional_flux_units
@@ -283,13 +281,12 @@ def _integrate_flux_simpson(
         * ureg.particle
         / (ureg.centimeter**2 * ureg.second)
     )
-    if __debug__:
-        if not isinstance(
-            integrated_flux, Quantity
-        ) or not integrated_flux.is_compatible_with(
-            ureg.particle / (ureg.centimeter**2 * ureg.second)
-        ):
-            raise TypeError("integrated_flux must be a pint Quantity (IntegratedFlux)")
+    if __debug__ and (not isinstance(
+        integrated_flux, Quantity
+    ) or not integrated_flux.is_compatible_with(
+        ureg.particle / (ureg.centimeter**2 * ureg.second)
+    )):
+        raise TypeError("integrated_flux must be a pint Quantity (IntegratedFlux)")
 
     return integrated_flux
 

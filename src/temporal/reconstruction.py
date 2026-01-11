@@ -62,7 +62,8 @@ def compute_potential_series(
         if longitudes is None:
             longitudes = lons
         maps[idx] = potential
-    assert latitudes is not None and longitudes is not None
+    assert latitudes is not None
+    assert longitudes is not None
     return latitudes, longitudes, maps
 
 

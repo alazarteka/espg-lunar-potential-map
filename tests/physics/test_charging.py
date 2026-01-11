@@ -10,6 +10,7 @@ import src.config as cfg
 from src.physics.charging import (
     electron_current_density,
     electron_current_density_magnitude,
+    kappa_current_density_analytic,
 )
 from src.physics.kappa import KappaParams
 
@@ -43,3 +44,16 @@ def test_electron_current_density_magnitude(sample_params):
     assert isinstance(mag, float)
     qty = electron_current_density(sample_params).magnitude
     np.testing.assert_allclose(mag, qty, rtol=1e-2)
+
+
+def test_kappa_current_density_analytic_matches_numeric(sample_params):
+    analytic = kappa_current_density_analytic(sample_params).magnitude
+    numeric = electron_current_density_magnitude(
+        density=sample_params.density.magnitude,
+        kappa=sample_params.kappa,
+        theta=sample_params.theta.magnitude,
+        E_min=1e-3,
+        E_max=2e4,
+        n_steps=800,
+    )
+    np.testing.assert_allclose(numeric, analytic, rtol=3e-2)

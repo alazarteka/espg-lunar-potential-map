@@ -10,7 +10,6 @@ where a_lm(t) are fitted in temporal windows with spatial coverage validation.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -21,6 +20,8 @@ from numpy.linalg import LinAlgError, lstsq
 from ._harmonics import _sph_harm
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     import scipy.sparse
 
 
@@ -251,10 +252,7 @@ def _build_degree_weight_vector(lmax: int, exponent: float | None) -> np.ndarray
     weights = np.empty(n_coeffs, dtype=np.float64)
     idx = 0
     for l in range(lmax + 1):
-        if l == 0:
-            weight = 0.0
-        else:
-            weight = float((l * (l + 1)) ** exponent)
+        weight = 0.0 if l == 0 else float((l * (l + 1)) ** exponent)
         for _ in range(-l, l + 1):
             weights[idx] = weight
             idx += 1

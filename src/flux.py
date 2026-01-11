@@ -157,7 +157,7 @@ class ERData:
         energies = self.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)
         energies = energies[:, None] * ureg.electron_volt  # Reshape for broadcasting
         integration_time = (
-            np.array(list(map(lambda x: 1 / config.BINS_BY_LATITUDE[x], thetas)))
+            np.array([1 / config.BINS_BY_LATITUDE[x] for x in thetas])
             * config.ACCUMULATION_TIME
         )
         integration_time = integration_time[None, :]  # Reshape for broadcasting
@@ -329,7 +329,14 @@ class LossConeFitter:
         )
         self.spacecraft_potential = spacecraft_potential
 
-        self.beam_width_factor = config.LOSS_CONE_BEAM_WIDTH_FACTOR
+        # Surface potential bounds from config
+        self.u_surface_min = config.LOSS_CONE_U_SURFACE_MIN
+        self.u_surface_max = config.LOSS_CONE_U_SURFACE_MAX
+        self.bs_over_bm_min = config.LOSS_CONE_BS_OVER_BM_MIN
+        self.bs_over_bm_max = config.LOSS_CONE_BS_OVER_BM_MAX
+
+        # Beam parameters - use fixed width (not scaling with |U|)
+        self.beam_width_ev = config.LOSS_CONE_BEAM_WIDTH_EV
         self.beam_amp_min = config.LOSS_CONE_BEAM_AMP_MIN
         self.beam_amp_max = config.LOSS_CONE_BEAM_AMP_MAX
         if beam_amp_fixed is not None:
@@ -358,9 +365,16 @@ class LossConeFitter:
         Returns:
             np.ndarray: The Latin Hypercube sample.
         """
-        # Generate a Latin Hypercube sample across U_surface, B_s/B_m, and beam amplitude
-        lower_bounds = np.array([-1000.0, 0.1, self.beam_amp_min], dtype=float)
-        upper_bounds = np.array([1000.0, 1.1, self.beam_amp_max], dtype=float)
+        # Generate a Latin Hypercube sample across U_surface, B_s/B_m, beam amplitude.
+        # Use narrower LHS range than full bounds for initial sampling efficiency.
+        u_lhs_min = max(self.u_surface_min, -1000.0)
+        u_lhs_max = min(self.u_surface_max, 0.0)  # Focus on negative potentials
+        lower_bounds = np.array(
+            [u_lhs_min, self.bs_over_bm_min, self.beam_amp_min], dtype=float
+        )
+        upper_bounds = np.array(
+            [u_lhs_max, self.bs_over_bm_max, self.beam_amp_max], dtype=float
+        )
         if upper_bounds[2] <= lower_bounds[2]:
             upper_bounds[2] = lower_bounds[2] + 1e-12
         sampler = LatinHypercube(
@@ -551,6 +565,155 @@ class LossConeFitter:
 
         return norm2d
 
+    def build_norm2d_batch(self, chunk_indices: list[int]) -> np.ndarray:
+        """
+        Build normalized 2D flux distributions for multiple chunks at once.
+
+        Vectorized implementation for significant speedup over calling
+        build_norm2d() in a loop.
+
+        Args:
+            chunk_indices: List of measurement chunk indices to process
+
+        Returns:
+            np.ndarray: Shape (n_chunks, SWEEP_ROWS, CHANNELS) normalized flux.
+                        Invalid chunks are filled with NaN.
+        """
+        if not chunk_indices:
+            return np.zeros((0, config.SWEEP_ROWS, config.CHANNELS), dtype=np.float64)
+
+        n_chunks = len(chunk_indices)
+        n_rows = len(self.er_data.data)
+        nE = config.SWEEP_ROWS
+        nP = config.CHANNELS
+
+        # Load all flux and pitch data once
+        flux_all = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)
+        pitches_all = self.pitch_angle.pitch_angles
+
+        # Build index arrays for all chunks
+        chunk_indices_arr = np.array(chunk_indices, dtype=np.int64)
+        start_indices = chunk_indices_arr * nE
+        valid_chunks = start_indices < n_rows
+
+        # Pre-allocate output
+        result = np.full((n_chunks, nE, nP), np.nan, dtype=np.float64)
+
+        if not valid_chunks.any():
+            return result
+
+        # Get valid chunk data
+        valid_chunk_idx = np.where(valid_chunks)[0]
+
+        if self.normalization_mode == "ratio":
+            # Fully vectorized per-energy normalization
+            for i in valid_chunk_idx:
+                chunk_idx = chunk_indices[i]
+                s = chunk_idx * nE
+                e = min(s + nE, n_rows)
+                actual_rows = e - s
+
+                flux_chunk = flux_all[s:e]  # (actual_rows, nP)
+                pitch_chunk = pitches_all[s:e]  # (actual_rows, nP)
+
+                # Incident mask per row
+                incident_mask = pitch_chunk < 90.0  # (actual_rows, nP)
+
+                # Valid flux mask
+                valid_flux = np.isfinite(flux_chunk) & (flux_chunk > 0)
+
+                # Combined mask for valid incident flux
+                valid_incident = incident_mask & valid_flux  # (actual_rows, nP)
+
+                # Compute normalization factor per row using masked operations
+                # Replace non-incident values with NaN for aggregation
+                flux_for_norm = np.where(valid_incident, flux_chunk, np.nan)
+
+                if self.incident_flux_stat == "mean":
+                    # nanmean per row
+                    norm_factors = np.nanmean(flux_for_norm, axis=1)  # (actual_rows,)
+                else:
+                    # nanmax per row
+                    norm_factors = np.nanmax(flux_for_norm, axis=1)  # (actual_rows,)
+
+                # Handle rows with no valid incident flux
+                norm_factors = np.where(
+                    np.isfinite(norm_factors) & (norm_factors > 0), norm_factors, np.nan
+                )
+                norm_factors = np.maximum(norm_factors, config.EPS)
+
+                # Normalize: flux / norm_factor (broadcast over columns)
+                result[i, :actual_rows, :] = flux_chunk / norm_factors[:, np.newaxis]
+
+        elif self.normalization_mode == "global":
+            # Vectorized global normalization
+            for i in valid_chunk_idx:
+                chunk_idx = chunk_indices[i]
+                s = chunk_idx * nE
+                e = min(s + nE, n_rows)
+                actual_rows = e - s
+
+                flux_chunk = flux_all[s:e]
+                pitch_chunk = pitches_all[s:e]
+
+                # Incident mask
+                incident_mask = pitch_chunk < 90.0
+                valid_flux = np.isfinite(flux_chunk) & (flux_chunk > 0)
+                valid_incident = incident_mask & valid_flux
+
+                # Get max incident flux
+                incident_vals = flux_chunk[valid_incident]
+                if len(incident_vals) == 0:
+                    continue
+
+                global_norm = np.max(incident_vals)
+                result[i, :actual_rows, :] = flux_chunk / max(global_norm, config.EPS)
+
+        elif self.normalization_mode == "ratio_rescaled":
+            # Per-energy ratio then global rescale
+            for i in valid_chunk_idx:
+                chunk_idx = chunk_indices[i]
+                s = chunk_idx * nE
+                e = min(s + nE, n_rows)
+                actual_rows = e - s
+
+                flux_chunk = flux_all[s:e]
+                pitch_chunk = pitches_all[s:e]
+
+                incident_mask = pitch_chunk < 90.0
+                valid_flux = np.isfinite(flux_chunk) & (flux_chunk > 0)
+                valid_incident = incident_mask & valid_flux
+
+                flux_for_norm = np.where(valid_incident, flux_chunk, np.nan)
+
+                if self.incident_flux_stat == "mean":
+                    norm_factors = np.nanmean(flux_for_norm, axis=1)
+                else:
+                    norm_factors = np.nanmax(flux_for_norm, axis=1)
+
+                norm_factors = np.where(
+                    np.isfinite(norm_factors) & (norm_factors > 0), norm_factors, np.nan
+                )
+                norm_factors = np.maximum(norm_factors, config.EPS)
+
+                chunk_result = flux_chunk / norm_factors[:, np.newaxis]
+
+                # Global rescale
+                finite_vals = chunk_result[np.isfinite(chunk_result)]
+                if len(finite_vals) > 0:
+                    global_max = np.max(finite_vals)
+                    if global_max > 0:
+                        chunk_result = chunk_result / global_max
+
+                result[i, :actual_rows, :] = chunk_result
+
+        else:  # ratio2 - complex pairwise normalization
+            # Fall back to per-chunk for ratio2
+            for i in valid_chunk_idx:
+                result[i] = self.build_norm2d(chunk_indices[i])
+
+        return result
+
     def _fit_surface_potential(
         self, measurement_chunk: int
     ) -> tuple[float, float, float]:
@@ -615,11 +778,8 @@ class LossConeFitter:
         lhs_bs_over_bm = self.lhs[:, 1]
         lhs_beam_amp = self.lhs[:, 2]
 
-        # Calculate beam widths for all samples
-        # beam_width = max(abs(U_surface) * factor, EPS)
-        lhs_beam_width = np.maximum(
-            np.abs(lhs_U_surface) * self.beam_width_factor, config.EPS
-        )
+        # Use fixed beam width (not scaling with |U_surface| to prevent runaway)
+        lhs_beam_width = np.full_like(lhs_U_surface, self.beam_width_ev)
 
         # Evaluate models in batch: (N_samples, nE, nPitch)
         models = synth_losscone_batch(
@@ -653,7 +813,8 @@ class LossConeFitter:
         def chi2_scalar(params):
             U_surface, bs_over_bm, beam_amp = params
             beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
-            beam_width = max(abs(U_surface) * self.beam_width_factor, config.EPS)
+            # Use fixed beam width (not scaling with |U_surface|)
+            beam_width = self.beam_width_ev
             model = synth_losscone(
                 energy_grid=energies,
                 pitch_grid=pitches,
@@ -681,9 +842,14 @@ class LossConeFitter:
         # More robust than LHS + Nelder-Mead for avoiding local minima
         from scipy.optimize import differential_evolution
 
+        # Use constrained bounds: U_surface capped at detection threshold (~+20V)
+        # because electron reflectometry cannot measure positive potentials reliably
         bounds = [
-            (-2000.0, 2000.0),  # U_surface
-            (0.1, 1.1),  # bs_over_bm
+            (self.u_surface_min, self.u_surface_max),  # U_surface
+            (
+                self.bs_over_bm_min,
+                self.bs_over_bm_max,
+            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
             (self.beam_amp_min, self.beam_amp_max),  # beam_amp
         ]
 
@@ -705,7 +871,9 @@ class LossConeFitter:
         U_surface, bs_over_bm, beam_amp = result.x
 
         # Clip to ensure exact bounds (DE should respect them, but be safe)
-        bs_over_bm = float(np.clip(bs_over_bm, 0.1, 1.1))
+        bs_over_bm = float(
+            np.clip(bs_over_bm, self.bs_over_bm_min, self.bs_over_bm_max)
+        )
         beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
 
         return float(U_surface), bs_over_bm, beam_amp, float(result.fun)

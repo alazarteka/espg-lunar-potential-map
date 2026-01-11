@@ -217,11 +217,15 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
 
     # Reconstruct at window midpoints for compatibility with visualization
     window_hours = args.window_hours
-    n_windows = int((end_ts_exclusive - start_ts) / np.timedelta64(int(window_hours * 3600), "s"))
-    times = np.array([
-        start_ts + np.timedelta64(int((i + 0.5) * window_hours * 3600), "s")
-        for i in range(n_windows)
-    ])
+    n_windows = int(
+        (end_ts_exclusive - start_ts) / np.timedelta64(int(window_hours * 3600), "s")
+    )
+    times = np.array(
+        [
+            start_ts + np.timedelta64(int((i + 0.5) * window_hours * 3600), "s")
+            for i in range(n_windows)
+        ]
+    )
 
     results = reconstruct_at_times(result, times, reference_time=start_ts)
 
@@ -237,11 +241,13 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
     print("Temporal Basis Fitting Summary")
     print("=" * 60)
     print(f"Date range      : {args.start} → {args.end}")
-    print(f"Fit mode        : temporal basis")
+    print("Fit mode        : temporal basis")
     print(f"Bases           : {result.basis_names}")
     print(f"Max degree      : lmax = {args.lmax}")
     print(f"Total samples   : {result.n_samples}")
-    print(f"Parameters      : {len(result.basis_names)} × {_harmonic_coefficient_count(args.lmax)} = {len(result.basis_names) * _harmonic_coefficient_count(args.lmax)}")
+    print(
+        f"Parameters      : {len(result.basis_names)} × {_harmonic_coefficient_count(args.lmax)} = {len(result.basis_names) * _harmonic_coefficient_count(args.lmax)}"
+    )
     print(f"RMS residual    : {result.rms_residual:.2f} V")
     print(f"Output windows  : {len(results)}")
     print(f"\nSaved to: {args.output}")
@@ -304,7 +310,7 @@ def _main_window_mode(args: argparse.Namespace) -> int:
     print("Time-Dependent Spherical Harmonic Summary")
     print("=" * 60)
     print(f"Date range      : {args.start} → {args.end}")
-    print(f"Fit mode        : per-window")
+    print("Fit mode        : per-window")
     print(f"Time windows    : {len(results)}")
     print(f"Window duration : {args.window_hours:.1f} hours")
     print(f"Max degree      : lmax = {args.lmax}")

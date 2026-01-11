@@ -329,7 +329,7 @@ where:
 x = bs_over_bm × (1 + U_surface / (E - U_spacecraft))
 ```
 
-The secondary electron beam component is modeled as a Gaussian in energy centered at |U_surface| with angular concentration near pitch = 180°.
+The secondary electron beam component is modeled as a Gaussian in energy centered at U_spacecraft - U_surface (clamped by beam width), with angular concentration near pitch = 180°. The beam is suppressed when U_spacecraft <= U_surface.
 
 ---
 

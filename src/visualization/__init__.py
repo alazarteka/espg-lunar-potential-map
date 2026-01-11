@@ -22,11 +22,6 @@ from src.visualization.style import (
 from src.visualization.utils import add_stats_box, date_range, parse_iso_date
 
 __all__ = [
-    # loaders
-    "load_measurements",
-    "load_date_range_data_with_sza",
-    # style
-    "apply_paper_style",
     "BBOX_STYLE",
     "CMAP_DEFAULT",
     "CMAP_MAGNITUDE",
@@ -44,6 +39,11 @@ __all__ = [
     "GRID_STYLE",
     # utils
     "add_stats_box",
+    # style
+    "apply_paper_style",
     "date_range",
+    "load_date_range_data_with_sza",
+    # loaders
+    "load_measurements",
     "parse_iso_date",
 ]

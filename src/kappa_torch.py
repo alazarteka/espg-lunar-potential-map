@@ -26,9 +26,28 @@ except ImportError:
 
 from src.utils.optimization import BatchedDifferentialEvolution
 
-
 # Physical constant: electron mass in eV·s²/m²
 ELECTRON_MASS_EV_S2_M2 = 5.685630e-12
+
+
+def _auto_detect_dtype(device: "torch.device") -> "torch.dtype":
+    """
+    Auto-detect optimal dtype for the given device.
+
+    Returns float16 on modern CUDA GPUs (Volta+, compute 7.0+) which have
+    tensor cores for fast half-precision. Returns float32 for older GPUs
+    and CPU where float16 would be slower.
+    """
+    if not HAS_TORCH:
+        raise ImportError("PyTorch is required")
+
+    if device.type == "cuda":
+        props = torch.cuda.get_device_properties(device)
+        # Volta+ (compute 7.0+) has tensor cores for fast float16
+        if props.major >= 7:
+            return torch.float16
+        return torch.float32
+    return torch.float32  # CPU: float32 is fastest
 
 
 def _torch_lgamma(x: Tensor) -> Tensor:
@@ -76,8 +95,6 @@ def omnidirectional_flux_batch_torch(
     """
     N, P = kappa.shape
     E = energy.shape[0]
-    device = kappa.device
-    dtype = kappa.dtype
 
     # velocity = sqrt(2E/m_e) in m/s
     # Shape: (E,)
@@ -99,7 +116,7 @@ def omnidirectional_flux_batch_torch(
 
     # Core: n / θ³
     # Shape: (N, P, 1)
-    core = density_exp / (theta_exp ** 3)
+    core = density_exp / (theta_exp**3)
 
     # Tail: (1 + (v/θ)² / κ)^(-κ-1)
     # Shape: (N, P, E)
@@ -112,7 +129,7 @@ def omnidirectional_flux_batch_torch(
 
     # Directional flux: j(E) = f(v) · v² / m_e
     # Shape: (N, P, E)
-    directional_flux = distribution * (velocity_exp ** 2) / ELECTRON_MASS_EV_S2_M2
+    directional_flux = distribution * (velocity_exp**2) / ELECTRON_MASS_EV_S2_M2
 
     # Omnidirectional flux: J(E) = 4π · j(E) · (1e-4 for cm²->m²)
     # Shape: (N, P, E)
@@ -178,13 +195,13 @@ def compute_kappa_chi2_batch_torch(
     Returns:
         (N, P) chi² values
     """
-    N, P, E = model_flux.shape
+    _N, _P, _E = model_flux.shape
 
     # Apply response matrix if provided
     if response_matrix is not None:
         # W @ model_flux: response_matrix[f,e] * model_flux[n,p,e] -> convolved[n,p,f]
         # This matches CPU: W @ flux where W[i,j] maps input energy j to output i
-        model_flux = torch.einsum('fe,npe->npf', response_matrix, model_flux)
+        model_flux = torch.einsum("fe,npe->npf", response_matrix, model_flux)
 
     # Log-space comparison
     log_model = torch.log(model_flux + eps)
@@ -195,7 +212,7 @@ def compute_kappa_chi2_batch_torch(
     weights_exp = weights.unsqueeze(1)
 
     diff = (log_model - log_data) * weights_exp
-    chi2 = (diff ** 2).sum(dim=2)  # Sum over energy: (N, P)
+    chi2 = (diff**2).sum(dim=2)  # Sum over energy: (N, P)
 
     return chi2
 
@@ -213,14 +230,14 @@ class KappaFitterTorch:
     """
 
     DEFAULT_BOUNDS = [
-        (2.5, 6.0),   # kappa
-        (6.0, 8.0),   # log10(theta) where theta is in m/s
+        (2.5, 6.0),  # kappa
+        (6.0, 8.0),  # log10(theta) where theta is in m/s
     ]
 
     def __init__(
         self,
         device: str = "cpu",
-        dtype: str = "float64",
+        dtype: str = "auto",
         popsize: int = 30,
         maxiter: int = 100,
         use_convolution: bool = True,
@@ -231,7 +248,8 @@ class KappaFitterTorch:
 
         Args:
             device: torch device
-            dtype: 'float32' or 'float64'
+            dtype: 'auto', 'float16', 'float32', or 'float64'.
+                'auto' (default): float16 on modern GPUs (Volta+), float32 otherwise.
             popsize: DE population size
             maxiter: DE max iterations
             use_convolution: Apply energy response matrix
@@ -241,7 +259,14 @@ class KappaFitterTorch:
             raise ImportError("PyTorch required for KappaFitterTorch")
 
         self.device = torch.device(device)
-        self.dtype = torch.float64 if dtype == "float64" else torch.float32
+        if dtype == "auto":
+            self.dtype = _auto_detect_dtype(self.device)
+        elif dtype == "float64":
+            self.dtype = torch.float64
+        elif dtype == "float32":
+            self.dtype = torch.float32
+        else:
+            self.dtype = torch.float16
         self.popsize = popsize
         self.maxiter = maxiter
         self.use_convolution = use_convolution
@@ -268,12 +293,14 @@ class KappaFitterTorch:
             theta: (N,) fitted theta values [m/s]
             chi2: (N,) chi² values
         """
-        N, E = flux_data.shape
+        N, _E = flux_data.shape
 
         # Convert to tensors
         energy_t = torch.tensor(energy, device=self.device, dtype=self.dtype)
         flux_t = torch.tensor(flux_data, device=self.device, dtype=self.dtype)
-        density_t = torch.tensor(density_estimates, device=self.device, dtype=self.dtype)
+        density_t = torch.tensor(
+            density_estimates, device=self.device, dtype=self.dtype
+        )
 
         if weights is None:
             # Use log-flux uncertainty as weights
@@ -310,7 +337,7 @@ class KappaFitterTorch:
             """
             kappa = params[:, :, 0]  # (N, P)
             log_theta = params[:, :, 1]  # (N, P)
-            theta = 10.0 ** log_theta  # (N, P)
+            theta = 10.0**log_theta  # (N, P)
 
             # Compute model flux
             model_flux = omnidirectional_flux_batch_torch(
@@ -323,17 +350,19 @@ class KappaFitterTorch:
             )  # (N, P)
 
             # Penalize invalid
-            chi2 = torch.where(torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device))
+            chi2 = torch.where(
+                torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
+            )
 
             return chi2
 
         # Run optimization
-        best_params, best_chi2, n_iter = de.optimize(objective)
+        best_params, best_chi2, _n_iter = de.optimize(objective)
 
         # Extract results
         kappa = best_params[:, 0].cpu().numpy()
         log_theta = best_params[:, 1].cpu().numpy()
-        theta = 10.0 ** log_theta
+        theta = 10.0**log_theta
         chi2 = best_chi2.cpu().numpy()
 
         return kappa, theta, chi2

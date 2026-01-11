@@ -12,9 +12,7 @@ from src.utils import spice_ops
 from .utils import date_range
 
 
-def _discover_date_files(
-    cache_dir: Path, start_day: date, end_day: date
-) -> list[Path]:
+def _discover_date_files(cache_dir: Path, start_day: date, end_day: date) -> list[Path]:
     """Find NPZ cache files matching the date range.
 
     Args:

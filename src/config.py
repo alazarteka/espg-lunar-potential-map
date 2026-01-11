@@ -33,7 +33,9 @@ LUNAR_RADIUS_KM: float = 1737.400  # average radius of the Moon in kilometers
 LUNAR_RADIUS: LengthType = 1737.400 * ureg.kilometer  # average radius of the Moon
 ELECTRON_MASS: MassType = scipy.constants.electron_mass * ureg.kilogram  # electron
 ELECTRON_MASS_MAGNITUDE: float = scipy.constants.electron_mass  # electron mass in kg
-ELECTRON_MASS_EV_S2_M2: float = 5.685630e-12  # Electron mass in eV*s^2/m^2 units (for energy-velocity conversion)
+ELECTRON_MASS_EV_S2_M2: float = (
+    5.685630e-12  # Electron mass in eV*s^2/m^2 units (for energy-velocity conversion)
+)
 ELECTRON_CHARGE: ChargeType = (
     scipy.constants.e * ureg.coulomb
 )  # elementary charge in Coulombs
@@ -69,12 +71,26 @@ ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 # Alternative: 215_000 (95th percentile) or 657_000 (99th percentile) for stricter quality control
 FIT_ERROR_THRESHOLD = 657000  # chi-squared threshold for a good fit (99th percentile)
 LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
-# Beam width: energy bins have width 0.5U, factor of 0.5 gives ~half-bin spread
-LOSS_CONE_BEAM_WIDTH_FACTOR = 0.5  # beam energy width as fraction of |U_surface|
+
+# Surface potential bounds (see Halekas 2008 Section 5.2)
+# Electron reflectometry cannot reliably measure positive potentials because the
+# photoelectron sheath (~meters) is much thinner than magnetic field scales.
+# Detection threshold is ~20V; values within ±20V are "below threshold".
+LOSS_CONE_U_SURFACE_MIN = -2000.0  # lower bound in volts (extreme plasma sheet)
+LOSS_CONE_U_SURFACE_MAX = 20.0  # upper bound in volts (detection threshold)
+LOSS_CONE_DETECTION_THRESHOLD = 20.0  # values within ±threshold are unreliable
+
+# B_s/B_m bounds: avoid unrealistically low ratios that can cause degenerate fits.
+LOSS_CONE_BS_OVER_BM_MIN = 0.3
+LOSS_CONE_BS_OVER_BM_MAX = 1.1
+
+# Beam parameters
+# Beam width: fixed at ~15 eV (LP energy resolution), NOT scaling with |U_surface|
+# The previous scaling (0.5 * |U|) caused runaway at extreme potentials.
+LOSS_CONE_BEAM_WIDTH_EV = 15.0  # fixed beam width in eV (instrument resolution)
+LOSS_CONE_BEAM_WIDTH_FACTOR = 0.5  # DEPRECATED: kept for backward compatibility
 LOSS_CONE_BEAM_AMP_MIN = 0.0  # lower bound for normalized beam amplitude
-LOSS_CONE_BEAM_AMP_MAX = (
-    100.0  # upper bound (see docs/analysis/beam_amplitude_sensitivity.md)
-)
+LOSS_CONE_BEAM_AMP_MAX = 5.0  # upper bound (reduced from 100; data is normalized 0-1)
 # Pitch sigma: reasonable angular spread for secondary electron beam
 LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
 LOSS_CONE_BACKGROUND = (

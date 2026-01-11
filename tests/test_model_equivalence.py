@@ -43,20 +43,23 @@ def reference_synth_losscone(
 
     # Optional narrow beam
     if beam_width_eV > 0 and beam_amp > 0:
-        beam_center = max(abs(U_surface), beam_width_eV)
-        beam = beam_amp * np.exp(
-            -0.5 * ((energy_grid - beam_center) / beam_width_eV) ** 2
-        )
-        if beam_pitch_sigma_deg > 0:
-            pitch_weight = np.exp(
-                -0.5 * ((pitch_grid - 180.0) / beam_pitch_sigma_deg) ** 2
+        # Reference uses U_spacecraft = 0.0, so delta_u = -U_surface.
+        delta_u = -U_surface
+        if delta_u > 0:
+            beam_center = max(delta_u, beam_width_eV)
+            beam = beam_amp * np.exp(
+                -0.5 * ((energy_grid - beam_center) / beam_width_eV) ** 2
             )
-        else:
-            pitch_weight = np.ones_like(pitch_grid)
+            if beam_pitch_sigma_deg > 0:
+                pitch_weight = np.exp(
+                    -0.5 * ((pitch_grid - 180.0) / beam_pitch_sigma_deg) ** 2
+                )
+            else:
+                pitch_weight = np.ones_like(pitch_grid)
 
-        # Original implementation broadcasting logic
-        # beam is (nE,), pitch_weight is (nE, nPitch)
-        model += beam[:, None] * pitch_weight
+            # Original implementation broadcasting logic
+            # beam is (nE,), pitch_weight is (nE, nPitch)
+            model += beam[:, None] * pitch_weight
 
     return model
 
@@ -147,6 +150,43 @@ def test_single_vs_reference_edge_cases():
         energy_grid, pitch_grid, -200.0, U_spacecraft=0.0, bs_over_bm=1.0
     )
     np.testing.assert_allclose(ref, vec)
+
+
+def test_beam_suppressed_when_surface_above_spacecraft():
+    """Beam should be suppressed when U_spacecraft <= U_surface."""
+    n_energy = 20
+    n_pitch = 30
+    energy_grid = np.geomspace(10.0, 1000.0, n_energy)
+    pitch_grid = np.tile(np.linspace(0, 180, n_pitch), (n_energy, 1))
+
+    U_surface = 10.0
+    bs_over_bm = 0.5
+    beam_width = 10.0
+    beam_amp = 5.0
+    beam_pitch_sigma = 10.0
+
+    with_beam = synth_losscone(
+        energy_grid,
+        pitch_grid,
+        U_surface,
+        U_spacecraft=0.0,
+        bs_over_bm=bs_over_bm,
+        beam_width_eV=beam_width,
+        beam_amp=beam_amp,
+        beam_pitch_sigma_deg=beam_pitch_sigma,
+    )
+    no_beam = synth_losscone(
+        energy_grid,
+        pitch_grid,
+        U_surface,
+        U_spacecraft=0.0,
+        bs_over_bm=bs_over_bm,
+        beam_width_eV=beam_width,
+        beam_amp=0.0,
+        beam_pitch_sigma_deg=beam_pitch_sigma,
+    )
+
+    np.testing.assert_allclose(with_beam, no_beam, rtol=1e-12, atol=1e-12)
 
 
 def test_batch_vs_single():

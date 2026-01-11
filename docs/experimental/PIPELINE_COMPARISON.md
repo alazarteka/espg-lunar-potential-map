@@ -75,7 +75,7 @@ This document compares the paper's methodology with your current implementation.
    - `ratio2` = pairwise incident/reflected ← closest to paper, but unstable
 2. **Synthetic distribution**:
    - Loss cone: ✅ Same formula
-   - Secondary beam: ✅ Centered at |U_surface - U_SC|
+   - Secondary beam: ✅ Centered at U_SC - U_surface (suppressed if U_SC <= U_surface)
    - Extra: beam_amp as free parameter (paper doesn't mention)
 3. **Fitting**: ✅ Log-space least squares
 4. **Optimizer**: Differential evolution (global)
@@ -85,7 +85,7 @@ This document compares the paper's methodology with your current implementation.
 | Aspect | Paper | Your Code | Match? |
 |--------|-------|-----------|--------|
 | Loss cone formula | Pitch-conserving | Pitch-conserving | ✅ |
-| Beam center | U_M - U_SC | \|U_surface - U_SC\| | ✅ |
+| Beam center | U_M - U_SC | U_SC - U_surface (suppressed if U_SC <= U_surface) | ✅ |
 | Beam amplitude | Not mentioned | Free parameter | ⚠️ |
 | Normalization | reflected/incident | Multiple modes | ⚠️ |
 | Log least squares | ✓ | ✓ | ✅ |

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,7 +7,7 @@ name = "espg-lunar-potential-map"
 version = "0.1.0"
 description = "Lunar Prospector Surface Potential Mapping Analysis"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "Alazar Teka Gemechu", email = "alazargemechu@kaist.ac.kr" },
 ]
@@ -19,32 +19,38 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy",
     "Topic :: Scientific/Engineering :: Physics",
 ]
-requires-python = ">=3.12, <3.14"
+requires-python = ">=3.12,<3.13"
 dependencies = [
-    "numpy>=2.0.0",
+    "numpy>=1.26.0,<2.0.0",
     "pandas>=2.2.0",
-    "scipy>=1.15.0",
-    "matplotlib>=3.10.0",
+    "scipy>=1.14.0",
+    "matplotlib>=3.9.0",
     "spiceypy>=6.0.0",
     "plotly>=6.0.0",
     "beautifulsoup4>=4.13.0",
     "requests>=2.32.0",
     "tqdm>=4.67.0",
-    "jupyter>=1.0.0",
-    "ipykernel>=6.29.0",
-    "ipython>=8.34.0",
     "pint>=0.24.4",
-    "snakeviz>=2.2.2",
-    "numba>=0.61.2",
-    "imageio[ffmpeg]>=2.37.0",
-    "kaleido>=1.1.0",
+    "numba>=0.61.0",
     "tabulate>=0.9.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0.0", "ruff>=0.8.0", "mypy>=1.0.0"]
-test = ["pytest>=7.0.0", "pytest-cov>=4.0.0"]
-gpu = ["torch>=2.0.0"]  # Use CPU backend; CUDA needs compute capability 7.0+ (RTX 20xx+)
+notebook = ["jupyter>=1.1.0", "ipykernel>=6.29.0", "ipython>=8.34.0"]
+export = ["imageio[ffmpeg]>=2.37.0", "kaleido>=1.1.0"]
+gpu = ["torch>=2.7.0"]  # GPU acceleration (CUDA 12.8, RTX 20xx+, including 50xx)
+gpu-legacy = ["torch>=2.2,<2.3"]  # CUDA 11.8 builds for GTX 10xx (sm_61)
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.15.0",
+    "snakeviz>=2.2.2",
+]
+test = ["pytest>=8.0.0", "pytest-cov>=5.0.0"]
+lint = ["ruff>=0.8.0", "mypy>=1.15.0"]
 
 [project.urls]
 Homepage = "https://github.com/alazarteka/espg-lunar-potential-map"
@@ -53,23 +59,50 @@ Repository = "https://github.com/alazarteka/espg-lunar-potential-map"
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 
+[tool.uv]
+# GPU acceleration options:
+# - Modern GPU (RTX 20xx-50xx): uv sync --extra gpu
+# - Legacy GPU (GTX 10xx): uv sync --extra gpu-legacy
+index-strategy = "unsafe-best-match"
+required-environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu128", marker = "extra == 'gpu'" },
+    { index = "pytorch-cu118", marker = "extra != 'gpu' and extra == 'gpu-legacy'" },
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-
-[tool.ruff.format]
-# Uses Ruff's formatter (replaces Black)
-quote-style = "double"
-indent-style = "space"
+markers = [
+    "skip_ci: marks tests to skip in CI",
+    "slow: marks tests as slow",
+]
 
 [tool.ruff]
 line-length = 88
 target-version = "py312"
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
 [tool.ruff.lint]
-select = ["E", "F", "W", "B", "I", "UP", "SIM"]
+select = ["E", "F", "W", "B", "I", "UP", "SIM", "C4", "PT", "RUF", "TCH", "PERF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**/*.py" = ["E501"]

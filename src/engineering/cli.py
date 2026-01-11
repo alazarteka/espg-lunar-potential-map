@@ -52,7 +52,8 @@ def parse_args() -> argparse.Namespace:
         help="Longitude resolution in degrees.",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable DEBUG logging.",
     )
@@ -123,16 +124,18 @@ def main() -> int:
     site_results = []
     for site in SITES_OF_INTEREST:
         s_stats = extract_site_stats(dataset, site, args.current_density)
-        site_results.append({
-            "Site": site.name,
-            "Lat": site.lat,
-            "Lon": site.lon,
-            "Mean |U| (V)": f"{s_stats.mean_potential:.1f}",
-            "P95 |U| (V)": f"{s_stats.p95_potential:.1f}",
-            "Frac >1kV": f"{s_stats.frac_1kV:.2f}",
-            "Mean Power (mW/m^2)": f"{s_stats.mean_power * 1e3:.2f}",
-            "Assessment": s_stats.risk_assessment,
-        })
+        site_results.append(
+            {
+                "Site": site.name,
+                "Lat": site.lat,
+                "Lon": site.lon,
+                "Mean |U| (V)": f"{s_stats.mean_potential:.1f}",
+                "P95 |U| (V)": f"{s_stats.p95_potential:.1f}",
+                "Frac >1kV": f"{s_stats.frac_1kV:.2f}",
+                "Mean Power (mW/m^2)": f"{s_stats.mean_power * 1e3:.2f}",
+                "Assessment": s_stats.risk_assessment,
+            }
+        )
 
     df_sites = pd.DataFrame(site_results)
 
@@ -218,6 +221,7 @@ Maps indicate that while extreme charging events (>1 kV) are widespread, specifi
     logging.info("Saved summary report to %s", summary_path)
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

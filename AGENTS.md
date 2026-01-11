@@ -1,5 +1,7 @@
 # ESPG Lunar Potential Map
 
+> **Note:** `CLAUDE.md` is a symlink to this file. When modifying or committing, target `AGENTS.md` directly.
+
 ## Project Overview
 
 This project maps the lunar surface electrostatic potential using physics-based models. It processes SPICE kernel data, applies temporal reconstruction techniques, and generates potential maps accounting for plasma interactions and surface properties.
@@ -38,10 +40,31 @@ Use UV with Python 3.12.
 - Type check: `uv run mypy src`
 - Pre-commit: `pre-commit run --all-files`
 
+## GPU Acceleration
+
+This project has GPU-accelerated paths for compute-intensive operations. **Always check script flags and use GPU acceleration when available.**
+
+Key flags:
+- `--fast`: Enable PyTorch GPU acceleration (auto-detects dtype and batch size)
+- Requires GPU extra: `uv sync --extra gpu`
+
+Examples:
+```bash
+# Batch potential mapping (ALWAYS use --fast on GPU machines)
+uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4
+
+# GPU batch size sweep for tuning
+uv run python scripts/profiling/gpu_batch_sweep.py
+```
+
+The GPU path auto-detects:
+- **dtype**: float16 on modern GPUs (Volta+), float32 on older GPUs/CPU
+- **batch_size**: Calculated from available VRAM
+
 ## Coding Style & Naming Conventions
 
-- Python 3.12, 4-space indent, Black line length 88 (`pyproject.toml`).
-- Ruff rules: `E,F,W,B,I`; keep imports sorted; prefer explicit exports.
+- Python 3.12, 4-space indent, Ruff line length 88 (`pyproject.toml`).
+- Ruff rules: `E,F,W,B,I,UP,SIM`; keep imports sorted; prefer explicit exports.
 - Type hints required where practical; `mypy` configured with `pint` plugin.
 - Names: modules/functions `snake_case`; classes `PascalCase`; constants `UPPER_SNAKE_CASE` (see `src/config.py").
 - Units: use `src.utils.units` quantities for physical values.
@@ -56,7 +79,7 @@ Use UV with Python 3.12.
 
 - Commit messages: Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `style:`, `test:`, `chore:`) with optional scope, e.g., `feat(physics): ...`.
 - PRs must include: clear description, linked issues, rationale, before/after plots if applicable, and reproduction steps.
-- Pre-merge checklist: `ruff`, `black`, `mypy`, `pytest` all pass; update README/docs if behavior or interfaces change; do not commit large data or notebook outputs.
+- Pre-merge checklist: `ruff`, `mypy`, `pytest` all pass; update README/docs if behavior or interfaces change; do not commit large data or notebook outputs.
 
 ## Security & Configuration Tips (Optional)
 
