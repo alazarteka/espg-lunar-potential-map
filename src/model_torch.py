@@ -516,6 +516,8 @@ class LossConeFitterTorch:
         # Surface potential bounds from config
         self.u_surface_min = config.LOSS_CONE_U_SURFACE_MIN
         self.u_surface_max = config.LOSS_CONE_U_SURFACE_MAX
+        self.bs_over_bm_min = config.LOSS_CONE_BS_OVER_BM_MIN
+        self.bs_over_bm_max = config.LOSS_CONE_BS_OVER_BM_MAX
 
         # Beam parameters - use fixed width (not scaling with |U|)
         self.beam_width_ev = config.LOSS_CONE_BEAM_WIDTH_EV
@@ -661,7 +663,10 @@ class LossConeFitterTorch:
         # Bounds - U_surface capped at detection threshold
         bounds = [
             (self.u_surface_min, self.u_surface_max),  # U_surface
-            (0.1, 1.1),  # bs_over_bm
+            (
+                self.bs_over_bm_min,
+                self.bs_over_bm_max,
+            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]
 
@@ -692,7 +697,10 @@ class LossConeFitterTorch:
         # Phase 2: DE refinement starting from best LHS point
         de_bounds = [
             (self.u_surface_min, self.u_surface_max),  # U_surface
-            (0.1, 1.1),  # bs_over_bm
+            (
+                self.bs_over_bm_min,
+                self.bs_over_bm_max,
+            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]
 
@@ -717,7 +725,9 @@ class LossConeFitterTorch:
             best_chi2 = best_lhs_chi2
 
         U_surface = best_params[0].item()
-        bs_over_bm = float(np.clip(best_params[1].item(), 0.1, 1.1))
+        bs_over_bm = float(
+            np.clip(best_params[1].item(), self.bs_over_bm_min, self.bs_over_bm_max)
+        )
         beam_amp = float(
             np.clip(best_params[2].item(), self.beam_amp_min, self.beam_amp_max)
         )
@@ -897,7 +907,10 @@ class LossConeFitterTorch:
         # Bounds - U_surface capped at detection threshold
         bounds = [
             (self.u_surface_min, self.u_surface_max),  # U_surface
-            (0.1, 1.1),  # bs_over_bm
+            (
+                self.bs_over_bm_min,
+                self.bs_over_bm_max,
+            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]
 
@@ -998,7 +1011,10 @@ class LossConeFitterTorch:
         # Bounds - U_surface capped at detection threshold
         bounds = [
             (self.u_surface_min, self.u_surface_max),  # U_surface
-            (0.1, 1.1),  # bs_over_bm
+            (
+                self.bs_over_bm_min,
+                self.bs_over_bm_max,
+            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
             (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
         ]
 
@@ -1125,7 +1141,13 @@ class LossConeFitterTorch:
 
             for i, chunk_idx in enumerate(valid_indices):
                 U_surface = final_params_np[i, 0]
-                bs_over_bm = float(np.clip(final_params_np[i, 1], 0.1, 1.1))
+                bs_over_bm = float(
+                    np.clip(
+                        final_params_np[i, 1],
+                        self.bs_over_bm_min,
+                        self.bs_over_bm_max,
+                    )
+                )
                 beam_amp = float(
                     np.clip(final_params_np[i, 2], self.beam_amp_min, self.beam_amp_max)
                 )

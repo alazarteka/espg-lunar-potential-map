@@ -332,6 +332,8 @@ class LossConeFitter:
         # Surface potential bounds from config
         self.u_surface_min = config.LOSS_CONE_U_SURFACE_MIN
         self.u_surface_max = config.LOSS_CONE_U_SURFACE_MAX
+        self.bs_over_bm_min = config.LOSS_CONE_BS_OVER_BM_MIN
+        self.bs_over_bm_max = config.LOSS_CONE_BS_OVER_BM_MAX
 
         # Beam parameters - use fixed width (not scaling with |U|)
         self.beam_width_ev = config.LOSS_CONE_BEAM_WIDTH_EV
@@ -367,8 +369,12 @@ class LossConeFitter:
         # Use narrower LHS range than full bounds for initial sampling efficiency.
         u_lhs_min = max(self.u_surface_min, -1000.0)
         u_lhs_max = min(self.u_surface_max, 0.0)  # Focus on negative potentials
-        lower_bounds = np.array([u_lhs_min, 0.1, self.beam_amp_min], dtype=float)
-        upper_bounds = np.array([u_lhs_max, 1.1, self.beam_amp_max], dtype=float)
+        lower_bounds = np.array(
+            [u_lhs_min, self.bs_over_bm_min, self.beam_amp_min], dtype=float
+        )
+        upper_bounds = np.array(
+            [u_lhs_max, self.bs_over_bm_max, self.beam_amp_max], dtype=float
+        )
         if upper_bounds[2] <= lower_bounds[2]:
             upper_bounds[2] = lower_bounds[2] + 1e-12
         sampler = LatinHypercube(
@@ -840,7 +846,10 @@ class LossConeFitter:
         # because electron reflectometry cannot measure positive potentials reliably
         bounds = [
             (self.u_surface_min, self.u_surface_max),  # U_surface
-            (0.1, 1.1),  # bs_over_bm
+            (
+                self.bs_over_bm_min,
+                self.bs_over_bm_max,
+            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
             (self.beam_amp_min, self.beam_amp_max),  # beam_amp
         ]
 
@@ -862,7 +871,9 @@ class LossConeFitter:
         U_surface, bs_over_bm, beam_amp = result.x
 
         # Clip to ensure exact bounds (DE should respect them, but be safe)
-        bs_over_bm = float(np.clip(bs_over_bm, 0.1, 1.1))
+        bs_over_bm = float(
+            np.clip(bs_over_bm, self.bs_over_bm_min, self.bs_over_bm_max)
+        )
         beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
 
         return float(U_surface), bs_over_bm, beam_amp, float(result.fun)

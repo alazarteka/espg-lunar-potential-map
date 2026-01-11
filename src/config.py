@@ -80,6 +80,10 @@ LOSS_CONE_U_SURFACE_MIN = -2000.0  # lower bound in volts (extreme plasma sheet)
 LOSS_CONE_U_SURFACE_MAX = 20.0  # upper bound in volts (detection threshold)
 LOSS_CONE_DETECTION_THRESHOLD = 20.0  # values within ±threshold are unreliable
 
+# B_s/B_m bounds: avoid unrealistically low ratios that can cause degenerate fits.
+LOSS_CONE_BS_OVER_BM_MIN = 0.3
+LOSS_CONE_BS_OVER_BM_MAX = 1.1
+
 # Beam parameters
 # Beam width: fixed at ~15 eV (LP energy resolution), NOT scaling with |U_surface|
 # The previous scaling (0.5 * |U|) caused runaway at extreme potentials.

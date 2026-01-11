@@ -62,7 +62,8 @@ def _compute_loss_cone_angle(
     # TODO: Review behavior when E < U_spacecraft (physically impossible case).
     # Current: clamp to EPS → x large negative → clips to 0 → full loss cone.
     # Alternative: let E_corrected go negative → x > 1 → clips to 1 → closed cone.
-    # The alternative may be more physically correct (no electrons at impossible energies).
+    # The alternative may be more physically correct (no electrons at impossible
+    # energies).
     E_corrected = np.maximum(energy - U_spacecraft, EPS)
     x = bs_over_bm * (1.0 + U_surface / E_corrected)
     x_clipped = np.clip(x, 0.0, 1.0)
@@ -189,7 +190,7 @@ def synth_losscone_batch(
     if U_spacecraft.ndim == 0:
         U_spacecraft = U_spacecraft.reshape(1, 1, 1)
     else:
-        U_spacecraft = U_spacecraft[None, :, None]
+        U_spacecraft = U_spacecraft.reshape(1, -1, 1)
 
     # Compute loss cone angle
     ac_deg = _compute_loss_cone_angle(E_exp, U_surface, U_spacecraft, bs_over_bm)
