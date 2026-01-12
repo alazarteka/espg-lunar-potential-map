@@ -313,7 +313,7 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
                 frame["norm_reg"], fallback=(0.0, 1.0), pct=(1, 99)
             )
             model_mapper.low, model_mapper.high = _finite_range(
-                frame["model_reg"], fallback=(0.0, 1.0), pct=(1, 99)
+                frame["model_reg"], fallback=(0.0, 1.0), pct=(0, 100)
             )
             resid_low, resid_high = _finite_range(
                 frame["residual"], fallback=(-0.5, 0.5), pct=(5, 95)
