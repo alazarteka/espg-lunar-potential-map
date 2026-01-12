@@ -95,7 +95,8 @@ def synth_losscone_batch_torch(
     beam_amp: Tensor | None = None,
     beam_pitch_sigma_deg: float = 0.0,
     background: Tensor | None = None,
-) -> Tensor:
+    return_mask: bool = False,
+) -> Tensor | tuple[Tensor, Tensor]:
     """
     PyTorch batch loss-cone model for GPU acceleration.
 
@@ -115,9 +116,12 @@ def synth_losscone_batch_torch(
         beam_amp: (n_params,) beam amplitudes (default: all 0.0)
         beam_pitch_sigma_deg: beam angular spread in degrees (scalar)
         background: (n_params,) flux outside loss cone (default: all 0.05)
+        return_mask: if True, return (model, valid_mask) tuple
 
     Returns:
-        Model flux tensor of shape (n_params, nE, nPitch)
+        If return_mask=False: Model flux tensor of shape (n_params, nE, nPitch)
+        If return_mask=True: Tuple of (model, valid_mask) where valid_mask is
+            shape (n_params, nE, nPitch) indicating where E >= U_spacecraft
     """
     device = energy_grid.device
     dtype = energy_grid.dtype
@@ -155,15 +159,10 @@ def synth_losscone_batch_torch(
     beam_width_eV = beam_width_eV.view(-1, 1, 1)
     background = background.view(-1, 1, 1)
 
-    # Handle energy grid: guard against E <= 0
-    valid_E = energy_grid > 0
-    E_safe = torch.where(valid_E, energy_grid, torch.ones_like(energy_grid))
-
     # Reshape grids for broadcasting
     nE, nPitch = pitch_grid.shape
     pitch_exp = pitch_grid.unsqueeze(0)  # (1, nE, nPitch)
-    E_exp = E_safe.unsqueeze(0).unsqueeze(-1)  # (1, nE, 1)
-    valid_E_exp = valid_E.unsqueeze(0).unsqueeze(-1)  # (1, nE, 1)
+    E_exp = energy_grid.unsqueeze(0).unsqueeze(-1)  # (1, nE, 1)
 
     # Handle U_spacecraft: scalar -> (1,1,1), array(nE,) -> (1,nE,1)
     if isinstance(U_spacecraft, (int, float)):
@@ -174,6 +173,9 @@ def synth_losscone_batch_torch(
         U_spacecraft_t = (
             U_spacecraft.to(device=device, dtype=dtype).unsqueeze(0).unsqueeze(-1)
         )
+
+    # Compute validity mask: E >= U_spacecraft
+    valid_energy = E_exp >= U_spacecraft_t
 
     # Compute loss cone angle using Halekas 2008 formula
     # sin²(αc) = (BS/BM) × (1 + UM / (E - U_spacecraft))
@@ -186,7 +188,7 @@ def synth_losscone_batch_torch(
     model = background.expand(n_params, nE, nPitch).clone()
 
     # Inside loss cone: pitch <= 180 - αc (hard mask, matches CPU)
-    inside_cone = (pitch_exp <= (180.0 - ac_deg)) & valid_E_exp
+    inside_cone = pitch_exp <= (180.0 - ac_deg)
     model = torch.where(inside_cone, torch.ones_like(model), model)
 
     # Add secondary electron beam if enabled
@@ -211,7 +213,12 @@ def synth_losscone_batch_torch(
         beam = energy_profile * pitch_profile
         model = model + beam
 
-    return model
+    if return_mask:
+        # Broadcast valid_energy to full shape (n_params, nE, nPitch)
+        valid_mask = valid_energy.expand(n_params, nE, nPitch)
+        return model, valid_mask
+    else:
+        return model
 
 
 def compute_chi2_batch_torch(
@@ -219,6 +226,7 @@ def compute_chi2_batch_torch(
     data: Tensor,
     data_mask: Tensor,
     eps: float = 1e-6,
+    model_mask: Tensor | None = None,
 ) -> Tensor:
     """
     Compute chi-squared for batch of models against data.
@@ -228,6 +236,8 @@ def compute_chi2_batch_torch(
         data: (nE, nPitch) observed normalized flux
         data_mask: (nE, nPitch) boolean mask for valid data points
         eps: small value to avoid log(0)
+        model_mask: Optional (n_params, nE, nPitch) mask indicating where
+            model is physically valid (E >= U_spacecraft). Combined with data_mask.
 
     Returns:
         (n_params,) chi-squared values
@@ -243,9 +253,15 @@ def compute_chi2_batch_torch(
     log_data_exp = log_data.unsqueeze(0)  # (1, nE, nPitch)
     data_mask_exp = data_mask.unsqueeze(0)  # (1, nE, nPitch)
 
+    # Combine data_mask with model_mask if provided
+    if model_mask is not None:
+        combined_mask = data_mask_exp & model_mask
+    else:
+        combined_mask = data_mask_exp
+
     # Compute diff only where mask is True
     diff = torch.where(
-        data_mask_exp, log_data_exp - log_model, torch.zeros_like(log_model)
+        combined_mask, log_data_exp - log_model, torch.zeros_like(log_model)
     )
     chi2 = (diff**2).sum(dim=(1, 2))
 
@@ -405,6 +421,7 @@ def compute_chi2_multi_chunk_torch(
     data_mask: Tensor,
     eps: float = 1e-6,
     log_data_precomputed: tuple[Tensor, Tensor] | None = None,
+    model_mask: Tensor | None = None,
 ) -> Tensor:
     """
     Compute chi-squared for multiple chunks × multiple candidates.
@@ -416,6 +433,8 @@ def compute_chi2_multi_chunk_torch(
         eps: small value to avoid log(0)
         log_data_precomputed: Optional (log_data_exp, data_mask_exp) from
             precompute_log_data_torch(). If provided, skips redundant log(data).
+        model_mask: Optional (N_chunks, n_pop, nE, nPitch) mask indicating where
+            model is physically valid (E >= U_spacecraft). Combined with data_mask.
 
     Returns:
         (N_chunks, n_pop) chi-squared values
@@ -431,9 +450,15 @@ def compute_chi2_multi_chunk_torch(
         log_data_exp = log_data.unsqueeze(1)
         data_mask_exp = data_mask.unsqueeze(1)
 
+    # Combine data_mask with model_mask if provided
+    if model_mask is not None:
+        combined_mask = data_mask_exp & model_mask
+    else:
+        combined_mask = data_mask_exp
+
     # Compute diff only where mask is True
     diff = torch.where(
-        data_mask_exp, log_data_exp - log_model, torch.zeros_like(log_model)
+        combined_mask, log_data_exp - log_model, torch.zeros_like(log_model)
     )
     chi2 = (diff**2).sum(dim=(2, 3))  # Sum over (E, A) -> (N, P)
 

@@ -123,7 +123,8 @@ def synth_losscone_batch(
     beam_amp: np.ndarray | None = None,
     beam_pitch_sigma_deg: float = 0.0,
     background: np.ndarray | None = None,
-) -> np.ndarray:
+    return_mask: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """
     Vectorized batch loss-cone model for multiple parameter sets.
 
@@ -140,9 +141,12 @@ def synth_losscone_batch(
         beam_amp: (n_params,) beam amplitudes (default: all 0.0)
         beam_pitch_sigma_deg: beam angular spread in degrees (scalar)
         background: (n_params,) flux outside loss cone (default: all 0.05)
+        return_mask: if True, return (model, valid_mask) tuple
 
     Returns:
-        Model flux array of shape (n_params, nE, nPitch)
+        If return_mask=False: Model flux array of shape (n_params, nE, nPitch)
+        If return_mask=True: Tuple of (model, valid_mask) where valid_mask is
+            shape (n_params, nE, nPitch) indicating where E >= U_spacecraft
     """
     U_surface = np.atleast_1d(np.asarray(U_surface))
     n_params = U_surface.size
@@ -175,15 +179,10 @@ def synth_losscone_batch(
     beam_width_eV = beam_width_eV.reshape(-1, 1, 1)
     background = background.reshape(-1, 1, 1)
 
-    # Handle energy grid: guard against E <= 0
-    energy_grid = np.asarray(energy_grid)
-    valid_E = energy_grid > 0
-    E_safe = np.where(valid_E, energy_grid, 1.0)
-
     # Reshape grids for broadcasting
+    energy_grid = np.asarray(energy_grid)
     pitch_exp = pitch_grid[None, :, :]  # (1, nE, nPitch)
-    E_exp = E_safe[None, :, None]  # (1, nE, 1)
-    valid_E_exp = valid_E[None, :, None]  # (1, nE, 1)
+    E_exp = energy_grid[None, :, None]  # (1, nE, 1)
 
     # Handle U_spacecraft: scalar -> (1,1,1), array(nE,) -> (1,nE,1)
     U_spacecraft = np.asarray(U_spacecraft)
@@ -191,6 +190,10 @@ def synth_losscone_batch(
         U_spacecraft = U_spacecraft.reshape(1, 1, 1)
     else:
         U_spacecraft = U_spacecraft.reshape(1, -1, 1)
+
+    # Compute validity mask: E >= U_spacecraft
+    # Shape: (n_params, nE, nPitch) after broadcasting
+    valid_energy = E_exp >= U_spacecraft
 
     # Compute loss cone angle
     ac_deg = _compute_loss_cone_angle(E_exp, U_surface, U_spacecraft, bs_over_bm)
@@ -200,7 +203,7 @@ def synth_losscone_batch(
     model = np.broadcast_to(background, (n_params, nE, nPitch)).copy()
 
     # Inside loss cone: pitch <= 180 - αc
-    inside_cone = (pitch_exp <= (180.0 - ac_deg)) & valid_E_exp
+    inside_cone = pitch_exp <= (180.0 - ac_deg)
     model[inside_cone] = 1.0
 
     # Add secondary electron beam if enabled
@@ -216,7 +219,12 @@ def synth_losscone_batch(
         )
         model += beam
 
-    return model
+    if return_mask:
+        # Broadcast valid_energy to full shape (n_params, nE, nPitch)
+        valid_mask = np.broadcast_to(valid_energy, (n_params, nE, nPitch))
+        return model, valid_mask
+    else:
+        return model
 
 
 def synth_losscone(
@@ -229,7 +237,8 @@ def synth_losscone(
     beam_amp: float = 0.0,
     beam_pitch_sigma_deg: float = 0.0,
     background: float = DEFAULT_BACKGROUND,
-) -> np.ndarray:
+    return_mask: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """
     Build a loss-cone model for a single parameter set.
 
@@ -265,7 +274,8 @@ def synth_losscone(
         background: flux value outside loss cone (default 0.05)
 
     Returns:
-        Model flux array of shape (nE, nPitch)
+        If return_mask=False: Model flux array of shape (nE, nPitch)
+        If return_mask=True: Tuple of (model, valid_mask) of shape (nE, nPitch)
     """
     result = synth_losscone_batch(
         energy_grid,
@@ -277,5 +287,10 @@ def synth_losscone(
         beam_amp=np.array([beam_amp]),
         beam_pitch_sigma_deg=beam_pitch_sigma_deg,
         background=np.array([background]),
+        return_mask=return_mask,
     )
-    return result[0]
+    if return_mask:
+        model, mask = result
+        return model[0], mask[0]
+    else:
+        return result[0]

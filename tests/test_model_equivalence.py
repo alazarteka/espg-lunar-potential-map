@@ -19,15 +19,12 @@ def reference_synth_losscone(
 ):
     """
     Original loop-based implementation of synth_losscone for equivalence testing.
+    Assumes energy_grid contains only positive values (as in real data).
     """
     nE, nPitch = pitch_grid.shape
     model = np.full((nE, nPitch), background, dtype=float)
 
     for i, E in enumerate(energy_grid):
-        # Guard against E <= 0
-        if E <= 0:
-            continue
-
         x = bs_over_bm * (1.0 + U_surface / E)  # dimensionless
 
         # Map illegal values onto physically plausible limits
@@ -76,12 +73,8 @@ def test_single_vs_reference_randomized(seed):
     n_energy = np.random.randint(10, 50)
     n_pitch = np.random.randint(20, 100)
 
-    # Generate random inputs
+    # Generate random inputs (real data always has positive energies)
     energy_grid = np.geomspace(1.0, 20000.0, n_energy)
-    # Add some negative/zero energies to test masking
-    if np.random.rand() < 0.5:
-        energy_grid[0] = -5.0
-        energy_grid[1] = 0.0
 
     pitch_grid_1d = np.linspace(0, 180, n_pitch)
     pitch_grid = np.tile(pitch_grid_1d, (n_energy, 1))

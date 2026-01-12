@@ -782,7 +782,7 @@ class LossConeFitter:
         lhs_beam_width = np.full_like(lhs_U_surface, self.beam_width_ev)
 
         # Evaluate models in batch: (N_samples, nE, nPitch)
-        models = synth_losscone_batch(
+        models, model_masks = synth_losscone_batch(
             energy_grid=energies,
             pitch_grid=pitches,
             U_surface=lhs_U_surface,
@@ -792,11 +792,14 @@ class LossConeFitter:
             beam_amp=lhs_beam_amp,
             beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
             background=self.background,
+            return_mask=True,
         )
 
         log_models = np.log(models + eps)
 
-        diff = (log_data[None, :, :] - log_models) * data_mask_3d
+        # Combine data mask with model validity masks
+        combined_mask = data_mask_3d & model_masks
+        diff = (log_data[None, :, :] - log_models) * combined_mask
 
         # Sum over energy and pitch axes (1, 2)
         chi2_vals = np.sum(diff**2, axis=(1, 2))
