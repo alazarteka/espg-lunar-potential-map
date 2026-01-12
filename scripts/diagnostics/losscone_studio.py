@@ -50,6 +50,7 @@ def _build_frame(
     bs_over_bm: float,
     beam_amp: float,
     beam_width_ev: float,
+    beam_pitch_sigma_deg: float,
     u_spacecraft: float,
     n_pitch_bins: int,
 ) -> dict[str, np.ndarray | float | str | int]:
@@ -75,6 +76,7 @@ def _build_frame(
         bs_over_bm=bs_over_bm,
         beam_amp=beam_amp,
         beam_width_ev=beam_width_ev,
+        beam_pitch_sigma_deg=beam_pitch_sigma_deg,
         u_spacecraft=u_spacecraft,
         return_mask=True,
     )
@@ -188,6 +190,9 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
     beam_width = pn.widgets.FloatInput(
         name="Beam Width [eV]", value=args.beam_width, step=1.0
     )
+    beam_pitch_sigma = pn.widgets.FloatInput(
+        name="Beam Pitch σ [deg]", value=args.beam_pitch_sigma, step=0.5
+    )
     u_spacecraft = pn.widgets.FloatInput(
         name="U_sc [V]", value=args.u_spacecraft, step=5.0
     )
@@ -273,6 +278,7 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
                 bs_over_bm=float(bs_over_bm.value),
                 beam_amp=float(beam_amp.value),
                 beam_width_ev=float(beam_width.value),
+                beam_pitch_sigma_deg=float(beam_pitch_sigma.value),
                 u_spacecraft=float(u_spacecraft.value),
                 n_pitch_bins=int(n_pitch_bins.value),
             )
@@ -376,6 +382,7 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         bs_over_bm,
         beam_amp,
         beam_width,
+        beam_pitch_sigma,
         u_spacecraft,
         n_pitch_bins,
     ]:
@@ -399,6 +406,7 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         bs_over_bm,
         beam_amp,
         beam_width,
+        beam_pitch_sigma,
         u_spacecraft,
         n_pitch_bins,
         fit_mode,
@@ -471,6 +479,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=config.LOSS_CONE_BEAM_WIDTH_EV,
         help="Initial beam width [eV]",
+    )
+    parser.add_argument(
+        "--beam-pitch-sigma",
+        type=float,
+        default=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
+        help="Initial beam pitch angle spread [deg]",
     )
     parser.add_argument(
         "--u-spacecraft",

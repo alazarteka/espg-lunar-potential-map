@@ -235,6 +235,7 @@ class LossConeSession:
         bs_over_bm: float,
         beam_amp: float,
         beam_width_ev: float,
+        beam_pitch_sigma_deg: float,
         u_spacecraft: float,
         return_mask: bool = False,
     ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
@@ -260,7 +261,7 @@ class LossConeSession:
                 bs_over_bm=bs_t,
                 beam_width_eV=beam_width_t,
                 beam_amp=beam_amp_t,
-                beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
+                beam_pitch_sigma_deg=beam_pitch_sigma_deg,
                 background=background_t,
                 return_mask=return_mask,
             )
@@ -278,7 +279,7 @@ class LossConeSession:
             bs_over_bm=bs_over_bm,
             beam_width_eV=beam_width_ev,
             beam_amp=beam_amp,
-            beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
+            beam_pitch_sigma_deg=beam_pitch_sigma_deg,
             background=self.background,
             return_mask=return_mask,
         )
