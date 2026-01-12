@@ -44,6 +44,36 @@ def get_intersection_or_none(
     return p + t * v  # Intersection point
 
 
+def get_connection_and_polarity(
+    pos: np.ndarray, direction: np.ndarray, radius: LengthType
+) -> tuple[bool, int, np.ndarray | None]:
+    """
+    Determine if a sphere intersects along exactly one of +/- direction and return polarity.
+
+    Polarity convention:
+        +1: Moonward along +direction
+        -1: Moonward along -direction
+        0: No intersection (not connected or ambiguous)
+    """
+    if not np.all(np.isfinite(pos)) or not np.all(np.isfinite(direction)):
+        return False, 0, None
+    if np.linalg.norm(direction) <= 0:
+        return False, 0, None
+
+    hit_plus = get_intersection_or_none(pos, direction, radius)
+    hit_minus = get_intersection_or_none(pos, -direction, radius)
+
+    if hit_plus is None and hit_minus is None:
+        return False, 0, None
+    if hit_plus is not None and hit_minus is None:
+        return True, 1, hit_plus
+    if hit_minus is not None and hit_plus is None:
+        return True, -1, hit_minus
+
+    # Both intersections exist (e.g., position inside sphere); treat as disconnected.
+    return False, 0, None
+
+
 def get_intersections_or_none_batch(
     pos: np.ndarray, direction: np.ndarray, radius: LengthType
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -112,3 +142,34 @@ def get_intersections_or_none_batch(
         points[valid] = p[valid] + t[valid, None] * v[valid]
 
     return points, valid
+
+
+def get_connections_and_polarity_batch(
+    pos: np.ndarray, direction: np.ndarray, radius: LengthType
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Vectorized +/- direction intersections with polarity.
+
+    Returns:
+        points: (N, 3) intersection points with NaNs where no connection.
+        mask: (N,) True where exactly one of +direction or -direction intersects.
+        polarity: (N,) int8 with +1 for +direction, -1 for -direction, 0 for none.
+    """
+    points_plus, mask_plus = get_intersections_or_none_batch(pos, direction, radius)
+    points_minus, mask_minus = get_intersections_or_none_batch(pos, -direction, radius)
+
+    connected = mask_plus ^ mask_minus
+    polarity = np.zeros(pos.shape[0], dtype=np.int8)
+
+    plus_only = mask_plus & ~mask_minus
+    minus_only = mask_minus & ~mask_plus
+    polarity[plus_only] = 1
+    polarity[minus_only] = -1
+
+    points = np.full_like(pos, np.nan, dtype=float)
+    if np.any(plus_only):
+        points[plus_only] = points_plus[plus_only]
+    if np.any(minus_only):
+        points[minus_only] = points_minus[minus_only]
+
+    return points, connected, polarity

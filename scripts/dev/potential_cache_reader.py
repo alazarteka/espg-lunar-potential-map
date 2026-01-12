@@ -39,6 +39,7 @@ class TimeSeriesRows:
     projection_lat: np.ndarray  # degrees
     projection_lon: np.ndarray  # degrees
     projection_in_sun: np.ndarray  # bool
+    projection_polarity: np.ndarray  # int8
 
 
 def _parse_iso_date(value: str) -> np.datetime64:
@@ -70,6 +71,7 @@ def _load_rows(
     lat_parts: list[np.ndarray] = []
     lon_parts: list[np.ndarray] = []
     proj_sun_parts: list[np.ndarray] = []
+    proj_pol_parts: list[np.ndarray] = []
 
     start_str = str(start_ts.astype("datetime64[s]"))
     end_str = str(end_ts_exclusive.astype("datetime64[s]"))
@@ -82,6 +84,7 @@ def _load_rows(
             lat = data["rows_projection_latitude"].astype(np.float64)
             lon = data["rows_projection_longitude"].astype(np.float64)
             proj_in_sun = data.get("rows_projection_in_sun")
+            proj_pol = data.get("rows_projection_polarity")
 
         if utc.size == 0:
             continue
@@ -109,6 +112,10 @@ def _load_rows(
             proj_sun_parts.append(proj_in_sun[mask].astype(bool))
         else:
             proj_sun_parts.append(np.zeros(mask.sum(), dtype=bool))
+        if proj_pol is not None:
+            proj_pol_parts.append(proj_pol[mask].astype(np.int8))
+        else:
+            proj_pol_parts.append(np.zeros(mask.sum(), dtype=np.int8))
 
     if not utc_parts:
         empty_time = np.array([], dtype="datetime64[ns]")
@@ -120,6 +127,7 @@ def _load_rows(
             projection_lat=empty_float,
             projection_lon=empty_float,
             projection_in_sun=np.array([], dtype=bool),
+            projection_polarity=np.array([], dtype=np.int8),
         )
 
     return TimeSeriesRows(
@@ -129,6 +137,7 @@ def _load_rows(
         projection_lat=np.concatenate(lat_parts),
         projection_lon=np.concatenate(lon_parts),
         projection_in_sun=np.concatenate(proj_sun_parts),
+        projection_polarity=np.concatenate(proj_pol_parts),
     )
 
 
@@ -148,6 +157,7 @@ def _sample_rows(
         projection_lat=rows.projection_lat[idx],
         projection_lon=rows.projection_lon[idx],
         projection_in_sun=rows.projection_in_sun[idx],
+        projection_polarity=rows.projection_polarity[idx],
     )
 
 
@@ -162,6 +172,7 @@ def _sort_rows(rows: TimeSeriesRows) -> TimeSeriesRows:
         projection_lat=rows.projection_lat[order],
         projection_lon=rows.projection_lon[order],
         projection_in_sun=rows.projection_in_sun[order],
+        projection_polarity=rows.projection_polarity[order],
     )
 
 

@@ -33,7 +33,7 @@ from src.potential_mapper import plot as plot_mod
 from src.potential_mapper.coordinates import (
     CoordinateArrays,
     CoordinateCalculator,
-    find_surface_intersection,
+    find_surface_intersection_with_polarity,
     project_magnetic_fields,
 )
 from src.potential_mapper.date_utils import (
@@ -688,9 +688,14 @@ def process_merged_data(
     projected_b = project_magnetic_fields(er_data, coord_arrays)
 
     # Intersections on lunar sphere
-    points, mask = find_surface_intersection(coord_arrays, projected_b)
+    points, mask, polarity = find_surface_intersection_with_polarity(
+        coord_arrays, projected_b
+    )
+    # Polarity convention: +1 => Moonward along +B (projected_b),
+    # -1 => Moonward along -B, 0 => no connection.
 
     n = mask.shape[0]
+    projection_polarity = polarity.astype(np.int8, copy=False)
 
     # Spacecraft lat/lon from LP position in lunar frame
     spacecraft_lat = np.full(n, np.nan)
@@ -874,6 +879,7 @@ def process_merged_data(
         projected_potential=proj_potential,
         spacecraft_in_sun=sc_in_sun,
         projection_in_sun=proj_in_sun,
+        projection_polarity=projection_polarity,
         bs_over_bm=bs_over_bm_arr,
         beam_amp=beam_amp_arr,
         fit_chi2=fit_chi2_arr,

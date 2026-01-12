@@ -80,6 +80,7 @@ class PotentialResults:
     Coordinates:
     - spacecraft_latitude/longitude: Spacecraft geodetic in degrees (IAU_MOON frame).
     - projection_latitude/longitude: Surface intersection geodetic in degrees.
+    - projection_polarity: +1 if footprint is along +B, -1 if along -B, 0 if none.
 
     Potentials:
     - spacecraft_potential: Floating potential of spacecraft (V) per row.
@@ -114,6 +115,7 @@ class PotentialResults:
     # Illumination
     spacecraft_in_sun: np.ndarray
     projection_in_sun: np.ndarray
+    projection_polarity: np.ndarray = field(default_factory=lambda: np.array([]))
 
     # Loss-cone fit parameters (new)
     bs_over_bm: np.ndarray = field(default_factory=lambda: np.array([]))
@@ -145,6 +147,8 @@ class PotentialResults:
             self.kappa_value = np.full(n, np.nan)
         if len(self.environment_class) == 0:
             self.environment_class = np.zeros(n, dtype=np.int8)
+        if len(self.projection_polarity) == 0:
+            self.projection_polarity = np.zeros(n, dtype=np.int8)
 
     def classify_environments(self) -> None:
         """Classify plasma environment for each row based on temperature and illumination."""
@@ -176,6 +180,7 @@ def _concat_results(results: list[PotentialResults]) -> PotentialResults:
         projected_potential=cat("projected_potential"),
         spacecraft_in_sun=cat("spacecraft_in_sun"),
         projection_in_sun=cat("projection_in_sun"),
+        projection_polarity=cat("projection_polarity"),
         bs_over_bm=cat("bs_over_bm"),
         beam_amp=cat("beam_amp"),
         fit_chi2=cat("fit_chi2"),

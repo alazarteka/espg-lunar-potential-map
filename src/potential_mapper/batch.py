@@ -68,6 +68,7 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
         # Illumination
         "rows_spacecraft_in_sun": results.spacecraft_in_sun.astype(bool),
         "rows_projection_in_sun": results.projection_in_sun.astype(bool),
+        "rows_projection_polarity": results.projection_polarity.astype(np.int8),
         # Loss-cone fit parameters
         "rows_bs_over_bm": results.bs_over_bm.astype(np.float64),
         "rows_beam_amp": results.beam_amp.astype(np.float64),

@@ -8,7 +8,10 @@ import src.config as config
 from src.flux import FluxData
 from src.utils.attitude import get_current_ra_dec_batch
 from src.utils.coordinates import build_scd_to_j2000, ra_dec_to_unit
-from src.utils.geometry import get_intersections_or_none_batch
+from src.utils.geometry import (
+    get_connections_and_polarity_batch,
+    get_intersections_or_none_batch,
+)
 from src.utils.spice_ops import (
     get_j2000_iau_moon_transform_matrix_batch,
     get_lp_position_wrt_moon_batch,
@@ -219,3 +222,19 @@ def find_surface_intersection(
     )
 
     return intersections
+
+
+def find_surface_intersection_with_polarity(
+    coordinate_arrays: CoordinateArrays, projected_magnetic_field: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Compute +/- ray–sphere intersections for LP positions along projected B-field.
+
+    Returns (points, mask, polarity) where polarity is +1 for +B, -1 for -B.
+    """
+    points, mask, polarity = get_connections_and_polarity_batch(
+        pos=coordinate_arrays.lp_positions,
+        direction=projected_magnetic_field,
+        radius=config.LUNAR_RADIUS,
+    )
+    return points, mask, polarity

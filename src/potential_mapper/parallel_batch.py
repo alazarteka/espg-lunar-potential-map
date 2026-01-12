@@ -135,6 +135,7 @@ def process_single_day(
             rows_projected_potential=results.projected_potential,
             rows_spacecraft_in_sun=results.spacecraft_in_sun,
             rows_projection_in_sun=results.projection_in_sun,
+            rows_projection_polarity=results.projection_polarity,
         )
 
         elapsed = time.time() - start_time

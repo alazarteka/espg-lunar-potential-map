@@ -139,13 +139,14 @@ def patched_environment(monkeypatch):
     )
     monkeypatch.setattr(
         pipeline,
-        "find_surface_intersection",
+        "find_surface_intersection_with_polarity",
         lambda *_args: (
             np.tile(
                 np.array([config.LUNAR_RADIUS.to(ureg.meter).magnitude, 0.0, 0.0]),
                 (n_rows, 1),
             ),
             np.ones(n_rows, dtype=bool),
+            np.ones(n_rows, dtype=np.int8),
         ),
     )
     monkeypatch.setattr(
@@ -374,4 +375,3 @@ class TestApplyFitResults:
         )
 
         assert np.all(np.isnan(proj_potential))
-

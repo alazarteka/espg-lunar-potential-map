@@ -22,7 +22,11 @@ from .coordinates import (
 from .energy import make_relative_energy_bounds
 from .file_ops import list_files, list_folder_files
 from .flux_files import select_flux_day_file
-from .geometry import get_intersection_or_none
+from .geometry import (
+    get_connection_and_polarity,
+    get_connections_and_polarity_batch,
+    get_intersection_or_none,
+)
 from .spice_ops import (
     get_j2000_iau_moon_transform_matrix,
     get_lp_position_wrt_moon,
@@ -41,6 +45,8 @@ __all__ = [
     "cartesian_to_lat_lon",
     "get_current_ra_dec",
     # Geometry
+    "get_connection_and_polarity",
+    "get_connections_and_polarity_batch",
     "get_intersection_or_none",
     "get_j2000_iau_moon_transform_matrix",
     # SPICE operations
