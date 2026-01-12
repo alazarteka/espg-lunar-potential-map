@@ -278,14 +278,14 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
             )
 
             energy_log = frame["energy_log"]
-            pitch_min = float(np.nanmin(frame["pitches_reg"]))
-            pitch_max = float(np.nanmax(frame["pitches_reg"]))
             x_min = float(np.nanmin(energy_log))
             x_max = float(np.nanmax(energy_log))
             x_range.start = x_min
             x_range.end = x_max
-            y_range.start = pitch_min
-            y_range.end = pitch_max
+
+            # Keep pitch range fixed at 0-180
+            pitch_min = 0.0
+            pitch_max = 180.0
 
             def pack_image(data: np.ndarray) -> dict[str, list[object]]:
                 return dict(
