@@ -111,7 +111,7 @@ def sweep_losscone(
     print(f"Total chunks: {n_chunks}")
 
     theta_path = str(config.DATA_DIR / config.THETA_FILE)
-    pitch_angle = PitchAngle(er_data, theta_path)
+    pitch_angle = PitchAngle(er_data)
 
     results = []
 

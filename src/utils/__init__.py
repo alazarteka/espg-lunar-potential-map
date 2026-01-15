@@ -38,21 +38,26 @@ from .synthetic import (
     prepare_phis,
     prepare_synthetic_er,
 )
+from .thetas import clear_theta_cache, get_thetas
 
 # Re-export for backward compatibility
 __all__ = [
     "build_scd_to_j2000",
     "cartesian_to_lat_lon",
-    "get_current_ra_dec",
+    # Theta cache
+    "clear_theta_cache",
     # Geometry
     "get_connection_and_polarity",
     "get_connections_and_polarity_batch",
+    "get_current_ra_dec",
     "get_intersection_or_none",
     "get_j2000_iau_moon_transform_matrix",
     # SPICE operations
     "get_lp_position_wrt_moon",
     "get_lp_vector_to_sun_in_lunar_frame",
     "get_sun_vector_wrt_moon",
+    # Theta loader
+    "get_thetas",
     "get_time_range",
     "lat_lon_to_cartesian",
     # File operations

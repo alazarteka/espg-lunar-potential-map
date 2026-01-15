@@ -32,7 +32,7 @@ def plot_loss_cone_comparison(
     # Load data
     print(f"Loading {er_file.name}...")
     er_data = ERData(str(er_file))
-    pitch_angle = PitchAngle(er_data, str(config.DATA_DIR / config.THETA_FILE))
+    pitch_angle = PitchAngle(er_data)
 
     # Create fitter
     fitter = LossConeFitter(

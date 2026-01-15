@@ -118,7 +118,7 @@ def create_losscone_comparison_plot(
     """
     print(f"Loading {er_file.name}...")
     er_data = ERData(str(er_file))
-    pitch_angle = PitchAngle(er_data, str(theta_file))
+    pitch_angle = PitchAngle(er_data)
 
     # Create spacecraft potential array (constant USC per Halekas et al.)
     spacecraft_potential = np.full(len(er_data.data), usc)

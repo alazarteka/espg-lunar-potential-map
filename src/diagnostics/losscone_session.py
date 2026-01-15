@@ -117,7 +117,7 @@ class LossConeSession:
         self.er_data = ERData(str(self.er_file))
         if self.er_data.data.empty:
             raise ValueError(f"No data loaded from {self.er_file}")
-        self.pitch_angle = PitchAngle(self.er_data, str(self.theta_file))
+        self.pitch_angle = PitchAngle(self.er_data)
 
         self._norm_cache: dict[tuple[int, str, str], np.ndarray] = {}
         self._raw_cache: dict[int, ChunkData] = {}
@@ -144,7 +144,6 @@ class LossConeSession:
 
                 self.fitter = LossConeFitterTorch(
                     self.er_data,
-                    str(self.theta_file),
                     pitch_angle=self.pitch_angle,
                     normalization_mode=self.normalization_mode,
                     incident_flux_stat=self.incident_flux_stat,
@@ -157,7 +156,6 @@ class LossConeSession:
 
         self.fitter = LossConeFitter(
             self.er_data,
-            str(self.theta_file),
             pitch_angle=self.pitch_angle,
             normalization_mode=self.normalization_mode,
             incident_flux_stat=self.incident_flux_stat,

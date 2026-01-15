@@ -309,7 +309,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         print("Warning: large U/bs grid may generate a heavy HTML file.")
 
     er_data = ERData(str(args.er_file))
-    pitch_angle = PitchAngle(er_data, str(config.DATA_DIR / config.THETA_FILE))
+    pitch_angle = PitchAngle(er_data)
 
     if args.spec_no is not None:
         spec_vals = er_data.data[config.SPEC_NO_COLUMN].to_numpy()

@@ -391,7 +391,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         print("Warning: large U_sc/U_surface/Bs grid may be slow to compute.")
 
     er_data = ERData(str(args.er_file))
-    pitch_angle = PitchAngle(er_data, str(config.DATA_DIR / config.THETA_FILE))
+    pitch_angle = PitchAngle(er_data)
     fitter = LossConeFitter(
         er_data,
         str(config.DATA_DIR / config.THETA_FILE),

@@ -157,9 +157,7 @@ class Kappa:
         )
         self.er_data = spec_er_data
 
-        spec_pitch_angle = PitchAngle(
-            spec_er_data, str(config.DATA_DIR / config.THETA_FILE)
-        )
+        spec_pitch_angle = PitchAngle(spec_er_data)
 
         pitch_angles = spec_pitch_angle.pitch_angles
         pitch_angles_mask = pitch_angles < 90  # shape (Energy Bins, Pitch Angles)

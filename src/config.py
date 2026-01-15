@@ -99,8 +99,8 @@ LOSS_CONE_BACKGROUND = (
 
 
 # ========== Data Column names ==========
-UTC_COLUMN = "UTC"  # column name for UTC time in dataframes
-TIME_COLUMN = "time"  # column name for time in dataframes
+UTC_COLUMN = "UTC"  # column name for UTC time in dataframes - unique per row
+TIME_COLUMN = "time"  # column name for time in dataframes - seconds since epoch - unique per spec_no
 ENERGY_COLUMN = "energy"  # column name for energy in dataframes
 SPEC_NO_COLUMN = "spec_no"  # column name for spectrum number in dataframes
 

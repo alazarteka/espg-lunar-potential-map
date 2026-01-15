@@ -9,7 +9,7 @@ import pandas as pd
 from tqdm import tqdm
 
 import src.config as config
-from src.flux import ERData, LossConeFitter
+from src.flux import ERData, LossConeFitter, PitchAngle
 
 try:
     from src.model_torch import HAS_TORCH, LossConeFitterTorch
@@ -94,17 +94,19 @@ def spacecraft_potential_worker(
         return spec_no, rows_df.index.to_numpy(), None
 
 
-def fit_worker(args: tuple[pd.DataFrame, str, np.ndarray]) -> np.ndarray:
+def fit_worker(
+    args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None]
+) -> np.ndarray:
     """
     Worker function for parallel fitting.
 
     Args:
-        args: Tuple containing (chunk_df, theta_path, sc_pot).
+        args: Tuple containing (chunk_df, sc_pot, polarity).
 
     Returns:
         Fitting results array from LossConeFitter.
     """
-    chunk_df, theta_path, sc_pot = args
+    chunk_df, sc_pot, polarity = args
 
     # Create ERData from the chunk.
     # Note: This might re-trigger cleaning/counting if not handled in ERData,
@@ -114,9 +116,10 @@ def fit_worker(args: tuple[pd.DataFrame, str, np.ndarray]) -> np.ndarray:
     er_data = ERData.from_dataframe(chunk_df, "batch_chunk")
 
     # Initialize fitter with the chunk
+    pitch_angle = PitchAngle(er_data, polarity=polarity) if polarity is not None else None
     fitter = LossConeFitter(
         er_data,
-        theta_path,
+        pitch_angle=pitch_angle,
         spacecraft_potential=sc_pot,
     )
     return fitter.fit_surface_potential()
@@ -789,7 +792,6 @@ def process_merged_data(
         sc_potential = _spacecraft_potential_per_row(er_data, n)
 
     # Surface Potential Fitting
-    theta_path = str(config.DATA_DIR / config.THETA_FILE)
     proj_potential = np.full(n, np.nan)
     bs_over_bm_arr = np.full(n, np.nan)
     beam_amp_arr = np.full(n, np.nan)
@@ -803,6 +805,17 @@ def process_merged_data(
     rows_per_chunk = sweeps_per_chunk * rows_per_sweep
     # Torch mode uses its own vectorization, so don't use parallel chunking
     chunked = use_parallel and can_chunk and n > rows_per_chunk and not use_torch
+    pitch_angle = None
+    use_polarity = False
+    required_cols = set(config.PHI_COLS + config.MAG_COLS)
+    if required_cols.issubset(er_data.data.columns):
+        use_polarity = True
+        if not chunked:
+            pitch_angle = PitchAngle(er_data, polarity=projection_polarity)
+    else:
+        logging.debug(
+            "Pitch-angle polarity skipped; required ER columns are missing."
+        )
 
     if use_torch:
         # PyTorch-accelerated fitter (~5x faster)
@@ -813,7 +826,7 @@ def process_merged_data(
         logging.info("Running surface potential fitting (PyTorch-accelerated)...")
         fitter = LossConeFitterTorch(
             er_data,
-            theta_path,
+            pitch_angle=pitch_angle,
             spacecraft_potential=sc_potential,
             device=None,  # Auto-detect: CUDA if available, else CPU
         )
@@ -827,7 +840,7 @@ def process_merged_data(
         logging.info("Running surface potential fitting (sequential)...")
         fitter = LossConeFitter(
             er_data,
-            theta_path,
+            pitch_angle=pitch_angle,
             spacecraft_potential=sc_potential,
         )
         fit_mat = fitter.fit_surface_potential()
@@ -838,12 +851,13 @@ def process_merged_data(
     else:
         logging.info("Starting parallel surface potential fitting...")
 
-        chunks: list[tuple[pd.DataFrame, str, np.ndarray]] = []
+        chunks: list[tuple[pd.DataFrame, np.ndarray, np.ndarray | None]] = []
         for i in range(0, n, rows_per_chunk):
             end = min(i + rows_per_chunk, n)
             chunk_df = er_data.data.iloc[i:end].copy()
             chunk_sc_pot = sc_potential[i:end]
-            chunks.append((chunk_df, theta_path, chunk_sc_pot))
+            chunk_pol = projection_polarity[i:end] if use_polarity else None
+            chunks.append((chunk_df, chunk_sc_pot, chunk_pol))
 
         if chunks:
             num_workers = max(1, multiprocessing.cpu_count() - 1)

@@ -480,7 +480,6 @@ class LossConeFitterTorch:
     def __init__(
         self,
         er_data,
-        thetas: str,
         pitch_angle=None,
         spacecraft_potential: np.ndarray | None = None,
         normalization_mode: str = "ratio",
@@ -495,7 +494,6 @@ class LossConeFitterTorch:
 
         Args:
             er_data: ERData object
-            thetas: Path to theta file
             pitch_angle: Optional pre-computed PitchAngle object
             spacecraft_potential: Optional per-row spacecraft potential [V]
             normalization_mode: Flux normalization mode
@@ -515,12 +513,11 @@ class LossConeFitterTorch:
         # Import here to avoid circular imports
         from src import config
         from src.flux import PitchAngle
+        from src.utils.thetas import get_thetas
 
         self.er_data = er_data
-        self.thetas = np.loadtxt(thetas, dtype=np.float64)
-        self.pitch_angle = (
-            pitch_angle if pitch_angle is not None else PitchAngle(er_data, thetas)
-        )
+        self.thetas = get_thetas()
+        self.pitch_angle = pitch_angle or PitchAngle(er_data)
         self.spacecraft_potential = spacecraft_potential
         self.device = get_torch_device(device)
 
@@ -577,10 +574,9 @@ class LossConeFitterTorch:
 
             self._cpu_fitter = LossConeFitter(
                 self.er_data,
-                str(self.config.DATA_DIR / self.config.THETA_FILE),
-                self.pitch_angle,
-                self.spacecraft_potential,
-                self.normalization_mode,
+                pitch_angle=self.pitch_angle,
+                spacecraft_potential=self.spacecraft_potential,
+                normalization_mode=self.normalization_mode,
                 beam_amp_fixed=self.beam_amp_min
                 if self.beam_amp_min == self.beam_amp_max
                 else None,

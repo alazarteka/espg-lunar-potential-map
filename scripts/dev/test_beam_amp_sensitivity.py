@@ -32,7 +32,7 @@ def fit_with_different_strategies(er_file: Path, n_chunks: int = 100):
     """
     print(f"Loading {er_file.name}...")
     er_data = ERData(str(er_file))
-    pitch_angle = PitchAngle(er_data, str(config.DATA_DIR / config.THETA_FILE))
+    pitch_angle = PitchAngle(er_data)
 
     results = {"free": [], "fixed_25": [], "no_beam": [], "high_bound": []}
 

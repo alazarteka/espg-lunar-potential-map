@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 from src import config
 from src.model import synth_losscone, synth_losscone_batch
+from src.utils.thetas import get_thetas
 from src.utils.units import ureg
 
 logger = logging.getLogger(__name__)
@@ -193,21 +194,31 @@ class PitchAngle:
         cartesian_coords: The Cartesian coordinates of the data points.
         pitch_angles: The pitch angles in degrees.
         unit_magnetic_field: The unit magnetic field vectors.
+        polarity: Optional per-row polarity sign (+1/-1/0).
         valid_mask: A mask indicating valid data points.
     """
 
-    def __init__(self, er_data: ERData, thetas: str):
+    def __init__(
+        self,
+        er_data: ERData,
+        polarity: np.ndarray | None = None,
+    ):
         """
         Initialize the PitchAngle class with the ER data and theta values.
 
         Args:
             er_data (ERData): The ER data object.
-            thetas (str): The path to the theta values file.
+            polarity (np.ndarray | None): Optional per-row polarity sign (+1/-1/0).
+                Use +1 for Moonward along +B, -1 for Moonward along -B, and 0 to
+                mark rows as disconnected (pitch angles set to NaN).
+
+        Notes:
+            Theta values are loaded from config via get_thetas(); custom theta
+            files require updating config or extending this API.
         """
         self.er_data = er_data
-        self.thetas = np.loadtxt(
-            thetas, dtype=np.float64
-        )  # Expects theta values in degrees
+        self.thetas = get_thetas()
+        self.polarity = polarity
         self.cartesian_coords = np.array([])
         self.pitch_angles = np.array([])
         self.unit_magnetic_field = np.array([])
@@ -256,9 +267,22 @@ class PitchAngle:
 
         magnetic_field = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
         magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
-        # ER convention points +B roughly sunward; loss-cone tracing expects the
-        # opposite orientation (toward the Moon), so flip the direction here.
-        unit_magnetic_field = -magnetic_field / magnetic_field_magnitude
+        # ER convention points +B roughly sunward; loss-cone tracing expects
+        # Moonward orientation. If polarity is provided, use it as the sign.
+        if self.polarity is None:
+            unit_magnetic_field = -magnetic_field / magnetic_field_magnitude
+        else:
+            polarity = np.asarray(self.polarity)
+            if polarity.shape[0] != magnetic_field.shape[0]:
+                raise ValueError("polarity must match the number of ER rows")
+            unit_magnetic_field = (
+                magnetic_field / magnetic_field_magnitude
+            ) * polarity[:, None]
+            # Rows with polarity=0 are treated as disconnected; downstream masks
+            # should ignore the resulting NaNs.
+            invalid_polarity = ~np.isfinite(polarity) | (polarity == 0)
+            if np.any(invalid_polarity):
+                unit_magnetic_field[invalid_polarity] = np.nan
         unit_magnetic_field = np.tile(
             unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1)
         )
@@ -292,7 +316,6 @@ class LossConeFitter:
     def __init__(
         self,
         er_data: ERData,
-        thetas: str,
         pitch_angle: PitchAngle | None = None,
         spacecraft_potential: np.ndarray | None = None,
         normalization_mode: str = "ratio",
@@ -305,7 +328,6 @@ class LossConeFitter:
 
         Args:
             er_data (ERData): The ER data object.
-            thetas (str): The path to the theta values file.
             pitch_angle (PitchAngle, optional): Pre-computed pitch angle
                 object. If None, creates a new one.
             spacecraft_potential (np.ndarray | None): Optional per-row spacecraft
@@ -323,10 +345,8 @@ class LossConeFitter:
                 loss cone to stabilise log-space χ² (defaults to config value).
         """
         self.er_data = er_data
-        self.thetas = np.loadtxt(thetas, dtype=np.float64)
-        self.pitch_angle = (
-            pitch_angle if pitch_angle is not None else PitchAngle(er_data, thetas)
-        )
+        self.thetas = get_thetas()
+        self.pitch_angle = pitch_angle or PitchAngle(er_data)
         self.spacecraft_potential = spacecraft_potential
 
         # Surface potential bounds from config

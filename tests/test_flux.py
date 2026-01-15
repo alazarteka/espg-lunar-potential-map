@@ -117,7 +117,7 @@ class TestPitchAngle:
     def test_cartesian_conversion_known_values(self):
         """Spherical to Cartesian conversion for known angles."""
         er = prepare_synthetic_er()
-        pa = PitchAngle(er, str(config.DATA_DIR / config.THETA_FILE))
+        pa = PitchAngle(er)
         
         # Cartesian coords should be unit vectors (on unit sphere)
         norms = np.linalg.norm(pa.cartesian_coords, axis=-1)
@@ -126,7 +126,7 @@ class TestPitchAngle:
     def test_pitch_angles_in_valid_range(self):
         """Pitch angles should be in [0, 180] degrees."""
         er = prepare_synthetic_er()
-        pa = PitchAngle(er, str(config.DATA_DIR / config.THETA_FILE))
+        pa = PitchAngle(er)
         
         assert np.all(pa.pitch_angles >= 0)
         assert np.all(pa.pitch_angles <= 180)
@@ -134,10 +134,19 @@ class TestPitchAngle:
     def test_pitch_angles_shape_matches_data(self):
         """Pitch angles array shape matches (n_rows, n_channels)."""
         er = prepare_synthetic_er()
-        pa = PitchAngle(er, str(config.DATA_DIR / config.THETA_FILE))
+        pa = PitchAngle(er)
         
         n_rows = len(er.data)
         assert pa.pitch_angles.shape == (n_rows, config.CHANNELS)
+
+    def test_pitch_angles_polarity_zero_is_nan(self):
+        """Polarity=0 should mark pitch angles as NaN."""
+        er = prepare_synthetic_er()
+        polarity = np.zeros(len(er.data), dtype=int)
+        pa = PitchAngle(er, polarity=polarity)
+
+        assert np.isnan(pa.unit_magnetic_field).all()
+        assert np.isnan(pa.pitch_angles).all()
 
 
 # ==============================================================================
@@ -154,7 +163,6 @@ class TestLossConeFitterNormalization:
         er = prepare_synthetic_er()
         return LossConeFitter(
             er,
-            str(config.DATA_DIR / config.THETA_FILE),
             normalization_mode="ratio",
         )
 
@@ -173,7 +181,6 @@ class TestLossConeFitterNormalization:
         er = prepare_synthetic_er()
         fitter = LossConeFitter(
             er,
-            str(config.DATA_DIR / config.THETA_FILE),
             normalization_mode="ratio2",
         )
         
@@ -187,7 +194,6 @@ class TestLossConeFitterNormalization:
         er = prepare_synthetic_er()
         fitter = LossConeFitter(
             er,
-            str(config.DATA_DIR / config.THETA_FILE),
             normalization_mode="ratio_rescaled",
         )
         
@@ -204,7 +210,6 @@ class TestLossConeFitterNormalization:
         er = prepare_synthetic_er()
         fitter = LossConeFitter(
             er,
-            str(config.DATA_DIR / config.THETA_FILE),
             normalization_mode="global",
         )
         
@@ -219,7 +224,6 @@ class TestLossConeFitterNormalization:
         with pytest.raises(ValueError, match="Unknown normalization_mode"):
             LossConeFitter(
                 er,
-                str(config.DATA_DIR / config.THETA_FILE),
                 normalization_mode="invalid_mode",
             )
 
@@ -230,7 +234,6 @@ class TestLossConeFitterNormalization:
         with pytest.raises(ValueError, match="Unknown incident_flux_stat"):
             LossConeFitter(
                 er,
-                str(config.DATA_DIR / config.THETA_FILE),
                 incident_flux_stat="median",  # Invalid
             )
 
@@ -241,7 +244,6 @@ class TestLossConeFitterNormalization:
         with pytest.raises(ValueError, match="loss_cone_background must be positive"):
             LossConeFitter(
                 er,
-                str(config.DATA_DIR / config.THETA_FILE),
                 loss_cone_background=-1.0,
             )
 
@@ -252,10 +254,7 @@ class TestLossConeFitterFitting:
     def test_fit_returns_valid_results(self):
         """Full fitting returns array with expected shape."""
         er = prepare_synthetic_er()
-        fitter = LossConeFitter(
-            er,
-            str(config.DATA_DIR / config.THETA_FILE),
-        )
+        fitter = LossConeFitter(er)
         
         results = fitter.fit_surface_potential()
         
@@ -267,10 +266,7 @@ class TestLossConeFitterFitting:
     def test_fit_single_chunk(self):
         """Fitting a single chunk returns valid values."""
         er = prepare_synthetic_er()
-        fitter = LossConeFitter(
-            er,
-            str(config.DATA_DIR / config.THETA_FILE),
-        )
+        fitter = LossConeFitter(er)
         
         U_surface, bs_over_bm, beam_amp, chi2 = fitter._fit_surface_potential(0)
         
@@ -281,10 +277,7 @@ class TestLossConeFitterFitting:
     def test_fit_handles_out_of_range_chunk(self):
         """Fitting a chunk beyond data range returns NaN."""
         er = prepare_synthetic_er()
-        fitter = LossConeFitter(
-            er,
-            str(config.DATA_DIR / config.THETA_FILE),
-        )
+        fitter = LossConeFitter(er)
         
         # Request chunk that doesn't exist
         U_surface, bs_over_bm, beam_amp, chi2 = fitter._fit_surface_potential(999)
@@ -299,20 +292,14 @@ class TestLossConeFitterLatinHypercube:
     def test_lhs_shape(self):
         """LHS sample has correct shape (400 samples, 3 params)."""
         er = prepare_synthetic_er()
-        fitter = LossConeFitter(
-            er,
-            str(config.DATA_DIR / config.THETA_FILE),
-        )
+        fitter = LossConeFitter(er)
         
         assert fitter.lhs.shape == (400, 3)
 
     def test_lhs_bounds(self):
         """LHS samples are within specified bounds."""
         er = prepare_synthetic_er()
-        fitter = LossConeFitter(
-            er,
-            str(config.DATA_DIR / config.THETA_FILE),
-        )
+        fitter = LossConeFitter(er)
         
         # U_surface: [-1000, 1000]
         assert np.all(fitter.lhs[:, 0] >= -1000)

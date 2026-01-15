@@ -132,7 +132,7 @@ def profile_single_batch(batch_size: int, data_file) -> dict:
     n_rows = len(er_data.data)
     n_chunks = n_rows // config.SWEEP_ROWS
     theta_path = str(config.DATA_DIR / config.THETA_FILE)
-    pitch_angle = PitchAngle(er_data, theta_path)
+    pitch_angle = PitchAngle(er_data)
 
     # Create fitter
     fitter = LossConeFitterTorch(
