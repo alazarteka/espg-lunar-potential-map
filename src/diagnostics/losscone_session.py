@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,6 +24,8 @@ except Exception:  # pragma: no cover - optional GPU path
     torch = None  # type: ignore[assignment]
     _auto_detect_dtype = None  # type: ignore[assignment]
     synth_losscone_batch_torch = None  # type: ignore[assignment]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -94,6 +97,7 @@ class LossConeSession:
         loss_cone_background: float | None = None,
         use_torch: bool = False,
         torch_device: str | None = None,
+        use_polarity: bool = True,
     ) -> None:
         self.er_file = Path(er_file)
         self.theta_file = (
@@ -117,7 +121,12 @@ class LossConeSession:
         self.er_data = ERData(str(self.er_file))
         if self.er_data.data.empty:
             raise ValueError(f"No data loaded from {self.er_file}")
-        self.pitch_angle = PitchAngle(self.er_data)
+        self.polarity = self._compute_polarity() if use_polarity else None
+        if self.polarity is not None:
+            self.er_data.data, self.polarity = self._filter_zero_polarity(
+                self.er_data.data, self.polarity
+            )
+        self.pitch_angle = PitchAngle(self.er_data, polarity=self.polarity)
 
         self._norm_cache: dict[tuple[int, str, str], np.ndarray] = {}
         self._raw_cache: dict[int, ChunkData] = {}
@@ -135,6 +144,78 @@ class LossConeSession:
             self._torch_dtype = _auto_detect_dtype(self._torch_device)
 
         self._init_fitter()
+
+    def _filter_zero_polarity(self, data, polarity: np.ndarray):
+        if len(polarity) != len(data):
+            logger.warning(
+                "Polarity length mismatch; skipping zero-polarity filtering."
+            )
+            return data, polarity
+
+        zero_mask = polarity == 0
+        if not np.any(zero_mask):
+            return data, polarity
+
+        spec_vals = data[config.SPEC_NO_COLUMN].to_numpy()
+        bad_specs = set(spec_vals[zero_mask])
+        if not bad_specs:
+            return data, polarity
+
+        keep_mask = ~data[config.SPEC_NO_COLUMN].isin(bad_specs)
+        filtered = data[keep_mask].reset_index(drop=True)
+        filtered_polarity = polarity[keep_mask]
+
+        logger.info(
+            "Filtered %d sweeps with zero polarity (%d rows removed).",
+            len(bad_specs),
+            len(data) - len(filtered),
+        )
+        return filtered, filtered_polarity
+
+    def _compute_polarity(self) -> np.ndarray | None:
+        try:
+            from src.potential_mapper.coordinates import (
+                CoordinateCalculator,
+                find_surface_intersection_with_polarity,
+                project_magnetic_fields,
+            )
+            from src.potential_mapper.spice import load_spice_files
+            from src.utils.attitude import load_attitude_data
+        except Exception as exc:
+            logger.warning(
+                "Polarity support unavailable; falling back to legacy pitch angles: %s",
+                exc,
+            )
+            return None
+
+        try:
+            load_spice_files()
+            et_spin, ra_vals, dec_vals = load_attitude_data(
+                config.DATA_DIR / config.ATTITUDE_FILE
+            )
+            if (
+                et_spin is None
+                or ra_vals is None
+                or dec_vals is None
+                or len(et_spin) == 0
+                or len(ra_vals) == 0
+                or len(dec_vals) == 0
+            ):
+                raise RuntimeError("Attitude data unavailable or empty.")
+
+            coord_calc = CoordinateCalculator(et_spin, ra_vals, dec_vals)
+            coord_arrays = coord_calc.calculate_coordinate_transformation(self.er_data)
+            projected_b = project_magnetic_fields(self.er_data, coord_arrays)
+            _points, _mask, polarity = find_surface_intersection_with_polarity(
+                coord_arrays, projected_b
+            )
+            return polarity.astype(np.int8, copy=False)
+        except Exception as exc:
+            logger.warning(
+                "Polarity calculation failed; falling back to legacy pitch angles: %s",
+                exc,
+            )
+            return None
 
     def _init_fitter(self) -> None:
         self._norm_cache.clear()
