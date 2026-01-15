@@ -12,6 +12,7 @@ to find the best parameters for each spectrum independently.
 from __future__ import annotations
 
 import math
+from typing import ClassVar
 
 import numpy as np
 
@@ -30,7 +31,7 @@ from src.utils.optimization import BatchedDifferentialEvolution
 ELECTRON_MASS_EV_S2_M2 = 5.685630e-12
 
 
-def _auto_detect_dtype(device: "torch.device") -> "torch.dtype":
+def _auto_detect_dtype(device: torch.device) -> torch.dtype:
     """
     Auto-detect optimal dtype for the given device.
 
@@ -149,8 +150,9 @@ def build_response_matrix_torch(
     finite instrumental energy resolution. The sigma is computed from the
     relative energy width using: s = asinh(0.5 * width) / sqrt(2 * ln(2))
 
-    Note: A NumPy/Numba equivalent exists in kappa.Kappa.build_log_energy_response_matrix
-    for CPU execution. Both share the same physics formula.
+    Note: A NumPy/Numba equivalent exists in
+    kappa.Kappa.build_log_energy_response_matrix for CPU execution. Both share
+    the same physics formula.
 
     Args:
         energy: (E,) energy centers [eV]
@@ -229,7 +231,7 @@ class KappaFitterTorch:
     using vectorized tensor operations.
     """
 
-    DEFAULT_BOUNDS = [
+    DEFAULT_BOUNDS: ClassVar[list[tuple[float, float]]] = [
         (2.5, 6.0),  # kappa
         (6.0, 8.0),  # log10(theta) where theta is in m/s
     ]

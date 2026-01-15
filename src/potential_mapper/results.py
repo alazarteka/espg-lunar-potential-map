@@ -84,7 +84,8 @@ class PotentialResults:
 
     Potentials:
     - spacecraft_potential: Floating potential of spacecraft (V) per row.
-    - projected_potential: Surface potential U_surface (V) from loss-cone fit; NaN if not fit.
+    - projected_potential: Surface potential U_surface (V) from loss-cone fit;
+      NaN if not fit.
 
     Loss-cone fit parameters:
     - bs_over_bm: Fitted B_surface/B_spacecraft ratio; NaN if not fit.
@@ -99,7 +100,8 @@ class PotentialResults:
     Environment:
     - spacecraft_in_sun: True if LP→Sun line-of-sight does not intersect Moon.
     - projection_in_sun: True if surface normal · Moon→Sun > 0 at intersection.
-    - environment_class: PlasmaEnvironment classification (0=unknown, 1=SW, 2=sheath, 3=lobes, 4=PS, 5=wake).
+    - environment_class: PlasmaEnvironment classification (0=unknown, 1=SW,
+      2=sheath, 3=lobes, 4=PS, 5=wake).
     """
 
     # Coordinates
@@ -151,12 +153,12 @@ class PotentialResults:
             self.projection_polarity = np.zeros(n, dtype=np.int8)
 
     def classify_environments(self) -> None:
-        """Classify plasma environment for each row based on temperature and illumination."""
+        """Classify plasma environment for each row by temperature/illumination."""
         for i, (te, in_sun) in enumerate(
-            zip(self.electron_temperature, self.projection_in_sun)
+            zip(self.electron_temperature, self.projection_in_sun, strict=True)
         ):
-            self.environment_class[i] = PlasmaEnvironment.from_temperature_and_illumination(
-                te, bool(in_sun)
+            self.environment_class[i] = (
+                PlasmaEnvironment.from_temperature_and_illumination(te, bool(in_sun))
             )
 
 

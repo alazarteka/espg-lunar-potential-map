@@ -49,14 +49,12 @@ def discover_day_files(year: int, month: int | None = None) -> list[Path]:
             continue
 
         # Filter by month if specified
-        if month is not None:
-            # Subdirs are like "091_120APR" - need to check month
-            if MONTH_INT_TO_ABBREV.get(month, "") not in subdir.name:
-                continue
+        # Subdirs are like "091_120APR" - need to check month
+        if month is not None and MONTH_INT_TO_ABBREV.get(month, "") not in subdir.name:
+            continue
 
         # Find all .TAB files in this subdir
-        for tab_file in sorted(subdir.glob("3D*.TAB")):
-            day_files.append(tab_file)
+        day_files.extend(sorted(subdir.glob("3D*.TAB")))
 
     return day_files
 

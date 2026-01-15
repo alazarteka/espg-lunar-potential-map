@@ -3,7 +3,6 @@ Test validity masking for E < U_spacecraft cases.
 """
 
 import numpy as np
-import pytest
 
 from src.model import synth_losscone, synth_losscone_batch
 
@@ -34,7 +33,7 @@ def test_mask_returns_invalid_energies():
 
     # Check that energies < U_spacecraft are masked out
     for i, E in enumerate(energy_grid):
-        if E < U_spacecraft:
+        if U_spacecraft > E:
             assert not mask[i].any(), f"Energy {E} < {U_spacecraft} should be invalid"
         else:
             assert mask[i].all(), f"Energy {E} >= {U_spacecraft} should be valid"
@@ -100,7 +99,7 @@ def test_mask_combines_with_data_mask_in_chi2():
 
     # Check that low energies are excluded
     for i, E in enumerate(energy_grid):
-        if E < U_spacecraft:
+        if U_spacecraft > E:
             assert not combined_mask[i].any()
 
     # Check that bad data rows are excluded

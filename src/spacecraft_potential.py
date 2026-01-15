@@ -19,13 +19,9 @@ Conventions
 See docs/analysis/spacecraft_potential_analysis.md for a deeper discussion.
 """
 
-
 import numpy as np
 import spiceypy as spice
 from scipy.optimize import brentq
-
-# NumPy 1.x/2.x compatibility: trapezoid was added in NumPy 2.0
-_trapezoid = getattr(np, "trapezoid", np.trapz)
 
 from src import config
 from src.flux import ERData
@@ -50,6 +46,9 @@ from src.utils.units import (
     VoltageType,
     ureg,
 )
+
+# NumPy 1.x/2.x compatibility: trapezoid was added in NumPy 2.0
+_trapezoid = getattr(np, "trapezoid", np.trapz)
 
 CM2_TO_M2_FACTOR = 1.0e4  # unit conversion: cm^-2 → m^-2
 

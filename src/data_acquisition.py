@@ -215,9 +215,10 @@ class DataManager:
             existing,
         )
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor, tqdm(
-            total=len(remaining_tasks), desc=folder_desc, unit="file"
-        ) as pbar:
+        with (
+            ThreadPoolExecutor(max_workers=max_workers) as executor,
+            tqdm(total=len(remaining_tasks), desc=folder_desc, unit="file") as pbar,
+        ):
             futures = [
                 executor.submit(self.download_file, url, dest)
                 for url, dest in remaining_tasks

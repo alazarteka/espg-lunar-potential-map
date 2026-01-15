@@ -90,7 +90,10 @@ def _make_synodic2_basis(
 def _make_synodic3_basis(
     period_days: float = DEFAULT_SYNODIC_PERIOD_DAYS,
 ) -> list[BasisFunction]:
-    """Create 3rd harmonic (3ω) cosine and sine bases at triple the synodic frequency."""
+    """
+    Create 3rd harmonic (3ω) cosine and sine bases at triple the synodic
+    frequency.
+    """
     return _make_harmonic_basis("synodic3", period_days, harmonic=3)
 
 

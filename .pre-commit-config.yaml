@@ -4,21 +4,21 @@
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.2
+    rev: v0.14.10
     hooks:
       # Linter
       - id: ruff
-        args: [--fix]
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(src|tests)/
       # Formatter (replaces Black)
       - id: ruff-format
+        files: ^(src|tests)/
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+  - repo: local
     hooks:
-      - id: mypy
-        additional_dependencies:
-          - pint>=0.24.4
-          - numpy>=2.0.0
-        args: [--config-file=pyproject.toml, --namespace-packages, --explicit-package-bases]
-        # Only check src/, not tests or scripts
-        files: ^src/
+      - id: pytest
+        name: pytest
+        entry: uv run pytest -m "not skip_ci" --tb=short
+        language: system
+        pass_filenames: false
+        always_run: true

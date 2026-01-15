@@ -265,7 +265,9 @@ class LossConeSession:
             )
             if return_mask:
                 model_t, mask_t = result_t
-                return model_t[0].detach().cpu().numpy(), mask_t[0].detach().cpu().numpy()
+                return model_t[0].detach().cpu().numpy(), mask_t[
+                    0
+                ].detach().cpu().numpy()
             else:
                 return result_t[0].detach().cpu().numpy()
 
@@ -292,10 +294,7 @@ class LossConeSession:
         data_mask = np.isfinite(norm2d) & (norm2d > 0)
 
         # Combine data mask with model validity mask if provided
-        if model_mask is not None:
-            combined_mask = data_mask & model_mask
-        else:
-            combined_mask = data_mask
+        combined_mask = data_mask & model_mask if model_mask is not None else data_mask
 
         if not combined_mask.any():
             return float("nan")

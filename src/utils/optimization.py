@@ -71,7 +71,8 @@ class BatchedDifferentialEvolution:
 
         Args:
             bounds: List of (min, max) tuples for each parameter
-            n_spectra: Number of independent spectra to optimize (1 for single-spectrum mode)
+            n_spectra: Number of independent spectra to optimize (1 for
+                single-spectrum mode)
             popsize: Population size (per spectrum in multi-spectrum mode)
             mutation: Mutation factor F in [0, 2]
             crossover: Crossover probability CR in [0, 1]
@@ -251,8 +252,9 @@ class BatchedDifferentialEvolution:
         Run DE optimization.
 
         Args:
-            objective_fn: For single-spectrum mode: (popsize, n_params) -> (popsize,)
-                         For multi-spectrum mode: (n_spectra, popsize, n_params) -> (n_spectra, popsize)
+            objective_fn: For single-spectrum mode: (popsize, n_params)
+                -> (popsize,). For multi-spectrum mode: (n_spectra, popsize,
+                n_params) -> (n_spectra, popsize)
             x0: Optional initial best guess
                 - Single-spectrum: (n_params,) tensor
                 - Multi-spectrum: (n_spectra, n_params) tensor

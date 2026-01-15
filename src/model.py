@@ -101,8 +101,10 @@ def _compute_beam(
     delta_u = U_spacecraft - U_surface
     accel_mask = (delta_u > 0).astype(float)
     beam_center = np.maximum(delta_u, beam_width_eV)
-    energy_profile = beam_amp * accel_mask * np.exp(
-        -0.5 * ((energy - beam_center) / np.maximum(beam_width_eV, EPS)) ** 2
+    energy_profile = (
+        beam_amp
+        * accel_mask
+        * np.exp(-0.5 * ((energy - beam_center) / np.maximum(beam_width_eV, EPS)) ** 2)
     )
 
     if beam_pitch_sigma_deg > 0:

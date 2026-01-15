@@ -60,7 +60,9 @@ def parse_args() -> argparse.Namespace:
         "--fit-mode",
         choices=["window", "basis"],
         default="window",
-        help="Fitting mode: 'window' (per-window) or 'basis' (temporal basis expansion)",
+        help=(
+            "Fitting mode: 'window' (per-window) or 'basis' (temporal basis expansion)"
+        ),
     )
     parser.add_argument(
         "--temporal-basis",
@@ -78,7 +80,10 @@ def parse_args() -> argparse.Namespace:
         "--window-stride",
         type=float,
         default=None,
-        help="Temporal stride in hours (default: same as --window-hours for non-overlapping)",
+        help=(
+            "Temporal stride in hours (default: same as --window-hours for "
+            "non-overlapping)"
+        ),
     )
     parser.add_argument(
         "--l2-penalty",
@@ -114,7 +119,9 @@ def parse_args() -> argparse.Namespace:
         "--max-lag",
         type=int,
         default=1,
-        help="Max temporal lag for multi-scale regularization (1=adjacent, 5=±5 windows)",
+        help=(
+            "Max temporal lag for multi-scale regularization (1=adjacent, 5=±5 windows)"
+        ),
     )
     parser.add_argument(
         "--decay-factor",
@@ -132,7 +139,10 @@ def parse_args() -> argparse.Namespace:
         "--rotation-period-days",
         type=float,
         default=DEFAULT_SYNODIC_PERIOD_DAYS,
-        help="Rotation period (days) used when --co-rotate is set (sign controls direction)",
+        help=(
+            "Rotation period (days) used when --co-rotate is set "
+            "(sign controls direction)"
+        ),
     )
     parser.add_argument(
         "--output",
@@ -245,9 +255,12 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
     print(f"Bases           : {result.basis_names}")
     print(f"Max degree      : lmax = {args.lmax}")
     print(f"Total samples   : {result.n_samples}")
-    print(
-        f"Parameters      : {len(result.basis_names)} × {_harmonic_coefficient_count(args.lmax)} = {len(result.basis_names) * _harmonic_coefficient_count(args.lmax)}"
+    basis_count = len(result.basis_names)
+    coeff_count = _harmonic_coefficient_count(args.lmax)
+    param_line = (
+        f"Parameters      : {basis_count} × {coeff_count} = {basis_count * coeff_count}"
     )
+    print(param_line)
     print(f"RMS residual    : {result.rms_residual:.2f} V")
     print(f"Output windows  : {len(results)}")
     print(f"\nSaved to: {args.output}")
@@ -316,9 +329,11 @@ def _main_window_mode(args: argparse.Namespace) -> int:
     print(f"Max degree      : lmax = {args.lmax}")
     if args.co_rotate:
         direction = "forward" if args.rotation_period_days > 0 else "reverse"
-        print(
-            f"Temporal frame  : solar co-rotating ({abs(args.rotation_period_days):.3f} d, {direction})"
+        frame = (
+            "Temporal frame  : solar co-rotating "
+            f"({abs(args.rotation_period_days):.3f} d, {direction})"
         )
+        print(frame)
     else:
         print("Temporal frame  : moon-fixed")
     if args.spatial_weight_exponent is None:

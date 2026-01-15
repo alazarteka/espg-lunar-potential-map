@@ -1,5 +1,6 @@
 """
-Compute time-dependent spherical harmonic coefficients a_lm(t) for lunar surface potential.
+Compute time-dependent spherical harmonic coefficients a_lm(t) for lunar surface
+potential.
 
 Implements the expansion:
     U(φ, θ, t) = Σ_{l,m} a_lm(t) Y_lm(φ, θ)

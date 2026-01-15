@@ -122,8 +122,9 @@ class CoordinateCalculator:
         # Note: The original code skipped rows, effectively leaving them as NaNs
         # (initialized to np.full(..., np.nan)).
         # So we just need to ensure invalid rows remain NaNs.
-        # The batch functions already return NaNs on error, but we might have partial failures.
-        # We explicitly set invalid rows to NaN to be safe and consistent.
+        # The batch functions already return NaNs on error, but we might have
+        # partial failures. We explicitly set invalid rows to NaN to be safe
+        # and consistent.
 
         if not np.all(valid_mask):
             lp_positions[~valid_mask] = np.nan

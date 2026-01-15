@@ -1,4 +1,5 @@
 import math
+
 import numpy as np
 from scipy.integrate import simpson
 
@@ -176,10 +177,7 @@ def kappa_current_density_analytic(params: KappaParams) -> CurrentDensityType:
     )
     correction = _kappa_current_factor(kappa)
     current_mag = (
-        density_mag
-        * config.ELECTRON_CHARGE_MAGNITUDE
-        * thermal_term
-        * correction
+        density_mag * config.ELECTRON_CHARGE_MAGNITUDE * thermal_term * correction
     )
     return current_mag * (ureg.ampere / ureg.meter**2)
 
@@ -203,6 +201,4 @@ def kappa_current_density_analytic_magnitude(
         kT_joule / (2.0 * math.pi * config.ELECTRON_MASS_MAGNITUDE)
     )
     correction = _kappa_current_factor(kappa)
-    return (
-        density * config.ELECTRON_CHARGE_MAGNITUDE * thermal_term * correction
-    )
+    return density * config.ELECTRON_CHARGE_MAGNITUDE * thermal_term * correction

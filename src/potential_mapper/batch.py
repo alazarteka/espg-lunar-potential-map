@@ -103,9 +103,7 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
         # Get first valid value from the spectrum rows (all rows have same fit)
         u_chunk = results.projected_potential[row_slice]
         spec_valid.append(bool(np.isfinite(u_chunk).any()))
-        spec_u_surface.append(
-            u_chunk[0] if np.isfinite(u_chunk[0]) else np.nan
-        )
+        spec_u_surface.append(u_chunk[0] if np.isfinite(u_chunk[0]) else np.nan)
         spec_bs_over_bm.append(results.bs_over_bm[idx])
         spec_chi2.append(results.fit_chi2[idx])
         spec_te.append(results.electron_temperature[idx])
@@ -260,7 +258,10 @@ def _parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=Path("artifacts/potential_cache"),
-        help="Directory where output NPZ file is stored (default: artifacts/potential_cache)",
+        help=(
+            "Directory where output NPZ file is stored "
+            "(default: artifacts/potential_cache)"
+        ),
     )
     parser.add_argument("--year", type=int, default=None, help="Optional year filter")
     parser.add_argument(
@@ -277,7 +278,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--fast",
         action="store_true",
-        help="Use PyTorch-accelerated fitter (~5x faster). Requires: uv sync --extra gpu",
+        help=(
+            "Use PyTorch-accelerated fitter (~5x faster). Requires: uv sync --extra gpu"
+        ),
     )
     parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing output file"

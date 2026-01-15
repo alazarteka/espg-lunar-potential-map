@@ -1,5 +1,7 @@
-import pytest
 from datetime import date
+
+import pytest
+
 from src.visualization.utils import date_range
 
 

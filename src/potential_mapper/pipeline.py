@@ -94,9 +94,7 @@ def spacecraft_potential_worker(
         return spec_no, rows_df.index.to_numpy(), None
 
 
-def fit_worker(
-    args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None]
-) -> np.ndarray:
+def fit_worker(args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None]) -> np.ndarray:
     """
     Worker function for parallel fitting.
 
@@ -116,7 +114,9 @@ def fit_worker(
     er_data = ERData.from_dataframe(chunk_df, "batch_chunk")
 
     # Initialize fitter with the chunk
-    pitch_angle = PitchAngle(er_data, polarity=polarity) if polarity is not None else None
+    pitch_angle = (
+        PitchAngle(er_data, polarity=polarity) if polarity is not None else None
+    )
     fitter = LossConeFitter(
         er_data,
         pitch_angle=pitch_angle,
@@ -233,8 +233,9 @@ def _spacecraft_potential_per_row_parallel(
         f"{len(tasks)} spectra"
     )
 
-    # Execute in parallel with SPICE initialization per worker
-    # Use 'spawn' context to ensure thread-safety for SPICE (avoid global state corruption)
+    # Execute in parallel with SPICE initialization per worker.
+    # Use "spawn" context to ensure SPICE thread-safety and avoid global state
+    # corruption.
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=num_workers, initializer=_init_worker_spice) as pool:
         # Use imap_unordered for better memory efficiency
@@ -530,9 +531,12 @@ def _apply_fit_results(
         fit_chi2[row_start:row_end] = float(chi2)
 
         # Only store U_surface if fit quality is acceptable
-        if np.isfinite(U_surface) and np.isfinite(chi2):
-            if chi2 <= config.FIT_ERROR_THRESHOLD:
-                proj_potential[row_start:row_end] = float(U_surface)
+        if (
+            np.isfinite(U_surface)
+            and np.isfinite(chi2)
+            and chi2 <= config.FIT_ERROR_THRESHOLD
+        ):
+            proj_potential[row_start:row_end] = float(U_surface)
 
 
 class DataLoader:
@@ -660,7 +664,8 @@ def process_merged_data(
 
     Args:
         er_data: Merged ERData object
-        use_parallel: Enable multiprocessing for SC and surface potential (default: False)
+        use_parallel: Enable multiprocessing for SC and surface potential
+            (default: False)
         use_torch: Use PyTorch-accelerated fitter (~5x faster, default: False)
 
     Returns:
@@ -770,7 +775,9 @@ def process_merged_data(
         else:
             try:
                 sc_potential = _spacecraft_potential_per_row_torch(
-                    er_data, n, is_day=sc_in_sun,
+                    er_data,
+                    n,
+                    is_day=sc_in_sun,
                     electron_temp_out=electron_temp,
                     electron_dens_out=electron_dens,
                     kappa_out=kappa_vals_arr,
@@ -813,9 +820,7 @@ def process_merged_data(
         if not chunked:
             pitch_angle = PitchAngle(er_data, polarity=projection_polarity)
     else:
-        logging.debug(
-            "Pitch-angle polarity skipped; required ER columns are missing."
-        )
+        logging.debug("Pitch-angle polarity skipped; required ER columns are missing.")
 
     if use_torch:
         # PyTorch-accelerated fitter (~5x faster)
@@ -833,8 +838,13 @@ def process_merged_data(
         # Use batched GPU processing (auto-detects dtype and batch_size)
         fit_mat = fitter.fit_surface_potential_batched()
         _apply_fit_results(
-            fit_mat, proj_potential, bs_over_bm_arr, beam_amp_arr, fit_chi2_arr,
-            row_offset=0, n_total=n
+            fit_mat,
+            proj_potential,
+            bs_over_bm_arr,
+            beam_amp_arr,
+            fit_chi2_arr,
+            row_offset=0,
+            n_total=n,
         )
     elif not chunked:
         logging.info("Running surface potential fitting (sequential)...")
@@ -845,8 +855,13 @@ def process_merged_data(
         )
         fit_mat = fitter.fit_surface_potential()
         _apply_fit_results(
-            fit_mat, proj_potential, bs_over_bm_arr, beam_amp_arr, fit_chi2_arr,
-            row_offset=0, n_total=n
+            fit_mat,
+            proj_potential,
+            bs_over_bm_arr,
+            beam_amp_arr,
+            fit_chi2_arr,
+            row_offset=0,
+            n_total=n,
         )
     else:
         logging.info("Starting parallel surface potential fitting...")
@@ -879,8 +894,13 @@ def process_merged_data(
                 ):
                     row_offset = chunk_idx * rows_per_chunk
                     _apply_fit_results(
-                        chunk_res, proj_potential, bs_over_bm_arr, beam_amp_arr,
-                        fit_chi2_arr, row_offset, n_total=n
+                        chunk_res,
+                        proj_potential,
+                        bs_over_bm_arr,
+                        beam_amp_arr,
+                        fit_chi2_arr,
+                        row_offset,
+                        n_total=n,
                     )
 
     # Build results object

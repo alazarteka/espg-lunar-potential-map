@@ -34,7 +34,7 @@ EPS = 1e-12
 DEFAULT_BACKGROUND = 0.05
 
 
-def _auto_detect_dtype(device: "torch.device") -> "torch.dtype":
+def _auto_detect_dtype(device: torch.device) -> torch.dtype:
     """
     Auto-detect optimal dtype for the given device.
 
@@ -54,7 +54,7 @@ def _auto_detect_dtype(device: "torch.device") -> "torch.dtype":
     return torch.float32  # CPU: float32 is fastest
 
 
-def _auto_detect_batch_size(device: "torch.device", dtype: "torch.dtype") -> int:
+def _auto_detect_batch_size(device: torch.device, dtype: torch.dtype) -> int:
     """
     Auto-detect optimal batch size based on available VRAM.
 
@@ -199,8 +199,10 @@ def synth_losscone_batch_torch(
         accel_mask = (delta_u > 0).to(dtype=dtype)
         beam_center = torch.maximum(delta_u, beam_width_eV)
         beam_width_safe = torch.clamp(beam_width_eV, min=EPS)
-        energy_profile = beam_amp * accel_mask * torch.exp(
-            -0.5 * ((E_exp - beam_center) / beam_width_safe) ** 2
+        energy_profile = (
+            beam_amp
+            * accel_mask
+            * torch.exp(-0.5 * ((E_exp - beam_center) / beam_width_safe) ** 2)
         )
 
         if beam_pitch_sigma_deg > 0:
@@ -372,8 +374,10 @@ def synth_losscone_multi_chunk_torch(
         accel_mask = (delta_u > 0).to(dtype=dtype)
         beam_center = torch.maximum(delta_u, beam_width_exp)
         beam_width_safe = torch.clamp(beam_width_exp, min=EPS)
-        energy_profile = beam_amp_exp * accel_mask * torch.exp(
-            -0.5 * ((E_exp - beam_center) / beam_width_safe) ** 2
+        energy_profile = (
+            beam_amp_exp
+            * accel_mask
+            * torch.exp(-0.5 * ((E_exp - beam_center) / beam_width_safe) ** 2)
         )
 
         if beam_pitch_sigma_deg > 0:
@@ -1069,8 +1073,7 @@ class LossConeFitterTorch:
             )
 
             chi2 = compute_chi2_multi_chunk_torch(
-                models, norm2d, data_mask,
-                log_data_precomputed=log_data_precomputed
+                models, norm2d, data_mask, log_data_precomputed=log_data_precomputed
             )
             chi2 = torch.where(
                 torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)

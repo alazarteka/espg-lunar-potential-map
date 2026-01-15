@@ -55,7 +55,10 @@ def base_kappa_params():
     ]
 )
 def kappa_params_set(request):
-    """Fixture to provide different sets of KappaParams and their expected tuple representation."""
+    """
+    Fixture to provide different sets of KappaParams and their expected tuple
+    representation.
+    """
     density, kappa, theta, expected_tuple = request.param
     params = KappaParams(density=density, kappa=kappa, theta=theta)
     return params, expected_tuple
@@ -142,7 +145,8 @@ def test_kappa_distribution_velocity_dependence(
     kappa: float,
 ):
     """
-    Test that kappa distribution decreases with increasing velocity, with a characteristic ratio.
+    Test that kappa distribution decreases with increasing velocity, with a
+    characteristic ratio.
     """
     density = 1e6 * ureg.particle / ureg.meter**3
     kappa = kappa
@@ -171,7 +175,10 @@ def test_kappa_distribution_velocity_dependence(
 
 
 def test_kappa_distribution_density_dependence(kappa_params_set):
-    """Test that the integral of the velocity distribution over all velocities equals the density."""
+    """
+    Test that the integral of the velocity distribution over all velocities
+    equals the density.
+    """
     params, _ = kappa_params_set
 
     velocities = np.geomspace(1e-2, 1e50, num=1001) * ureg.meter / ureg.second

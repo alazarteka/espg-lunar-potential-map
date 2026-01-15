@@ -142,9 +142,8 @@ def prepare_synthetic_er_poisson(
             df = df.drop(columns=[col])
 
     # Compute expected counts per channel from the current flux.
-    flux_units = (
-        ureg.particle
-        / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
+    flux_units = ureg.particle / (
+        ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt
     )
     flux = df[config.FLUX_COLS].to_numpy(dtype=np.float64) * flux_units
     energies = df[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[:, None]

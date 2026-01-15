@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+
 from src.engineering.analysis import (
     DEFAULT_CURRENT_DENSITY,
     GlobalStats,
@@ -105,4 +106,6 @@ def test_high_potential_case():
     assert stats.mean_potential > 2000.0
     assert stats.frac_2kV == 1.0
     assert stats.frac_1kV == 1.0
-    assert "High Resource" in stats.risk_assessment or "High Risk" in stats.risk_assessment
+    assert (
+        "High Resource" in stats.risk_assessment or "High Risk" in stats.risk_assessment
+    )

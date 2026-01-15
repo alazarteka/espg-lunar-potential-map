@@ -79,13 +79,15 @@ def get_current_ra_dec_batch(
     # bisect_right is equivalent to searchsorted(side='right')
     idxs = np.searchsorted(et_spin, times, side="right")
 
-    # Mask invalid indices
-    # Valid indices for bisect_right logic in get_current_ra_dec are > 0 and < len(ra_vals)
-    # (Note: original code checks idx <= 0 or idx >= len(ra_vals), so valid is 0 < idx < len)
+    # Mask invalid indices.
+    # Valid indices for bisect_right logic in get_current_ra_dec are > 0 and
+    # < len(ra_vals). Original code checks idx <= 0 or idx >= len(ra_vals),
+    # so valid is 0 < idx < len(ra_vals).
     # Wait, original code: if idx <= 0 or idx >= len(ra_vals): return None
-    # So valid range is 1 to len(ra_vals)-1 ?
-    # Let's check: ra_vals[idx] is accessed. So idx must be < len(ra_vals).
-    # And idx > 0 check means we don't accept time < et_spin[0] (where insertion point is 0).
+    # So valid range is 1 to len(ra_vals)-1?
+    # Let's check: ra_vals[idx] is accessed, so idx must be < len(ra_vals).
+    # And idx > 0 means we don't accept time < et_spin[0]
+    # (where insertion point is 0).
 
     n = len(ra_vals)
     valid_mask = (idxs > 0) & (idxs < n)

@@ -37,7 +37,8 @@ def _discover_date_files(cache_dir: Path, start_day: date, end_day: date) -> lis
 
     if not files:
         raise FileNotFoundError(
-            f"No cache files found for date range {start_day} to {end_day} in {cache_dir}"
+            f"No cache files found for date range {start_day} to {end_day} "
+            f"in {cache_dir}"
         )
 
     return files
@@ -119,7 +120,8 @@ def load_date_range_data_with_sza(
             in_sun = data["rows_projection_in_sun"]
 
             # Compute SZA for each measurement
-            # Vectorized approach would be better but keeping original loop for fidelity first
+            # Vectorized approach would be better but keeping original loop for
+            # fidelity first.
             # Or wait, the original loop was slow?
             # Original code in plot_terminator_profile_paper.py:
             # for lat, lon, pot, utc_str, sun_flag in zip(...)

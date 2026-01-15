@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
+import pytest  # noqa: TC002
 
 import src.config as config
 from scripts.dev import potential_mapper_batch as batch

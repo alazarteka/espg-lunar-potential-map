@@ -1,7 +1,6 @@
 # Tests for src/kappa.py
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from src import config
@@ -24,7 +23,10 @@ from src.utils.units import (
     ]
 )
 def kappa_params_set(request):
-    """Fixture to provide different sets of KappaParams and their expected tuple representation."""
+    """
+    Fixture to provide different sets of KappaParams and their expected tuple
+    representation.
+    """
     density, kappa, theta, expected_tuple = request.param
     params = KappaParams(density=density, kappa=kappa, theta=theta)
     return params, expected_tuple
@@ -47,18 +49,23 @@ def test_density_estimate(kappa_params_set):
     assert kappa_fitter.density_estimate.units == ureg.particle / ureg.meter**3, (
         "Density estimate should have correct units."
     )
+    density_message = (
+        f"Expected density {params.density.magnitude}, got "
+        f"{kappa_fitter.density_estimate.magnitude}"
+    )
     assert np.isclose(
         kappa_fitter.density_estimate.magnitude,
         params.density.magnitude,
         rtol=1e-2,
-    ), (
-        f"Expected density {params.density.magnitude}, got {kappa_fitter.density_estimate.magnitude}"
-    )
+    ), density_message
 
 
 @pytest.mark.skip_ci
 def test_objective_functions(kappa_params_set):
-    """Test that the standard and fast objective functions produce consistent results."""
+    """
+    Test that the standard and fast objective functions produce consistent
+    results.
+    """
     params, _ = kappa_params_set
     synthetic_er = prepare_synthetic_er(
         density=params.density.to(ureg.particle / ureg.meter**3).magnitude,
@@ -92,7 +99,10 @@ def test_objective_functions(kappa_params_set):
 
 @pytest.mark.skip_ci
 def test_objective_functions_in_fitter(kappa_params_set):
-    """Test the Kappa fitter performance with the standard and fast objective functions."""
+    """
+    Test the Kappa fitter performance with the standard and fast objective
+    functions.
+    """
     params, _ = kappa_params_set
     synthetic_er = prepare_synthetic_er(
         density=params.density.to(ureg.particle / ureg.meter**3).magnitude,
@@ -130,7 +140,8 @@ def test_kappa_fitter(kappa_params_set):
         theta=params.theta.to(ureg.meter / ureg.second).magnitude,
     )
     kappa_fitter = Kappa(synthetic_er, 1)
-    # The synthetic data is generated without energy convolution, so we disable it in the fit
+    # The synthetic data is generated without energy convolution, so we disable
+    # it in the fit.
     fit_results = kappa_fitter.fit(use_convolution=False)
 
     assert isinstance(fit_results.params, KappaParams), (
@@ -141,13 +152,15 @@ def test_kappa_fitter(kappa_params_set):
     assert np.isclose(fit_results.params.kappa, params.kappa, rtol=1e-2), (
         f"Expected kappa {params.kappa}, got {fit_results.params.kappa}"
     )
+    theta_message = (
+        f"Expected theta {params.theta.to(ureg.meter / ureg.second).magnitude}, got "
+        f"{fit_results.params.theta.magnitude}"
+    )
     assert np.isclose(
         fit_results.params.theta.magnitude,
         params.theta.to(ureg.meter / ureg.second).magnitude,
         rtol=1e-2,
-    ), (
-        f"Expected theta {params.theta.to(ureg.meter / ureg.second).magnitude}, got {fit_results.params.theta.magnitude}"
-    )
+    ), theta_message
 
 
 # ==============================================================================
@@ -160,7 +173,7 @@ class TestKappaEdgeCases:
 
     def test_invalid_spec_no_raises_in_constructor(self, caplog):
         """Kappa with non-existent spec_no raises ValueError during construction.
-        
+
         The constructor calls _prepare_data() which logs a warning, then
         _get_density_estimate() raises ValueError because flux data is None.
         """
@@ -215,11 +228,12 @@ class TestCorrectedFitDaylight:
     @pytest.fixture(autouse=True)
     def mock_spice_daylight(self, monkeypatch):
         """Mock SPICE functions to simulate daylight geometry.
-        
+
         We must patch at src.kappa module level since that's where the
         functions are imported and used.
         """
         import spiceypy
+
         import src.kappa as kappa_module
 
         # Mock str2et to return some ephemeris time
@@ -272,11 +286,12 @@ class TestCorrectedFitNightside:
     @pytest.fixture(autouse=True)
     def mock_spice_nightside(self, monkeypatch):
         """Mock SPICE functions to simulate nightside geometry.
-        
+
         We must patch at src.kappa module level since that's where the
         functions are imported and used.
         """
         import spiceypy
+
         import src.kappa as kappa_module
 
         monkeypatch.setattr(spiceypy, "str2et", lambda s: 0.0)
@@ -343,4 +358,3 @@ class TestCorrectedFitSpiceFailure:
 
         assert result is None
         assert U is None
-

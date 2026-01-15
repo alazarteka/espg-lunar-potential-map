@@ -68,8 +68,9 @@ class InjectionTestSummary:
     results: list[InjectionResult]
 
     def __str__(self) -> str:
+        success_rate = 100 * self.n_successful / self.n_tests
         return f"""Injection Test Summary:
-  Tests: {self.n_successful}/{self.n_tests} successful ({100*self.n_successful/self.n_tests:.1f}%)
+  Tests: {self.n_successful}/{self.n_tests} successful ({success_rate:.1f}%)
   U_surface:
     Bias:  {self.u_bias:+.2f} V
     RMSE:  {self.u_rmse:.2f} V
@@ -180,8 +181,11 @@ def run_injection_test(
     # Chi-squared objective function
     def chi2_scalar(params):
         U_surf, bs, beam_amp = params
-        beam_amp = float(np.clip(beam_amp, config.LOSS_CONE_BEAM_AMP_MIN,
-                                  config.LOSS_CONE_BEAM_AMP_MAX))
+        beam_amp = float(
+            np.clip(
+                beam_amp, config.LOSS_CONE_BEAM_AMP_MIN, config.LOSS_CONE_BEAM_AMP_MAX
+            )
+        )
         beam_width = config.LOSS_CONE_BEAM_WIDTH_EV
 
         model = synth_losscone(
@@ -342,12 +346,17 @@ def main():
     if summary.results:
         print("\nExample results (first 5):")
         print("-" * 60)
-        print(f"{'True U':>10} {'Fitted U':>10} {'Error':>10} {'True bs':>8} {'Fitted bs':>10}")
+        header = (
+            f"{'True U':>10} {'Fitted U':>10} {'Error':>10} "
+            f"{'True bs':>8} {'Fitted bs':>10}"
+        )
+        print(header)
         print("-" * 60)
         for r in summary.results[:5]:
             print(
                 f"{r.true_u_surface:>10.1f} {r.fitted_u_surface:>10.1f} "
-                f"{r.u_error:>+10.1f} {r.true_bs_over_bm:>8.3f} {r.fitted_bs_over_bm:>10.3f}"
+                f"{r.u_error:>+10.1f} {r.true_bs_over_bm:>8.3f} "
+                f"{r.fitted_bs_over_bm:>10.3f}"
             )
 
 

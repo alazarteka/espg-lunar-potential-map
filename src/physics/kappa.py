@@ -73,11 +73,11 @@ def velocity_from_energy(energy: EnergyType) -> SpeedType:
     Returns:
         Speed: Speed in m/s.
     """
-    if __debug__:
-        if not isinstance(energy, Quantity) or not energy.is_compatible_with(
-            ureg.electron_volt
-        ):
-            raise TypeError("energy must be a pint Quantity (Energy)")
+    if __debug__ and (
+        not isinstance(energy, Quantity)
+        or not energy.is_compatible_with(ureg.electron_volt)
+    ):
+        raise TypeError("energy must be a pint Quantity (Energy)")
     return np.sqrt(2 * energy / config.ELECTRON_MASS).to(ureg.meter / ureg.second)
 
 
@@ -156,27 +156,28 @@ def directional_flux(parameters: KappaParams, energy: EnergyType) -> FluxType:
     Returns:
         Flux: The directional flux evaluated at the given energy.
     """
-    if __debug__:
-        if not isinstance(energy, Quantity) or not energy.is_compatible_with(
-            ureg.electron_volt
-        ):
-            raise TypeError("energy must be a pint Quantity (Energy)")
-        if not isinstance(parameters, KappaParams):
-            raise TypeError("parameters must be an instance of KappaParams")
+    if __debug__ and (
+        not isinstance(energy, Quantity)
+        or not energy.is_compatible_with(ureg.electron_volt)
+    ):
+        raise TypeError("energy must be a pint Quantity (Energy)")
+    if __debug__ and not isinstance(parameters, KappaParams):
+        raise TypeError("parameters must be an instance of KappaParams")
 
     velocity = velocity_from_energy(energy)
-    if __debug__:
-        if not isinstance(velocity, Quantity) or not velocity.is_compatible_with(
-            ureg.meter / ureg.second
-        ):
-            raise TypeError("velocity must be a pint Quantity (Speed)")
+    if __debug__ and (
+        not isinstance(velocity, Quantity)
+        or not velocity.is_compatible_with(ureg.meter / ureg.second)
+    ):
+        raise TypeError("velocity must be a pint Quantity (Speed)")
 
     distribution = kappa_distribution(parameters, velocity)
-    if __debug__ and (not isinstance(
-        distribution, Quantity
-    ) or not distribution.is_compatible_with(
-        ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second) ** 3)
-    )):
+    if __debug__ and (
+        not isinstance(distribution, Quantity)
+        or not distribution.is_compatible_with(
+            ureg.particle / (ureg.meter**3 * (ureg.meter / ureg.second) ** 3)
+        )
+    ):
         raise TypeError("distribution must be a pint Quantity (PhaseSpaceDensity)")
 
     return (distribution * velocity**2 / config.ELECTRON_MASS).to(
@@ -210,9 +211,10 @@ def omnidirectional_flux(
     omnidirectional_flux_units = ureg.particle / (
         ureg.centimeter**2 * ureg.second * ureg.electron_volt * ureg.steradian
     )
-    if __debug__ and (not isinstance(
-        directional_flux_value, Quantity
-    ) or not directional_flux_value.is_compatible_with(omnidirectional_flux_units)):
+    if __debug__ and (
+        not isinstance(directional_flux_value, Quantity)
+        or not directional_flux_value.is_compatible_with(omnidirectional_flux_units)
+    ):
         raise TypeError("directional_flux_value must be a pint Quantity (Flux)")
 
     return (4 * np.pi * ureg.steradian) * directional_flux_value.to(
@@ -240,11 +242,11 @@ def _create_energy_grid(energy_ranges: EnergyType, n_samples: int) -> EnergyType
         )
         * ureg.electron_volt
     )
-    if __debug__:
-        if not isinstance(energy_grid, Quantity) or not energy_grid.is_compatible_with(
-            ureg.electron_volt
-        ):
-            raise TypeError("energy_grid must be a pint Quantity (Energy)")
+    if __debug__ and (
+        not isinstance(energy_grid, Quantity)
+        or not energy_grid.is_compatible_with(ureg.electron_volt)
+    ):
+        raise TypeError("energy_grid must be a pint Quantity (Energy)")
 
     return energy_grid
 
@@ -262,13 +264,13 @@ def _integrate_flux_simpson(
     Returns:
         IntegratedFlux: Integrated omnidirectional flux.
     """
-    if __debug__:
-        if not isinstance(flux_values, Quantity) or not flux_values.is_compatible_with(
+    if __debug__ and (
+        not isinstance(flux_values, Quantity)
+        or not flux_values.is_compatible_with(
             ureg.particle / (ureg.centimeter**2 * ureg.second * ureg.electron_volt)
-        ):
-            raise TypeError(
-                "flux_values must be a pint Quantity (Omnidirectional Flux)"
-            )
+        )
+    ):
+        raise TypeError("flux_values must be a pint Quantity (Omnidirectional Flux)")
 
     integrated_flux = (
         simpson(
@@ -281,11 +283,12 @@ def _integrate_flux_simpson(
         * ureg.particle
         / (ureg.centimeter**2 * ureg.second)
     )
-    if __debug__ and (not isinstance(
-        integrated_flux, Quantity
-    ) or not integrated_flux.is_compatible_with(
-        ureg.particle / (ureg.centimeter**2 * ureg.second)
-    )):
+    if __debug__ and (
+        not isinstance(integrated_flux, Quantity)
+        or not integrated_flux.is_compatible_with(
+            ureg.particle / (ureg.centimeter**2 * ureg.second)
+        )
+    ):
         raise TypeError("integrated_flux must be a pint Quantity (IntegratedFlux)")
 
     return integrated_flux
@@ -318,9 +321,8 @@ def omnidirectional_flux_integrated(
         if not isinstance(n_samples, int):
             raise TypeError("n_samples must be an integer")
 
-    assert n_samples > 0 and n_samples % 2 == 1, (
-        "n_samples must be an odd positive integer"
-    )
+    assert n_samples > 0, "n_samples must be positive"
+    assert n_samples % 2 == 1, "n_samples must be odd"
 
     energy_grid = _create_energy_grid(energy_ranges, n_samples)
     flux_values = omnidirectional_flux(parameters, energy_grid)

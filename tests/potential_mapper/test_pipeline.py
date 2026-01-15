@@ -233,7 +233,7 @@ class TestLoadAllData:
     def test_empty_file_list_returns_empty_erdata(self):
         """load_all_data with empty list returns empty ERData."""
         result = pipeline.load_all_data([])
-        
+
         assert result.data.empty
         assert result.er_data_file == "empty"
 
@@ -241,13 +241,13 @@ class TestLoadAllData:
         """load_all_data offsets spec_no to maintain uniqueness across files."""
         # Create test files with overlapping spec_no values
         all_cols = config.ALL_COLS
-        
+
         file1 = tmp_path / "file1.tab"
         file2 = tmp_path / "file2.tab"
-        
+
         # Create minimal valid data
         n_rows = config.SWEEP_ROWS
-        
+
         def make_file_content(spec_no_start: int) -> str:
             lines = []
             for i in range(n_rows):
@@ -257,30 +257,31 @@ class TestLoadAllData:
                 spec_idx = all_cols.index(config.SPEC_NO_COLUMN)
                 time_idx = all_cols.index(config.TIME_COLUMN)
                 energy_idx = all_cols.index(config.ENERGY_COLUMN)
-                
+
                 values[spec_idx] = str(spec_no_start)
                 values[time_idx] = "2025-01-01T00:00:00"
                 values[energy_idx] = str(20.0 + i)
-                
+
                 # Set valid mag field
                 for col in config.MAG_COLS:
                     mag_idx = all_cols.index(col)
                     values[mag_idx] = "1.0"
-                
+
                 lines.append(" ".join(values))
             return "\n".join(lines)
-        
+
         file1.write_text(make_file_content(1))
         file2.write_text(make_file_content(1))  # Same spec_no, should be offset
-        
+
         # Mock theta loading since it happens in ERData
         result = pipeline.load_all_data([file1, file2])
-        
+
         # Check that spec_no values are unique
         spec_nos = result.data[config.SPEC_NO_COLUMN].unique()
         # After merging, should have at least 2 different spec_no values
         # (original + offset version)
         assert len(result.data) > 0
+        assert len(spec_nos) >= 2
 
 
 # ==============================================================================
@@ -300,21 +301,28 @@ class TestApplyFitResults:
         fit_chi2 = np.full(n, np.nan)
 
         # Fit result: [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
-        fit_results = np.array([
-            [-10.0, 0.5, 1.0, config.FIT_ERROR_THRESHOLD / 2, 0],
-        ])
+        fit_results = np.array(
+            [
+                [-10.0, 0.5, 1.0, config.FIT_ERROR_THRESHOLD / 2, 0],
+            ]
+        )
 
         pipeline._apply_fit_results(
-            fit_results, proj_potential, bs_over_bm, beam_amp, fit_chi2,
-            row_offset=0, n_total=n
+            fit_results,
+            proj_potential,
+            bs_over_bm,
+            beam_amp,
+            fit_chi2,
+            row_offset=0,
+            n_total=n,
         )
 
         # First SWEEP_ROWS should have the value
-        assert np.allclose(proj_potential[:config.SWEEP_ROWS], -10.0)
-        assert np.allclose(bs_over_bm[:config.SWEEP_ROWS], 0.5)
-        assert np.allclose(beam_amp[:config.SWEEP_ROWS], 1.0)
+        assert np.allclose(proj_potential[: config.SWEEP_ROWS], -10.0)
+        assert np.allclose(bs_over_bm[: config.SWEEP_ROWS], 0.5)
+        assert np.allclose(beam_amp[: config.SWEEP_ROWS], 1.0)
         # Second SWEEP_ROWS should still be NaN (no result for chunk 1)
-        assert np.all(np.isnan(proj_potential[config.SWEEP_ROWS:]))
+        assert np.all(np.isnan(proj_potential[config.SWEEP_ROWS :]))
 
     def test_skips_high_chi2_results(self):
         """Results with chi2 > threshold are skipped for U_surface but params stored."""
@@ -324,13 +332,20 @@ class TestApplyFitResults:
         beam_amp = np.full(n, np.nan)
         fit_chi2 = np.full(n, np.nan)
 
-        fit_results = np.array([
-            [-10.0, 0.5, 1.0, config.FIT_ERROR_THRESHOLD * 2, 0],  # High chi2
-        ])
+        fit_results = np.array(
+            [
+                [-10.0, 0.5, 1.0, config.FIT_ERROR_THRESHOLD * 2, 0],  # High chi2
+            ]
+        )
 
         pipeline._apply_fit_results(
-            fit_results, proj_potential, bs_over_bm, beam_amp, fit_chi2,
-            row_offset=0, n_total=n
+            fit_results,
+            proj_potential,
+            bs_over_bm,
+            beam_amp,
+            fit_chi2,
+            row_offset=0,
+            n_total=n,
         )
 
         # U_surface should remain NaN because chi2 exceeds threshold
@@ -347,13 +362,20 @@ class TestApplyFitResults:
         beam_amp = np.full(n, np.nan)
         fit_chi2 = np.full(n, np.nan)
 
-        fit_results = np.array([
-            [np.nan, 0.5, 1.0, 0.1, 0],
-        ])
+        fit_results = np.array(
+            [
+                [np.nan, 0.5, 1.0, 0.1, 0],
+            ]
+        )
 
         pipeline._apply_fit_results(
-            fit_results, proj_potential, bs_over_bm, beam_amp, fit_chi2,
-            row_offset=0, n_total=n
+            fit_results,
+            proj_potential,
+            bs_over_bm,
+            beam_amp,
+            fit_chi2,
+            row_offset=0,
+            n_total=n,
         )
 
         assert np.all(np.isnan(proj_potential))
@@ -370,8 +392,13 @@ class TestApplyFitResults:
 
         # Should not raise
         pipeline._apply_fit_results(
-            fit_results, proj_potential, bs_over_bm, beam_amp, fit_chi2,
-            row_offset=0, n_total=n
+            fit_results,
+            proj_potential,
+            bs_over_bm,
+            beam_amp,
+            fit_chi2,
+            row_offset=0,
+            n_total=n,
         )
 
         assert np.all(np.isnan(proj_potential))

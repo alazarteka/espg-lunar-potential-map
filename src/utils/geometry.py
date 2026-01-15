@@ -48,7 +48,8 @@ def get_connection_and_polarity(
     pos: np.ndarray, direction: np.ndarray, radius: LengthType
 ) -> tuple[bool, int, np.ndarray | None]:
     """
-    Determine if a sphere intersects along exactly one of +/- direction and return polarity.
+    Determine if a sphere intersects along exactly one of +/- direction and
+    return polarity.
 
     Polarity convention:
         +1: Moonward along +direction

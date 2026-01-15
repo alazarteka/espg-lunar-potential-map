@@ -111,6 +111,21 @@ known-first-party = ["src"]
 # E741: 'l' is standard notation for spherical harmonic degree
 "src/temporal/coefficients.py" = ["E741"]
 "src/temporal/reconstruction.py" = ["E741"]
+"src/engineering/analysis.py" = ["E741"]
+"src/flux.py" = ["E501"]
+"src/utils/injection_tests.py" = ["F841"]
+# Test-specific: allow compound assertions, unused unpacking, broad raises, parametrize style
+"tests/**/*.py" = ["PT006", "PT011", "PT018", "RUF059", "B007", "TC003"]
+# Allow unicode in scientific code (μ, °, eV, etc.)
+"src/**/*.py" = ["RUF001", "RUF002", "RUF003"]
+# Allow line length in config comments and CLI formatting strings
+"src/config.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+"src/engineering/cli.py" = ["E402", "E501"]
+# Allow late imports for conditional/expensive deps (torch, GPU checks)
+"src/potential_mapper/__init__.py" = ["E402"]
+"src/physics/kappa_torch.py" = ["E402"]
+"src/kappa_torch.py" = ["E402"]
+"src/model_torch.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.12"

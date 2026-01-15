@@ -96,8 +96,6 @@ class TestSynthLossconeBatchTorch:
         from src.model_torch import synth_losscone_batch_torch
 
         nE, nPitch = 15, 20
-        n_params = 3
-
         energy_np = np.logspace(1, 3, nE)
         pitch_np = np.tile(np.linspace(0, 180, nPitch), (nE, 1))
 

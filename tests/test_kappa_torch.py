@@ -215,9 +215,7 @@ class TestKappaFitterTorch:
         flux_data = np.random.rand(N_spectra, N_energies) * 1e8 + 1e6
         density_estimates = np.full(N_spectra, 1e6)
 
-        fitter = KappaFitterTorch(
-            device="cpu", dtype="float64", popsize=10, maxiter=20
-        )
+        fitter = KappaFitterTorch(device="cpu", dtype="float64", popsize=10, maxiter=20)
         kappa, theta, chi2 = fitter.fit_batch(energy, flux_data, density_estimates)
 
         assert kappa.shape == (N_spectra,)
@@ -235,9 +233,7 @@ class TestKappaFitterTorch:
         flux_data = np.random.rand(N_spectra, N_energies) * 1e8 + 1e6
         density_estimates = np.full(N_spectra, 1e6)
 
-        fitter = KappaFitterTorch(
-            device="cpu", dtype="float64", popsize=10, maxiter=30
-        )
+        fitter = KappaFitterTorch(device="cpu", dtype="float64", popsize=10, maxiter=30)
         kappa, theta, chi2 = fitter.fit_batch(energy, flux_data, density_estimates)
 
         # Check kappa bounds

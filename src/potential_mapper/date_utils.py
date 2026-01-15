@@ -38,7 +38,8 @@ def parse_3d_filename(filename: str) -> tuple[int, int, int]:
     """Parse 3D date filename format (e.g., '3D980415') into (year, month, day).
 
     Args:
-        filename: Filename with or without extension (e.g., '3D980415' or '3D980415.TAB')
+        filename: Filename with or without extension (e.g., "3D980415" or
+            "3D980415.TAB")
 
     Returns:
         Tuple of (year, month, day) where year is full 4-digit year
