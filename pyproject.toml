@@ -38,6 +38,7 @@ dependencies = [
 [project.optional-dependencies]
 notebook = ["jupyter>=1.1.0", "ipykernel>=6.29.0", "ipython>=8.34.0"]
 export = ["imageio[ffmpeg]>=2.37.0", "kaleido>=1.1.0"]
+diagnostics = ["panel>=1.4.0", "bokeh>=3.4.0"]
 gpu = ["torch>=2.7.0"]  # GPU acceleration (CUDA 12.8, RTX 20xx+, including 50xx)
 gpu-legacy = ["torch>=2.2,<2.3"]  # CUDA 11.8 builds for GTX 10xx (sm_61)
 
