@@ -17,6 +17,8 @@ import argparse
 import logging
 from pathlib import Path
 
+import warnings
+
 import numpy as np
 
 from src import config
@@ -53,15 +55,29 @@ def _has_peak(
     min_peak: float,
     neighbor_window: int,
     edge_skip: int,
-) -> bool:
+    min_neighbor: float = 1.5,
+) -> tuple[bool, int | None, float | None]:
+    """
+    Check if the energy profile has a valid peak.
+
+    Returns:
+        Tuple of (has_peak, peak_index, peak_value):
+        - has_peak: True if a valid peak was found
+        - peak_index: Index into the profile array of the peak (None if no peak)
+        - peak_value: The normalized flux value at the peak (None if no peak)
+    """
     if profile.size == 0:
-        return False
+        return False, None, None
 
     window = max(1, neighbor_window)
     start = max(edge_skip, window)
     end = profile.size - max(edge_skip, window)
     if end <= start:
-        return False
+        return False, None, None
+
+    # Find the best peak (highest value that meets all criteria)
+    best_idx: int | None = None
+    best_value: float = -np.inf
 
     for idx in range(start, end):
         value = profile[idx]
@@ -69,13 +85,29 @@ def _has_peak(
             continue
         left = profile[idx - window : idx]
         right = profile[idx + 1 : idx + 1 + window]
-        left_max = np.nanmax(left) if left.size else np.nan
-        right_max = np.nanmax(right) if right.size else np.nan
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            left_max = np.nanmax(left) if left.size else np.nan
+            right_max = np.nanmax(right) if right.size else np.nan
         if not np.isfinite(left_max) or not np.isfinite(right_max):
             continue
-        if value >= left_max * contrast and value >= right_max * contrast:
-            return True
-    return False
+
+        # Check contrast requirement
+        if not (value >= left_max * contrast and value >= right_max * contrast):
+            continue
+
+        # Check neighbor threshold requirement: at least one neighbor must exceed min_neighbor
+        if left_max < min_neighbor and right_max < min_neighbor:
+            continue
+
+        # This is a valid peak; track the best one
+        if value > best_value:
+            best_value = value
+            best_idx = idx
+
+    if best_idx is not None:
+        return True, best_idx, float(best_value)
+    return False, None, None
 
 
 def parse_args() -> argparse.Namespace:
@@ -106,7 +138,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-band-points",
         type=int,
-        default=3,
+        default=5,
         help="Minimum points in pitch band per energy row",
     )
     parser.add_argument(
@@ -118,7 +150,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-peak",
         type=float,
-        default=1.0,
+        default=2.0,
         help="Minimum normalized value to qualify as a peak",
     )
     parser.add_argument(
@@ -134,6 +166,12 @@ def parse_args() -> argparse.Namespace:
         help="Skip this many energy bins at both ends",
     )
     parser.add_argument(
+        "--min-neighbor",
+        type=float,
+        default=1.5,
+        help="Minimum normalized value for adjacent bin to confirm peak",
+    )
+    parser.add_argument(
         "--no-polarity",
         action="store_true",
         help="Disable polarity filtering (legacy pitch-angle orientation)",
@@ -145,8 +183,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--list-peaks",
-        action="store_true",
-        help="Print spec_no values with detected peaks",
+        nargs="?",
+        const=10,
+        type=int,
+        metavar="N",
+        help="Print spec_no values with detected peaks (default: first 10, use 0 for all)",
     )
     return parser.parse_args()
 
@@ -170,11 +211,13 @@ def main() -> int:
     )
     valid_spec_nos = np.unique(session.er_data.data[config.SPEC_NO_COLUMN].to_numpy())
 
-    peak_specs: list[int] = []
+    # Track detected peaks: list of (spec_no, beam_energy, peak_amplitude)
+    peak_data: list[tuple[int, float, float]] = []
+
     for chunk_idx in range(session.chunk_count()):
         chunk = session.get_chunk_data(chunk_idx)
         norm2d = session.get_norm2d(chunk_idx)
-        _, profile = _build_energy_profile(
+        energies_sorted, profile = _build_energy_profile(
             energies=chunk.energies,
             pitches=chunk.pitches,
             norm2d=norm2d,
@@ -182,19 +225,24 @@ def main() -> int:
             pitch_max=args.pitch_max,
             min_band_points=args.min_band_points,
         )
-        if _has_peak(
+        has_peak, peak_idx, peak_value = _has_peak(
             profile,
             contrast=args.peak_contrast,
             min_peak=args.min_peak,
             neighbor_window=args.neighbor_window,
             edge_skip=args.edge_skip,
-        ):
-            peak_specs.append(int(chunk.spec_no))
+            min_neighbor=args.min_neighbor,
+        )
+        if has_peak and peak_idx is not None and peak_value is not None:
+            beam_energy = float(energies_sorted[peak_idx])
+            peak_data.append((int(chunk.spec_no), beam_energy, peak_value))
 
-    peak_specs = sorted(set(peak_specs))
+    # Sort by spec_no
+    peak_data.sort(key=lambda x: x[0])
+
     total_count = len(total_spec_nos)
     valid_count = len(valid_spec_nos)
-    peak_count = len(peak_specs)
+    peak_count = len(peak_data)
 
     total_pct = (peak_count / total_count * 100.0) if total_count else 0.0
     valid_pct = (peak_count / valid_count * 100.0) if valid_count else 0.0
@@ -204,15 +252,38 @@ def main() -> int:
     print(f"File: {args.er_file}")
     print(f"Pitch band: {args.pitch_min:.1f}–{args.pitch_max:.1f} deg")
     print(f"Normalization: {args.normalization} (incident={args.incident_stat})")
+    print(f"Thresholds: min_peak={args.min_peak}, min_neighbor={args.min_neighbor}")
     print(f"Total spec_nos (cleaned): {total_count}")
     print(f"Valid spec_nos (polarity!=0): {valid_count}")
     print(f"Peaks detected: {peak_count}")
     print(f"Peak % of total: {total_pct:.1f}%")
     print(f"Peak % of valid: {valid_pct:.1f}%")
 
-    if args.list_peaks:
-        print("\nSpec_nos with peaks:")
-        print(", ".join(str(s) for s in peak_specs) if peak_specs else "(none)")
+    # Beam energy summary
+    if peak_count > 0:
+        beam_energies = [p[1] for p in peak_data]
+        peak_amplitudes = [p[2] for p in peak_data]
+        print()
+        print("Beam Energy Summary (ΔU estimates):")
+        print(f"  Mean:   {np.mean(beam_energies):.1f} eV")
+        print(f"  Median: {np.median(beam_energies):.1f} eV")
+        print(f"  Range:  {np.min(beam_energies):.1f} – {np.max(beam_energies):.1f} eV")
+        print(f"  Peak amplitude range: {np.min(peak_amplitudes):.2f} – {np.max(peak_amplitudes):.2f}")
+
+    if args.list_peaks is not None:
+        if args.list_peaks == 0 or len(peak_data) <= args.list_peaks:
+            shown = peak_data
+            suffix = ""
+        else:
+            shown = peak_data[: args.list_peaks]
+            suffix = f"\n  ... ({len(peak_data) - args.list_peaks} more, use --list-peaks 0 for all)"
+        print("\nDetected peaks (spec_no: energy, amplitude):")
+        if shown:
+            for spec_no, energy, amplitude in shown:
+                print(f"  {spec_no}: {energy:.1f} eV, {amplitude:.2f}")
+            print(suffix, end="")
+        else:
+            print("  (none)")
 
     return 0
 
