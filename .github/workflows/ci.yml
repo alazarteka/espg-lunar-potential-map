@@ -10,6 +10,8 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      CUDA_VISIBLE_DEVICES: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,8 +26,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Select lockfile
+        run: cp locks/uv.lock.cuda12 uv.lock
+
       - name: Install dependencies
-        run: uv sync --group lint
+        run: uv sync --frozen --group lint
 
       - name: Check formatting
         run: uv run ruff format --check src tests
@@ -36,6 +41,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    env:
+      CUDA_VISIBLE_DEVICES: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,8 +57,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Select lockfile
+        run: cp locks/uv.lock.cuda12 uv.lock
+
       - name: Install dependencies
-        run: uv sync --group test
+        run: uv sync --frozen --group test
 
       - name: Run tests
         run: uv run pytest -m "not skip_ci" --tb=short

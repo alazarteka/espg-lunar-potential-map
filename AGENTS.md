@@ -17,7 +17,8 @@ This project maps the lunar surface electrostatic potential using physics-based 
 ## Quick Reference
 
 ```bash
-uv sync --locked --all-extras --dev    # Install all deps
+./scripts/select-env.sh cuda12         # Sync modern GPU env
+./scripts/select-env.sh cuda11         # Sync legacy GPU env
 uv run pytest -q                        # Run tests
 uv run ruff check . && uv run mypy src  # Lint + type check
 uv run python -m src.data_acquisition   # Download data
@@ -41,6 +42,8 @@ See [docs/development.md](docs/development.md) for complete workflow reference.
   - `analysis/` - Plotting and exploration
   - `profiling/` - Performance measurement
   - `dev/` - Quick experiments
+- `locks/` - Tracked lockfiles for CUDA 11/12 GPU variants
+- `uv.lock` - Machine-local lockfile (gitignored; copied from `locks/`)
 - `tests/`, `data/`, `artifacts/`, `docs/`, `notebooks/`
 
 ## Documentation

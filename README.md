@@ -33,7 +33,10 @@ All dependencies are managed through [UV](https://docs.astral.sh/uv/) and specif
 .
 ├── README.md               # This file
 ├── pyproject.toml          # UV project configuration and dependencies
-├── uv.lock                 # Dependency lock file
+├── locks/                  # Tracked lockfiles for GPU variants
+│   ├── uv.lock.cuda11       # Legacy GPU (CUDA 11.8)
+│   └── uv.lock.cuda12       # Modern GPU (CUDA 12.x)
+├── uv.lock                 # Machine-local lockfile (gitignored; copied from locks/)
 ├── .gitignore              # Git ignore file
 ├── artifacts/              # Generated outputs (plots, reports, caches)
 │   ├── plots/              # Figures, animations, HTML exports
@@ -103,14 +106,17 @@ and exploratory outputs that should stay out of version control.
     uv sync --group dev --extra notebook --extra export
     ```
 
-3.  **GPU acceleration (optional):**
+3.  **GPU acceleration (optional, recommended workflow):**
     ```bash
-    # Modern GPU (RTX 20xx+, CUDA 12.x) - uses default PyPI torch
-    uv sync --extra gpu
+    # Modern GPU (RTX 20xx+, CUDA 12.x)
+    ./scripts/select-env.sh cuda12
 
-    # Legacy GPU (GTX 10xx, CUDA 11.8) - uses PyTorch cu118 index (Python 3.12 only)
-    uv sync --extra gpu-legacy
+    # Legacy GPU (GTX 10xx, CUDA 11.8)
+    ./scripts/select-env.sh cuda11
     ```
+
+    This copies the appropriate lockfile from `locks/` into `uv.lock` and runs
+    `uv sync --frozen` with the matching extra.
 
 4.  **Download necessary data:**
     ```bash

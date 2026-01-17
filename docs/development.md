@@ -13,11 +13,11 @@ Complete reference for building, testing, and contributing to the project.
 ### Basic Installation
 
 ```bash
-# Install all dependencies
+# Install core dependencies
 uv sync
 
-# Install with all development tools
-uv sync --locked --all-extras --dev
+# Install with development tools (CPU-only)
+uv sync --group dev
 ```
 
 ### Optional Extras
@@ -27,8 +27,21 @@ uv sync --locked --all-extras --dev
 | `notebook` | `uv sync --extra notebook` | Jupyter notebook support |
 | `export` | `uv sync --extra export` | Image/video export (Kaleido, imageio) |
 | `diagnostics` | `uv sync --extra diagnostics` | Interactive browser tools (Panel, Bokeh) |
-| `gpu` | `uv sync --extra gpu` | PyTorch GPU acceleration (CUDA 12.8, RTX 20xx+) |
-| `gpu-legacy` | `uv sync --extra gpu-legacy` | PyTorch for older GPUs (CUDA 11.8, GTX 10xx) |
+| `gpu` | `./scripts/select-env.sh cuda12` | PyTorch GPU acceleration (CUDA 12.8, RTX 20xx+) |
+| `gpu-legacy` | `./scripts/select-env.sh cuda11` | PyTorch for older GPUs (CUDA 11.8, GTX 10xx) |
+
+### GPU Lockfiles
+
+This repo tracks CUDA-specific lockfiles under `locks/`. `uv.lock` is
+machine-local (gitignored) and copied from `locks/` via the selector script.
+
+```bash
+# Modern GPUs (RTX 20xx, 30xx, 40xx, 50xx)
+./scripts/select-env.sh cuda12
+
+# Legacy GPUs (GTX 10xx series)
+./scripts/select-env.sh cuda11
+```
 
 ### Upgrading Dependencies
 
@@ -36,8 +49,11 @@ uv sync --locked --all-extras --dev
 # Upgrade to latest compatible versions
 uv sync --upgrade
 
-# Regenerate lock file
+# Regenerate lock file (machine-local)
 uv lock --upgrade
+
+# Update the tracked lockfile for your GPU tier
+cp uv.lock locks/uv.lock.cuda12  # or locks/uv.lock.cuda11
 ```
 
 ---
@@ -184,10 +200,10 @@ Pre-commit runs:
 
 ```bash
 # Modern GPUs (RTX 20xx, 30xx, 40xx, 50xx)
-uv sync --extra gpu
+./scripts/select-env.sh cuda12
 
 # Legacy GPUs (GTX 10xx series)
-uv sync --extra gpu-legacy
+./scripts/select-env.sh cuda11
 ```
 
 ### Usage
