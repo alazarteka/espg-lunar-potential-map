@@ -25,8 +25,20 @@ from bokeh.plotting import figure
 from src import config
 from src.diagnostics import (
     LossConeSession,
+    _build_energy_profile,
     compute_loss_cone_boundary,
+    detect_peak,
     interpolate_to_regular_grid,
+)
+from src.diagnostics.beam_detection import (
+    DEFAULT_EDGE_SKIP,
+    DEFAULT_MIN_BAND_POINTS,
+    DEFAULT_MIN_NEIGHBOR,
+    DEFAULT_MIN_PEAK,
+    DEFAULT_NEIGHBOR_WINDOW,
+    DEFAULT_PEAK_CONTRAST,
+    DEFAULT_PITCH_MAX,
+    DEFAULT_PITCH_MIN,
 )
 
 
@@ -41,6 +53,47 @@ def _finite_range(
     if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
         return fallback
     return vmin, vmax
+
+
+def _find_beam_chunks(
+    session: LossConeSession,
+    pitch_min: float = DEFAULT_PITCH_MIN,
+    pitch_max: float = DEFAULT_PITCH_MAX,
+    min_band_points: int = DEFAULT_MIN_BAND_POINTS,
+    min_peak: float = DEFAULT_MIN_PEAK,
+    min_neighbor: float = DEFAULT_MIN_NEIGHBOR,
+    peak_contrast: float = DEFAULT_PEAK_CONTRAST,
+    neighbor_window: int = DEFAULT_NEIGHBOR_WINDOW,
+    edge_skip: int = DEFAULT_EDGE_SKIP,
+) -> list[int]:
+    """Find all chunk indices that have beam peaks.
+
+    Returns:
+        List of chunk indices where beam detection thresholds are met.
+    """
+    beam_chunks: list[int] = []
+    for chunk_idx in range(session.chunk_count()):
+        chunk = session.get_chunk_data(chunk_idx)
+        norm2d = session.get_norm2d(chunk_idx)
+        _, profile = _build_energy_profile(
+            energies=chunk.energies,
+            pitches=chunk.pitches,
+            norm2d=norm2d,
+            pitch_min=pitch_min,
+            pitch_max=pitch_max,
+            min_band_points=min_band_points,
+        )
+        result = detect_peak(
+            profile,
+            contrast=peak_contrast,
+            min_peak=min_peak,
+            neighbor_window=neighbor_window,
+            edge_skip=edge_skip,
+            min_neighbor=min_neighbor,
+        )
+        if result.has_peak:
+            beam_chunks.append(chunk_idx)
+    return beam_chunks
 
 
 def _build_frame(
@@ -169,6 +222,10 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
     spec_input = pn.widgets.IntInput(name="Spec No", value=0, step=1)
     spec_go = pn.widgets.Button(name="Go To Spec", button_type="primary")
 
+    beam_only = pn.widgets.Checkbox(name="Beam-detected only", value=False)
+    beam_chunks: list[int] = []
+    beam_chunk_count = pn.pane.Markdown("", sizing_mode="stretch_width")
+
     normalization = pn.widgets.Select(
         name="Normalization",
         options=["global", "ratio", "ratio2", "ratio_rescaled"],
@@ -245,15 +302,23 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
 
     guard = {"busy": False}
 
+    def get_current_chunk_idx() -> int:
+        if beam_only.value and beam_chunks:
+            idx = int(chunk_slider.value)
+            if 0 <= idx < len(beam_chunks):
+                return beam_chunks[idx]
+        return int(chunk_slider.value)
+
     def sync_chunk_input() -> None:
         chunk_input.value = chunk_slider.value
 
     def sync_chunk_slider() -> None:
+        max_idx = len(beam_chunks) - 1 if (beam_only.value and beam_chunks) else max_chunk
         value = int(chunk_input.value)
-        if 0 <= value <= max_chunk:
+        if 0 <= value <= max_idx:
             chunk_slider.value = value
         else:
-            status.object = f"Chunk {value} out of range (0..{max_chunk})."
+            status.object = f"Index {value} out of range (0..{max_idx})."
             status.alert_type = "warning"
 
     def apply_spec_jump() -> None:
@@ -262,8 +327,39 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
             status.object = f"Spec {spec_input.value} not found."
             status.alert_type = "warning"
             return
-        chunk_slider.value = target
-        chunk_input.value = target
+        if beam_only.value:
+            try:
+                filtered_idx = beam_chunks.index(target)
+                chunk_slider.value = filtered_idx
+                chunk_input.value = filtered_idx
+            except ValueError:
+                status.object = f"Spec {spec_input.value} has no beam detection."
+                status.alert_type = "warning"
+                return
+        else:
+            chunk_slider.value = target
+            chunk_input.value = target
+
+    def update_beam_filter() -> None:
+        nonlocal beam_chunks
+        session.set_normalization(normalization.value, incident_stat.value)
+        beam_chunks = _find_beam_chunks(session)
+        beam_chunk_count.object = f"Beam-detected chunks: {len(beam_chunks)} / {max_chunk + 1}"
+        if beam_only.value and not beam_chunks:
+            status.object = "No beam detections found with current settings."
+            status.alert_type = "warning"
+        elif beam_only.value:
+            status.object = f"Showing {len(beam_chunks)} beam-detected chunks."
+            status.alert_type = "success"
+        else:
+            status.object = ""
+
+        max_idx = len(beam_chunks) - 1 if (beam_only.value and beam_chunks) else max_chunk
+        chunk_slider.end = max_idx
+        if chunk_slider.value > max_idx:
+            chunk_slider.value = max(0, max_idx)
+        chunk_input.value = chunk_slider.value
+        update_view()
 
     def update_view(*_events) -> None:
         if guard["busy"]:
@@ -271,9 +367,10 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         guard["busy"] = True
         try:
             session.set_normalization(normalization.value, incident_stat.value)
+            actual_chunk_idx = get_current_chunk_idx()
             frame = _build_frame(
                 session=session,
-                chunk_idx=int(chunk_slider.value),
+                chunk_idx=actual_chunk_idx,
                 u_surface=float(u_surface.value),
                 bs_over_bm=float(bs_over_bm.value),
                 beam_amp=float(beam_amp.value),
@@ -329,8 +426,10 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
             residual_mapper.high = max_abs
 
             spec_input.value = int(frame["spec_no"])
+            actual_idx = get_current_chunk_idx()
+            filter_indicator = f" [filtered {chunk_slider.value}/{len(beam_chunks)-1}]" if (beam_only.value and beam_chunks) else ""
             metrics.object = (
-                f"Chunk: {chunk_slider.value}  |  Spec: {frame['spec_no']}  |  "
+                f"Chunk: {actual_idx}{filter_indicator}  |  Spec: {frame['spec_no']}  |  "
                 f"UTC: {frame['timestamp']}  |  chi2: {frame['chi2']:.3g}"
             )
             status.object = ""
@@ -347,13 +446,12 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         guard["busy"] = True
         try:
             session.set_normalization(normalization.value, incident_stat.value)
+            actual_chunk = get_current_chunk_idx()
             if fit_mode.value == "full":
-                u_val, bs_val, beam_val, chi2 = session.fit_chunk_full(
-                    int(chunk_slider.value)
-                )
+                u_val, bs_val, beam_val, chi2 = session.fit_chunk_full(actual_chunk)
             else:
                 u_val, bs_val, beam_val, chi2 = session.fit_chunk_lhs(
-                    int(chunk_slider.value),
+                    actual_chunk,
                     beam_width_ev=float(beam_width.value),
                     u_spacecraft=float(u_spacecraft.value),
                 )
@@ -376,8 +474,6 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
 
     for widget in [
         chunk_slider,
-        normalization,
-        incident_stat,
         u_surface,
         bs_over_bm,
         beam_amp,
@@ -388,9 +484,14 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
     ]:
         widget.param.watch(update_view, "value")
 
+    for widget in [normalization, incident_stat]:
+        widget.param.watch(update_beam_filter, "value")
+
+    beam_only.param.watch(update_beam_filter, "value")
+
     fit_button.on_click(run_fit)
 
-    update_view()
+    update_beam_filter()
 
     controls = pn.Column(
         "## Controls",
@@ -399,6 +500,10 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         chunk_go,
         spec_input,
         spec_go,
+        pn.layout.Divider(),
+        beam_only,
+        beam_chunk_count,
+        pn.layout.Divider(),
         normalization,
         incident_stat,
         pn.layout.Divider(),

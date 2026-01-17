@@ -17,97 +17,11 @@ import argparse
 import logging
 from pathlib import Path
 
-import warnings
-
 import numpy as np
 
 from src import config
-from src.diagnostics import LossConeSession
+from src.diagnostics import LossConeSession, _build_energy_profile, detect_peak
 from src.flux import ERData
-
-
-def _build_energy_profile(
-    energies: np.ndarray,
-    pitches: np.ndarray,
-    norm2d: np.ndarray,
-    pitch_min: float,
-    pitch_max: float,
-    min_band_points: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    band_mask = (pitches >= pitch_min) & (pitches <= pitch_max)
-    values = np.full(energies.shape, np.nan, dtype=float)
-
-    for idx in range(len(energies)):
-        row_mask = band_mask[idx] & np.isfinite(norm2d[idx])
-        if min_band_points > 0 and np.count_nonzero(row_mask) < min_band_points:
-            continue
-        if np.any(row_mask):
-            values[idx] = float(np.nanmean(norm2d[idx][row_mask]))
-
-    order = np.argsort(energies)
-    return energies[order], values[order]
-
-
-def _has_peak(
-    profile: np.ndarray,
-    *,
-    contrast: float,
-    min_peak: float,
-    neighbor_window: int,
-    edge_skip: int,
-    min_neighbor: float = 1.5,
-) -> tuple[bool, int | None, float | None]:
-    """
-    Check if the energy profile has a valid peak.
-
-    Returns:
-        Tuple of (has_peak, peak_index, peak_value):
-        - has_peak: True if a valid peak was found
-        - peak_index: Index into the profile array of the peak (None if no peak)
-        - peak_value: The normalized flux value at the peak (None if no peak)
-    """
-    if profile.size == 0:
-        return False, None, None
-
-    window = max(1, neighbor_window)
-    start = max(edge_skip, window)
-    end = profile.size - max(edge_skip, window)
-    if end <= start:
-        return False, None, None
-
-    # Find the best peak (highest value that meets all criteria)
-    best_idx: int | None = None
-    best_value: float = -np.inf
-
-    for idx in range(start, end):
-        value = profile[idx]
-        if not np.isfinite(value) or value < min_peak:
-            continue
-        left = profile[idx - window : idx]
-        right = profile[idx + 1 : idx + 1 + window]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            left_max = np.nanmax(left) if left.size else np.nan
-            right_max = np.nanmax(right) if right.size else np.nan
-        if not np.isfinite(left_max) or not np.isfinite(right_max):
-            continue
-
-        # Check contrast requirement
-        if not (value >= left_max * contrast and value >= right_max * contrast):
-            continue
-
-        # Check neighbor threshold requirement: at least one neighbor must exceed min_neighbor
-        if left_max < min_neighbor and right_max < min_neighbor:
-            continue
-
-        # This is a valid peak; track the best one
-        if value > best_value:
-            best_value = value
-            best_idx = idx
-
-    if best_idx is not None:
-        return True, best_idx, float(best_value)
-    return False, None, None
 
 
 def parse_args() -> argparse.Namespace:
@@ -225,7 +139,7 @@ def main() -> int:
             pitch_max=args.pitch_max,
             min_band_points=args.min_band_points,
         )
-        has_peak, peak_idx, peak_value = _has_peak(
+        result = detect_peak(
             profile,
             contrast=args.peak_contrast,
             min_peak=args.min_peak,
@@ -233,9 +147,9 @@ def main() -> int:
             edge_skip=args.edge_skip,
             min_neighbor=args.min_neighbor,
         )
-        if has_peak and peak_idx is not None and peak_value is not None:
-            beam_energy = float(energies_sorted[peak_idx])
-            peak_data.append((int(chunk.spec_no), beam_energy, peak_value))
+        if result.has_peak and result.peak_idx is not None and result.peak_value is not None:
+            beam_energy = float(energies_sorted[result.peak_idx])
+            peak_data.append((int(chunk.spec_no), beam_energy, result.peak_value))
 
     # Sort by spec_no
     peak_data.sort(key=lambda x: x[0])

@@ -52,6 +52,7 @@ See [docs/development.md](docs/development.md) for complete workflow reference.
 |-------|------|-------------|
 | Architecture | [WALKTHROUGH.md](docs/WALKTHROUGH.md) | End-to-end code walkthrough |
 | Development | [development.md](docs/development.md) | Build, test, lint workflow |
+| Lockfiles | [lockfiles.md](docs/lockfiles.md) | GPU environment configurations |
 | Batch Processing | [potential_mapper_batch.md](docs/potential_mapper_batch.md) | GPU-accelerated batch mode |
 | Diagnostics | [diagnostics.md](docs/diagnostics.md) | Beam detection tools |
 | Temporal | [temporal.md](docs/temporal.md) | Spherical harmonics fitting |

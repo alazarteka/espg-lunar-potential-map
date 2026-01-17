@@ -121,6 +121,8 @@ Opens a Panel/Bokeh app in your browser with:
 - Loss cone boundary overlay
 - Parameter sliders (U_surface, Bs/Bm, beam amplitude, etc.)
 
+**Beam Filter**: Toggle "Beam-detected only" to navigate only through sweeps where beam signatures were detected. The app uses the same detection thresholds as `losscone_peak_scan.py` (min_peak=2.0, min_neighbor=1.5, etc.). When enabled, the chunk slider shows filtered index, and metrics display the actual chunk number and spec_no.
+
 ### losscone_orbit_studio.py
 
 Multi-panel orbit diagnostics with flux correction and SPICE geometry.
