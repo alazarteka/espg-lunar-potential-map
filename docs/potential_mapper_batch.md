@@ -97,6 +97,26 @@ print(f"Valid fits: {valid.sum()} / {len(valid)}")
 - BLAS/LAPACK threading is disabled for deterministic results
 - Progress bars show overall and per-spectrum progress
 
+## GPU Acceleration
+
+Enable GPU acceleration with the `--fast` flag for significant speedups (~160-1000x):
+
+```bash
+# GPU-accelerated batch processing
+uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4
+```
+
+**Requirements:**
+- Install GPU extra: `uv sync --extra gpu` (or `--extra gpu-legacy` for GTX 10xx)
+
+**Auto-detection:**
+- **dtype**: Uses float16 on modern GPUs (Volta+), float32 on older GPUs or CPU
+- **batch_size**: Automatically calculated from available VRAM
+
+**Performance tips:**
+- Always use `--fast` when a GPU is available
+- For profiling, see `scripts/profiling/gpu_batch_sweep.py`
+
 ## Prerequisites
 
 Run `src.data_acquisition` first to download required data files.
