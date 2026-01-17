@@ -51,3 +51,13 @@ def mock_data_files(monkeypatch):
             return original_loadtxt(fname, *args, **kwargs)
 
     monkeypatch.setattr(np, "loadtxt", side_effect)
+
+    # Patch cached theta loader to avoid file access in CI.
+    import src.flux as flux_module
+    import src.utils.thetas as thetas_module
+
+    thetas_module.get_thetas.cache_clear()
+    monkeypatch.setattr(
+        thetas_module, "get_thetas", lambda theta_path=None: mock_thetas
+    )
+    monkeypatch.setattr(flux_module, "get_thetas", lambda theta_path=None: mock_thetas)
