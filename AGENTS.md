@@ -50,13 +50,17 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
 
 | Topic | Link | Description |
 |-------|------|-------------|
-| Architecture | [WALKTHROUGH.md](docs/archive/legacy/WALKTHROUGH.md) | End-to-end code walkthrough |
+| Architecture | [pipeline_overview.md](docs/architecture/pipeline_overview.md) | End-to-end pipeline summary |
+| Coordinate Frames | [coordinate_frames.md](docs/architecture/coordinate_frames.md) | SPICE + frame transforms |
+| GPU Acceleration | [gpu_acceleration.md](docs/architecture/gpu_acceleration.md) | Torch + optimizer overview |
 | Development | [development.md](docs/dev/development.md) | Build, test, lint workflow |
 | Lockfiles | [lockfiles.md](docs/dev/lockfiles.md) | GPU environment configurations |
 | Batch Processing | [potential_mapper_batch.md](docs/cli/potential_mapper_batch.md) | GPU-accelerated batch mode |
+| Engineering | [engineering.md](docs/cli/engineering.md) | Engineering maps and site summaries |
 | Diagnostics | [diagnostics.md](docs/cli/diagnostics.md) | Beam detection tools |
 | Temporal | [temporal.md](docs/cli/temporal.md) | Spherical harmonics fitting |
 | Visualization | [visualization.md](docs/visualization/visualization.md) | Plot styling |
+| Spacecraft Potential | [spacecraft_potential.md](docs/physics/spacecraft_potential.md) | U_sc estimation details |
 
 ## Coding Standards
 
