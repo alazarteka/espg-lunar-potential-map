@@ -56,6 +56,32 @@ uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.T
 uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.TAB --spec-no 653 --row-mad 3 --smooth-pitch 5 --compare --filter-report
 ```
 
+### beam_label_studio.py
+
+Blind browser-based labeling tool for **pre-rendered** sweep images (e.g., from
+`view_norm2d.py`). It reads a manifest `selection.json` and writes your labels
+to a separate JSON file. The manifest’s truth labels (e.g. `human_label`) are
+**not shown** during labeling.
+
+Requires the `diagnostics` extra: `uv sync --extra diagnostics`.
+
+```bash
+# Serve the labeling UI (writes labels_user.json next to the manifest by default)
+uv run python scripts/diagnostics/beam_label_studio.py \
+  --manifest artifacts/diagnostics/beam_goldset_2026-01-19/selection.json
+
+# Resume / write to an explicit output path
+uv run python scripts/diagnostics/beam_label_studio.py \
+  --manifest artifacts/diagnostics/beam_goldset_2026-01-19/selection.json \
+  --output artifacts/diagnostics/beam_goldset_2026-01-19/labels_al.json
+
+# After labeling: generate a markdown comparison report
+uv run python scripts/diagnostics/beam_label_studio.py \
+  --manifest artifacts/diagnostics/beam_goldset_2026-01-19/selection.json \
+  --output artifacts/diagnostics/beam_goldset_2026-01-19/labels_al.json \
+  --report
+```
+
 ### beam_detection_survey.py
 
 Sample files across the dataset to measure detection rates and temporal trends.
