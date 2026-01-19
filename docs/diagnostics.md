@@ -156,6 +156,8 @@ Tuned to filter noise while keeping real beams:
 | `high_energy_floor` | 400 eV | High-energy deficit check lower bound |
 | `high_energy_ratio_max` | 0.5 | High-energy mean must be ≤ this fraction of peak |
 | `peak_width_max` | 4 bins | Max contiguous bins above half-peak |
+| `contiguity_min_bins` | 3 bins | Min contiguous pitch bins above threshold |
+| `contiguity_min_value` | 1.5 | Threshold used for pitch contiguity |
 
 These thresholds were determined empirically through the beam detection survey.
 The energy window defaults to 20–500 eV; override via `losscone_peak_scan.py --energy-min/--energy-max` if needed.
@@ -168,6 +170,8 @@ Added two lightweight checks to the beam detector:
   expected beam signature (localized low-energy excess).
 - **Peak width constraint**: limits the number of contiguous energy bins above
   half-peak (default max 4) to avoid overly broad enhancements.
+- **Pitch contiguity**: requires a short contiguous run of pitch bins above a
+  threshold in the high-pitch band (default min 3 bins at ≥1.5).
 
 **Empirical review (5 files, 20 samples)**:
 - Files sampled: `3D980503`, `3D980523`, `3D990323`, `3D990429`, `3D990505`

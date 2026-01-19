@@ -28,6 +28,7 @@ from src.diagnostics.beam_detection import (
     DEFAULT_HIGH_ENERGY_FLOOR,
     DEFAULT_HIGH_ENERGY_MIN_POINTS,
     DEFAULT_HIGH_ENERGY_RATIO_MAX,
+    DEFAULT_CONTIGUITY_MIN_BINS,
     DEFAULT_PEAK_HALF_FRACTION,
     DEFAULT_PEAK_WIDTH_MAX,
 )
@@ -124,6 +125,23 @@ def parse_args() -> argparse.Namespace:
         help="Maximum allowed contiguous bins above half-peak",
     )
     parser.add_argument(
+        "--no-contiguity-check",
+        action="store_true",
+        help="Disable pitch contiguity check",
+    )
+    parser.add_argument(
+        "--contiguity-min-bins",
+        type=int,
+        default=DEFAULT_CONTIGUITY_MIN_BINS,
+        help="Minimum contiguous pitch bins above threshold",
+    )
+    parser.add_argument(
+        "--contiguity-min-value",
+        type=float,
+        default=DEFAULT_MIN_NEIGHBOR,
+        help="Minimum normalized value for contiguity check",
+    )
+    parser.add_argument(
         "--peak-contrast",
         type=float,
         default=1.2,
@@ -212,6 +230,8 @@ def main() -> int:
         result = detect_peak(
             profile,
             energies=energies_sorted,
+            norm2d=norm2d,
+            pitches=chunk.pitches,
             contrast=args.peak_contrast,
             min_peak=args.min_peak,
             neighbor_window=args.neighbor_window,
@@ -225,6 +245,10 @@ def main() -> int:
             check_peak_width=not args.no_peak_width_check,
             peak_half_fraction=args.peak_half_fraction,
             peak_width_max=args.peak_width_max,
+            check_pitch_contiguity=not args.no_contiguity_check,
+            contiguity_pitch_min=args.pitch_min,
+            contiguity_min_value=args.contiguity_min_value,
+            contiguity_min_bins=args.contiguity_min_bins,
         )
         if result.has_peak and result.peak_idx is not None and result.peak_value is not None:
             beam_energy = float(energies_sorted[result.peak_idx])
@@ -248,7 +272,8 @@ def main() -> int:
     print(
         "Heuristics: "
         f"high_energy={'off' if args.no_high_energy_check else 'on'}, "
-        f"peak_width={'off' if args.no_peak_width_check else 'on'}"
+        f"peak_width={'off' if args.no_peak_width_check else 'on'}, "
+        f"contiguity={'off' if args.no_contiguity_check else 'on'}"
     )
     print(f"Normalization: {args.normalization} (incident={args.incident_stat})")
     print(f"Thresholds: min_peak={args.min_peak}, min_neighbor={args.min_neighbor}")

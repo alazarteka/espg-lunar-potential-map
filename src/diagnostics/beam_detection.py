@@ -33,6 +33,7 @@ DEFAULT_HIGH_ENERGY_RATIO_MAX = 0.5
 DEFAULT_HIGH_ENERGY_MIN_POINTS = 2
 DEFAULT_PEAK_HALF_FRACTION = 0.5
 DEFAULT_PEAK_WIDTH_MAX = 4
+DEFAULT_CONTIGUITY_MIN_BINS = 3
 
 
 def _build_energy_profile(
@@ -126,10 +127,48 @@ def _passes_high_energy_deficit(
     return high_mean <= max_high_ratio * peak_value
 
 
+def _max_true_run(mask: np.ndarray) -> int:
+    best = 0
+    current = 0
+    for value in mask:
+        if value:
+            current += 1
+            if current > best:
+                best = current
+        else:
+            current = 0
+    return best
+
+
+def _passes_pitch_contiguity(
+    norm2d: np.ndarray,
+    pitches: np.ndarray,
+    peak_idx: int,
+    *,
+    pitch_min: float,
+    value_floor: float,
+    min_bins: int,
+) -> bool:
+    if peak_idx < 0 or peak_idx >= norm2d.shape[0]:
+        return True
+    row = norm2d[peak_idx]
+    pitch_row = pitches[peak_idx]
+    valid = np.isfinite(row) & np.isfinite(pitch_row)
+    if np.count_nonzero(valid) < min_bins:
+        return True
+    order = np.argsort(pitch_row[valid])
+    pitch_sorted = pitch_row[valid][order]
+    row_sorted = row[valid][order]
+    mask = (pitch_sorted >= pitch_min) & (row_sorted >= value_floor)
+    return _max_true_run(mask) >= min_bins
+
+
 def detect_peak(
     profile: np.ndarray,
     *,
     energies: np.ndarray | None = None,
+    norm2d: np.ndarray | None = None,
+    pitches: np.ndarray | None = None,
     contrast: float = DEFAULT_PEAK_CONTRAST,
     min_peak: float = DEFAULT_MIN_PEAK,
     neighbor_window: int = DEFAULT_NEIGHBOR_WINDOW,
@@ -143,12 +182,19 @@ def detect_peak(
     check_peak_width: bool = True,
     peak_half_fraction: float = DEFAULT_PEAK_HALF_FRACTION,
     peak_width_max: int = DEFAULT_PEAK_WIDTH_MAX,
+    check_pitch_contiguity: bool = False,
+    contiguity_pitch_min: float = DEFAULT_PITCH_MIN,
+    contiguity_min_value: float | None = None,
+    contiguity_min_bins: int = DEFAULT_CONTIGUITY_MIN_BINS,
 ) -> BeamDetectionResult:
     """Detect if the energy profile has a valid peak.
 
     Args:
         profile: Energy profile (mean normalized flux per energy)
         energies: Sorted energy values matching profile (optional)
+        energies: Sorted energy values matching profile (optional)
+        norm2d: Normalized flux grid for pitch contiguity checks (optional)
+        pitches: Pitch angle grid for pitch contiguity checks (optional)
         contrast: Peak must exceed neighbors by this multiplicative factor
         min_peak: Minimum normalized value to qualify as a peak
         neighbor_window: Number of energy bins on each side for peak comparison
@@ -162,6 +208,10 @@ def detect_peak(
         check_peak_width: Enforce peak width constraint
         peak_half_fraction: Fraction of peak used for width measurement
         peak_width_max: Maximum contiguous bins above half-peak
+        check_pitch_contiguity: Enforce pitch contiguity check
+        contiguity_pitch_min: Minimum pitch angle for contiguity check
+        contiguity_min_value: Minimum normalized value for contiguity check
+        contiguity_min_bins: Minimum contiguous bins required
 
     Returns:
         BeamDetectionResult with detection status and peak details.
@@ -225,6 +275,22 @@ def detect_peak(
             )
         ):
             continue
+
+        if check_pitch_contiguity and norm2d is not None and pitches is not None:
+            floor = (
+                float(contiguity_min_value)
+                if contiguity_min_value is not None
+                else min_neighbor
+            )
+            if not _passes_pitch_contiguity(
+                norm2d,
+                pitches,
+                idx,
+                pitch_min=contiguity_pitch_min,
+                value_floor=floor,
+                min_bins=contiguity_min_bins,
+            ):
+                continue
 
         if value > best_value:
             best_value = value
