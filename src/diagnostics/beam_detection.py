@@ -16,13 +16,34 @@ class BeamDetectionResult:
     beam_energy: float | None
 
 
+# Default thresholds matching losscone_peak_scan.py
+DEFAULT_PITCH_MIN = 150.0
+DEFAULT_PITCH_MAX = 180.0
+DEFAULT_MIN_BAND_POINTS = 5
+DEFAULT_MIN_PEAK = 2.0
+DEFAULT_MIN_NEIGHBOR = 1.5
+DEFAULT_PEAK_CONTRAST = 1.2
+DEFAULT_NEIGHBOR_WINDOW = 1
+DEFAULT_EDGE_SKIP = 1
+DEFAULT_ENERGY_MIN = 20.0
+DEFAULT_ENERGY_MAX = 500.0
+DEFAULT_HIGH_ENERGY_FLOOR = 400.0
+DEFAULT_HIGH_ENERGY_FACTOR = 2.0
+DEFAULT_HIGH_ENERGY_RATIO_MAX = 0.5
+DEFAULT_HIGH_ENERGY_MIN_POINTS = 2
+DEFAULT_PEAK_HALF_FRACTION = 0.5
+DEFAULT_PEAK_WIDTH_MAX = 4
+
+
 def _build_energy_profile(
     energies: np.ndarray,
     pitches: np.ndarray,
     norm2d: np.ndarray,
-    pitch_min: float = 150.0,
-    pitch_max: float = 180.0,
-    min_band_points: int = 5,
+    pitch_min: float = DEFAULT_PITCH_MIN,
+    pitch_max: float = DEFAULT_PITCH_MAX,
+    min_band_points: int = DEFAULT_MIN_BAND_POINTS,
+    energy_min: float | None = DEFAULT_ENERGY_MIN,
+    energy_max: float | None = DEFAULT_ENERGY_MAX,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Build an energy profile by averaging normalized flux in a pitch band.
 
@@ -33,6 +54,8 @@ def _build_energy_profile(
         pitch_min: Lower bound of pitch band (degrees)
         pitch_max: Upper bound of pitch band (degrees)
         min_band_points: Minimum valid pitch points per energy row
+        energy_min: Minimum energy to include (eV)
+        energy_max: Maximum energy to include (eV)
 
     Returns:
         Tuple of (sorted_energies, profile_values) where profile_values contains
@@ -49,27 +72,96 @@ def _build_energy_profile(
             values[idx] = float(np.nanmean(norm2d[idx][row_mask]))
 
     order = np.argsort(energies)
-    return energies[order], values[order]
+    energies_sorted = energies[order]
+    values_sorted = values[order]
+    if energy_min is not None:
+        values_sorted[energies_sorted < energy_min] = np.nan
+    if energy_max is not None:
+        values_sorted[energies_sorted > energy_max] = np.nan
+    return energies_sorted, values_sorted
+
+
+def _peak_width_bins(
+    profile: np.ndarray,
+    peak_idx: int,
+    peak_value: float,
+    half_fraction: float,
+) -> int:
+    threshold = peak_value * half_fraction
+    width = 1
+    for idx in range(peak_idx - 1, -1, -1):
+        value = profile[idx]
+        if np.isfinite(value) and value >= threshold:
+            width += 1
+        else:
+            break
+    for idx in range(peak_idx + 1, len(profile)):
+        value = profile[idx]
+        if np.isfinite(value) and value >= threshold:
+            width += 1
+        else:
+            break
+    return width
+
+
+def _passes_high_energy_deficit(
+    profile: np.ndarray,
+    energies: np.ndarray,
+    peak_idx: int,
+    peak_value: float,
+    *,
+    high_energy_floor: float,
+    high_energy_factor: float,
+    max_high_ratio: float,
+    min_points: int,
+) -> bool:
+    peak_energy = energies[peak_idx]
+    threshold = max(high_energy_floor, high_energy_factor * peak_energy)
+    high_mask = (energies >= threshold) & np.isfinite(profile)
+    if np.count_nonzero(high_mask) < min_points:
+        return True
+    high_mean = float(np.nanmean(profile[high_mask]))
+    if not np.isfinite(high_mean):
+        return True
+    return high_mean <= max_high_ratio * peak_value
 
 
 def detect_peak(
     profile: np.ndarray,
     *,
-    contrast: float = 1.2,
-    min_peak: float = 2.0,
-    neighbor_window: int = 1,
-    edge_skip: int = 1,
-    min_neighbor: float = 1.5,
+    energies: np.ndarray | None = None,
+    contrast: float = DEFAULT_PEAK_CONTRAST,
+    min_peak: float = DEFAULT_MIN_PEAK,
+    neighbor_window: int = DEFAULT_NEIGHBOR_WINDOW,
+    edge_skip: int = DEFAULT_EDGE_SKIP,
+    min_neighbor: float = DEFAULT_MIN_NEIGHBOR,
+    check_high_energy: bool = True,
+    high_energy_floor: float = DEFAULT_HIGH_ENERGY_FLOOR,
+    high_energy_factor: float = DEFAULT_HIGH_ENERGY_FACTOR,
+    high_energy_ratio_max: float = DEFAULT_HIGH_ENERGY_RATIO_MAX,
+    high_energy_min_points: int = DEFAULT_HIGH_ENERGY_MIN_POINTS,
+    check_peak_width: bool = True,
+    peak_half_fraction: float = DEFAULT_PEAK_HALF_FRACTION,
+    peak_width_max: int = DEFAULT_PEAK_WIDTH_MAX,
 ) -> BeamDetectionResult:
     """Detect if the energy profile has a valid peak.
 
     Args:
         profile: Energy profile (mean normalized flux per energy)
+        energies: Sorted energy values matching profile (optional)
         contrast: Peak must exceed neighbors by this multiplicative factor
         min_peak: Minimum normalized value to qualify as a peak
         neighbor_window: Number of energy bins on each side for peak comparison
         edge_skip: Skip this many energy bins at both ends
         min_neighbor: Minimum normalized value for adjacent bin to confirm peak
+        check_high_energy: Enforce high-energy deficit check
+        high_energy_floor: Minimum high-energy threshold (eV)
+        high_energy_factor: Scale factor applied to peak energy for deficit check
+        high_energy_ratio_max: Max allowed high-energy mean relative to peak
+        high_energy_min_points: Minimum points required for deficit check
+        check_peak_width: Enforce peak width constraint
+        peak_half_fraction: Fraction of peak used for width measurement
+        peak_width_max: Maximum contiguous bins above half-peak
 
     Returns:
         BeamDetectionResult with detection status and peak details.
@@ -96,13 +188,42 @@ def detect_peak(
             warnings.simplefilter("ignore", RuntimeWarning)
             left_max = np.nanmax(left) if left.size else np.nan
             right_max = np.nanmax(right) if right.size else np.nan
-        if not np.isfinite(left_max) or not np.isfinite(right_max):
+        left_finite = np.isfinite(left_max)
+        right_finite = np.isfinite(right_max)
+        if not left_finite and not right_finite:
             continue
 
-        if not (value >= left_max * contrast and value >= right_max * contrast):
+        if left_finite and value < left_max * contrast:
+            continue
+        if right_finite and value < right_max * contrast:
             continue
 
-        if left_max < min_neighbor and right_max < min_neighbor:
+        if not (
+            (left_finite and left_max >= min_neighbor)
+            or (right_finite and right_max >= min_neighbor)
+        ):
+            continue
+
+        if check_peak_width:
+            width = _peak_width_bins(profile, idx, value, peak_half_fraction)
+            if width > peak_width_max:
+                continue
+
+        if (
+            check_high_energy
+            and energies is not None
+            and len(energies) > idx
+            and not _passes_high_energy_deficit(
+                profile,
+                energies,
+                idx,
+                value,
+                high_energy_floor=high_energy_floor,
+                high_energy_factor=high_energy_factor,
+                max_high_ratio=high_energy_ratio_max,
+                min_points=high_energy_min_points,
+            )
+        ):
             continue
 
         if value > best_value:
@@ -110,16 +231,8 @@ def detect_peak(
             best_idx = idx
 
     if best_idx is not None:
-        return BeamDetectionResult(True, best_idx, float(best_value), None)
+        beam_energy = None
+        if energies is not None and len(energies) > best_idx:
+            beam_energy = float(energies[best_idx])
+        return BeamDetectionResult(True, best_idx, float(best_value), beam_energy)
     return BeamDetectionResult(False, None, None, None)
-
-
-# Default thresholds matching losscone_peak_scan.py
-DEFAULT_PITCH_MIN = 150.0
-DEFAULT_PITCH_MAX = 180.0
-DEFAULT_MIN_BAND_POINTS = 5
-DEFAULT_MIN_PEAK = 2.0
-DEFAULT_MIN_NEIGHBOR = 1.5
-DEFAULT_PEAK_CONTRAST = 1.2
-DEFAULT_NEIGHBOR_WINDOW = 1
-DEFAULT_EDGE_SKIP = 1

@@ -10,6 +10,7 @@ Usage:
   uv run python scripts/diagnostics/view_norm2d.py data/.../3D*.TAB --spec-no 42
   uv run python scripts/diagnostics/view_norm2d.py data/.../3D*.TAB --spec-no 42 --save plot.png
   uv run python scripts/diagnostics/view_norm2d.py data/.../3D*.TAB --spec-no 42 --show-band
+  uv run python scripts/diagnostics/view_norm2d.py data/.../3D*.TAB --spec-no 42 --row-mad 3 --smooth-pitch 5 --compare
 """
 
 from __future__ import annotations
@@ -20,9 +21,103 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import TwoSlopeNorm
 
 from src import config
 from src.diagnostics import LossConeSession
+
+
+def _odd_window(window: int) -> int:
+    if window <= 1:
+        return 1
+    return window + 1 if window % 2 == 0 else window
+
+
+def _rolling_mean_1d(values: np.ndarray, window: int) -> np.ndarray:
+    if window <= 1:
+        return values.copy()
+    half = window // 2
+    out = np.full_like(values, np.nan, dtype=float)
+    for idx in range(len(values)):
+        start = max(0, idx - half)
+        end = min(len(values), idx + half + 1)
+        segment = values[start:end]
+        finite = np.isfinite(segment)
+        if np.any(finite):
+            out[idx] = float(np.mean(segment[finite]))
+    return out
+
+
+def _apply_smooth(norm2d: np.ndarray, axis: int, window: int) -> np.ndarray:
+    window = _odd_window(window)
+    if window <= 1:
+        return norm2d
+    return np.apply_along_axis(_rolling_mean_1d, axis, norm2d, window)
+
+
+def _mask_range_1d(
+    values: np.ndarray, vmin: float | None, vmax: float | None
+) -> np.ndarray:
+    if vmin is None and vmax is None:
+        return np.ones_like(values, dtype=bool)
+    mask = np.ones_like(values, dtype=bool)
+    if vmin is not None:
+        mask &= values >= vmin
+    if vmax is not None:
+        mask &= values <= vmax
+    return mask
+
+
+def _mask_values(
+    norm2d: np.ndarray,
+    *,
+    mask_below: float | None,
+    mask_above: float | None,
+) -> np.ndarray:
+    if mask_below is None and mask_above is None:
+        return norm2d
+    out = norm2d.copy()
+    mask = np.isfinite(out)
+    if mask_below is not None:
+        mask &= out >= mask_below
+    if mask_above is not None:
+        mask &= out <= mask_above
+    out[~mask] = np.nan
+    return out
+
+
+def _row_min_finite(norm2d: np.ndarray, min_count: int) -> np.ndarray:
+    if min_count <= 0:
+        return norm2d
+    out = norm2d.copy()
+    counts = np.sum(np.isfinite(out), axis=1)
+    out[counts < min_count, :] = np.nan
+    return out
+
+
+def _row_mad_clip(norm2d: np.ndarray, n_sigma: float) -> np.ndarray:
+    if n_sigma <= 0:
+        return norm2d
+    out = norm2d.copy()
+    for idx in range(out.shape[0]):
+        row = out[idx]
+        finite = np.isfinite(row)
+        if not np.any(finite):
+            continue
+        median = float(np.nanmedian(row))
+        mad = float(np.nanmedian(np.abs(row - median)))
+        if not np.isfinite(mad) or mad <= 0:
+            continue
+        outlier_mask = np.abs(row - median) > n_sigma * mad
+        out[idx, outlier_mask] = np.nan
+    return out
+
+
+def _finite_summary(values: np.ndarray) -> tuple[int, int, float]:
+    finite = int(np.isfinite(values).sum())
+    total = int(values.size)
+    fraction = (finite / total) if total else 0.0
+    return finite, total, fraction
 
 
 def parse_args() -> argparse.Namespace:
@@ -79,6 +174,76 @@ def parse_args() -> argparse.Namespace:
         help="Upper bound of pitch band to highlight (with --show-band)",
     )
     parser.add_argument(
+        "--filter-energy-min",
+        type=float,
+        default=None,
+        help="Mask energies below this value (eV)",
+    )
+    parser.add_argument(
+        "--filter-energy-max",
+        type=float,
+        default=None,
+        help="Mask energies above this value (eV)",
+    )
+    parser.add_argument(
+        "--filter-pitch-min",
+        type=float,
+        default=None,
+        help="Mask pitches below this value (deg)",
+    )
+    parser.add_argument(
+        "--filter-pitch-max",
+        type=float,
+        default=None,
+        help="Mask pitches above this value (deg)",
+    )
+    parser.add_argument(
+        "--mask-below",
+        type=float,
+        default=None,
+        help="Mask normalized flux values below this threshold",
+    )
+    parser.add_argument(
+        "--mask-above",
+        type=float,
+        default=None,
+        help="Mask normalized flux values above this threshold",
+    )
+    parser.add_argument(
+        "--row-min-finite",
+        type=int,
+        default=0,
+        help="Mask entire energy rows with fewer than N finite values",
+    )
+    parser.add_argument(
+        "--row-mad",
+        type=float,
+        default=0.0,
+        help="Row-wise MAD clipping (mask values beyond N * MAD)",
+    )
+    parser.add_argument(
+        "--smooth-pitch",
+        type=int,
+        default=0,
+        help="Rolling-mean window along pitch axis (odd window size)",
+    )
+    parser.add_argument(
+        "--smooth-energy",
+        type=int,
+        default=0,
+        help="Rolling-mean window along energy axis (odd window size)",
+    )
+    parser.add_argument(
+        "--compare",
+        action="store_true",
+        help="Show raw vs filtered panels side-by-side",
+    )
+    parser.add_argument(
+        "--filter-report",
+        action="store_true",
+        help="Print filtering summary",
+    )
+    parser.add_argument(
         "--vmin",
         type=float,
         default=None,
@@ -89,6 +254,17 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=None,
         help="Maximum value for color scale",
+    )
+    parser.add_argument(
+        "--vcenter",
+        type=float,
+        default=1.0,
+        help="Center value for diverging colormap (default: 1.0)",
+    )
+    parser.add_argument(
+        "--no-center",
+        action="store_true",
+        help="Disable centered colormap scaling",
     )
     parser.add_argument(
         "--no-polarity",
@@ -147,71 +323,167 @@ def main() -> int:
     norm2d = norm2d[:, sort_order]
     energy_axis = chunk.energies  # (15,)
 
+    norm2d_raw = norm2d.copy()
+
+    # Apply filters
+    energy_mask = _mask_range_1d(
+        energy_axis, args.filter_energy_min, args.filter_energy_max
+    )
+    if not np.all(energy_mask):
+        norm2d = norm2d.copy()
+        norm2d[~energy_mask, :] = np.nan
+
+    pitch_mask = _mask_range_1d(
+        pitch_axis, args.filter_pitch_min, args.filter_pitch_max
+    )
+    if not np.all(pitch_mask):
+        norm2d = norm2d.copy()
+        norm2d[:, ~pitch_mask] = np.nan
+
+    norm2d = _mask_values(
+        norm2d,
+        mask_below=args.mask_below,
+        mask_above=args.mask_above,
+    )
+    norm2d = _row_min_finite(norm2d, args.row_min_finite)
+    norm2d = _row_mad_clip(norm2d, args.row_mad)
+    norm2d = _apply_smooth(norm2d, axis=1, window=args.smooth_pitch)
+    norm2d = _apply_smooth(norm2d, axis=0, window=args.smooth_energy)
+
+    if args.filter_report:
+        raw_finite, raw_total, raw_frac = _finite_summary(norm2d_raw)
+        filt_finite, filt_total, filt_frac = _finite_summary(norm2d)
+        print(
+            "Filtering summary: "
+            f"raw={raw_finite}/{raw_total} ({raw_frac:.1%}), "
+            f"filtered={filt_finite}/{filt_total} ({filt_frac:.1%})"
+        )
+
     # Determine color scale
-    if args.vmin is not None:
-        vmin = args.vmin
-    else:
-        vmin = 0.0
+    vmin = args.vmin if args.vmin is not None else 0.0
 
     if args.vmax is not None:
         vmax = args.vmax
     else:
         # Auto-scale: use 95th percentile or 2.0, whichever is larger
-        finite_vals = norm2d[np.isfinite(norm2d)]
-        if len(finite_vals) > 0:
-            vmax = max(2.0, np.percentile(finite_vals, 95))
+        if args.compare:
+            combined = np.concatenate(
+                [
+                    norm2d_raw[np.isfinite(norm2d_raw)],
+                    norm2d[np.isfinite(norm2d)],
+                ]
+            )
+            finite_vals = combined if len(combined) > 0 else np.array([])
         else:
-            vmax = 2.0
-
-    # Create figure
-    fig, ax = plt.subplots(figsize=(10, 6), dpi=args.dpi)
-
-    # Plot heatmap: norm2d is (energy, pitch), we want pitch on Y, energy on X
-    # pcolormesh expects (X, Y, C) where C has shape (len(Y)-1, len(X)-1) or (len(Y), len(X))
-    # We'll transpose norm2d to get (pitch, energy) for display
-    im = ax.pcolormesh(
-        energy_axis,
-        pitch_axis,
-        norm2d.T,  # (88 pitch, 15 energy)
-        cmap="RdBu_r",  # Red = high (>1), Blue = low (<1)
-        vmin=vmin,
-        vmax=vmax,
-        shading="auto",
-    )
-
-    # Draw band lines if requested
-    if args.show_band:
-        ax.axhline(args.pitch_min, color="green", linestyle="--", linewidth=1.5, alpha=0.8)
-        ax.axhline(args.pitch_max, color="green", linestyle="--", linewidth=1.5, alpha=0.8)
-        ax.fill_between(
-            energy_axis,
-            args.pitch_min,
-            args.pitch_max,
-            alpha=0.1,
-            color="green",
+            finite_vals = norm2d[np.isfinite(norm2d)]
+        vmax = (
+            max(2.0, np.percentile(finite_vals, 95))
+            if len(finite_vals) > 0
+            else 2.0
         )
 
-    # Formatting
-    ax.set_xlabel("Energy (eV)")
-    ax.set_ylabel("Pitch Angle (°)")
-    ax.set_xscale("log")
-    ax.set_ylim(0, 180)
+    norm = None
+    if not args.no_center and vmin < args.vcenter < vmax:
+        norm = TwoSlopeNorm(vmin=vmin, vcenter=args.vcenter, vmax=vmax)
+
+    def _plot_panel(ax, data: np.ndarray, panel_title: str) -> None:
+        plot_kwargs = {
+            "cmap": "RdBu_r",
+            "shading": "auto",
+        }
+        if norm is None:
+            plot_kwargs["vmin"] = vmin
+            plot_kwargs["vmax"] = vmax
+        else:
+            plot_kwargs["norm"] = norm
+
+        im = ax.pcolormesh(
+            energy_axis,
+            pitch_axis,
+            data.T,  # (pitch, energy)
+            **plot_kwargs,
+        )
+        if args.show_band:
+            ax.axhline(
+                args.pitch_min, color="green", linestyle="--", linewidth=1.5, alpha=0.8
+            )
+            ax.axhline(
+                args.pitch_max, color="green", linestyle="--", linewidth=1.5, alpha=0.8
+            )
+            ax.fill_between(
+                energy_axis,
+                args.pitch_min,
+                args.pitch_max,
+                alpha=0.1,
+                color="green",
+            )
+        ax.set_xlabel("Energy (eV)")
+        ax.set_ylabel("Pitch Angle (°)")
+        ax.set_xscale("log")
+        ax.set_ylim(0, 180)
+        ax.set_title(panel_title, fontsize=10)
+        ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
+        return im
+
+    filter_labels: list[str] = []
+    if args.filter_energy_min is not None or args.filter_energy_max is not None:
+        filter_labels.append("energy_mask")
+    if args.filter_pitch_min is not None or args.filter_pitch_max is not None:
+        filter_labels.append("pitch_mask")
+    if args.mask_below is not None or args.mask_above is not None:
+        filter_labels.append("value_mask")
+    if args.row_min_finite > 0:
+        filter_labels.append(f"row_min={args.row_min_finite}")
+    if args.row_mad > 0:
+        filter_labels.append(f"row_mad={args.row_mad:g}")
+    if args.smooth_pitch > 1:
+        filter_labels.append(f"smooth_pitch={_odd_window(args.smooth_pitch)}")
+    if args.smooth_energy > 1:
+        filter_labels.append(f"smooth_energy={_odd_window(args.smooth_energy)}")
+
+    filters_note = ""
+    if filter_labels:
+        filters_note = f"\nfilters: {', '.join(filter_labels)}"
+
+    if args.compare:
+        fig, axes = plt.subplots(
+            1, 2, figsize=(12, 5), dpi=args.dpi, sharey=True, constrained_layout=True
+        )
+        _plot_panel(
+            axes[0],
+            norm2d_raw,
+            (
+                f"Raw\nspec_no={chunk.spec_no}  |  {chunk.timestamp}"
+                f"\nnorm={args.normalization}, incident={args.incident_stat}"
+            ),
+        )
+        im = _plot_panel(
+            axes[1],
+            norm2d,
+            (
+                f"Filtered\nspec_no={chunk.spec_no}  |  {chunk.timestamp}"
+                f"\nnorm={args.normalization}, incident={args.incident_stat}"
+                f"{filters_note}"
+            ),
+        )
+    else:
+        fig, ax = plt.subplots(figsize=(10, 6), dpi=args.dpi, constrained_layout=True)
+        im = _plot_panel(
+            ax,
+            norm2d,
+            (
+                f"spec_no={chunk.spec_no}  |  {chunk.timestamp}\n"
+                f"norm={args.normalization}, incident={args.incident_stat}"
+                f"{filters_note}"
+            ),
+        )
 
     # Colorbar
-    cbar = fig.colorbar(im, ax=ax, label="Normalized Flux")
-    # Mark 1.0 on colorbar
-    cbar.ax.axhline(1.0, color="black", linestyle="-", linewidth=1)
+    cbar = fig.colorbar(im, ax=axes if args.compare else ax, label="Normalized Flux")
+    cbar.ax.axhline(args.vcenter, color="black", linestyle="-", linewidth=1)
 
-    # Title
-    title = (
-        f"spec_no={chunk.spec_no}  |  {chunk.timestamp}\n"
-        f"norm={args.normalization}, incident={args.incident_stat}"
-    )
-    ax.set_title(title, fontsize=10)
-
-    ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.4)
-
-    plt.tight_layout()
+    if not fig.get_constrained_layout():
+        plt.tight_layout()
 
     # Save or show
     if args.save:

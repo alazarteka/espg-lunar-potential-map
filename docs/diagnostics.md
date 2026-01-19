@@ -51,6 +51,9 @@ uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.T
 
 # Show the high-pitch-angle detection band
 uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.TAB --spec-no 653 --show-band
+
+# Compare raw vs filtered views (row MAD clip + pitch smoothing)
+uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.TAB --spec-no 653 --row-mad 3 --smooth-pitch 5 --compare --filter-report
 ```
 
 ### beam_detection_survey.py
@@ -148,8 +151,32 @@ Tuned to filter noise while keeping real beams:
 | `min_peak` | 2.0 | Peak normalized flux must exceed this |
 | `min_neighbor` | 1.5 | At least one adjacent energy bin must exceed this |
 | `min_band_points` | 5 | Minimum valid pitch bins in the 150-180° band |
+| `energy_min` | 20 eV | Minimum energy included in detection |
+| `energy_max` | 500 eV | Maximum energy included in detection |
+| `high_energy_floor` | 400 eV | High-energy deficit check lower bound |
+| `high_energy_ratio_max` | 0.5 | High-energy mean must be ≤ this fraction of peak |
+| `peak_width_max` | 4 bins | Max contiguous bins above half-peak |
 
 These thresholds were determined empirically through the beam detection survey.
+The energy window defaults to 20–500 eV; override via `losscone_peak_scan.py --energy-min/--energy-max` if needed.
+
+### Heuristic Update Notes (2026-01-19)
+
+Added two lightweight checks to the beam detector:
+- **High-energy deficit**: after the peak, the high-pitch band should drop at
+  high energies (default floor 400 eV, or 2x peak energy). This matches the
+  expected beam signature (localized low-energy excess).
+- **Peak width constraint**: limits the number of contiguous energy bins above
+  half-peak (default max 4) to avoid overly broad enhancements.
+
+**Empirical review (5 files, 20 samples)**:
+- Files sampled: `3D980503`, `3D980523`, `3D990323`, `3D990429`, `3D990505`
+- Detection rates by file: 31.9%, 21.0%, 11.2%, 31.2%, 22.4%
+- Eyeball vs detector: 9/10 detected samples looked beam-like; 4/10 non-detected
+  samples were ambiguous or weak beams (low-contrast/broad bands).
+
+These findings suggest the detector is conservative. A future "soft beam" mode
+may be warranted for low-contrast or broad beams, but it is not yet implemented.
 
 ---
 
