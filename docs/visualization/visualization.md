@@ -63,5 +63,5 @@ ax.set_title("Title", fontsize=style.FONT_SIZE_TITLE)
 
 ## See Also
 
-- [`src/visualization/style.py`](../src/visualization/style.py) — implementation
-- [`src/visualization/utils.py`](../src/visualization/utils.py) — helper functions (e.g., `add_stats_box`)
+- [`src/visualization/style.py`](../../src/visualization/style.py) — implementation
+- [`src/visualization/utils.py`](../../src/visualization/utils.py) — helper functions (e.g., `add_stats_box`)

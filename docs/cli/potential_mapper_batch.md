@@ -16,7 +16,8 @@ uv run python -m src.potential_mapper.batch [OPTIONS]
 | `--year` | int | None | Filter to specific year |
 | `--month` | int | None | Filter to specific month (1-12) |
 | `--day` | int | None | Filter to specific day (1-31) |
-| `--no-parallel` | flag | False | Disable parallel fitting (sequential mode) |
+| `--parallel` | flag | False | Enable parallel fitting (experimental) |
+| `--fast` | flag | False | Use PyTorch-accelerated fitter (GPU/CPU) |
 | `--overwrite` | flag | False | Overwrite existing output file |
 | `-v`, `--verbose` | flag | False | Enable DEBUG-level logging |
 
@@ -24,10 +25,10 @@ uv run python -m src.potential_mapper.batch [OPTIONS]
 
 | Aspect | `potential_mapper` | `potential_mapper.batch` |
 |--------|-------------------|-------------------------|
-| Fitting | Sequential per-file | Parallel across spectra |
+| Fitting | Sequential per-file | Merged dataset; optional parallel/GPU |
 | Data loading | Per-file | Merged into single dataset |
 | Output | In-memory | Compressed NPZ cache |
-| Speed | Slower | Faster (multiprocessing) |
+| Speed | Slower | Faster with `--parallel` or `--fast` |
 | Use case | Interactive/debugging | Large-scale processing |
 
 ## Output Files
@@ -93,7 +94,7 @@ print(f"Valid fits: {valid.sum()} / {len(valid)}")
 
 ## Performance
 
-- Uses `multiprocessing` with CPU count - 1 workers
+- Uses `multiprocessing` with CPU count - 1 workers when `--parallel` is enabled
 - BLAS/LAPACK threading is disabled for deterministic results
 - Progress bars show overall and per-spectrum progress
 

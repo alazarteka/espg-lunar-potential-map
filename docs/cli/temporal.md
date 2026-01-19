@@ -22,10 +22,14 @@ uv run python -m src.temporal --start YYYY-MM-DD --end YYYY-MM-DD --output FILE 
 |------|------|---------|-------------|
 | `--cache-dir` | path | `artifacts/potential_cache` | Directory with potential NPZ files |
 | `--lmax` | int | 5 | Maximum spherical harmonic degree |
+| `--fit-mode` | str | `window` | Fitting mode: `window` or `basis` |
+| `--temporal-basis` | str | `constant,synodic` | Comma-separated basis (basis mode only) |
 | `--window-hours` | float | 24.0 | Temporal window duration (hours) |
 | `--window-stride` | float | None | Stride for overlapping windows |
 | `--l2-penalty` | float | 0.0 | Ridge penalty (spatial regularization) |
 | `--temporal-lambda` | float | 0.0 | Temporal continuity regularization |
+| `--max-lag` | int | 1 | Max lag for multi-scale temporal regularization |
+| `--decay-factor` | float | 0.5 | Weight decay per lag step |
 | `--min-samples` | int | 100 | Minimum measurements per window |
 | `--min-coverage` | float | 0.1 | Minimum spatial coverage (0-1) |
 | `--co-rotate` | flag | False | Use solar co-rotating frame |
@@ -37,10 +41,16 @@ uv run python -m src.temporal --start YYYY-MM-DD --end YYYY-MM-DD --output FILE 
 
 1. Loads potential NPZ files from the cache directory
 2. Filters measurements to the specified date range
-3. Partitions data into temporal windows (default: 24h)
-4. For each window, fits spherical harmonic coefficients up to degree `lmax`
-5. Optionally applies temporal smoothing between windows
-6. Saves coefficients to compressed NPZ file
+3. **Window mode**: partitions data into temporal windows (default: 24h)
+4. **Basis mode**: fits temporal basis functions across the full range
+5. Fits spherical harmonic coefficients up to degree `lmax`
+6. Optionally applies temporal smoothing between windows
+7. Saves coefficients to compressed NPZ file
+
+## Fit Modes
+
+- **window**: Independent fits per time window (default).
+- **basis**: Fits coefficients using a temporal basis (e.g., constant + synodic).
 
 ## Output Format
 
