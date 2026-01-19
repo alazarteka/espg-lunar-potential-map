@@ -31,7 +31,7 @@ This model accounts not only for the statistical Poisson noise (`N`) but also fo
 
 ### 3.2. Data-Driven Fit Quality Threshold
 
-To programmatically distinguish between reliable and questionable fits, a statistical analysis was performed on the distribution of chi-squared errors across the entire dataset (see `docs/analysis/fitter_error_analysis.md` for details).
+To programmatically distinguish between reliable and questionable fits, a statistical analysis was performed on the distribution of chi-squared errors across the entire dataset (see `docs/archive/analysis/fitter_error_analysis.md` for details).
 
 Based on this analysis, a **fit quality threshold** was initially proposed at the 95th percentile of the filtered error distribution (215,000).
 
@@ -39,7 +39,7 @@ Based on this analysis, a **fit quality threshold** was initially proposed at th
 
 The code currently uses `FIT_ERROR_THRESHOLD = 21_500_000_000` (2.15×10¹⁰), which is substantially more permissive than the statistically-derived value. This threshold accepts nearly all fits except catastrophic failures.
 
-A boolean flag, `is_good_fit`, is returned with every fit. **Note:** The interpretation of this flag depends on which threshold value is ultimately adopted. See `docs/analysis/fitter_error_analysis.md` Section 5 for ongoing discussion of threshold selection.
+A boolean flag, `is_good_fit`, is returned with every fit. **Note:** The interpretation of this flag depends on which threshold value is ultimately adopted. See `docs/archive/analysis/fitter_error_analysis.md` Section 5 for ongoing discussion of threshold selection.
 
 ### 3.3. Uncertainty Calculation for Fitted Parameters
 

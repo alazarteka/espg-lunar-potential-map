@@ -25,7 +25,7 @@ uv run python -m src.data_acquisition   # Download data
 uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4  # GPU batch
 ```
 
-See [docs/development.md](docs/development.md) for complete workflow reference.
+See [docs/dev/development.md](docs/dev/development.md) for complete workflow reference.
 
 ## Project Structure
 
@@ -50,13 +50,13 @@ See [docs/development.md](docs/development.md) for complete workflow reference.
 
 | Topic | Link | Description |
 |-------|------|-------------|
-| Architecture | [WALKTHROUGH.md](docs/WALKTHROUGH.md) | End-to-end code walkthrough |
-| Development | [development.md](docs/development.md) | Build, test, lint workflow |
-| Lockfiles | [lockfiles.md](docs/lockfiles.md) | GPU environment configurations |
-| Batch Processing | [potential_mapper_batch.md](docs/potential_mapper_batch.md) | GPU-accelerated batch mode |
-| Diagnostics | [diagnostics.md](docs/diagnostics.md) | Beam detection tools |
-| Temporal | [temporal.md](docs/temporal.md) | Spherical harmonics fitting |
-| Visualization | [visualization.md](docs/visualization.md) | Plot styling |
+| Architecture | [WALKTHROUGH.md](docs/archive/legacy/WALKTHROUGH.md) | End-to-end code walkthrough |
+| Development | [development.md](docs/dev/development.md) | Build, test, lint workflow |
+| Lockfiles | [lockfiles.md](docs/dev/lockfiles.md) | GPU environment configurations |
+| Batch Processing | [potential_mapper_batch.md](docs/cli/potential_mapper_batch.md) | GPU-accelerated batch mode |
+| Diagnostics | [diagnostics.md](docs/cli/diagnostics.md) | Beam detection tools |
+| Temporal | [temporal.md](docs/cli/temporal.md) | Spherical harmonics fitting |
+| Visualization | [visualization.md](docs/visualization/visualization.md) | Plot styling |
 
 ## Coding Standards
 
@@ -65,7 +65,7 @@ See [docs/development.md](docs/development.md) for complete workflow reference.
 - Use `src.utils.units` for physical quantities
 - Conventional Commits: `feat(scope):`, `fix(scope):`, `docs:`, etc.
 
-See [docs/development.md](docs/development.md) for full guidelines.
+See [docs/dev/development.md](docs/dev/development.md) for full guidelines.
 
 ---
 
@@ -79,7 +79,7 @@ When working on this project, AI agents should follow these principles:
 
 - Update this file (AGENTS.md) when adding new modules, scripts, or capabilities
 - Document empirical findings immediately (detection rates, parameter tuning results, performance benchmarks)
-- Add usage examples for new scripts in `docs/diagnostics.md` or relevant doc files
+- Add usage examples for new scripts in `docs/cli/diagnostics.md` or relevant doc files
 - Record parameter tuning decisions with the reasoning and results that led to them
 
 **Don't wait to be asked.** If you add a script, document it. If you discover something useful, write it down.
@@ -135,7 +135,7 @@ Place new scripts in the appropriate directory:
 
 For production scripts:
 - Include a docstring with usage examples
-- Add to `docs/diagnostics.md` or relevant documentation
+- Add to `docs/cli/diagnostics.md` or relevant documentation
 - Follow CLI conventions (argparse, `--help` support)
 
 For dev scripts:
@@ -185,7 +185,7 @@ When an experiment succeeds:
 **Adding a new diagnostic script:**
 1. Create in `scripts/diagnostics/`
 2. Add docstring with usage example
-3. Document in `docs/diagnostics.md`
+3. Document in `docs/cli/diagnostics.md`
 4. Update AGENTS.md if it's a significant new capability
 
 **Improving a physics model:**
