@@ -20,7 +20,7 @@ This project maps the lunar surface electrostatic potential using physics-based 
 ./scripts/select-env.sh cuda12         # Sync modern GPU env
 ./scripts/select-env.sh cuda11         # Sync legacy GPU env
 uv run pytest -q                        # Run tests
-uv run ruff check . && uv run mypy src  # Lint + type check
+uv run ruff check src tests             # Lint
 uv run python -m src.data_acquisition   # Download data
 uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4  # GPU batch
 ```
@@ -65,7 +65,7 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
 ## Coding Standards
 
 - Python 3.12, 4-space indent, Ruff line length 88
-- Type hints required; `mypy` configured with `pint` plugin
+- Type hints required; lint via `ruff`
 - Use `src.utils.units` for physical quantities
 - Conventional Commits: `feat(scope):`, `fix(scope):`, `docs:`, etc.
 
@@ -116,8 +116,7 @@ When working in an area, reference existing code patterns and tests.
 
 Before declaring work complete:
 
-- Run `uv run ruff check .` and fix issues
-- Run `uv run mypy src` and address type errors
+- Run `uv run ruff check src tests` and fix issues
 - Run `uv run pytest -q` to verify nothing broke
 - Add type hints to new functions
 - Follow existing patterns in the codebase (look at similar files)

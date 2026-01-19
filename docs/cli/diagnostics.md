@@ -51,6 +51,9 @@ uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.T
 
 # Show the high-pitch-angle detection band
 uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.TAB --spec-no 653 --show-band
+
+# Compare raw vs filtered views (row MAD clip + pitch smoothing)
+uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.TAB --spec-no 653 --row-mad 3 --smooth-pitch 5 --compare --filter-report
 ```
 
 ### beam_detection_survey.py
@@ -121,7 +124,7 @@ Opens a Panel/Bokeh app in your browser with:
 - Loss cone boundary overlay
 - Parameter sliders (U_surface, Bs/Bm, beam amplitude, etc.)
 
-**Beam Filter**: Toggle "Beam-detected only" to navigate only through sweeps where beam signatures were detected. The app uses the same detection thresholds as `losscone_peak_scan.py` (min_peak=2.0, min_neighbor=1.5, etc.). When enabled, the chunk slider shows filtered index, and metrics display the actual chunk number and spec_no.
+**Beam Filter**: Toggle "Beam-detected only" to navigate only through sweeps where beam signatures were detected. The app uses the same detection thresholds as `losscone_peak_scan.py` (min_peak=2.0, min_neighbor=1.5, etc.). The spec selector (with Prev/Next buttons) only offers valid magnetic-field sweeps when the filter is off, and switches to beam-detected spec numbers when enabled; metrics display both the chunk index and spec number.
 
 ### losscone_orbit_studio.py
 
