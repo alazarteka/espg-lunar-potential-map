@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,16 @@ from src.utils.thetas import get_thetas
 from src.utils.units import ureg
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class FitChunkData:
+    norm2d: np.ndarray
+    energies: np.ndarray
+    pitches: np.ndarray
+    raw_flux: np.ndarray
+    spacecraft_slice: float | np.ndarray
+    valid_energy_mask: np.ndarray
 
 
 def build_lillis_mask(
@@ -50,6 +61,44 @@ def build_lillis_mask(
         & (relative < config.LILLIS_RELATIVE_FLUX_MAX)
     )
     return mask if original_ndim > 1 else mask[0]
+
+
+def compute_halekas_chi2(
+    norm2d: np.ndarray,
+    model: np.ndarray,
+    model_mask: np.ndarray | None = None,
+    eps: float | None = None,
+) -> float:
+    if eps is None:
+        eps = config.EPS if hasattr(config, "EPS") else 1e-6
+    data_mask = np.isfinite(norm2d) & (norm2d > 0)
+    combined_mask = data_mask & model_mask if model_mask is not None else data_mask
+    if not combined_mask.any():
+        return float("nan")
+    log_data = np.zeros_like(norm2d, dtype=float)
+    log_data[combined_mask] = np.log(norm2d[combined_mask] + eps)
+    log_model = np.log(model + eps)
+    diff = (log_data - log_model) * combined_mask
+    chi2 = np.sum(diff * diff)
+    return float(chi2)
+
+
+def compute_lillis_chi2(
+    norm2d: np.ndarray,
+    model: np.ndarray,
+    raw_flux: np.ndarray,
+    pitches: np.ndarray,
+    model_mask: np.ndarray | None = None,
+) -> float:
+    data_mask = build_lillis_mask(raw_flux, pitches)
+    combined_mask = data_mask & model_mask if model_mask is not None else data_mask
+    n_valid = int(np.count_nonzero(combined_mask))
+    if n_valid < config.LILLIS_MIN_VALID_BINS:
+        return float("nan")
+    diff = (norm2d - model) * combined_mask
+    chi2 = np.sum(diff * diff)
+    dof = max(n_valid - 3, 1)
+    return float(chi2) / float(dof)
 
 
 class ERData:
@@ -632,6 +681,68 @@ class LossConeFitter:
 
         return norm2d
 
+    def _prepare_chunk_data(self, measurement_chunk: int) -> FitChunkData | None:
+        if self.er_data.data.empty:
+            return None
+
+        norm2d = self.build_norm2d(measurement_chunk)
+        if np.isnan(norm2d).all():
+            return None
+
+        s = measurement_chunk * config.SWEEP_ROWS
+        e = (measurement_chunk + 1) * config.SWEEP_ROWS
+        max_rows = len(self.er_data.data)
+        if s >= max_rows:
+            return None
+        e = min(e, max_rows)
+
+        energies = self.er_data.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[
+            s:e
+        ]
+        if self.pitch_angle.pitch_angles is None or s >= len(
+            self.pitch_angle.pitch_angles
+        ):
+            return None
+        pitches = self.pitch_angle.pitch_angles[s:e]
+
+        spacecraft_slice = (
+            self.spacecraft_potential[s:e]
+            if self.spacecraft_potential is not None
+            else 0.0
+        )
+
+        actual_rows = e - s
+        if norm2d.shape[0] > actual_rows:
+            norm2d = norm2d[:actual_rows]
+        if pitches.shape[0] > actual_rows:
+            pitches = pitches[:actual_rows]
+
+        raw_flux = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[
+            s:e
+        ]
+        if raw_flux.shape[0] > actual_rows:
+            raw_flux = raw_flux[:actual_rows]
+
+        if isinstance(spacecraft_slice, np.ndarray) and (
+            spacecraft_slice.shape[0] > actual_rows
+        ):
+            spacecraft_slice = spacecraft_slice[:actual_rows]
+
+        if isinstance(spacecraft_slice, np.ndarray):
+            valid_energy = energies[:, None] >= spacecraft_slice[:, None]
+        else:
+            valid_energy = energies[:, None] >= float(spacecraft_slice)
+        valid_energy_mask = np.broadcast_to(valid_energy, pitches.shape)
+
+        return FitChunkData(
+            norm2d=norm2d,
+            energies=energies,
+            pitches=pitches,
+            raw_flux=raw_flux,
+            spacecraft_slice=spacecraft_slice,
+            valid_energy_mask=valid_energy_mask,
+        )
+
     def build_norm2d_batch(self, chunk_indices: list[int]) -> np.ndarray:
         """
         Build normalized 2D flux distributions for multiple chunks at once.
@@ -801,40 +912,15 @@ class LossConeFitter:
         if self.fit_method == "lillis":
             return self._fit_surface_potential_lillis(measurement_chunk)
 
-        assert not self.er_data.data.empty, "Data not loaded."
+        data = self._prepare_chunk_data(measurement_chunk)
+        if data is None:
+            return np.nan, np.nan, np.nan, np.nan
 
         eps = 1e-6
-        norm2d = self.build_norm2d(measurement_chunk)
-
-        if np.isnan(norm2d).all():
-            return np.nan, np.nan, np.nan, np.nan
-
-        s = measurement_chunk * config.SWEEP_ROWS
-        e = (measurement_chunk + 1) * config.SWEEP_ROWS
-
-        max_rows = len(self.er_data.data)
-        if s >= max_rows:
-            return np.nan, np.nan, np.nan, np.nan
-        e = min(e, max_rows)
-
-        energies = self.er_data.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[
-            s:e
-        ]
-
-        if self.pitch_angle.pitch_angles is None or s >= len(
-            self.pitch_angle.pitch_angles
-        ):
-            return np.nan, np.nan, np.nan, np.nan
-        pitches = self.pitch_angle.pitch_angles[s:e]
-        spacecraft_slice = (
-            self.spacecraft_potential[s:e]
-            if self.spacecraft_potential is not None
-            else 0.0
-        )
-
-        actual_rows = e - s
-        if norm2d.shape[0] > actual_rows:
-            norm2d = norm2d[:actual_rows]
+        norm2d = data.norm2d
+        energies = data.energies
+        pitches = data.pitches
+        spacecraft_slice = data.spacecraft_slice
 
         data_mask = np.isfinite(norm2d) & (norm2d > 0)
         if not data_mask.any():
@@ -960,52 +1046,17 @@ class LossConeFitter:
         Uses a relative-flux mask to exclude low/zero bins, then minimizes
         linear-space chi2. Returns reduced chi2 for quality control.
         """
-        assert not self.er_data.data.empty, "Data not loaded."
-
-        norm2d = self.build_norm2d(measurement_chunk)
-        if np.isnan(norm2d).all():
+        data = self._prepare_chunk_data(measurement_chunk)
+        if data is None:
             return np.nan, np.nan, np.nan, np.nan
 
-        s = measurement_chunk * config.SWEEP_ROWS
-        e = (measurement_chunk + 1) * config.SWEEP_ROWS
+        norm2d = data.norm2d
+        energies = data.energies
+        pitches = data.pitches
+        spacecraft_slice = data.spacecraft_slice
 
-        max_rows = len(self.er_data.data)
-        if s >= max_rows:
-            return np.nan, np.nan, np.nan, np.nan
-        e = min(e, max_rows)
-
-        energies = self.er_data.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[
-            s:e
-        ]
-
-        if self.pitch_angle.pitch_angles is None or s >= len(
-            self.pitch_angle.pitch_angles
-        ):
-            return np.nan, np.nan, np.nan, np.nan
-        pitches = self.pitch_angle.pitch_angles[s:e]
-        spacecraft_slice = (
-            self.spacecraft_potential[s:e]
-            if self.spacecraft_potential is not None
-            else 0.0
-        )
-
-        actual_rows = e - s
-        if norm2d.shape[0] > actual_rows:
-            norm2d = norm2d[:actual_rows]
-
-        flux_raw = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[
-            s:e
-        ]
-        if flux_raw.shape[0] > actual_rows:
-            flux_raw = flux_raw[:actual_rows]
-        lillis_mask = build_lillis_mask(flux_raw, pitches)
-
-        # Apply model validity mask (E >= U_spacecraft)
-        if isinstance(spacecraft_slice, np.ndarray):
-            valid_energy = energies[:, None] >= spacecraft_slice[:, None]
-        else:
-            valid_energy = energies[:, None] >= float(spacecraft_slice)
-        combined_mask = lillis_mask & valid_energy
+        lillis_mask = build_lillis_mask(data.raw_flux, pitches)
+        combined_mask = lillis_mask & data.valid_energy_mask
 
         if int(np.count_nonzero(combined_mask)) < config.LILLIS_MIN_VALID_BINS:
             return np.nan, np.nan, np.nan, np.nan

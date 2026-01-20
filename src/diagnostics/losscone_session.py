@@ -8,7 +8,14 @@ import numpy as np
 from scipy.stats.qmc import LatinHypercube, scale
 
 from src import config
-from src.flux import ERData, LossConeFitter, PitchAngle, build_lillis_mask
+from src.flux import (
+    ERData,
+    LossConeFitter,
+    PitchAngle,
+    build_lillis_mask,
+    compute_halekas_chi2,
+    compute_lillis_chi2,
+)
 from src.model import synth_losscone, synth_losscone_batch
 
 try:  # Optional GPU path
@@ -136,6 +143,7 @@ class LossConeSession:
 
         self._norm_cache: dict[tuple[int, str, str], np.ndarray] = {}
         self._raw_cache: dict[int, ChunkData] = {}
+        self._lillis_mask_cache: dict[int, np.ndarray] = {}
         self._spec_to_chunk = self._build_spec_map()
 
         self.use_torch = bool(use_torch and HAS_TORCH and self.fit_method == "halekas")
@@ -225,6 +233,7 @@ class LossConeSession:
 
     def _init_fitter(self) -> None:
         self._norm_cache.clear()
+        self._lillis_mask_cache.clear()
         if self.use_torch:
             try:
                 from src.model_torch import LossConeFitterTorch
@@ -313,6 +322,14 @@ class LossConeSession:
         self._norm_cache[cache_key] = norm2d
         return norm2d
 
+    def get_lillis_mask(self, chunk_idx: int) -> np.ndarray:
+        if chunk_idx in self._lillis_mask_cache:
+            return self._lillis_mask_cache[chunk_idx]
+        chunk = self.get_chunk_data(chunk_idx)
+        mask = build_lillis_mask(chunk.flux, chunk.pitches)
+        self._lillis_mask_cache[chunk_idx] = mask
+        return mask
+
     def compute_model(
         self,
         energies: np.ndarray,
@@ -381,34 +398,21 @@ class LossConeSession:
         raw_pitches: np.ndarray | None = None,
     ) -> float:
         if self.fit_method == "lillis":
-            flux_for_mask = raw_flux if raw_flux is not None else norm2d
-            data_mask = build_lillis_mask(flux_for_mask, raw_pitches)
-            combined_mask = (
-                data_mask & model_mask if model_mask is not None else data_mask
-            )
-            if int(np.count_nonzero(combined_mask)) < config.LILLIS_MIN_VALID_BINS:
+            if raw_flux is None or raw_pitches is None:
                 return float("nan")
-            diff = (norm2d - model) * combined_mask
-            chi2 = float(np.sum(diff * diff))
-            dof = max(int(np.count_nonzero(combined_mask)) - 3, 1)
-            return chi2 / float(dof)
+            return compute_lillis_chi2(
+                norm2d=norm2d,
+                model=model,
+                raw_flux=raw_flux,
+                pitches=raw_pitches,
+                model_mask=model_mask,
+            )
 
-        eps = config.EPS
-        data_mask = np.isfinite(norm2d) & (norm2d > 0)
-
-        # Combine data mask with model validity mask if provided
-        combined_mask = data_mask & model_mask if model_mask is not None else data_mask
-
-        if not combined_mask.any():
-            return float("nan")
-        log_data = np.zeros_like(norm2d, dtype=float)
-        log_data[combined_mask] = np.log(norm2d[combined_mask] + eps)
-        log_model = np.log(model + eps)
-        diff = (log_data - log_model) * combined_mask
-        chi2 = np.sum(diff * diff)
-        return float(chi2)
+        return compute_halekas_chi2(norm2d, model, model_mask=model_mask, eps=config.EPS)
 
     def _generate_lhs(self, n_samples: int = 400) -> np.ndarray:
+        if hasattr(self.fitter, "lhs") and len(self.fitter.lhs) == n_samples:
+            return self.fitter.lhs
         u_min = max(config.LOSS_CONE_U_SURFACE_MIN, -1000.0)
         u_max = min(config.LOSS_CONE_U_SURFACE_MAX, 0.0)
         lower = np.array(
@@ -443,7 +447,7 @@ class LossConeSession:
         pitches = chunk.pitches
 
         if self.fit_method == "lillis":
-            data_mask = build_lillis_mask(chunk.flux, chunk.pitches)
+            data_mask = self.get_lillis_mask(chunk_idx)
             if int(np.count_nonzero(data_mask)) < config.LILLIS_MIN_VALID_BINS:
                 return np.nan, np.nan, np.nan, np.nan
             data_mask_3d = data_mask[None, :, :]
