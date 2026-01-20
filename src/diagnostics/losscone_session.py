@@ -8,7 +8,7 @@ import numpy as np
 from scipy.stats.qmc import LatinHypercube, scale
 
 from src import config
-from src.flux import ERData, LossConeFitter, PitchAngle
+from src.flux import ERData, LossConeFitter, PitchAngle, build_lillis_mask
 from src.model import synth_losscone, synth_losscone_batch
 
 try:  # Optional GPU path
@@ -98,6 +98,7 @@ class LossConeSession:
         use_torch: bool = False,
         torch_device: str | None = None,
         use_polarity: bool = True,
+        fit_method: str | None = None,
     ) -> None:
         self.er_file = Path(er_file)
         self.theta_file = (
@@ -112,6 +113,11 @@ class LossConeSession:
             if loss_cone_background is not None
             else float(config.LOSS_CONE_BACKGROUND)
         )
+        self.fit_method = (
+            fit_method if fit_method is not None else config.LOSS_CONE_FIT_METHOD
+        )
+        if self.fit_method not in {"halekas", "lillis"}:
+            raise ValueError(f"Unknown fit_method: {self.fit_method}")
 
         if not self.er_file.exists():
             raise FileNotFoundError(f"ER file not found: {self.er_file}")
@@ -132,7 +138,7 @@ class LossConeSession:
         self._raw_cache: dict[int, ChunkData] = {}
         self._spec_to_chunk = self._build_spec_map()
 
-        self.use_torch = bool(use_torch and HAS_TORCH)
+        self.use_torch = bool(use_torch and HAS_TORCH and self.fit_method == "halekas")
         self._torch_device = None
         self._torch_dtype = None
         if self.use_torch and torch is not None:
@@ -241,6 +247,7 @@ class LossConeSession:
             normalization_mode=self.normalization_mode,
             incident_flux_stat=self.incident_flux_stat,
             loss_cone_background=self.background,
+            fit_method=self.fit_method,
         )
 
     def _build_spec_map(self) -> dict[int, int]:
@@ -370,7 +377,22 @@ class LossConeSession:
         norm2d: np.ndarray,
         model: np.ndarray,
         model_mask: np.ndarray | None = None,
+        raw_flux: np.ndarray | None = None,
+        raw_pitches: np.ndarray | None = None,
     ) -> float:
+        if self.fit_method == "lillis":
+            flux_for_mask = raw_flux if raw_flux is not None else norm2d
+            data_mask = build_lillis_mask(flux_for_mask, raw_pitches)
+            combined_mask = (
+                data_mask & model_mask if model_mask is not None else data_mask
+            )
+            if int(np.count_nonzero(combined_mask)) < config.LILLIS_MIN_VALID_BINS:
+                return float("nan")
+            diff = (norm2d - model) * combined_mask
+            chi2 = float(np.sum(diff * diff))
+            dof = max(int(np.count_nonzero(combined_mask)) - 3, 1)
+            return chi2 / float(dof)
+
         eps = config.EPS
         data_mask = np.isfinite(norm2d) & (norm2d > 0)
 
@@ -420,13 +442,19 @@ class LossConeSession:
         energies = chunk.energies
         pitches = chunk.pitches
 
-        data_mask = np.isfinite(norm2d) & (norm2d > 0)
-        if not data_mask.any():
-            return np.nan, np.nan, np.nan, np.nan
+        if self.fit_method == "lillis":
+            data_mask = build_lillis_mask(chunk.flux, chunk.pitches)
+            if int(np.count_nonzero(data_mask)) < config.LILLIS_MIN_VALID_BINS:
+                return np.nan, np.nan, np.nan, np.nan
+            data_mask_3d = data_mask[None, :, :]
+        else:
+            data_mask = np.isfinite(norm2d) & (norm2d > 0)
+            if not data_mask.any():
+                return np.nan, np.nan, np.nan, np.nan
 
-        log_data = np.zeros_like(norm2d, dtype=float)
-        log_data[data_mask] = np.log(norm2d[data_mask] + config.EPS)
-        data_mask_3d = data_mask[None, :, :]
+            log_data = np.zeros_like(norm2d, dtype=float)
+            log_data[data_mask] = np.log(norm2d[data_mask] + config.EPS)
+            data_mask_3d = data_mask[None, :, :]
 
         samples = self._generate_lhs(n_samples)
         u_surface = samples[:, 0]
@@ -447,10 +475,16 @@ class LossConeSession:
             background=background,
             return_mask=True,
         )
-        log_models = np.log(models + config.EPS)
         combined_mask = data_mask_3d & model_masks
-        diff = (log_data[None, :, :] - log_models) * combined_mask
-        chi2 = np.sum(diff * diff, axis=(1, 2))
+        if self.fit_method == "lillis":
+            diff = (norm2d[None, :, :] - models) * combined_mask
+            chi2 = np.sum(diff * diff, axis=(1, 2))
+            dof = max(int(np.count_nonzero(combined_mask[0])) - 3, 1)
+            chi2 = chi2 / float(dof)
+        else:
+            log_models = np.log(models + config.EPS)
+            diff = (log_data[None, :, :] - log_models) * combined_mask
+            chi2 = np.sum(diff * diff, axis=(1, 2))
         chi2[~np.isfinite(chi2)] = 1e30
         best_idx = int(np.argmin(chi2))
         return (

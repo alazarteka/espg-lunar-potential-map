@@ -13,6 +13,45 @@ from src.utils.units import ureg
 logger = logging.getLogger(__name__)
 
 
+def build_lillis_mask(
+    raw_flux: np.ndarray, pitches: np.ndarray | None = None
+) -> np.ndarray:
+    """
+    Build Lillis-style mask based on relative flux thresholds.
+
+    The mask uses raw (unnormalized) flux with per-energy maxima (incident-only
+    when pitches are provided) to exclude low/zero bins and bins near the max,
+    reducing bias from saturation or background.
+    """
+    raw_flux = np.asarray(raw_flux)
+    if raw_flux.size == 0:
+        return np.zeros_like(raw_flux, dtype=bool)
+
+    original_ndim = raw_flux.ndim
+    if original_ndim == 1:
+        raw_flux = raw_flux[None, :]
+
+    if pitches is not None:
+        pitches = np.asarray(pitches)
+        if pitches.shape != raw_flux.shape:
+            raise ValueError("pitches must match raw_flux shape for Lillis mask")
+        incident = pitches < 90.0
+        flux_for_max = np.where(incident, raw_flux, np.nan)
+    else:
+        flux_for_max = raw_flux
+
+    row_max = np.nanmax(flux_for_max, axis=1, keepdims=True)
+    row_max = np.where((row_max > 0) & np.isfinite(row_max), row_max, np.nan)
+    relative = raw_flux / row_max
+    mask = (
+        np.isfinite(raw_flux)
+        & (raw_flux > 0)
+        & (relative > config.LILLIS_RELATIVE_FLUX_MIN)
+        & (relative < config.LILLIS_RELATIVE_FLUX_MAX)
+    )
+    return mask if original_ndim > 1 else mask[0]
+
+
 class ERData:
     def __init__(self, er_data_file: str):
         """
@@ -319,6 +358,7 @@ class LossConeFitter:
         pitch_angle: PitchAngle | None = None,
         spacecraft_potential: np.ndarray | None = None,
         normalization_mode: str = "ratio",
+        fit_method: str | None = None,
         beam_amp_fixed: float | None = None,
         incident_flux_stat: str = "mean",
         loss_cone_background: float | None = None,
@@ -337,12 +377,13 @@ class LossConeFitter:
                 - "ratio": per-energy ratio of reflected/incident flux (default)
                 - "ratio2": pairwise normalization (incident→1, reflected→reflected/incident)
                 - "ratio_rescaled": per-energy ratio, then rescale to [0, 1]
+            fit_method (str | None): Loss-cone fitting method ("halekas" or "lillis").
             beam_amp_fixed (float | None): If set, fix the Gaussian beam amplitude
                 to this value instead of fitting it.
             incident_flux_stat (str): Statistic for incident flux normalization
                 ("mean" or "max").
             loss_cone_background (float | None): Baseline model value outside the
-                loss cone to stabilise log-space χ² (defaults to config value).
+                loss cone to stabilise log-space chi2 (defaults to config value).
         """
         self.er_data = er_data
         self.thetas = get_thetas()
@@ -375,6 +416,12 @@ class LossConeFitter:
         if loss_cone_background <= 0:
             raise ValueError("loss_cone_background must be positive")
         self.background = float(loss_cone_background)
+
+        if fit_method is None:
+            fit_method = config.LOSS_CONE_FIT_METHOD
+        if fit_method not in {"halekas", "lillis"}:
+            raise ValueError(f"Unknown fit_method: {fit_method}")
+        self.fit_method = fit_method
 
         self.lhs = self._generate_latin_hypercube()
 
@@ -736,21 +783,24 @@ class LossConeFitter:
 
     def _fit_surface_potential(
         self, measurement_chunk: int
-    ) -> tuple[float, float, float]:
+    ) -> tuple[float, float, float, float]:
         """
         Fit surface potential (U_surface) and B_s/B_m for one 15-row measurement chunk
-        using χ² minimisation with scipy.optimize.minimize.
+        using chi2 minimisation. Method is controlled by fit_method.
 
         Args:
             measurement_chunk (int): The index of the measurement chunk.
 
         Returns:
-            tuple[float, float, float]:
+            tuple[float, float, float, float]:
                 - U_surface: best-fit surface potential in volts
                 - bs_over_bm: best-fit B_s/B_m ratio
                 - beam_amp: best-fit Gaussian beam amplitude
-                - chi2: final χ² value
+                - chi2: final chi2 value
         """
+        if self.fit_method == "lillis":
+            return self._fit_surface_potential_lillis(measurement_chunk)
+
         assert not self.er_data.data.empty, "Data not loaded."
 
         eps = 1e-6
@@ -901,17 +951,174 @@ class LossConeFitter:
 
         return float(U_surface), bs_over_bm, beam_amp, float(result.fun)
 
+    def _fit_surface_potential_lillis(
+        self, measurement_chunk: int
+    ) -> tuple[float, float, float, float]:
+        """
+        Fit surface potential using Lillis-style masked linear chi2 + Nelder-Mead.
+
+        Uses a relative-flux mask to exclude low/zero bins, then minimizes
+        linear-space chi2. Returns reduced chi2 for quality control.
+        """
+        assert not self.er_data.data.empty, "Data not loaded."
+
+        norm2d = self.build_norm2d(measurement_chunk)
+        if np.isnan(norm2d).all():
+            return np.nan, np.nan, np.nan, np.nan
+
+        s = measurement_chunk * config.SWEEP_ROWS
+        e = (measurement_chunk + 1) * config.SWEEP_ROWS
+
+        max_rows = len(self.er_data.data)
+        if s >= max_rows:
+            return np.nan, np.nan, np.nan, np.nan
+        e = min(e, max_rows)
+
+        energies = self.er_data.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[
+            s:e
+        ]
+
+        if self.pitch_angle.pitch_angles is None or s >= len(
+            self.pitch_angle.pitch_angles
+        ):
+            return np.nan, np.nan, np.nan, np.nan
+        pitches = self.pitch_angle.pitch_angles[s:e]
+        spacecraft_slice = (
+            self.spacecraft_potential[s:e]
+            if self.spacecraft_potential is not None
+            else 0.0
+        )
+
+        actual_rows = e - s
+        if norm2d.shape[0] > actual_rows:
+            norm2d = norm2d[:actual_rows]
+
+        flux_raw = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[
+            s:e
+        ]
+        if flux_raw.shape[0] > actual_rows:
+            flux_raw = flux_raw[:actual_rows]
+        lillis_mask = build_lillis_mask(flux_raw, pitches)
+
+        # Apply model validity mask (E >= U_spacecraft)
+        if isinstance(spacecraft_slice, np.ndarray):
+            valid_energy = energies[:, None] >= spacecraft_slice[:, None]
+        else:
+            valid_energy = energies[:, None] >= float(spacecraft_slice)
+        combined_mask = lillis_mask & valid_energy
+
+        if int(np.count_nonzero(combined_mask)) < config.LILLIS_MIN_VALID_BINS:
+            return np.nan, np.nan, np.nan, np.nan
+
+        data_mask_3d = combined_mask[None, :, :]
+
+        # LHS samples provide a robust starting point
+        lhs_U_surface = self.lhs[:, 0]
+        lhs_bs_over_bm = self.lhs[:, 1]
+        lhs_beam_amp = self.lhs[:, 2]
+        lhs_beam_width = np.full_like(lhs_U_surface, self.beam_width_ev)
+
+        models, model_masks = synth_losscone_batch(
+            energy_grid=energies,
+            pitch_grid=pitches,
+            U_surface=lhs_U_surface,
+            U_spacecraft=spacecraft_slice,
+            bs_over_bm=lhs_bs_over_bm,
+            beam_width_eV=lhs_beam_width,
+            beam_amp=lhs_beam_amp,
+            beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
+            background=self.background,
+            return_mask=True,
+        )
+
+        # Combine with model validity (E >= U_spacecraft) just in case
+        combined_mask_3d = data_mask_3d & model_masks
+        diff = (norm2d[None, :, :] - models) * combined_mask_3d
+        chi2_vals = np.sum(diff**2, axis=(1, 2))
+        chi2_vals[~np.isfinite(chi2_vals)] = 1e30
+
+        best_idx = int(np.argmin(chi2_vals))
+        x0 = self.lhs[best_idx]
+
+        # Nelder-Mead optimization (bounds enforced via penalty)
+        from scipy.optimize import minimize
+
+        bounds = [
+            (self.u_surface_min, self.u_surface_max),
+            (self.bs_over_bm_min, self.bs_over_bm_max),
+            (self.beam_amp_min, self.beam_amp_max),
+        ]
+
+        def chi2_scalar(params):
+            U_surface, bs_over_bm, beam_amp = params
+            if not np.isfinite(params).all():
+                return 1e30
+            if (
+                U_surface < bounds[0][0]
+                or U_surface > bounds[0][1]
+                or bs_over_bm < bounds[1][0]
+                or bs_over_bm > bounds[1][1]
+                or beam_amp < bounds[2][0]
+                or beam_amp > bounds[2][1]
+            ):
+                return 1e30
+
+            model = synth_losscone(
+                energy_grid=energies,
+                pitch_grid=pitches,
+                U_surface=U_surface,
+                U_spacecraft=spacecraft_slice,
+                bs_over_bm=bs_over_bm,
+                beam_width_eV=self.beam_width_ev,
+                beam_amp=beam_amp,
+                beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
+                background=self.background,
+            )
+            if not np.all(np.isfinite(model)):
+                return 1e30
+
+            diff_local = (norm2d - model) * combined_mask
+            chi2_val = float(np.sum(diff_local * diff_local))
+            if not np.isfinite(chi2_val):
+                return 1e30
+            return chi2_val
+
+        result = minimize(
+            chi2_scalar,
+            x0=x0,
+            method="Nelder-Mead",
+            options={"maxiter": 2000, "xatol": 1e-6, "fatol": 1e-6},
+        )
+
+        if not result.success or not np.isfinite(result.fun):
+            return np.nan, np.nan, np.nan, np.nan
+
+        U_surface, bs_over_bm, beam_amp = result.x
+        # Clip to bounds defensively
+        U_surface = float(np.clip(U_surface, bounds[0][0], bounds[0][1]))
+        bs_over_bm = float(np.clip(bs_over_bm, bounds[1][0], bounds[1][1]))
+        beam_amp = float(np.clip(beam_amp, bounds[2][0], bounds[2][1]))
+
+        dof = int(np.count_nonzero(combined_mask)) - 3
+        dof = max(dof, 1)
+        chi2_reduced = float(result.fun) / float(dof)
+
+        if chi2_reduced > config.LILLIS_CHI2_REDUCED_MAX:
+            return np.nan, np.nan, np.nan, chi2_reduced
+
+        return U_surface, bs_over_bm, beam_amp, chi2_reduced
+
     def fit_surface_potential(self) -> np.ndarray:
         """
         Fit surface potential (U_surface) and B_s/B_m for all 15-row measurement chunks
-        using χ² minimisation with scipy.optimize.minimize.
+        using chi2 minimisation with scipy.optimize.minimize.
 
         Returns:
             np.ndarray: Array with columns [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
                 - U_surface: best-fit surface potential in volts
                 - bs_over_bm: best-fit B_s/B_m ratio
                 - beam_amp: best-fit Gaussian beam amplitude
-                - chi2: final χ² value
+                - chi2: final chi2 value
                 - chunk_index: measurement chunk index
         """
         assert not self.er_data.data.empty, "Data not loaded."

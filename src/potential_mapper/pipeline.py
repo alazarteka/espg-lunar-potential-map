@@ -94,17 +94,19 @@ def spacecraft_potential_worker(
         return spec_no, rows_df.index.to_numpy(), None
 
 
-def fit_worker(args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None]) -> np.ndarray:
+def fit_worker(
+    args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None, str]
+) -> np.ndarray:
     """
     Worker function for parallel fitting.
 
     Args:
-        args: Tuple containing (chunk_df, sc_pot, polarity).
+        args: Tuple containing (chunk_df, sc_pot, polarity, fit_method).
 
     Returns:
         Fitting results array from LossConeFitter.
     """
-    chunk_df, sc_pot, polarity = args
+    chunk_df, sc_pot, polarity, fit_method = args
 
     # Create ERData from the chunk.
     # Note: This might re-trigger cleaning/counting if not handled in ERData,
@@ -121,6 +123,7 @@ def fit_worker(args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None]) -> np.n
         er_data,
         pitch_angle=pitch_angle,
         spacecraft_potential=sc_pot,
+        fit_method=fit_method,
     )
     return fitter.fit_surface_potential()
 
@@ -651,7 +654,11 @@ def load_all_data(files: list[Path]) -> ERData:
 
 
 def process_merged_data(
-    er_data: ERData, *, use_parallel: bool = False, use_torch: bool = False
+    er_data: ERData,
+    *,
+    use_parallel: bool = False,
+    use_torch: bool = False,
+    fit_method: str | None = None,
 ) -> PotentialResults:
     """
     Process the merged ER dataset.
@@ -667,11 +674,20 @@ def process_merged_data(
         use_parallel: Enable multiprocessing for SC and surface potential
             (default: False)
         use_torch: Use PyTorch-accelerated fitter (~5x faster, default: False)
+        fit_method: Loss-cone fitting method ("halekas" or "lillis")
 
     Returns:
         PotentialResults with all computed fields
     """
     logging.info("Processing merged dataset...")
+
+    if fit_method is None:
+        fit_method = config.LOSS_CONE_FIT_METHOD
+    if fit_method not in {"halekas", "lillis"}:
+        raise ValueError(f"Unknown fit_method: {fit_method}")
+    if use_torch and fit_method != "halekas":
+        logging.warning("Lillis fit_method is CPU-only; disabling --fast.")
+        use_torch = False
 
     # Load attitude
     et_spin, ra_vals, dec_vals = load_attitude_data(
@@ -852,6 +868,7 @@ def process_merged_data(
             er_data,
             pitch_angle=pitch_angle,
             spacecraft_potential=sc_potential,
+            fit_method=fit_method,
         )
         fit_mat = fitter.fit_surface_potential()
         _apply_fit_results(
@@ -866,13 +883,13 @@ def process_merged_data(
     else:
         logging.info("Starting parallel surface potential fitting...")
 
-        chunks: list[tuple[pd.DataFrame, np.ndarray, np.ndarray | None]] = []
+        chunks: list[tuple[pd.DataFrame, np.ndarray, np.ndarray | None, str]] = []
         for i in range(0, n, rows_per_chunk):
             end = min(i + rows_per_chunk, n)
             chunk_df = er_data.data.iloc[i:end].copy()
             chunk_sc_pot = sc_potential[i:end]
             chunk_pol = projection_polarity[i:end] if use_polarity else None
-            chunks.append((chunk_df, chunk_sc_pot, chunk_pol))
+            chunks.append((chunk_df, chunk_sc_pot, chunk_pol, fit_method))
 
         if chunks:
             num_workers = max(1, multiprocessing.cpu_count() - 1)
@@ -928,7 +945,7 @@ def process_merged_data(
     return results
 
 
-def process_lp_file(file_path: Path) -> PotentialResults:
+def process_lp_file(file_path: Path, *, fit_method: str | None = None) -> PotentialResults:
     """
     Process a single ER file into PotentialResults (sequential fitting).
 
@@ -936,7 +953,7 @@ def process_lp_file(file_path: Path) -> PotentialResults:
     """
     logging.debug(f"Processing LP file: {file_path}")
     er_data = ERData(str(file_path))
-    return process_merged_data(er_data, use_parallel=False)
+    return process_merged_data(er_data, use_parallel=False, fit_method=fit_method)
 
 
 def run(args: argparse.Namespace) -> int:

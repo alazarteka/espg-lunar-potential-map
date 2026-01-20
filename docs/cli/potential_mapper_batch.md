@@ -18,6 +18,7 @@ uv run python -m src.potential_mapper.batch [OPTIONS]
 | `--day` | int | None | Filter to specific day (1-31) |
 | `--parallel` | flag | False | Enable parallel fitting (experimental) |
 | `--fast` | flag | False | Use PyTorch-accelerated fitter (GPU/CPU) |
+| `--losscone-fit-method` | str | None | Loss-cone fitter (`halekas` or `lillis`, defaults to config) |
 | `--overwrite` | flag | False | Overwrite existing output file |
 | `-v`, `--verbose` | flag | False | Enable DEBUG-level logging |
 
@@ -73,6 +74,9 @@ uv run python -m src.potential_mapper.batch --year 1998 --output-dir ./my_cache
 
 # Verbose logging
 uv run python -m src.potential_mapper.batch --year 1998 --month 1 -v
+
+# Use Lillis masked linear chi2 fitting
+uv run python -m src.potential_mapper.batch --year 1998 --losscone-fit-method lillis
 ```
 
 ## Loading Results

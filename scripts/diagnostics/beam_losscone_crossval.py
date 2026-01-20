@@ -198,6 +198,12 @@ def parse_args() -> argparse.Namespace:
         help="Use torch model if available",
     )
     parser.add_argument(
+        "--fit-method",
+        choices=["halekas", "lillis"],
+        default=None,
+        help="Loss-cone fitting method (defaults to config)",
+    )
+    parser.add_argument(
         "--constrain-from-beam",
         action="store_true",
         help="Constrain U_surface search to ±50%% of beam-derived estimate",
@@ -216,6 +222,7 @@ def main() -> int:
         incident_flux_stat="mean",
         use_torch=args.fast,
         use_polarity=True,
+        fit_method=args.fit_method,
     )
 
     n_chunks = session.chunk_count()

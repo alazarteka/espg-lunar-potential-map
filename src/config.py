@@ -72,6 +72,9 @@ ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 FIT_ERROR_THRESHOLD = 657000  # chi-squared threshold for a good fit (99th percentile)
 LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
 
+# Loss-cone fit method ("halekas" log-chi2 or "lillis" masked linear chi2)
+LOSS_CONE_FIT_METHOD = "halekas"
+
 # Surface potential bounds (see Halekas 2008 Section 5.2)
 # Electron reflectometry cannot reliably measure positive potentials because the
 # photoelectron sheath (~meters) is much thinner than magnetic field scales.
@@ -96,6 +99,12 @@ LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
 LOSS_CONE_BACKGROUND = (
     0.05  # baseline model value outside loss cone (for log stability)
 )
+
+# Lillis 2008 masked-fit thresholds (relative flux-based)
+LILLIS_RELATIVE_FLUX_MIN = 0.07
+LILLIS_RELATIVE_FLUX_MAX = 0.79
+LILLIS_MIN_VALID_BINS = 5
+LILLIS_CHI2_REDUCED_MAX = 2.0
 
 
 # ========== Data Column names ==========

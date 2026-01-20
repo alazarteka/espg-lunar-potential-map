@@ -25,6 +25,10 @@ uv run python -m src.data_acquisition   # Download data
 uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4  # GPU batch
 ```
 
+Loss-cone fitting supports both Halekas (log-chi2) and Lillis (masked linear chi2).
+Set `LOSS_CONE_FIT_METHOD` in `src/config.py` or use `--losscone-fit-method` on
+the batch CLI / `--fit-method` in diagnostics tools.
+
 See [docs/dev/development.md](docs/dev/development.md) for complete workflow reference.
 
 ## Project Structure

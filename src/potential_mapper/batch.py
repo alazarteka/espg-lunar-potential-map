@@ -167,6 +167,7 @@ def run_batch(
     use_parallel: bool = True,
     overwrite: bool = False,
     use_torch: bool = False,
+    fit_method: str | None = None,
 ) -> int:
     """
     Run batch processing with merged data loading.
@@ -179,6 +180,7 @@ def run_batch(
         use_parallel: Whether to use parallel fitting (default: True)
         overwrite: Whether to overwrite existing output file
         use_torch: Use PyTorch-accelerated fitter (~5x faster)
+        fit_method: Loss-cone fit method ("halekas" or "lillis")
 
     Returns:
         Exit code (0 for success, 1 for failure)
@@ -224,7 +226,10 @@ def run_batch(
             f"Processing merged data (parallel={use_parallel}, torch={use_torch})..."
         )
         results = process_merged_data(
-            er_data, use_parallel=use_parallel, use_torch=use_torch
+            er_data,
+            use_parallel=use_parallel,
+            use_torch=use_torch,
+            fit_method=fit_method,
         )
     except Exception as e:
         logging.exception(f"Failed to process merged data: {e}")
@@ -283,6 +288,12 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--losscone-fit-method",
+        choices=["halekas", "lillis"],
+        default=None,
+        help="Loss-cone fitting method (defaults to config)",
+    )
+    parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing output file"
     )
     parser.add_argument(
@@ -306,6 +317,7 @@ def main() -> int:
         use_parallel=args.parallel,
         overwrite=args.overwrite,
         use_torch=args.fast,
+        fit_method=args.losscone_fit_method,
     )
 
 

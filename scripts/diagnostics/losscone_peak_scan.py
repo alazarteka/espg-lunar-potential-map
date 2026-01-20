@@ -96,6 +96,12 @@ def parse_args() -> argparse.Namespace:
         help="Use torch model if available",
     )
     parser.add_argument(
+        "--fit-method",
+        choices=["halekas", "lillis"],
+        default=None,
+        help="Loss-cone fitting method (defaults to config)",
+    )
+    parser.add_argument(
         "--list-peaks",
         nargs="?",
         const=10,
@@ -122,6 +128,7 @@ def main() -> int:
         incident_flux_stat=args.incident_stat,
         use_torch=args.fast,
         use_polarity=not args.no_polarity,
+        fit_method=args.fit_method,
     )
     valid_spec_nos = np.unique(session.er_data.data[config.SPEC_NO_COLUMN].to_numpy())
 
