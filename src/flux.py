@@ -474,7 +474,7 @@ class LossConeFitter:
 
         self.lhs = self._generate_latin_hypercube()
 
-    def _generate_latin_hypercube(self) -> np.ndarray:
+    def _generate_latin_hypercube(self, n_samples: int = 400) -> np.ndarray:
         """
         Generate a Latin Hypercube sample.
 
@@ -496,7 +496,7 @@ class LossConeFitter:
         sampler = LatinHypercube(
             d=len(lower_bounds), scramble=False, seed=config.LOSS_CONE_LHS_SEED
         )
-        lhs = sampler.random(n=400)  # 400 points
+        lhs = sampler.random(n=n_samples)
 
         scaled = scale(lhs, lower_bounds, upper_bounds)
         if self.beam_amp_max <= self.beam_amp_min:
@@ -1036,6 +1036,80 @@ class LossConeFitter:
         beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
 
         return float(U_surface), bs_over_bm, beam_amp, float(result.fun)
+
+    def fit_chunk_lhs(
+        self,
+        measurement_chunk: int,
+        beam_width_ev: float | None = None,
+        u_spacecraft: float | None = None,
+        n_samples: int = 400,
+    ) -> tuple[float, float, float, float]:
+        data = self._prepare_chunk_data(measurement_chunk)
+        if data is None:
+            return np.nan, np.nan, np.nan, np.nan
+
+        norm2d = data.norm2d
+        energies = data.energies
+        pitches = data.pitches
+        spacecraft_slice = (
+            float(u_spacecraft) if u_spacecraft is not None else data.spacecraft_slice
+        )
+
+        if self.fit_method == "lillis":
+            data_mask = build_lillis_mask(data.raw_flux, pitches)
+            if int(np.count_nonzero(data_mask)) < config.LILLIS_MIN_VALID_BINS:
+                return np.nan, np.nan, np.nan, np.nan
+            data_mask_3d = data_mask[None, :, :]
+        else:
+            data_mask = np.isfinite(norm2d) & (norm2d > 0)
+            if not data_mask.any():
+                return np.nan, np.nan, np.nan, np.nan
+            log_data = np.zeros_like(norm2d, dtype=float)
+            log_data[data_mask] = np.log(norm2d[data_mask] + config.EPS)
+            data_mask_3d = data_mask[None, :, :]
+
+        samples = (
+            self.lhs if n_samples == len(self.lhs) else self._generate_latin_hypercube(n_samples)
+        )
+        u_surface = samples[:, 0]
+        bs_over_bm = samples[:, 1]
+        beam_amp = samples[:, 2]
+        width = self.beam_width_ev if beam_width_ev is None else beam_width_ev
+        beam_width = np.full_like(u_surface, width)
+        background = np.full_like(u_surface, self.background)
+
+        models, model_masks = synth_losscone_batch(
+            energy_grid=energies,
+            pitch_grid=pitches,
+            U_surface=u_surface,
+            U_spacecraft=spacecraft_slice,
+            bs_over_bm=bs_over_bm,
+            beam_width_eV=beam_width,
+            beam_amp=beam_amp,
+            beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
+            background=background,
+            return_mask=True,
+        )
+        combined_mask = data_mask_3d & model_masks
+
+        if self.fit_method == "lillis":
+            diff = (norm2d[None, :, :] - models) * combined_mask
+            chi2 = np.sum(diff * diff, axis=(1, 2))
+            dof = max(int(np.count_nonzero(combined_mask[0])) - 3, 1)
+            chi2 = chi2 / float(dof)
+        else:
+            log_models = np.log(models + config.EPS)
+            diff = (log_data[None, :, :] - log_models) * combined_mask
+            chi2 = np.sum(diff * diff, axis=(1, 2))
+
+        chi2[~np.isfinite(chi2)] = 1e30
+        best_idx = int(np.argmin(chi2))
+        return (
+            float(u_surface[best_idx]),
+            float(bs_over_bm[best_idx]),
+            float(beam_amp[best_idx]),
+            float(chi2[best_idx]),
+        )
 
     def _fit_surface_potential_lillis(
         self, measurement_chunk: int

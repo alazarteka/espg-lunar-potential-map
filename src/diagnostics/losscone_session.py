@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from scipy.stats.qmc import LatinHypercube, scale
 
 from src import config
 from src.flux import (
@@ -410,27 +409,6 @@ class LossConeSession:
 
         return compute_halekas_chi2(norm2d, model, model_mask=model_mask, eps=config.EPS)
 
-    def _generate_lhs(self, n_samples: int = 400) -> np.ndarray:
-        if hasattr(self.fitter, "lhs") and len(self.fitter.lhs) == n_samples:
-            return self.fitter.lhs
-        u_min = max(config.LOSS_CONE_U_SURFACE_MIN, -1000.0)
-        u_max = min(config.LOSS_CONE_U_SURFACE_MAX, 0.0)
-        lower = np.array(
-            [u_min, config.LOSS_CONE_BS_OVER_BM_MIN, config.LOSS_CONE_BEAM_AMP_MIN],
-            dtype=float,
-        )
-        upper = np.array(
-            [u_max, config.LOSS_CONE_BS_OVER_BM_MAX, config.LOSS_CONE_BEAM_AMP_MAX],
-            dtype=float,
-        )
-        if upper[2] <= lower[2]:
-            upper[2] = lower[2] + 1e-12
-        sampler = LatinHypercube(
-            d=len(lower), scramble=False, seed=config.LOSS_CONE_LHS_SEED
-        )
-        lhs = sampler.random(n=n_samples)
-        return scale(lhs, lower, upper)
-
     def fit_chunk_lhs(
         self,
         chunk_idx: int,
@@ -438,64 +416,11 @@ class LossConeSession:
         u_spacecraft: float,
         n_samples: int = 400,
     ) -> tuple[float, float, float, float]:
-        norm2d = self.get_norm2d(chunk_idx)
-        if np.isnan(norm2d).all():
-            return np.nan, np.nan, np.nan, np.nan
-
-        chunk = self.get_chunk_data(chunk_idx)
-        energies = chunk.energies
-        pitches = chunk.pitches
-
-        if self.fit_method == "lillis":
-            data_mask = self.get_lillis_mask(chunk_idx)
-            if int(np.count_nonzero(data_mask)) < config.LILLIS_MIN_VALID_BINS:
-                return np.nan, np.nan, np.nan, np.nan
-            data_mask_3d = data_mask[None, :, :]
-        else:
-            data_mask = np.isfinite(norm2d) & (norm2d > 0)
-            if not data_mask.any():
-                return np.nan, np.nan, np.nan, np.nan
-
-            log_data = np.zeros_like(norm2d, dtype=float)
-            log_data[data_mask] = np.log(norm2d[data_mask] + config.EPS)
-            data_mask_3d = data_mask[None, :, :]
-
-        samples = self._generate_lhs(n_samples)
-        u_surface = samples[:, 0]
-        bs_over_bm = samples[:, 1]
-        beam_amp = samples[:, 2]
-        beam_width = np.full_like(u_surface, beam_width_ev)
-        background = np.full_like(u_surface, self.background)
-
-        models, model_masks = synth_losscone_batch(
-            energy_grid=energies,
-            pitch_grid=pitches,
-            U_surface=u_surface,
-            U_spacecraft=float(u_spacecraft),
-            bs_over_bm=bs_over_bm,
-            beam_width_eV=beam_width,
-            beam_amp=beam_amp,
-            beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
-            background=background,
-            return_mask=True,
-        )
-        combined_mask = data_mask_3d & model_masks
-        if self.fit_method == "lillis":
-            diff = (norm2d[None, :, :] - models) * combined_mask
-            chi2 = np.sum(diff * diff, axis=(1, 2))
-            dof = max(int(np.count_nonzero(combined_mask[0])) - 3, 1)
-            chi2 = chi2 / float(dof)
-        else:
-            log_models = np.log(models + config.EPS)
-            diff = (log_data[None, :, :] - log_models) * combined_mask
-            chi2 = np.sum(diff * diff, axis=(1, 2))
-        chi2[~np.isfinite(chi2)] = 1e30
-        best_idx = int(np.argmin(chi2))
-        return (
-            float(u_surface[best_idx]),
-            float(bs_over_bm[best_idx]),
-            float(beam_amp[best_idx]),
-            float(chi2[best_idx]),
+        return self.fitter.fit_chunk_lhs(
+            chunk_idx,
+            beam_width_ev=beam_width_ev,
+            u_spacecraft=u_spacecraft,
+            n_samples=n_samples,
         )
 
     def fit_chunk_full(self, chunk_idx: int) -> tuple[float, float, float, float]:
