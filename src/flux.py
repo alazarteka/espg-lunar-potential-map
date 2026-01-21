@@ -3,11 +3,11 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-from scipy.stats.qmc import LatinHypercube, scale
 from tqdm import tqdm
 
 from src import config
 from src.model import synth_losscone, synth_losscone_batch
+from src.utils.losscone_lhs import generate_losscone_lhs
 from src.utils.thetas import get_thetas
 from src.utils.units import ureg
 
@@ -481,27 +481,16 @@ class LossConeFitter:
         Returns:
             np.ndarray: The Latin Hypercube sample.
         """
-        # Generate a Latin Hypercube sample across U_surface, B_s/B_m, beam amplitude.
-        # Use narrower LHS range than full bounds for initial sampling efficiency.
-        u_lhs_min = max(self.u_surface_min, -1000.0)
-        u_lhs_max = min(self.u_surface_max, 0.0)  # Focus on negative potentials
-        lower_bounds = np.array(
-            [u_lhs_min, self.bs_over_bm_min, self.beam_amp_min], dtype=float
+        return generate_losscone_lhs(
+            n_samples=n_samples,
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+            seed=config.LOSS_CONE_LHS_SEED,
         )
-        upper_bounds = np.array(
-            [u_lhs_max, self.bs_over_bm_max, self.beam_amp_max], dtype=float
-        )
-        if upper_bounds[2] <= lower_bounds[2]:
-            upper_bounds[2] = lower_bounds[2] + 1e-12
-        sampler = LatinHypercube(
-            d=len(lower_bounds), scramble=False, seed=config.LOSS_CONE_LHS_SEED
-        )
-        lhs = sampler.random(n=n_samples)
-
-        scaled = scale(lhs, lower_bounds, upper_bounds)
-        if self.beam_amp_max <= self.beam_amp_min:
-            scaled[:, 2] = self.beam_amp_min
-        return scaled
 
     def _get_normalized_flux(
         self, energy_bin: int, measurement_chunk: int
@@ -717,9 +706,7 @@ class LossConeFitter:
         if pitches.shape[0] > actual_rows:
             pitches = pitches[:actual_rows]
 
-        raw_flux = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[
-            s:e
-        ]
+        raw_flux = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[s:e]
         if raw_flux.shape[0] > actual_rows:
             raw_flux = raw_flux[:actual_rows]
 
@@ -1069,7 +1056,9 @@ class LossConeFitter:
             data_mask_3d = data_mask[None, :, :]
 
         samples = (
-            self.lhs if n_samples == len(self.lhs) else self._generate_latin_hypercube(n_samples)
+            self.lhs
+            if n_samples == len(self.lhs)
+            else self._generate_latin_hypercube(n_samples)
         )
         u_surface = samples[:, 0]
         bs_over_bm = samples[:, 1]

@@ -22,6 +22,7 @@ except ImportError:
     HAS_TORCH = False
     Tensor = None  # type: ignore[misc, assignment]
 
+from src.utils.losscone_lhs import generate_losscone_lhs
 from src.utils.optimization import (
     BatchedDifferentialEvolution,
     get_torch_device,
@@ -1028,27 +1029,16 @@ class LossConeFitterTorch:
 
         Uses a narrowed U_surface range for sampling efficiency.
         """
-        from scipy.stats.qmc import LatinHypercube, scale
-
-        u_lhs_min = max(self.u_surface_min, -1000.0)
-        u_lhs_max = min(self.u_surface_max, 0.0)
-        lower_bounds = np.array(
-            [u_lhs_min, self.bs_over_bm_min, self.beam_amp_min], dtype=float
+        return generate_losscone_lhs(
+            n_samples=n_samples,
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+            seed=self.config.LOSS_CONE_LHS_SEED,
         )
-        upper_bounds = np.array(
-            [u_lhs_max, self.bs_over_bm_max, self.beam_amp_max], dtype=float
-        )
-        if upper_bounds[2] <= lower_bounds[2]:
-            upper_bounds[2] = lower_bounds[2] + 1e-12
-
-        sampler = LatinHypercube(
-            d=len(lower_bounds), scramble=False, seed=self.config.LOSS_CONE_LHS_SEED
-        )
-        lhs = sampler.random(n=n_samples)
-        scaled = scale(lhs, lower_bounds, upper_bounds)
-        if self.beam_amp_max <= self.beam_amp_min:
-            scaled[:, 2] = self.beam_amp_min
-        return scaled
 
     def fit_chunk_lhs(
         self,

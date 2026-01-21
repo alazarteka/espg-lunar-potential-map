@@ -41,6 +41,7 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
   - `engineering/` - GlobalStats, SiteStats, site analysis
   - `diagnostics/` - Loss cone session management
   - `physics/`, `utils/`, `visualization/` - Supporting modules
+  - `utils/losscone_lhs.py` - Shared loss-cone LHS sampling helper
 - `scripts/`: CLI tools
   - `diagnostics/` - Beam detection and loss cone tools
   - `analysis/` - Plotting and exploration
