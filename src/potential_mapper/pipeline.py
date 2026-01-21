@@ -685,9 +685,6 @@ def process_merged_data(
         fit_method = config.LOSS_CONE_FIT_METHOD
     if fit_method not in {"halekas", "lillis"}:
         raise ValueError(f"Unknown fit_method: {fit_method}")
-    if use_torch and fit_method != "halekas":
-        logging.warning("Lillis fit_method is CPU-only; disabling --fast.")
-        use_torch = False
 
     # Load attitude
     et_spin, ra_vals, dec_vals = load_attitude_data(
@@ -850,6 +847,7 @@ def process_merged_data(
             pitch_angle=pitch_angle,
             spacecraft_potential=sc_potential,
             device=None,  # Auto-detect: CUDA if available, else CPU
+            fit_method=fit_method,
         )
         # Use batched GPU processing (auto-detects dtype and batch_size)
         fit_mat = fitter.fit_surface_potential_batched()
@@ -945,7 +943,9 @@ def process_merged_data(
     return results
 
 
-def process_lp_file(file_path: Path, *, fit_method: str | None = None) -> PotentialResults:
+def process_lp_file(
+    file_path: Path, *, fit_method: str | None = None
+) -> PotentialResults:
     """
     Process a single ER file into PotentialResults (sequential fitting).
 

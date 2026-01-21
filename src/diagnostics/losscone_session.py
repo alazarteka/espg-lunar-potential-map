@@ -15,7 +15,7 @@ from src.flux import (
     compute_halekas_chi2,
     compute_lillis_chi2,
 )
-from src.model import synth_losscone, synth_losscone_batch
+from src.model import synth_losscone
 
 try:  # Optional GPU path
     import torch
@@ -145,7 +145,7 @@ class LossConeSession:
         self._lillis_mask_cache: dict[int, np.ndarray] = {}
         self._spec_to_chunk = self._build_spec_map()
 
-        self.use_torch = bool(use_torch and HAS_TORCH and self.fit_method == "halekas")
+        self.use_torch = bool(use_torch and HAS_TORCH)
         self._torch_device = None
         self._torch_dtype = None
         if self.use_torch and torch is not None:
@@ -244,6 +244,7 @@ class LossConeSession:
                     incident_flux_stat=self.incident_flux_stat,
                     loss_cone_background=self.background,
                     device=str(self._torch_device) if self._torch_device else None,
+                    fit_method=self.fit_method,
                 )
                 return
             except Exception:
@@ -407,7 +408,9 @@ class LossConeSession:
                 model_mask=model_mask,
             )
 
-        return compute_halekas_chi2(norm2d, model, model_mask=model_mask, eps=config.EPS)
+        return compute_halekas_chi2(
+            norm2d, model, model_mask=model_mask, eps=config.EPS
+        )
 
     def fit_chunk_lhs(
         self,
