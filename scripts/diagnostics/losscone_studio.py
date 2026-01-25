@@ -343,7 +343,7 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
             chunk_slider.value = target
             chunk_input.value = target
 
-    def update_beam_filter() -> None:
+    def update_beam_filter(*_events) -> None:
         nonlocal beam_chunks
         session.set_normalization(normalization.value, incident_stat.value)
         beam_chunks = _find_beam_chunks(session)
