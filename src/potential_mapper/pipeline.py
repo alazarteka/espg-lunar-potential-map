@@ -535,12 +535,9 @@ def _apply_fit_results(
         beam_amp[row_start:row_end] = float(amp)
         fit_chi2[row_start:row_end] = float(chi2)
 
-        # Only store U_surface if fit quality is acceptable
-        if (
-            np.isfinite(U_surface)
-            and np.isfinite(chi2)
-            and chi2 <= config.FIT_ERROR_THRESHOLD
-        ):
+        # Store U_surface whenever the fit returned a finite value.
+        # Use fit_chi2 for downstream quality filtering.
+        if np.isfinite(U_surface):
             proj_potential[row_start:row_end] = float(U_surface)
 
 

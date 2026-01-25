@@ -324,8 +324,8 @@ class TestApplyFitResults:
         # Second SWEEP_ROWS should still be NaN (no result for chunk 1)
         assert np.all(np.isnan(proj_potential[config.SWEEP_ROWS :]))
 
-    def test_skips_high_chi2_results(self):
-        """Results with chi2 > threshold are skipped for U_surface but params stored."""
+    def test_writes_high_chi2_results(self):
+        """Results with chi2 > threshold still write U_surface; chi2 is QC only."""
         n = config.SWEEP_ROWS
         proj_potential = np.full(n, np.nan)
         bs_over_bm = np.full(n, np.nan)
@@ -348,9 +348,9 @@ class TestApplyFitResults:
             n_total=n,
         )
 
-        # U_surface should remain NaN because chi2 exceeds threshold
-        assert np.all(np.isnan(proj_potential))
-        # But fit params should still be stored
+        # U_surface should be stored even if chi2 exceeds threshold
+        assert np.allclose(proj_potential, -10.0)
+        # Fit params should still be stored
         assert np.allclose(bs_over_bm, 0.5)
         assert np.allclose(fit_chi2, config.FIT_ERROR_THRESHOLD * 2)
 

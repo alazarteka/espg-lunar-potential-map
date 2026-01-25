@@ -49,6 +49,7 @@ Output filename is auto-generated based on date filters:
 - `rows_spacecraft_latitude`, `rows_spacecraft_longitude`
 - `rows_projection_latitude`, `rows_projection_longitude`
 - `rows_spacecraft_potential`, `rows_projected_potential`
+- `rows_bs_over_bm`, `rows_beam_amp`, `rows_fit_chi2`
 - `rows_spacecraft_in_sun`, `rows_projection_in_sun`
 
 **Spectrum-level arrays** (aggregated per spectrum):
@@ -91,8 +92,9 @@ latitudes = data["rows_projection_latitude"]
 longitudes = data["rows_projection_longitude"]
 potentials = data["rows_projected_potential"]
 
-# Filter to valid fits
-valid = np.isfinite(potentials)
+# Filter to higher-quality fits (example threshold)
+chi2 = data["rows_fit_chi2"]
+valid = np.isfinite(potentials) & np.isfinite(chi2) & (chi2 <= 6.57e5)
 print(f"Valid fits: {valid.sum()} / {len(valid)}")
 ```
 
