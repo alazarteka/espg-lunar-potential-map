@@ -283,7 +283,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--parallel",
         action="store_true",
-        help="Enable parallel fitting (experimental, may cause hangs)",
+        help=(
+            "Enable legacy CPU parallel fitting (deprecated; falls back to sequential)."
+        ),
     )
     parser.add_argument(
         "--fast",

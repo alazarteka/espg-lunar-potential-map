@@ -671,7 +671,7 @@ def process_merged_data(
     Args:
         er_data: Merged ERData object
         use_parallel: Enable multiprocessing for SC and surface potential
-            (default: False)
+            (default: False; deprecated for CPU path)
         use_torch: Use PyTorch-accelerated fitter (~5x faster, default: False)
         fit_method: Loss-cone fitting method ("halekas" or "lillis")
 
@@ -679,6 +679,13 @@ def process_merged_data(
         PotentialResults with all computed fields
     """
     logging.info("Processing merged dataset...")
+
+    if use_parallel and not use_torch:
+        logging.warning(
+            "CPU parallel fitting is deprecated; falling back to sequential. "
+            "Use --fast for torch acceleration."
+        )
+        use_parallel = False
 
     fit_method = parse_fit_method(fit_method)
 

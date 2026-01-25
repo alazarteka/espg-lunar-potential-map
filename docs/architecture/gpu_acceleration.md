@@ -44,14 +44,14 @@ Memory use grows with:
 - population size in Differential Evolution
 - energy bins × pitch bins per spectrum
 
-If you hit OOM, reduce scope (month → day), disable `--parallel`, or rerun
-without `--fast` for a smaller slice.
+If you hit OOM, reduce scope (month → day) or rerun without `--fast` for a
+smaller slice.
 
 ## Parallel vs Fast
 
-- `--parallel` uses multiprocessing (CPU) across spectra
+- `--parallel` is deprecated (legacy CPU multiprocessing)
 - `--fast` uses PyTorch (GPU if available, CPU if not)
-- They can be combined, but GPU is usually the bigger win for throughput
+- Use `--fast` for performance; CPU parallelism now falls back to sequential
 
 ## Performance Notes
 
