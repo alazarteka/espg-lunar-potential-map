@@ -15,6 +15,7 @@ from src.flux import (
     compute_halekas_chi2,
     compute_lillis_chi2,
 )
+from src.losscone.types import FitMethod, parse_fit_method
 from src.model import synth_losscone
 
 try:  # Optional GPU path
@@ -104,7 +105,7 @@ class LossConeSession:
         use_torch: bool = False,
         torch_device: str | None = None,
         use_polarity: bool = True,
-        fit_method: str | None = None,
+        fit_method: str | FitMethod | None = None,
     ) -> None:
         self.er_file = Path(er_file)
         self.theta_file = (
@@ -119,11 +120,7 @@ class LossConeSession:
             if loss_cone_background is not None
             else float(config.LOSS_CONE_BACKGROUND)
         )
-        self.fit_method = (
-            fit_method if fit_method is not None else config.LOSS_CONE_FIT_METHOD
-        )
-        if self.fit_method not in {"halekas", "lillis"}:
-            raise ValueError(f"Unknown fit_method: {self.fit_method}")
+        self.fit_method = parse_fit_method(fit_method)
 
         if not self.er_file.exists():
             raise FileNotFoundError(f"ER file not found: {self.er_file}")
@@ -397,7 +394,7 @@ class LossConeSession:
         raw_flux: np.ndarray | None = None,
         raw_pitches: np.ndarray | None = None,
     ) -> float:
-        if self.fit_method == "lillis":
+        if self.fit_method == FitMethod.LILLIS:
             if raw_flux is None or raw_pitches is None:
                 return float("nan")
             return compute_lillis_chi2(

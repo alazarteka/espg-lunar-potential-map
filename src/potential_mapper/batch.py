@@ -20,11 +20,13 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 import src.config as config
+from src.losscone.types import parse_fit_method
 from src.potential_mapper.logging_utils import setup_logging
 from src.potential_mapper.pipeline import DataLoader, load_all_data, process_merged_data
 from src.potential_mapper.spice import load_spice_files
 
 if TYPE_CHECKING:
+    from src.losscone.types import FitMethod
     from src.potential_mapper.results import PotentialResults
 
 
@@ -167,7 +169,7 @@ def run_batch(
     use_parallel: bool = True,
     overwrite: bool = False,
     use_torch: bool = False,
-    fit_method: str | None = None,
+    fit_method: str | FitMethod | None = None,
 ) -> int:
     """
     Run batch processing with merged data loading.
@@ -225,11 +227,14 @@ def run_batch(
         logging.info(
             f"Processing merged data (parallel={use_parallel}, torch={use_torch})..."
         )
+        fit_method_parsed = (
+            parse_fit_method(fit_method) if fit_method is not None else None
+        )
         results = process_merged_data(
             er_data,
             use_parallel=use_parallel,
             use_torch=use_torch,
-            fit_method=fit_method,
+            fit_method=fit_method_parsed,
         )
     except Exception as e:
         logging.exception(f"Failed to process merged data: {e}")

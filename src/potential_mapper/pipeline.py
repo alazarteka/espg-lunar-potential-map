@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 import src.config as config
 from src.flux import ERData, LossConeFitter, PitchAngle
+from src.losscone.types import FitMethod, parse_fit_method
 
 try:
     from src.model_torch import HAS_TORCH, LossConeFitterTorch
@@ -95,7 +96,7 @@ def spacecraft_potential_worker(
 
 
 def fit_worker(
-    args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None, str]
+    args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None, FitMethod | str],
 ) -> np.ndarray:
     """
     Worker function for parallel fitting.
@@ -107,6 +108,7 @@ def fit_worker(
         Fitting results array from LossConeFitter.
     """
     chunk_df, sc_pot, polarity, fit_method = args
+    fit_method = parse_fit_method(fit_method)
 
     # Create ERData from the chunk.
     # Note: This might re-trigger cleaning/counting if not handled in ERData,
@@ -658,7 +660,7 @@ def process_merged_data(
     *,
     use_parallel: bool = False,
     use_torch: bool = False,
-    fit_method: str | None = None,
+    fit_method: str | FitMethod | None = None,
 ) -> PotentialResults:
     """
     Process the merged ER dataset.
@@ -681,10 +683,7 @@ def process_merged_data(
     """
     logging.info("Processing merged dataset...")
 
-    if fit_method is None:
-        fit_method = config.LOSS_CONE_FIT_METHOD
-    if fit_method not in {"halekas", "lillis"}:
-        raise ValueError(f"Unknown fit_method: {fit_method}")
+    fit_method = parse_fit_method(fit_method)
 
     # Load attitude
     et_spin, ra_vals, dec_vals = load_attitude_data(
@@ -881,7 +880,7 @@ def process_merged_data(
     else:
         logging.info("Starting parallel surface potential fitting...")
 
-        chunks: list[tuple[pd.DataFrame, np.ndarray, np.ndarray | None, str]] = []
+        chunks: list[tuple[pd.DataFrame, np.ndarray, np.ndarray | None, FitMethod]] = []
         for i in range(0, n, rows_per_chunk):
             end = min(i + rows_per_chunk, n)
             chunk_df = er_data.data.iloc[i:end].copy()
@@ -944,7 +943,7 @@ def process_merged_data(
 
 
 def process_lp_file(
-    file_path: Path, *, fit_method: str | None = None
+    file_path: Path, *, fit_method: str | FitMethod | None = None
 ) -> PotentialResults:
     """
     Process a single ER file into PotentialResults (sequential fitting).

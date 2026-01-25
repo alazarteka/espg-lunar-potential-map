@@ -1,104 +1,38 @@
 import logging
-from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 from src import config
+from src.losscone.chi2 import compute_halekas_chi2, compute_lillis_chi2
+from src.losscone.masks import build_lillis_mask
+from src.losscone.types import (
+    FitChunkData,
+    FitMethod,
+    NormalizationMode,
+    parse_fit_method,
+    parse_normalization_mode,
+)
 from src.model import synth_losscone, synth_losscone_batch
 from src.utils.losscone_lhs import generate_losscone_lhs
 from src.utils.thetas import get_thetas
 from src.utils.units import ureg
 
+__all__ = [
+    "ERData",
+    "FitChunkData",
+    "FitMethod",
+    "FluxData",
+    "LossConeFitter",
+    "NormalizationMode",
+    "PitchAngle",
+    "build_lillis_mask",
+    "compute_halekas_chi2",
+    "compute_lillis_chi2",
+]
+
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class FitChunkData:
-    norm2d: np.ndarray
-    energies: np.ndarray
-    pitches: np.ndarray
-    raw_flux: np.ndarray
-    spacecraft_slice: float | np.ndarray
-    valid_energy_mask: np.ndarray
-
-
-def build_lillis_mask(
-    raw_flux: np.ndarray, pitches: np.ndarray | None = None
-) -> np.ndarray:
-    """
-    Build Lillis-style mask based on relative flux thresholds.
-
-    The mask uses raw (unnormalized) flux with per-energy maxima (incident-only
-    when pitches are provided) to exclude low/zero bins and bins near the max,
-    reducing bias from saturation or background.
-    """
-    raw_flux = np.asarray(raw_flux)
-    if raw_flux.size == 0:
-        return np.zeros_like(raw_flux, dtype=bool)
-
-    original_ndim = raw_flux.ndim
-    if original_ndim == 1:
-        raw_flux = raw_flux[None, :]
-
-    if pitches is not None:
-        pitches = np.asarray(pitches)
-        if pitches.shape != raw_flux.shape:
-            raise ValueError("pitches must match raw_flux shape for Lillis mask")
-        incident = pitches < 90.0
-        flux_for_max = np.where(incident, raw_flux, np.nan)
-    else:
-        flux_for_max = raw_flux
-
-    row_max = np.nanmax(flux_for_max, axis=1, keepdims=True)
-    row_max = np.where((row_max > 0) & np.isfinite(row_max), row_max, np.nan)
-    relative = raw_flux / row_max
-    mask = (
-        np.isfinite(raw_flux)
-        & (raw_flux > 0)
-        & (relative > config.LILLIS_RELATIVE_FLUX_MIN)
-        & (relative < config.LILLIS_RELATIVE_FLUX_MAX)
-    )
-    return mask if original_ndim > 1 else mask[0]
-
-
-def compute_halekas_chi2(
-    norm2d: np.ndarray,
-    model: np.ndarray,
-    model_mask: np.ndarray | None = None,
-    eps: float | None = None,
-) -> float:
-    if eps is None:
-        eps = config.EPS if hasattr(config, "EPS") else 1e-6
-    data_mask = np.isfinite(norm2d) & (norm2d > 0)
-    combined_mask = data_mask & model_mask if model_mask is not None else data_mask
-    if not combined_mask.any():
-        return float("nan")
-    log_data = np.zeros_like(norm2d, dtype=float)
-    log_data[combined_mask] = np.log(norm2d[combined_mask] + eps)
-    log_model = np.log(model + eps)
-    diff = (log_data - log_model) * combined_mask
-    chi2 = np.sum(diff * diff)
-    return float(chi2)
-
-
-def compute_lillis_chi2(
-    norm2d: np.ndarray,
-    model: np.ndarray,
-    raw_flux: np.ndarray,
-    pitches: np.ndarray,
-    model_mask: np.ndarray | None = None,
-) -> float:
-    data_mask = build_lillis_mask(raw_flux, pitches)
-    combined_mask = data_mask & model_mask if model_mask is not None else data_mask
-    n_valid = int(np.count_nonzero(combined_mask))
-    if n_valid < config.LILLIS_MIN_VALID_BINS:
-        return float("nan")
-    diff = (norm2d - model) * combined_mask
-    chi2 = np.sum(diff * diff)
-    dof = max(n_valid - 3, 1)
-    return float(chi2) / float(dof)
 
 
 class ERData:
@@ -406,8 +340,8 @@ class LossConeFitter:
         er_data: ERData,
         pitch_angle: PitchAngle | None = None,
         spacecraft_potential: np.ndarray | None = None,
-        normalization_mode: str = "ratio",
-        fit_method: str | None = None,
+        normalization_mode: str | NormalizationMode = "ratio",
+        fit_method: str | FitMethod | None = None,
         beam_amp_fixed: float | None = None,
         incident_flux_stat: str = "mean",
         loss_cone_background: float | None = None,
@@ -454,9 +388,7 @@ class LossConeFitter:
             self.beam_amp_max = beam_amp_fixed
         self.beam_pitch_sigma_deg = config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG
 
-        if normalization_mode not in {"global", "ratio", "ratio2", "ratio_rescaled"}:
-            raise ValueError(f"Unknown normalization_mode: {normalization_mode}")
-        self.normalization_mode = normalization_mode
+        self.normalization_mode = parse_normalization_mode(normalization_mode)
         if incident_flux_stat not in {"mean", "max"}:
             raise ValueError(f"Unknown incident_flux_stat: {incident_flux_stat}")
         self.incident_flux_stat = incident_flux_stat
@@ -466,11 +398,7 @@ class LossConeFitter:
             raise ValueError("loss_cone_background must be positive")
         self.background = float(loss_cone_background)
 
-        if fit_method is None:
-            fit_method = config.LOSS_CONE_FIT_METHOD
-        if fit_method not in {"halekas", "lillis"}:
-            raise ValueError(f"Unknown fit_method: {fit_method}")
-        self.fit_method = fit_method
+        self.fit_method = parse_fit_method(fit_method)
 
         self.lhs = self._generate_latin_hypercube()
 
@@ -563,7 +491,7 @@ class LossConeFitter:
             "Data not loaded. Please load the data first."
         )
 
-        if self.normalization_mode == "ratio":
+        if self.normalization_mode == NormalizationMode.RATIO:
             # Per-energy normalization: divide each energy by its own incident flux
             norm2d = np.vstack(
                 [
@@ -571,7 +499,7 @@ class LossConeFitter:
                     for energy_bin in range(config.SWEEP_ROWS)
                 ]
             )
-        elif self.normalization_mode == "ratio2":
+        elif self.normalization_mode == NormalizationMode.RATIO2:
             # Pairwise normalization: mirror incident/reflected angles around 90°
             # Each reflected angle normalized by its closest mirrored incident angle
             s = measurement_chunk * config.SWEEP_ROWS
@@ -625,7 +553,7 @@ class LossConeFitter:
                 mid = int(np.argmin(np.abs(pitch_row - 90.0)))
                 norm2d[row, mid] = 1.0
 
-        elif self.normalization_mode == "ratio_rescaled":
+        elif self.normalization_mode == NormalizationMode.RATIO_RESCALED:
             # Two-step hybrid: per-energy ratio, then global rescale to [0, 1]
             # Step 1: Per-energy normalization (same as "ratio")
             norm2d = np.vstack(
@@ -770,7 +698,7 @@ class LossConeFitter:
         # Get valid chunk data
         valid_chunk_idx = np.where(valid_chunks)[0]
 
-        if self.normalization_mode == "ratio":
+        if self.normalization_mode == NormalizationMode.RATIO:
             # Fully vectorized per-energy normalization
             for i in valid_chunk_idx:
                 chunk_idx = chunk_indices[i]
@@ -810,7 +738,7 @@ class LossConeFitter:
                 # Normalize: flux / norm_factor (broadcast over columns)
                 result[i, :actual_rows, :] = flux_chunk / norm_factors[:, np.newaxis]
 
-        elif self.normalization_mode == "global":
+        elif self.normalization_mode == NormalizationMode.GLOBAL:
             # Vectorized global normalization
             for i in valid_chunk_idx:
                 chunk_idx = chunk_indices[i]
@@ -834,7 +762,7 @@ class LossConeFitter:
                 global_norm = np.max(incident_vals)
                 result[i, :actual_rows, :] = flux_chunk / max(global_norm, config.EPS)
 
-        elif self.normalization_mode == "ratio_rescaled":
+        elif self.normalization_mode == NormalizationMode.RATIO_RESCALED:
             # Per-energy ratio then global rescale
             for i in valid_chunk_idx:
                 chunk_idx = chunk_indices[i]
@@ -896,7 +824,7 @@ class LossConeFitter:
                 - beam_amp: best-fit Gaussian beam amplitude
                 - chi2: final chi2 value
         """
-        if self.fit_method == "lillis":
+        if self.fit_method == FitMethod.LILLIS:
             return self._fit_surface_potential_lillis(measurement_chunk)
 
         data = self._prepare_chunk_data(measurement_chunk)
@@ -1042,7 +970,7 @@ class LossConeFitter:
             float(u_spacecraft) if u_spacecraft is not None else data.spacecraft_slice
         )
 
-        if self.fit_method == "lillis":
+        if self.fit_method == FitMethod.LILLIS:
             data_mask = build_lillis_mask(data.raw_flux, pitches)
             if int(np.count_nonzero(data_mask)) < config.LILLIS_MIN_VALID_BINS:
                 return np.nan, np.nan, np.nan, np.nan
@@ -1081,7 +1009,7 @@ class LossConeFitter:
         )
         combined_mask = data_mask_3d & model_masks
 
-        if self.fit_method == "lillis":
+        if self.fit_method == FitMethod.LILLIS:
             diff = (norm2d[None, :, :] - models) * combined_mask
             chi2 = np.sum(diff * diff, axis=(1, 2))
             dof = max(int(np.count_nonzero(combined_mask[0])) - 3, 1)
