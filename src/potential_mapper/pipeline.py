@@ -803,7 +803,8 @@ def process_merged_data(
             # PyTorch-accelerated Kappa fitting (~78x faster)
             if not HAS_KAPPA_TORCH or KappaFitterTorch is None:
                 logging.warning(
-                    "PyTorch not available for Kappa fitting; falling back to sequential"
+                    "PyTorch not available for Kappa fitting; "
+                    "falling back to sequential"
                 )
                 sc_potential = _spacecraft_potential_per_row(er_data, n)
             else:
