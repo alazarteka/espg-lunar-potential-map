@@ -110,14 +110,22 @@ def _write_npz_atomic(out_path: Path, payload: dict[str, np.ndarray]) -> None:
 
 
 def _process_file(
-    file_path: Path, output_root: Path, overwrite: bool
+    file_path: Path,
+    output_root: Path,
+    overwrite: bool,
+    fit_method: str | None,
+    u_spacecraft: float | None,
 ) -> tuple[str, str]:
     _ensure_spice_loaded()
     out_path = _relative_output_path(file_path, output_root)
     if out_path.exists() and not overwrite:
         return (str(file_path), "skipped")
 
-    results = process_lp_file(file_path)
+    results = process_lp_file(
+        file_path,
+        fit_method=fit_method,
+        spacecraft_potential_override=u_spacecraft,
+    )
     er_data = ERData(str(file_path))
     payload = _prepare_payload(er_data, results)
     _write_npz_atomic(out_path, payload)
@@ -153,6 +161,18 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Process at most this many files (debugging aid)",
     )
+    parser.add_argument(
+        "--losscone-fit-method",
+        choices=["halekas", "lillis"],
+        default=None,
+        help="Loss-cone fitting method (defaults to config)",
+    )
+    parser.add_argument(
+        "--u-spacecraft",
+        type=float,
+        default=None,
+        help="Override spacecraft potential [V] (constant for all rows)",
+    )
     return parser.parse_args()
 
 
@@ -185,7 +205,12 @@ def main() -> int:
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
         futures = {
             executor.submit(
-                _process_file, file_path, output_root, args.overwrite
+                _process_file,
+                file_path,
+                output_root,
+                args.overwrite,
+                args.losscone_fit_method,
+                args.u_spacecraft,
             ): file_path
             for file_path in flux_files
         }

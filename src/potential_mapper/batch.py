@@ -170,6 +170,7 @@ def run_batch(
     overwrite: bool = False,
     use_torch: bool = False,
     fit_method: str | FitMethod | None = None,
+    spacecraft_potential_override: float | None = None,
 ) -> int:
     """
     Run batch processing with merged data loading.
@@ -183,6 +184,7 @@ def run_batch(
         overwrite: Whether to overwrite existing output file
         use_torch: Use PyTorch-accelerated fitter (~5x faster)
         fit_method: Loss-cone fit method ("halekas" or "lillis")
+        spacecraft_potential_override: Optional constant spacecraft potential [V]
 
     Returns:
         Exit code (0 for success, 1 for failure)
@@ -235,6 +237,7 @@ def run_batch(
             use_parallel=use_parallel,
             use_torch=use_torch,
             fit_method=fit_method_parsed,
+            spacecraft_potential_override=spacecraft_potential_override,
         )
     except Exception as e:
         logging.exception(f"Failed to process merged data: {e}")
@@ -301,6 +304,15 @@ def _parse_args() -> argparse.Namespace:
         help="Loss-cone fitting method (defaults to config)",
     )
     parser.add_argument(
+        "--u-spacecraft",
+        type=float,
+        default=None,
+        help=(
+            "Override spacecraft potential [V] (constant for all rows; skips "
+            "spacecraft potential estimation)"
+        ),
+    )
+    parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing output file"
     )
     parser.add_argument(
@@ -325,6 +337,7 @@ def main() -> int:
         overwrite=args.overwrite,
         use_torch=args.fast,
         fit_method=args.losscone_fit_method,
+        spacecraft_potential_override=args.u_spacecraft,
     )
 
 

@@ -23,6 +23,8 @@ uv run pytest -q                        # Run tests
 uv run ruff check src tests             # Lint
 uv run python -m src.data_acquisition   # Download data
 uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4  # GPU batch
+uv run python -m src.potential_mapper.batch --fast --year 1999 --month 4 --day 29 \
+  --losscone-fit-method lillis --u-spacecraft 0  # Lillis + U_sc override
 ```
 
 Loss-cone fitting supports both Halekas (log-chi2) and Lillis (masked linear chi2).

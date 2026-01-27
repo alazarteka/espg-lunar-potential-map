@@ -19,6 +19,7 @@ uv run python -m src.potential_mapper.batch [OPTIONS]
 | `--parallel` | flag | False | Legacy CPU parallel fitting (deprecated; falls back to sequential) |
 | `--fast` | flag | False | Use PyTorch-accelerated fitter (GPU/CPU) |
 | `--losscone-fit-method` | str | None | Loss-cone fitter (`halekas` or `lillis`, defaults to config) |
+| `--u-spacecraft` | float | None | Override spacecraft potential [V] (constant for all rows; skips estimation) |
 | `--overwrite` | flag | False | Overwrite existing output file |
 | `-v`, `--verbose` | flag | False | Enable DEBUG-level logging |
 
@@ -75,6 +76,10 @@ uv run python -m src.potential_mapper.batch --year 1998 --month 1 -v
 
 # Use Lillis masked linear chi2 fitting
 uv run python -m src.potential_mapper.batch --year 1998 --losscone-fit-method lillis
+
+# Force spacecraft potential to 0 V for a single day
+uv run python -m src.potential_mapper.batch --year 1999 --month 4 --day 29 \
+  --losscone-fit-method lillis --u-spacecraft 0
 ```
 
 ## Loading Results
