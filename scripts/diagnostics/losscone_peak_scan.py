@@ -3,7 +3,7 @@
 Scan loss-cone normalized flux for mid-energy peaks at high pitch angles.
 
 This script loads a single ER file, applies loss-cone normalization, and
-checks each sweep for a peak in the high-pitch band (default 150–180°).
+checks each sweep for a peak in the high-pitch band (default 150-180°).
 It reports the fraction of total sweeps and polarity-valid sweeps that
 show a peak.
 
@@ -21,6 +21,17 @@ import numpy as np
 
 from src import config
 from src.diagnostics import LossConeSession, _build_energy_profile, detect_peak
+from src.diagnostics.beam_detection import (
+    DEFAULT_ENERGY_MAX,
+    DEFAULT_ENERGY_MIN,
+    DEFAULT_HIGH_ENERGY_FACTOR,
+    DEFAULT_HIGH_ENERGY_FLOOR,
+    DEFAULT_HIGH_ENERGY_MIN_POINTS,
+    DEFAULT_HIGH_ENERGY_RATIO_MAX,
+    DEFAULT_CONTIGUITY_MIN_BINS,
+    DEFAULT_PEAK_HALF_FRACTION,
+    DEFAULT_PEAK_WIDTH_MAX,
+)
 from src.flux import ERData
 
 
@@ -54,6 +65,81 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=5,
         help="Minimum points in pitch band per energy row",
+    )
+    parser.add_argument(
+        "--energy-min",
+        type=float,
+        default=DEFAULT_ENERGY_MIN,
+        help="Minimum energy to include in beam detection (eV)",
+    )
+    parser.add_argument(
+        "--energy-max",
+        type=float,
+        default=DEFAULT_ENERGY_MAX,
+        help="Maximum energy to include in beam detection (eV)",
+    )
+    parser.add_argument(
+        "--no-high-energy-check",
+        action="store_true",
+        help="Disable high-energy deficit check",
+    )
+    parser.add_argument(
+        "--high-energy-floor",
+        type=float,
+        default=DEFAULT_HIGH_ENERGY_FLOOR,
+        help="Minimum high-energy threshold for deficit check (eV)",
+    )
+    parser.add_argument(
+        "--high-energy-factor",
+        type=float,
+        default=DEFAULT_HIGH_ENERGY_FACTOR,
+        help="Scale factor applied to peak energy for deficit check",
+    )
+    parser.add_argument(
+        "--high-energy-ratio-max",
+        type=float,
+        default=DEFAULT_HIGH_ENERGY_RATIO_MAX,
+        help="Max allowed high-energy mean relative to peak",
+    )
+    parser.add_argument(
+        "--high-energy-min-points",
+        type=int,
+        default=DEFAULT_HIGH_ENERGY_MIN_POINTS,
+        help="Minimum high-energy points required for deficit check",
+    )
+    parser.add_argument(
+        "--no-peak-width-check",
+        action="store_true",
+        help="Disable peak width check",
+    )
+    parser.add_argument(
+        "--peak-half-fraction",
+        type=float,
+        default=DEFAULT_PEAK_HALF_FRACTION,
+        help="Fraction of peak used for width measurement",
+    )
+    parser.add_argument(
+        "--peak-width-max",
+        type=int,
+        default=DEFAULT_PEAK_WIDTH_MAX,
+        help="Maximum allowed contiguous bins above half-peak",
+    )
+    parser.add_argument(
+        "--no-contiguity-check",
+        action="store_true",
+        help="Disable pitch contiguity check",
+    )
+    parser.add_argument(
+        "--contiguity-min-bins",
+        type=int,
+        default=DEFAULT_CONTIGUITY_MIN_BINS,
+        help="Minimum contiguous pitch bins above threshold",
+    )
+    parser.add_argument(
+        "--contiguity-min-value",
+        type=float,
+        default=DEFAULT_MIN_NEIGHBOR,
+        help="Minimum normalized value for contiguity check",
     )
     parser.add_argument(
         "--peak-contrast",
@@ -145,14 +231,31 @@ def main() -> int:
             pitch_min=args.pitch_min,
             pitch_max=args.pitch_max,
             min_band_points=args.min_band_points,
+            energy_min=args.energy_min,
+            energy_max=args.energy_max,
         )
         result = detect_peak(
             profile,
+            energies=energies_sorted,
+            norm2d=norm2d,
+            pitches=chunk.pitches,
             contrast=args.peak_contrast,
             min_peak=args.min_peak,
             neighbor_window=args.neighbor_window,
             edge_skip=args.edge_skip,
             min_neighbor=args.min_neighbor,
+            check_high_energy=not args.no_high_energy_check,
+            high_energy_floor=args.high_energy_floor,
+            high_energy_factor=args.high_energy_factor,
+            high_energy_ratio_max=args.high_energy_ratio_max,
+            high_energy_min_points=args.high_energy_min_points,
+            check_peak_width=not args.no_peak_width_check,
+            peak_half_fraction=args.peak_half_fraction,
+            peak_width_max=args.peak_width_max,
+            check_pitch_contiguity=not args.no_contiguity_check,
+            contiguity_pitch_min=args.pitch_min,
+            contiguity_min_value=args.contiguity_min_value,
+            contiguity_min_bins=args.contiguity_min_bins,
         )
         if result.has_peak and result.peak_idx is not None and result.peak_value is not None:
             beam_energy = float(energies_sorted[result.peak_idx])
@@ -171,7 +274,14 @@ def main() -> int:
     print("Loss Cone Peak Scan Summary")
     print("-" * 60)
     print(f"File: {args.er_file}")
-    print(f"Pitch band: {args.pitch_min:.1f}–{args.pitch_max:.1f} deg")
+    print(f"Pitch band: {args.pitch_min:.1f}-{args.pitch_max:.1f} deg")
+    print(f"Energy window: {args.energy_min:.1f}-{args.energy_max:.1f} eV")
+    print(
+        "Heuristics: "
+        f"high_energy={'off' if args.no_high_energy_check else 'on'}, "
+        f"peak_width={'off' if args.no_peak_width_check else 'on'}, "
+        f"contiguity={'off' if args.no_contiguity_check else 'on'}"
+    )
     print(f"Normalization: {args.normalization} (incident={args.incident_stat})")
     print(f"Thresholds: min_peak={args.min_peak}, min_neighbor={args.min_neighbor}")
     print(f"Total spec_nos (cleaned): {total_count}")
@@ -188,8 +298,13 @@ def main() -> int:
         print("Beam Energy Summary (ΔU estimates):")
         print(f"  Mean:   {np.mean(beam_energies):.1f} eV")
         print(f"  Median: {np.median(beam_energies):.1f} eV")
-        print(f"  Range:  {np.min(beam_energies):.1f} – {np.max(beam_energies):.1f} eV")
-        print(f"  Peak amplitude range: {np.min(peak_amplitudes):.2f} – {np.max(peak_amplitudes):.2f}")
+        print(
+            f"  Range:  {np.min(beam_energies):.1f} - {np.max(beam_energies):.1f} eV"
+        )
+        print(
+            "  Peak amplitude range: "
+            f"{np.min(peak_amplitudes):.2f} - {np.max(peak_amplitudes):.2f}"
+        )
 
     if args.list_peaks is not None:
         if args.list_peaks == 0 or len(peak_data) <= args.list_peaks:
