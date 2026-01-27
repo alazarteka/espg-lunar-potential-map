@@ -1,6 +1,6 @@
 # Potential Mapper (Batch Mode)
 
-High-performance batch processing for lunar surface potential mapping with parallel fitting.
+High-performance batch processing for lunar surface potential mapping.
 
 ## Usage
 
@@ -16,8 +16,10 @@ uv run python -m src.potential_mapper.batch [OPTIONS]
 | `--year` | int | None | Filter to specific year |
 | `--month` | int | None | Filter to specific month (1-12) |
 | `--day` | int | None | Filter to specific day (1-31) |
-| `--parallel` | flag | False | Enable parallel fitting (experimental) |
+| `--parallel` | flag | False | Legacy CPU parallel fitting (deprecated; falls back to sequential) |
 | `--fast` | flag | False | Use PyTorch-accelerated fitter (GPU/CPU) |
+| `--losscone-fit-method` | str | None | Loss-cone fitter (`halekas` or `lillis`, defaults to config) |
+| `--u-spacecraft` | float | None | Override spacecraft potential [V] (constant for all rows; skips estimation) |
 | `--overwrite` | flag | False | Overwrite existing output file |
 | `-v`, `--verbose` | flag | False | Enable DEBUG-level logging |
 
@@ -25,10 +27,10 @@ uv run python -m src.potential_mapper.batch [OPTIONS]
 
 | Aspect | `potential_mapper` | `potential_mapper.batch` |
 |--------|-------------------|-------------------------|
-| Fitting | Sequential per-file | Merged dataset; optional parallel/GPU |
+| Fitting | Sequential per-file | Merged dataset; GPU via `--fast` |
 | Data loading | Per-file | Merged into single dataset |
 | Output | In-memory | Compressed NPZ cache |
-| Speed | Slower | Faster with `--parallel` or `--fast` |
+| Speed | Slower | Faster with `--fast` |
 | Use case | Interactive/debugging | Large-scale processing |
 
 ## Output Files
@@ -48,6 +50,7 @@ Output filename is auto-generated based on date filters:
 - `rows_spacecraft_latitude`, `rows_spacecraft_longitude`
 - `rows_projection_latitude`, `rows_projection_longitude`
 - `rows_spacecraft_potential`, `rows_projected_potential`
+- `rows_bs_over_bm`, `rows_beam_amp`, `rows_fit_chi2`
 - `rows_spacecraft_in_sun`, `rows_projection_in_sun`
 
 **Spectrum-level arrays** (aggregated per spectrum):
@@ -59,20 +62,24 @@ Output filename is auto-generated based on date filters:
 ## Examples
 
 ```bash
-# Process an entire year with parallel fitting
-uv run python -m src.potential_mapper.batch --year 1998
-
 # Process a month, overwriting existing cache
 uv run python -m src.potential_mapper.batch --year 1998 --month 6 --overwrite
 
-# Sequential mode (for debugging or memory-constrained systems)
-uv run python -m src.potential_mapper.batch --year 1998 --month 1 --no-parallel
+# Sequential mode (default)
+uv run python -m src.potential_mapper.batch --year 1998 --month 1
 
 # Custom output directory
 uv run python -m src.potential_mapper.batch --year 1998 --output-dir ./my_cache
 
 # Verbose logging
 uv run python -m src.potential_mapper.batch --year 1998 --month 1 -v
+
+# Use Lillis masked linear chi2 fitting
+uv run python -m src.potential_mapper.batch --year 1998 --losscone-fit-method lillis
+
+# Force spacecraft potential to 0 V for a single day
+uv run python -m src.potential_mapper.batch --year 1999 --month 4 --day 29 \
+  --losscone-fit-method lillis --u-spacecraft 0
 ```
 
 ## Loading Results
@@ -87,14 +94,15 @@ latitudes = data["rows_projection_latitude"]
 longitudes = data["rows_projection_longitude"]
 potentials = data["rows_projected_potential"]
 
-# Filter to valid fits
-valid = np.isfinite(potentials)
+# Filter to higher-quality fits (example threshold)
+chi2 = data["rows_fit_chi2"]
+valid = np.isfinite(potentials) & np.isfinite(chi2) & (chi2 <= 6.57e5)
 print(f"Valid fits: {valid.sum()} / {len(valid)}")
 ```
 
 ## Performance
 
-- Uses `multiprocessing` with CPU count - 1 workers when `--parallel` is enabled
+- CPU parallel fitting is deprecated; use `--fast` for acceleration
 - BLAS/LAPACK threading is disabled for deterministic results
 - Progress bars show overall and per-spectrum progress
 

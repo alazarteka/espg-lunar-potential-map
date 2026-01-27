@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from src import config
-from src.flux import ERData, LossConeFitter, PitchAngle
+from src.flux import ERData, LossConeFitter, PitchAngle, build_lillis_mask
 from src.utils.synthetic import prepare_synthetic_er
 
 # ==============================================================================
@@ -246,6 +246,16 @@ class TestLossConeFitterNormalization:
                 incident_flux_stat="median",  # Invalid
             )
 
+    def test_invalid_fit_method_raises(self):
+        """Unknown fit_method raises ValueError."""
+        er = prepare_synthetic_er()
+
+        with pytest.raises(ValueError, match="Unknown fit_method"):
+            LossConeFitter(
+                er,
+                fit_method="unknown",
+            )
+
     def test_invalid_loss_cone_background_raises(self):
         """Non-positive loss_cone_background raises ValueError."""
         er = prepare_synthetic_er()
@@ -255,6 +265,15 @@ class TestLossConeFitterNormalization:
                 er,
                 loss_cone_background=-1.0,
             )
+
+
+def test_build_lillis_mask_thresholds():
+    """Lillis mask should exclude low/zero, near-max, and NaN bins."""
+    raw_flux = np.array([[1.0, 10.0, 2.0, 0.1, np.nan]])
+    pitches = np.array([[30.0, 150.0, 60.0, 120.0, 45.0]])
+    mask = build_lillis_mask(raw_flux, pitches)
+    expected = np.array([[True, False, False, False, False]])
+    np.testing.assert_array_equal(mask, expected)
 
 
 class TestLossConeFitterFitting:

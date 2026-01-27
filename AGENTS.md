@@ -23,7 +23,13 @@ uv run pytest -q                        # Run tests
 uv run ruff check src tests             # Lint
 uv run python -m src.data_acquisition   # Download data
 uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4  # GPU batch
+uv run python -m src.potential_mapper.batch --fast --year 1999 --month 4 --day 29 \
+  --losscone-fit-method lillis --u-spacecraft 0  # Lillis + U_sc override
 ```
+
+Loss-cone fitting supports both Halekas (log-chi2) and Lillis (masked linear chi2).
+Set `LOSS_CONE_FIT_METHOD` in `src/config.py` or use `--losscone-fit-method` on
+the batch CLI / `--fit-method` in diagnostics tools.
 
 See [docs/dev/development.md](docs/dev/development.md) for complete workflow reference.
 
@@ -35,8 +41,10 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
   - `potential_mapper/` - Mapping pipeline
   - `temporal/` - Spherical harmonic reconstruction
   - `engineering/` - GlobalStats, SiteStats, site analysis
+  - `losscone/` - Shared loss-cone helpers (masks, chi2, types)
   - `diagnostics/` - Loss cone session management
   - `physics/`, `utils/`, `visualization/` - Supporting modules
+  - `utils/losscone_lhs.py` - Shared loss-cone LHS sampling helper
 - `scripts/`: CLI tools
   - `diagnostics/` - Beam detection and loss cone tools
   - `analysis/` - Plotting and exploration

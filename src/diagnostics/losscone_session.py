@@ -5,11 +5,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from scipy.stats.qmc import LatinHypercube, scale
 
 from src import config
-from src.flux import ERData, LossConeFitter, PitchAngle
-from src.model import synth_losscone, synth_losscone_batch
+from src.flux import (
+    ERData,
+    LossConeFitter,
+    PitchAngle,
+    build_lillis_mask,
+    compute_halekas_chi2,
+    compute_lillis_chi2,
+)
+from src.losscone.types import FitMethod, parse_fit_method
+from src.model import synth_losscone
 
 try:  # Optional GPU path
     import torch
@@ -98,6 +105,7 @@ class LossConeSession:
         use_torch: bool = False,
         torch_device: str | None = None,
         use_polarity: bool = True,
+        fit_method: str | FitMethod | None = None,
     ) -> None:
         self.er_file = Path(er_file)
         self.theta_file = (
@@ -112,6 +120,7 @@ class LossConeSession:
             if loss_cone_background is not None
             else float(config.LOSS_CONE_BACKGROUND)
         )
+        self.fit_method = parse_fit_method(fit_method)
 
         if not self.er_file.exists():
             raise FileNotFoundError(f"ER file not found: {self.er_file}")
@@ -130,6 +139,7 @@ class LossConeSession:
 
         self._norm_cache: dict[tuple[int, str, str], np.ndarray] = {}
         self._raw_cache: dict[int, ChunkData] = {}
+        self._lillis_mask_cache: dict[int, np.ndarray] = {}
         self._spec_to_chunk = self._build_spec_map()
 
         self.use_torch = bool(use_torch and HAS_TORCH)
@@ -219,6 +229,7 @@ class LossConeSession:
 
     def _init_fitter(self) -> None:
         self._norm_cache.clear()
+        self._lillis_mask_cache.clear()
         if self.use_torch:
             try:
                 from src.model_torch import LossConeFitterTorch
@@ -230,6 +241,7 @@ class LossConeSession:
                     incident_flux_stat=self.incident_flux_stat,
                     loss_cone_background=self.background,
                     device=str(self._torch_device) if self._torch_device else None,
+                    fit_method=self.fit_method,
                 )
                 return
             except Exception:
@@ -241,6 +253,7 @@ class LossConeSession:
             normalization_mode=self.normalization_mode,
             incident_flux_stat=self.incident_flux_stat,
             loss_cone_background=self.background,
+            fit_method=self.fit_method,
         )
 
     def _build_spec_map(self) -> dict[int, int]:
@@ -306,6 +319,14 @@ class LossConeSession:
         self._norm_cache[cache_key] = norm2d
         return norm2d
 
+    def get_lillis_mask(self, chunk_idx: int) -> np.ndarray:
+        if chunk_idx in self._lillis_mask_cache:
+            return self._lillis_mask_cache[chunk_idx]
+        chunk = self.get_chunk_data(chunk_idx)
+        mask = build_lillis_mask(chunk.flux, chunk.pitches)
+        self._lillis_mask_cache[chunk_idx] = mask
+        return mask
+
     def compute_model(
         self,
         energies: np.ndarray,
@@ -370,40 +391,23 @@ class LossConeSession:
         norm2d: np.ndarray,
         model: np.ndarray,
         model_mask: np.ndarray | None = None,
+        raw_flux: np.ndarray | None = None,
+        raw_pitches: np.ndarray | None = None,
     ) -> float:
-        eps = config.EPS
-        data_mask = np.isfinite(norm2d) & (norm2d > 0)
+        if self.fit_method == FitMethod.LILLIS:
+            if raw_flux is None or raw_pitches is None:
+                return float("nan")
+            return compute_lillis_chi2(
+                norm2d=norm2d,
+                model=model,
+                raw_flux=raw_flux,
+                pitches=raw_pitches,
+                model_mask=model_mask,
+            )
 
-        # Combine data mask with model validity mask if provided
-        combined_mask = data_mask & model_mask if model_mask is not None else data_mask
-
-        if not combined_mask.any():
-            return float("nan")
-        log_data = np.zeros_like(norm2d, dtype=float)
-        log_data[combined_mask] = np.log(norm2d[combined_mask] + eps)
-        log_model = np.log(model + eps)
-        diff = (log_data - log_model) * combined_mask
-        chi2 = np.sum(diff * diff)
-        return float(chi2)
-
-    def _generate_lhs(self, n_samples: int = 400) -> np.ndarray:
-        u_min = max(config.LOSS_CONE_U_SURFACE_MIN, -1000.0)
-        u_max = min(config.LOSS_CONE_U_SURFACE_MAX, 0.0)
-        lower = np.array(
-            [u_min, config.LOSS_CONE_BS_OVER_BM_MIN, config.LOSS_CONE_BEAM_AMP_MIN],
-            dtype=float,
+        return compute_halekas_chi2(
+            norm2d, model, model_mask=model_mask, eps=config.EPS
         )
-        upper = np.array(
-            [u_max, config.LOSS_CONE_BS_OVER_BM_MAX, config.LOSS_CONE_BEAM_AMP_MAX],
-            dtype=float,
-        )
-        if upper[2] <= lower[2]:
-            upper[2] = lower[2] + 1e-12
-        sampler = LatinHypercube(
-            d=len(lower), scramble=False, seed=config.LOSS_CONE_LHS_SEED
-        )
-        lhs = sampler.random(n=n_samples)
-        return scale(lhs, lower, upper)
 
     def fit_chunk_lhs(
         self,
@@ -412,52 +416,11 @@ class LossConeSession:
         u_spacecraft: float,
         n_samples: int = 400,
     ) -> tuple[float, float, float, float]:
-        norm2d = self.get_norm2d(chunk_idx)
-        if np.isnan(norm2d).all():
-            return np.nan, np.nan, np.nan, np.nan
-
-        chunk = self.get_chunk_data(chunk_idx)
-        energies = chunk.energies
-        pitches = chunk.pitches
-
-        data_mask = np.isfinite(norm2d) & (norm2d > 0)
-        if not data_mask.any():
-            return np.nan, np.nan, np.nan, np.nan
-
-        log_data = np.zeros_like(norm2d, dtype=float)
-        log_data[data_mask] = np.log(norm2d[data_mask] + config.EPS)
-        data_mask_3d = data_mask[None, :, :]
-
-        samples = self._generate_lhs(n_samples)
-        u_surface = samples[:, 0]
-        bs_over_bm = samples[:, 1]
-        beam_amp = samples[:, 2]
-        beam_width = np.full_like(u_surface, beam_width_ev)
-        background = np.full_like(u_surface, self.background)
-
-        models, model_masks = synth_losscone_batch(
-            energy_grid=energies,
-            pitch_grid=pitches,
-            U_surface=u_surface,
-            U_spacecraft=float(u_spacecraft),
-            bs_over_bm=bs_over_bm,
-            beam_width_eV=beam_width,
-            beam_amp=beam_amp,
-            beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
-            background=background,
-            return_mask=True,
-        )
-        log_models = np.log(models + config.EPS)
-        combined_mask = data_mask_3d & model_masks
-        diff = (log_data[None, :, :] - log_models) * combined_mask
-        chi2 = np.sum(diff * diff, axis=(1, 2))
-        chi2[~np.isfinite(chi2)] = 1e30
-        best_idx = int(np.argmin(chi2))
-        return (
-            float(u_surface[best_idx]),
-            float(bs_over_bm[best_idx]),
-            float(beam_amp[best_idx]),
-            float(chi2[best_idx]),
+        return self.fitter.fit_chunk_lhs(
+            chunk_idx,
+            beam_width_ev=beam_width_ev,
+            u_spacecraft=u_spacecraft,
+            n_samples=n_samples,
         )
 
     def fit_chunk_full(self, chunk_idx: int) -> tuple[float, float, float, float]:

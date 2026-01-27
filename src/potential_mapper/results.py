@@ -85,7 +85,7 @@ class PotentialResults:
     Potentials:
     - spacecraft_potential: Floating potential of spacecraft (V) per row.
     - projected_potential: Surface potential U_surface (V) from loss-cone fit;
-      NaN if not fit.
+      NaN if fit failed (finite values may include poor fits; use fit_chi2).
 
     Loss-cone fit parameters:
     - bs_over_bm: Fitted B_surface/B_spacecraft ratio; NaN if not fit.

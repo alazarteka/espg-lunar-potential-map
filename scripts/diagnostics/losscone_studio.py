@@ -161,7 +161,9 @@ def _build_frame(
         "model_reg": model_reg,
         "residual": residual,
         "loss_cone": loss_cone,
-        "chi2": session.compute_chi2(norm2d, model, model_mask),
+        "chi2": session.compute_chi2(
+            norm2d, model, model_mask, raw_flux=chunk.flux, raw_pitches=chunk.pitches
+        ),
         "spec_no": chunk.spec_no,
         "timestamp": chunk.timestamp,
     }
@@ -208,6 +210,7 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         incident_flux_stat=args.incident_stat,
         loss_cone_background=args.background,
         use_torch=args.fast,
+        fit_method=args.fit_method,
     )
 
     max_chunk = max(session.chunk_count() - 1, 0)
@@ -340,7 +343,7 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
             chunk_slider.value = target
             chunk_input.value = target
 
-    def update_beam_filter() -> None:
+    def update_beam_filter(*_events) -> None:
         nonlocal beam_chunks
         session.set_normalization(normalization.value, incident_stat.value)
         beam_chunks = _find_beam_chunks(session)
@@ -608,6 +611,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=config.LOSS_CONE_BACKGROUND,
         help="Loss-cone background level",
+    )
+    parser.add_argument(
+        "--fit-method",
+        choices=["halekas", "lillis"],
+        default=None,
+        help="Loss-cone fitting method (defaults to config)",
     )
     parser.add_argument(
         "--fast",

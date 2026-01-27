@@ -124,6 +124,11 @@ Opens a Panel/Bokeh app in your browser with:
 - Loss cone boundary overlay
 - Parameter sliders (U_surface, Bs/Bm, beam amplitude, etc.)
 
+**Fit method**: pass `--fit-method lillis` to use the masked linear chi2 fitter
+(relative flux mask 0.07-0.79 per-energy on raw flux, using incident-only maxima;
+reduced chi2 cutoff 2.0). Default is the Halekas
+log-chi2 fitter.
+
 **Beam Filter**: Toggle "Beam-detected only" to navigate only through sweeps where beam signatures were detected. The app uses the same detection thresholds as `losscone_peak_scan.py` (min_peak=2.0, min_neighbor=1.5, etc.). The spec selector (with Prev/Next buttons) only offers valid magnetic-field sweeps when the filter is off, and switches to beam-detected spec numbers when enabled; metrics display both the chunk index and spec number.
 
 ### losscone_orbit_studio.py
@@ -191,3 +196,6 @@ Main class for loading and analyzing ER flux files:
 
 - `compute_loss_cone_boundary()`: Calculate the pitch angle boundary for given surface potential
 - `interpolate_to_regular_grid()`: Resample irregular pitch angle data to uniform grid
+
+`LossConeSession` accepts `fit_method="halekas"` or `fit_method="lillis"` to
+switch between log-chi2 and masked linear-chi2 fitting.

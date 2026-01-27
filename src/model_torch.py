@@ -11,6 +11,8 @@ Physics basis from Halekas 2008 (doi:10.1029/2008JA013194), paragraph 37.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 try:
@@ -22,10 +24,15 @@ except ImportError:
     HAS_TORCH = False
     Tensor = None  # type: ignore[misc, assignment]
 
+from src.losscone.types import FitMethod, parse_fit_method, parse_normalization_mode
+from src.utils.losscone_lhs import generate_losscone_lhs
 from src.utils.optimization import (
     BatchedDifferentialEvolution,
     get_torch_device,
 )
+
+if TYPE_CHECKING:
+    from src.losscone.types import NormalizationMode
 
 # Small epsilon to avoid division by zero
 EPS = 1e-12
@@ -270,6 +277,39 @@ def compute_chi2_batch_torch(
     return chi2
 
 
+def compute_lillis_chi2_batch_torch(
+    model: Tensor,
+    data: Tensor,
+    data_mask: Tensor,
+    model_mask: Tensor | None = None,
+) -> Tensor:
+    """
+    Compute Lillis-style reduced chi-squared for batch of models (linear space).
+
+    Args:
+        model: (n_params, nE, nPitch) model predictions
+        data: (nE, nPitch) observed normalized flux
+        data_mask: (nE, nPitch) boolean mask for valid bins (Lillis mask)
+        model_mask: Optional (n_params, nE, nPitch) model validity mask
+
+    Returns:
+        (n_params,) reduced chi-squared values
+    """
+    data_exp = data.unsqueeze(0)  # (1, nE, nPitch)
+    data_mask_exp = data_mask.unsqueeze(0)  # (1, nE, nPitch)
+
+    if model_mask is not None:
+        combined_mask = data_mask_exp & model_mask
+    else:
+        combined_mask = data_mask_exp
+
+    diff = torch.where(combined_mask, data_exp - model, torch.zeros_like(model))
+    chi2 = (diff**2).sum(dim=(1, 2))
+    n_valid = combined_mask.sum(dim=(1, 2)).to(dtype=chi2.dtype)
+    dof = torch.clamp(n_valid - 3.0, min=1.0)
+    return chi2 / dof
+
+
 def synth_losscone_multi_chunk_torch(
     energy_grids: Tensor,
     pitch_grids: Tensor,
@@ -469,6 +509,39 @@ def compute_chi2_multi_chunk_torch(
     return chi2
 
 
+def compute_lillis_chi2_multi_chunk_torch(
+    models: Tensor,
+    data: Tensor,
+    data_mask: Tensor,
+    model_mask: Tensor | None = None,
+) -> Tensor:
+    """
+    Compute Lillis-style reduced chi-squared for multiple chunks × candidates.
+
+    Args:
+        models: (N_chunks, n_pop, nE, nPitch) model predictions
+        data: (N_chunks, nE, nPitch) observed normalized flux per chunk
+        data_mask: (N_chunks, nE, nPitch) boolean Lillis mask per chunk
+        model_mask: Optional (N_chunks, n_pop, nE, nPitch) model validity mask
+
+    Returns:
+        (N_chunks, n_pop) reduced chi-squared values
+    """
+    data_exp = data.unsqueeze(1)  # (N, 1, nE, nPitch)
+    data_mask_exp = data_mask.unsqueeze(1)  # (N, 1, nE, nPitch)
+
+    if model_mask is not None:
+        combined_mask = data_mask_exp & model_mask
+    else:
+        combined_mask = data_mask_exp
+
+    diff = torch.where(combined_mask, data_exp - models, torch.zeros_like(models))
+    chi2 = (diff**2).sum(dim=(2, 3))
+    n_valid = data_mask.sum(dim=(1, 2)).to(dtype=chi2.dtype)
+    dof = torch.clamp(n_valid - 3.0, min=1.0).unsqueeze(1)
+    return chi2 / dof
+
+
 # Use shared BatchedDifferentialEvolution for backwards compatibility
 GPUDifferentialEvolution = BatchedDifferentialEvolution
 
@@ -486,7 +559,8 @@ class LossConeFitterTorch:
         er_data,
         pitch_angle=None,
         spacecraft_potential: np.ndarray | None = None,
-        normalization_mode: str = "ratio",
+        normalization_mode: str | NormalizationMode = "ratio",
+        fit_method: str | FitMethod | None = None,
         beam_amp_fixed: float | None = None,
         incident_flux_stat: str = "mean",
         loss_cone_background: float | None = None,
@@ -501,6 +575,7 @@ class LossConeFitterTorch:
             pitch_angle: Optional pre-computed PitchAngle object
             spacecraft_potential: Optional per-row spacecraft potential [V]
             normalization_mode: Flux normalization mode
+            fit_method: Loss-cone fitting method ("halekas" or "lillis")
             beam_amp_fixed: Fixed beam amplitude (None to fit)
             incident_flux_stat: Statistic for incident flux ("mean" or "max")
             loss_cone_background: Background level outside loss cone
@@ -554,9 +629,7 @@ class LossConeFitterTorch:
             self.beam_amp_max = beam_amp_fixed
         self.beam_pitch_sigma_deg = config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG
 
-        if normalization_mode not in {"global", "ratio", "ratio2", "ratio_rescaled"}:
-            raise ValueError(f"Unknown normalization_mode: {normalization_mode}")
-        self.normalization_mode = normalization_mode
+        self.normalization_mode = parse_normalization_mode(normalization_mode)
 
         if incident_flux_stat not in {"mean", "max"}:
             raise ValueError(f"Unknown incident_flux_stat: {incident_flux_stat}")
@@ -567,6 +640,8 @@ class LossConeFitterTorch:
         if loss_cone_background <= 0:
             raise ValueError("loss_cone_background must be positive")
         self.background = float(loss_cone_background)
+
+        self.fit_method = parse_fit_method(fit_method)
 
         self.config = config
         self._cpu_fitter = None  # Lazy-initialized for normalization
@@ -636,9 +711,28 @@ class LossConeFitterTorch:
         if norm2d.shape[0] > actual_rows:
             norm2d = norm2d[:actual_rows]
 
-        data_mask = np.isfinite(norm2d) & (norm2d > 0)
-        if not data_mask.any():
-            return np.nan, np.nan, np.nan, np.nan
+        if self.fit_method == FitMethod.LILLIS:
+            from src.flux import build_lillis_mask
+
+            raw_flux = self.er_data.data[self.config.FLUX_COLS].to_numpy(
+                dtype=np.float64
+            )[s:e]
+            if raw_flux.shape[0] > actual_rows:
+                raw_flux = raw_flux[:actual_rows]
+            lillis_mask = build_lillis_mask(raw_flux, pitches)
+
+            if isinstance(spacecraft_slice, np.ndarray):
+                valid_energy = energies[:, None] >= spacecraft_slice[:, None]
+            else:
+                valid_energy = energies[:, None] >= float(spacecraft_slice)
+            valid_energy = np.broadcast_to(valid_energy, pitches.shape)
+            data_mask = lillis_mask & valid_energy
+            if int(np.count_nonzero(data_mask)) < self.config.LILLIS_MIN_VALID_BINS:
+                return np.nan, np.nan, np.nan, np.nan
+        else:
+            data_mask = np.isfinite(norm2d) & (norm2d > 0)
+            if not data_mask.any():
+                return np.nan, np.nan, np.nan, np.nan
 
         # Convert to torch tensors
         energies_t = torch.tensor(energies, device=self.device, dtype=self.dtype)
@@ -677,7 +771,10 @@ class LossConeFitterTorch:
             )
 
             # Compute chi2
-            chi2 = compute_chi2_batch_torch(models, norm2d_t, data_mask_t, eps)
+            if self.fit_method == FitMethod.LILLIS:
+                chi2 = compute_lillis_chi2_batch_torch(models, norm2d_t, data_mask_t)
+            else:
+                chi2 = compute_chi2_batch_torch(models, norm2d_t, data_mask_t, eps)
 
             # Penalize invalid models
             invalid = ~torch.isfinite(chi2)
@@ -757,6 +854,12 @@ class LossConeFitterTorch:
             np.clip(best_params[2].item(), self.beam_amp_min, self.beam_amp_max)
         )
 
+        if (
+            self.fit_method == FitMethod.LILLIS
+            and best_chi2 > self.config.LILLIS_CHI2_REDUCED_MAX
+        ):
+            return np.nan, np.nan, np.nan, best_chi2
+
         return U_surface, bs_over_bm, beam_amp, best_chi2
 
     def fit_surface_potential(self) -> np.ndarray:
@@ -813,11 +916,12 @@ class LossConeFitterTorch:
         cpu_fitter = self._get_cpu_fitter()
         norm2d_all = cpu_fitter.build_norm2d_batch(chunk_indices)  # (n_chunks, nE, nP)
 
-        # Pre-load all energy and pitch data
+        # Pre-load all energy, pitch, and flux data
         energy_all = self.er_data.data[self.config.ENERGY_COLUMN].to_numpy(
             dtype=np.float64
         )
         pitch_all = self.pitch_angle.pitch_angles
+        flux_all = self.er_data.data[self.config.FLUX_COLS].to_numpy(dtype=np.float64)
 
         # Filter to valid chunks
         energies_list = []
@@ -857,10 +961,6 @@ class LossConeFitterTorch:
                 )
                 norm2d = np.pad(norm2d, ((0, pad_rows), (0, 0)), constant_values=np.nan)
 
-            data_mask = np.isfinite(norm2d) & (norm2d > 0)
-            if not data_mask.any():
-                continue
-
             # Get spacecraft potential for this chunk (per-row, not averaged)
             if self.spacecraft_potential is not None:
                 sc_pot = self.spacecraft_potential[s:e].copy()
@@ -871,6 +971,29 @@ class LossConeFitterTorch:
                     )
             else:
                 sc_pot = np.zeros(nE)
+
+            if self.fit_method == FitMethod.LILLIS:
+                from src.flux import build_lillis_mask
+
+                flux_chunk = flux_all[s:e]
+                if actual_rows < nE:
+                    flux_chunk = np.pad(
+                        flux_chunk,
+                        ((0, nE - actual_rows), (0, 0)),
+                        constant_values=np.nan,
+                    )
+                lillis_mask = build_lillis_mask(flux_chunk, pitches)
+                valid_energy = energies[:, None] >= sc_pot[:, None]
+                valid_energy = np.broadcast_to(valid_energy, pitches.shape)
+                data_mask = lillis_mask & valid_energy
+            else:
+                data_mask = np.isfinite(norm2d) & (norm2d > 0)
+
+            if self.fit_method == FitMethod.LILLIS:
+                if int(np.count_nonzero(data_mask)) < self.config.LILLIS_MIN_VALID_BINS:
+                    continue
+            elif not data_mask.any():
+                continue
 
             energies_list.append(energies)
             pitches_list.append(pitches)
@@ -900,6 +1023,103 @@ class LossConeFitterTorch:
 
         return energies_t, pitches_t, norm2d_t, mask_t, sc_pot_t, valid_indices
 
+    def fit_chunk_lhs(
+        self,
+        measurement_chunk: int,
+        beam_width_ev: float | None = None,
+        u_spacecraft: float | None = None,
+        n_samples: int = 400,
+    ) -> tuple[float, float, float, float]:
+        """
+        LHS-only fit for a single chunk (mirrors CPU implementation).
+        """
+        cpu_fitter = self._get_cpu_fitter()
+        data = cpu_fitter._prepare_chunk_data(measurement_chunk)
+        if data is None:
+            return np.nan, np.nan, np.nan, np.nan
+
+        norm2d = data.norm2d
+        energies = data.energies
+        pitches = data.pitches
+        spacecraft_slice = (
+            float(u_spacecraft) if u_spacecraft is not None else data.spacecraft_slice
+        )
+
+        if self.fit_method == FitMethod.LILLIS:
+            from src.flux import build_lillis_mask
+
+            data_mask = build_lillis_mask(data.raw_flux, pitches)
+            if int(np.count_nonzero(data_mask)) < self.config.LILLIS_MIN_VALID_BINS:
+                return np.nan, np.nan, np.nan, np.nan
+        else:
+            data_mask = np.isfinite(norm2d) & (norm2d > 0)
+            if not data_mask.any():
+                return np.nan, np.nan, np.nan, np.nan
+
+        samples = generate_losscone_lhs(
+            n_samples=n_samples,
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+            seed=self.config.LOSS_CONE_LHS_SEED,
+        )
+        u_surface = torch.tensor(samples[:, 0], device=self.device, dtype=self.dtype)
+        bs_over_bm = torch.tensor(samples[:, 1], device=self.device, dtype=self.dtype)
+        beam_amp = torch.tensor(samples[:, 2], device=self.device, dtype=self.dtype)
+
+        width = self.beam_width_ev if beam_width_ev is None else beam_width_ev
+        beam_width = torch.full_like(u_surface, width)
+        background = torch.full_like(u_surface, self.background)
+
+        energies_t = torch.tensor(energies, device=self.device, dtype=self.dtype)
+        pitches_t = torch.tensor(pitches, device=self.device, dtype=self.dtype)
+        norm2d_t = torch.tensor(norm2d, device=self.device, dtype=self.dtype)
+        data_mask_t = torch.tensor(data_mask, device=self.device, dtype=torch.bool)
+
+        if isinstance(spacecraft_slice, np.ndarray):
+            spacecraft_t = torch.tensor(
+                spacecraft_slice, device=self.device, dtype=self.dtype
+            )
+        else:
+            spacecraft_t = float(spacecraft_slice)
+
+        models, model_masks = synth_losscone_batch_torch(
+            energy_grid=energies_t,
+            pitch_grid=pitches_t,
+            U_surface=u_surface,
+            U_spacecraft=spacecraft_t,
+            bs_over_bm=bs_over_bm,
+            beam_width_eV=beam_width,
+            beam_amp=beam_amp,
+            beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
+            background=background,
+            return_mask=True,
+        )
+
+        if self.fit_method == FitMethod.LILLIS:
+            chi2 = compute_lillis_chi2_batch_torch(
+                models, norm2d_t, data_mask_t, model_mask=model_masks
+            )
+        else:
+            chi2 = compute_chi2_batch_torch(
+                models, norm2d_t, data_mask_t, model_mask=model_masks
+            )
+
+        chi2 = torch.where(
+            torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
+        )
+        best_idx = int(torch.argmin(chi2).item())
+
+        return (
+            float(u_surface[best_idx].item()),
+            float(bs_over_bm[best_idx].item()),
+            float(beam_amp[best_idx].item()),
+            float(chi2[best_idx].item()),
+        )
+
     def _fit_batch_lhs(
         self,
         energies: Tensor,
@@ -927,7 +1147,10 @@ class LossConeFitterTorch:
         N_chunks = energies.size(0)
 
         # Precompute log(data) once to avoid redundant computation in chi2
-        log_data_precomputed = precompute_log_data_torch(norm2d, data_mask)
+        # (Halekas only).
+        log_data_precomputed = None
+        if self.fit_method != FitMethod.LILLIS:
+            log_data_precomputed = precompute_log_data_torch(norm2d, data_mask)
 
         # Bounds - U_surface capped at detection threshold
         bounds = [
@@ -978,10 +1201,13 @@ class LossConeFitterTorch:
             background=torch.full_like(U_surface, self.background),
         )  # (N, n_lhs, nE, nPitch)
 
-        # Compute chi2 for all (using precomputed log_data)
-        chi2 = compute_chi2_multi_chunk_torch(
-            models, norm2d, data_mask, log_data_precomputed=log_data_precomputed
-        )  # (N, n_lhs)
+        # Compute chi2 for all
+        if self.fit_method == FitMethod.LILLIS:
+            chi2 = compute_lillis_chi2_multi_chunk_torch(models, norm2d, data_mask)
+        else:
+            chi2 = compute_chi2_multi_chunk_torch(
+                models, norm2d, data_mask, log_data_precomputed=log_data_precomputed
+            )  # (N, n_lhs)
 
         # Penalize invalid
         chi2 = torch.where(
@@ -1031,7 +1257,10 @@ class LossConeFitterTorch:
         N_chunks = energies.size(0)
 
         # Precompute log(data) once to avoid redundant computation in chi2
-        log_data_precomputed = precompute_log_data_torch(norm2d, data_mask)
+        # (Halekas only).
+        log_data_precomputed = None
+        if self.fit_method != FitMethod.LILLIS:
+            log_data_precomputed = precompute_log_data_torch(norm2d, data_mask)
 
         # Bounds - U_surface capped at detection threshold
         bounds = [
@@ -1072,9 +1301,12 @@ class LossConeFitterTorch:
                 background=torch.full_like(U_surface, self.background),
             )
 
-            chi2 = compute_chi2_multi_chunk_torch(
-                models, norm2d, data_mask, log_data_precomputed=log_data_precomputed
-            )
+            if self.fit_method == FitMethod.LILLIS:
+                chi2 = compute_lillis_chi2_multi_chunk_torch(models, norm2d, data_mask)
+            else:
+                chi2 = compute_chi2_multi_chunk_torch(
+                    models, norm2d, data_mask, log_data_precomputed=log_data_precomputed
+                )
             chi2 = torch.where(
                 torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
             )
@@ -1176,6 +1408,13 @@ class LossConeFitterTorch:
                     np.clip(final_params_np[i, 2], self.beam_amp_min, self.beam_amp_max)
                 )
                 chi2 = final_chi2_np[i]
+
+                if (
+                    self.fit_method == FitMethod.LILLIS
+                    and chi2 > self.config.LILLIS_CHI2_REDUCED_MAX
+                ):
+                    results[chunk_idx] = [np.nan, np.nan, np.nan, chi2, chunk_idx]
+                    continue
 
                 results[chunk_idx] = [U_surface, bs_over_bm, beam_amp, chi2, chunk_idx]
 

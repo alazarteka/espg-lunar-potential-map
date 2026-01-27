@@ -2,6 +2,7 @@ import argparse
 import logging
 import multiprocessing
 import numbers
+import os
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,7 @@ from tqdm import tqdm
 
 import src.config as config
 from src.flux import ERData, LossConeFitter, PitchAngle
+from src.losscone.types import FitMethod, parse_fit_method
 
 try:
     from src.model_torch import HAS_TORCH, LossConeFitterTorch
@@ -94,17 +96,20 @@ def spacecraft_potential_worker(
         return spec_no, rows_df.index.to_numpy(), None
 
 
-def fit_worker(args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None]) -> np.ndarray:
+def fit_worker(
+    args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None, FitMethod | str],
+) -> np.ndarray:
     """
     Worker function for parallel fitting.
 
     Args:
-        args: Tuple containing (chunk_df, sc_pot, polarity).
+        args: Tuple containing (chunk_df, sc_pot, polarity, fit_method).
 
     Returns:
         Fitting results array from LossConeFitter.
     """
-    chunk_df, sc_pot, polarity = args
+    chunk_df, sc_pot, polarity, fit_method = args
+    fit_method = parse_fit_method(fit_method)
 
     # Create ERData from the chunk.
     # Note: This might re-trigger cleaning/counting if not handled in ERData,
@@ -121,6 +126,7 @@ def fit_worker(args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None]) -> np.n
         er_data,
         pitch_angle=pitch_angle,
         spacecraft_potential=sc_pot,
+        fit_method=fit_method,
     )
     return fitter.fit_surface_potential()
 
@@ -519,6 +525,8 @@ def _apply_fit_results(
         return
 
     for U_surface, bs, amp, chi2, chunk_idx in fit_results:
+        if not np.isfinite(chunk_idx):
+            continue
         chunk_idx = int(chunk_idx)
         row_start = row_offset + chunk_idx * rows_per_sweep
         row_end = min(row_start + rows_per_sweep, n_total)
@@ -530,12 +538,9 @@ def _apply_fit_results(
         beam_amp[row_start:row_end] = float(amp)
         fit_chi2[row_start:row_end] = float(chi2)
 
-        # Only store U_surface if fit quality is acceptable
-        if (
-            np.isfinite(U_surface)
-            and np.isfinite(chi2)
-            and chi2 <= config.FIT_ERROR_THRESHOLD
-        ):
+        # Store U_surface whenever the fit returned a finite value.
+        # Use fit_chi2 for downstream quality filtering.
+        if np.isfinite(U_surface):
             proj_potential[row_start:row_end] = float(U_surface)
 
 
@@ -570,11 +575,15 @@ class DataLoader:
             "areas.tab",
         }
 
-        candidates = [
-            p
-            for p in data_dir.rglob(f"*{config.EXT_TAB}")
-            if p.is_file() and p.name.lower() not in exclude_basenames
-        ]
+        candidates: list[Path] = []
+        # Use os.walk with followlinks=True so symlinked data dirs are discovered.
+        for root, _dirs, files in os.walk(data_dir, followlinks=True):
+            for filename in files:
+                if not filename.endswith(config.EXT_TAB):
+                    continue
+                if filename.lower() in exclude_basenames:
+                    continue
+                candidates.append(Path(root) / filename)
 
         def matches_date(p: Path) -> bool:
             if year is None and month is None and day is None:
@@ -651,7 +660,12 @@ def load_all_data(files: list[Path]) -> ERData:
 
 
 def process_merged_data(
-    er_data: ERData, *, use_parallel: bool = False, use_torch: bool = False
+    er_data: ERData,
+    *,
+    use_parallel: bool = False,
+    use_torch: bool = False,
+    fit_method: str | FitMethod | None = None,
+    spacecraft_potential_override: float | None = None,
 ) -> PotentialResults:
     """
     Process the merged ER dataset.
@@ -665,13 +679,26 @@ def process_merged_data(
     Args:
         er_data: Merged ERData object
         use_parallel: Enable multiprocessing for SC and surface potential
-            (default: False)
+            (default: False; deprecated for CPU path)
         use_torch: Use PyTorch-accelerated fitter (~5x faster, default: False)
+        fit_method: Loss-cone fitting method ("halekas" or "lillis")
+        spacecraft_potential_override: Optional constant spacecraft potential [V].
+            When provided, skips spacecraft potential estimation and uses this
+            value for all rows.
 
     Returns:
         PotentialResults with all computed fields
     """
     logging.info("Processing merged dataset...")
+
+    if use_parallel and not use_torch:
+        logging.warning(
+            "CPU parallel fitting is deprecated; falling back to sequential. "
+            "Use --fast for torch acceleration."
+        )
+        use_parallel = False
+
+    fit_method = parse_fit_method(fit_method)
 
     # Load attitude
     et_spin, ra_vals, dec_vals = load_attitude_data(
@@ -764,39 +791,47 @@ def process_merged_data(
     kappa_vals_arr = np.full(n, np.nan)
 
     # Spacecraft potential
-    logging.info("Calculating spacecraft potential...")
-    if use_torch:
-        # PyTorch-accelerated Kappa fitting (~78x faster)
-        if not HAS_KAPPA_TORCH or KappaFitterTorch is None:
-            logging.warning(
-                "PyTorch not available for Kappa fitting; falling back to sequential"
-            )
-            sc_potential = _spacecraft_potential_per_row(er_data, n)
-        else:
-            try:
-                sc_potential = _spacecraft_potential_per_row_torch(
-                    er_data,
-                    n,
-                    is_day=sc_in_sun,
-                    electron_temp_out=electron_temp,
-                    electron_dens_out=electron_dens,
-                    kappa_out=kappa_vals_arr,
-                )
-            except Exception as e:
+    if spacecraft_potential_override is not None:
+        sc_potential = np.full(n, float(spacecraft_potential_override))
+        logging.info(
+            "Using constant spacecraft potential override: %.2f V",
+            float(spacecraft_potential_override),
+        )
+    else:
+        logging.info("Calculating spacecraft potential...")
+        if use_torch:
+            # PyTorch-accelerated Kappa fitting (~78x faster)
+            if not HAS_KAPPA_TORCH or KappaFitterTorch is None:
                 logging.warning(
-                    "Torch SC potential failed (%s); falling back to sequential", e
+                    "PyTorch not available for Kappa fitting; falling back to sequential"
                 )
                 sc_potential = _spacecraft_potential_per_row(er_data, n)
-    elif use_parallel:
-        try:
-            sc_potential = _spacecraft_potential_per_row_parallel(er_data, n)
-        except (PermissionError, OSError) as e:
-            logging.warning(
-                "Parallel SC potential failed (%s); falling back to sequential", e
-            )
+            else:
+                try:
+                    sc_potential = _spacecraft_potential_per_row_torch(
+                        er_data,
+                        n,
+                        is_day=sc_in_sun,
+                        electron_temp_out=electron_temp,
+                        electron_dens_out=electron_dens,
+                        kappa_out=kappa_vals_arr,
+                    )
+                except Exception as e:
+                    logging.warning(
+                        "Torch SC potential failed (%s); falling back to sequential",
+                        e,
+                    )
+                    sc_potential = _spacecraft_potential_per_row(er_data, n)
+        elif use_parallel:
+            try:
+                sc_potential = _spacecraft_potential_per_row_parallel(er_data, n)
+            except (PermissionError, OSError) as e:
+                logging.warning(
+                    "Parallel SC potential failed (%s); falling back to sequential", e
+                )
+                sc_potential = _spacecraft_potential_per_row(er_data, n)
+        else:
             sc_potential = _spacecraft_potential_per_row(er_data, n)
-    else:
-        sc_potential = _spacecraft_potential_per_row(er_data, n)
 
     # Surface Potential Fitting
     proj_potential = np.full(n, np.nan)
@@ -834,6 +869,7 @@ def process_merged_data(
             pitch_angle=pitch_angle,
             spacecraft_potential=sc_potential,
             device=None,  # Auto-detect: CUDA if available, else CPU
+            fit_method=fit_method,
         )
         # Use batched GPU processing (auto-detects dtype and batch_size)
         fit_mat = fitter.fit_surface_potential_batched()
@@ -852,6 +888,7 @@ def process_merged_data(
             er_data,
             pitch_angle=pitch_angle,
             spacecraft_potential=sc_potential,
+            fit_method=fit_method,
         )
         fit_mat = fitter.fit_surface_potential()
         _apply_fit_results(
@@ -866,13 +903,13 @@ def process_merged_data(
     else:
         logging.info("Starting parallel surface potential fitting...")
 
-        chunks: list[tuple[pd.DataFrame, np.ndarray, np.ndarray | None]] = []
+        chunks: list[tuple[pd.DataFrame, np.ndarray, np.ndarray | None, FitMethod]] = []
         for i in range(0, n, rows_per_chunk):
             end = min(i + rows_per_chunk, n)
             chunk_df = er_data.data.iloc[i:end].copy()
             chunk_sc_pot = sc_potential[i:end]
             chunk_pol = projection_polarity[i:end] if use_polarity else None
-            chunks.append((chunk_df, chunk_sc_pot, chunk_pol))
+            chunks.append((chunk_df, chunk_sc_pot, chunk_pol, fit_method))
 
         if chunks:
             num_workers = max(1, multiprocessing.cpu_count() - 1)
@@ -928,7 +965,12 @@ def process_merged_data(
     return results
 
 
-def process_lp_file(file_path: Path) -> PotentialResults:
+def process_lp_file(
+    file_path: Path,
+    *,
+    fit_method: str | FitMethod | None = None,
+    spacecraft_potential_override: float | None = None,
+) -> PotentialResults:
     """
     Process a single ER file into PotentialResults (sequential fitting).
 
@@ -936,7 +978,12 @@ def process_lp_file(file_path: Path) -> PotentialResults:
     """
     logging.debug(f"Processing LP file: {file_path}")
     er_data = ERData(str(file_path))
-    return process_merged_data(er_data, use_parallel=False)
+    return process_merged_data(
+        er_data,
+        use_parallel=False,
+        fit_method=fit_method,
+        spacecraft_potential_override=spacecraft_potential_override,
+    )
 
 
 def run(args: argparse.Namespace) -> int:

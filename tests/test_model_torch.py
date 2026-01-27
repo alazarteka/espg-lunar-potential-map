@@ -344,6 +344,48 @@ class TestComputeChi2MultiChunkTorch:
         torch.testing.assert_close(chi2_multi, chi2_single, rtol=1e-10, atol=1e-10)
 
 
+class TestLossConeFitterTorchLillis:
+    """Tests for Lillis-specific guardrails in LossConeFitterTorch."""
+
+    def test_precompute_skips_low_valid_bins(self):
+        """Low-information chunks should be filtered out in batched prep."""
+        from src.model_torch import LossConeFitterTorch
+        from src.utils.synthetic import prepare_synthetic_er
+
+        er = prepare_synthetic_er()
+        fitter = LossConeFitterTorch(
+            er, fit_method="lillis", normalization_mode="ratio", device="cpu"
+        )
+
+        energies, pitches, norm2d, mask, sc_pot, valid_indices = (
+            fitter._precompute_chunk_data([0])
+        )
+
+        assert valid_indices == []
+        assert energies.numel() == 0
+        assert pitches.numel() == 0
+        assert norm2d.numel() == 0
+        assert mask.numel() == 0
+        assert sc_pot.numel() == 0
+
+    def test_fit_chunk_lhs_returns_nan_for_low_bins(self):
+        """LHS fit should return NaN when Lillis mask is too small."""
+        from src.model_torch import LossConeFitterTorch
+        from src.utils.synthetic import prepare_synthetic_er
+
+        er = prepare_synthetic_er()
+        fitter = LossConeFitterTorch(
+            er, fit_method="lillis", normalization_mode="ratio", device="cpu"
+        )
+
+        u_surface, bs_over_bm, beam_amp, chi2 = fitter.fit_chunk_lhs(0, n_samples=32)
+
+        assert np.isnan(u_surface)
+        assert np.isnan(bs_over_bm)
+        assert np.isnan(beam_amp)
+        assert np.isnan(chi2)
+
+
 class TestDeviceHandling:
     """Tests for device handling."""
 
