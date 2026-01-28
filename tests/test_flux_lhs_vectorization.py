@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from src import config
+from src.losscone.chi2 import compute_halekas_chi2, compute_halekas_chi2_batch
 from src.model import synth_losscone, synth_losscone_batch
 
 
@@ -65,10 +66,7 @@ def test_lhs_chi2_batch_matches_sequential():
         beam_pitch_sigma_deg=beam_pitch_sigma,
     )
 
-    log_data = np.log(norm2d + eps)
-    log_models_batch = np.log(models_batch + eps)
-    diff_batch = log_data[None, :, :] - log_models_batch
-    chi2_batch = np.sum(diff_batch**2, axis=(1, 2))
+    chi2_batch = compute_halekas_chi2_batch(norm2d=norm2d, models=models_batch, eps=eps)
 
     # SEQUENTIAL PATH (original implementation for comparison)
     chi2_sequential = np.zeros(n_samples)
@@ -84,9 +82,7 @@ def test_lhs_chi2_batch_matches_sequential():
             beam_pitch_sigma_deg=beam_pitch_sigma,
         )
 
-        log_model_i = np.log(model_i + eps)
-        diff_i = log_data - log_model_i
-        chi2_sequential[i] = np.sum(diff_i**2)
+        chi2_sequential[i] = compute_halekas_chi2(norm2d=norm2d, model=model_i, eps=eps)
 
     # Should match exactly
     np.testing.assert_allclose(
@@ -146,10 +142,7 @@ def test_lhs_vectorization_with_edge_cases():
         beam_pitch_sigma_deg=10.0,
     )
 
-    log_data = np.log(norm2d + eps)
-    log_models = np.log(models_batch + eps)
-    diff = log_data[None, :, :] - log_models
-    chi2_batch = np.sum(diff**2, axis=(1, 2))
+    chi2_batch = compute_halekas_chi2_batch(norm2d=norm2d, models=models_batch, eps=eps)
 
     # Sequential
     chi2_seq = []
@@ -164,8 +157,7 @@ def test_lhs_vectorization_with_edge_cases():
             beam_amp=lhs_beam_amp[i],
             beam_pitch_sigma_deg=10.0,
         )
-        log_model = np.log(model + eps)
-        chi2_seq.append(np.sum((log_data - log_model) ** 2))
+        chi2_seq.append(compute_halekas_chi2(norm2d=norm2d, model=model, eps=eps))
 
     chi2_seq = np.array(chi2_seq)
 
@@ -209,10 +201,7 @@ def test_lhs_vectorization_randomized(seed):
         beam_pitch_sigma_deg=beam_pitch_sigma,
     )
 
-    log_data = np.log(norm2d + eps)
-    log_models = np.log(models_batch + eps)
-    diff = log_data[None, :, :] - log_models
-    chi2_batch = np.sum(diff**2, axis=(1, 2))
+    chi2_batch = compute_halekas_chi2_batch(norm2d=norm2d, models=models_batch, eps=eps)
 
     # Sequential
     chi2_seq = []
@@ -227,8 +216,7 @@ def test_lhs_vectorization_randomized(seed):
             beam_amp=lhs_beam_amp[i],
             beam_pitch_sigma_deg=beam_pitch_sigma,
         )
-        log_model = np.log(model + eps)
-        chi2_seq.append(np.sum((log_data - log_model) ** 2))
+        chi2_seq.append(compute_halekas_chi2(norm2d=norm2d, model=model, eps=eps))
 
     chi2_seq = np.array(chi2_seq)
 

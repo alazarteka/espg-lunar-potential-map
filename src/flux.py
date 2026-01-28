@@ -5,7 +5,12 @@ import pandas as pd
 from tqdm import tqdm
 
 from src import config
-from src.losscone.chi2 import compute_halekas_chi2, compute_lillis_chi2
+from src.losscone.chi2 import (
+    compute_halekas_chi2,
+    compute_halekas_chi2_batch,
+    compute_lillis_chi2,
+    compute_lillis_chi2_batch,
+)
 from src.losscone.masks import build_lillis_mask
 from src.losscone.types import (
     FitChunkData,
@@ -831,7 +836,7 @@ class LossConeFitter:
         if data is None:
             return np.nan, np.nan, np.nan, np.nan
 
-        eps = 1e-6
+        eps = config.EPS
         norm2d = data.norm2d
         energies = data.energies
         pitches = data.pitches
@@ -840,9 +845,6 @@ class LossConeFitter:
         data_mask = np.isfinite(norm2d) & (norm2d > 0)
         if not data_mask.any():
             return np.nan, np.nan, np.nan, np.nan
-        log_data = np.zeros_like(norm2d, dtype=float)
-        log_data[data_mask] = np.log(norm2d[data_mask] + eps)
-        data_mask_3d = data_mask[None, :, :]
 
         # self.lhs is (N_samples, 3) -> [U_surface, bs_over_bm, beam_amp]
         lhs_U_surface = self.lhs[:, 0]
@@ -865,15 +867,9 @@ class LossConeFitter:
             background=self.background,
             return_mask=True,
         )
-
-        log_models = np.log(models + eps)
-
-        # Combine data mask with model validity masks
-        combined_mask = data_mask_3d & model_masks
-        diff = (log_data[None, :, :] - log_models) * combined_mask
-
-        # Sum over energy and pitch axes (1, 2)
-        chi2_vals = np.sum(diff**2, axis=(1, 2))
+        chi2_vals = compute_halekas_chi2_batch(
+            norm2d=norm2d, models=models, model_mask=model_masks, eps=eps
+        )
 
         bad_mask = ~np.isfinite(chi2_vals)
         chi2_vals[bad_mask] = 1e30
@@ -901,12 +897,15 @@ class LossConeFitter:
                 background=self.background,
             )
 
-            if not np.all(np.isfinite(model)) or (model <= 0).all():
+            if not np.all(np.isfinite(model)):
                 return 1e30  # big penalty
 
-            log_model = np.log(model + eps)
-            diff = (log_data - log_model) * data_mask
-            chi2 = np.sum(diff * diff)
+            chi2 = compute_halekas_chi2(
+                norm2d=norm2d,
+                model=model,
+                model_mask=data.valid_energy_mask,
+                eps=eps,
+            )
 
             if not np.isfinite(chi2):
                 return 1e30
@@ -971,17 +970,15 @@ class LossConeFitter:
         )
 
         if self.fit_method == FitMethod.LILLIS:
-            data_mask = build_lillis_mask(data.raw_flux, pitches)
-            if int(np.count_nonzero(data_mask)) < config.LILLIS_MIN_VALID_BINS:
+            combined_mask = build_lillis_mask(data.raw_flux, pitches) & data.valid_energy_mask
+            if int(np.count_nonzero(combined_mask)) < config.LILLIS_MIN_VALID_BINS:
                 return np.nan, np.nan, np.nan, np.nan
-            data_mask_3d = data_mask[None, :, :]
         else:
-            data_mask = np.isfinite(norm2d) & (norm2d > 0)
-            if not data_mask.any():
+            combined_mask = (
+                np.isfinite(norm2d) & (norm2d > 0) & data.valid_energy_mask
+            )
+            if not combined_mask.any():
                 return np.nan, np.nan, np.nan, np.nan
-            log_data = np.zeros_like(norm2d, dtype=float)
-            log_data[data_mask] = np.log(norm2d[data_mask] + config.EPS)
-            data_mask_3d = data_mask[None, :, :]
 
         samples = (
             self.lhs
@@ -1007,17 +1004,18 @@ class LossConeFitter:
             background=background,
             return_mask=True,
         )
-        combined_mask = data_mask_3d & model_masks
-
         if self.fit_method == FitMethod.LILLIS:
-            diff = (norm2d[None, :, :] - models) * combined_mask
-            chi2 = np.sum(diff * diff, axis=(1, 2))
-            dof = max(int(np.count_nonzero(combined_mask[0])) - 3, 1)
-            chi2 = chi2 / float(dof)
+            chi2 = compute_lillis_chi2_batch(
+                norm2d=norm2d,
+                models=models,
+                raw_flux=data.raw_flux,
+                pitches=pitches,
+                model_mask=model_masks,
+            )
         else:
-            log_models = np.log(models + config.EPS)
-            diff = (log_data[None, :, :] - log_models) * combined_mask
-            chi2 = np.sum(diff * diff, axis=(1, 2))
+            chi2 = compute_halekas_chi2_batch(
+                norm2d=norm2d, models=models, model_mask=model_masks, eps=config.EPS
+            )
 
         chi2[~np.isfinite(chi2)] = 1e30
         best_idx = int(np.argmin(chi2))
@@ -1052,8 +1050,6 @@ class LossConeFitter:
         if int(np.count_nonzero(combined_mask)) < config.LILLIS_MIN_VALID_BINS:
             return np.nan, np.nan, np.nan, np.nan
 
-        data_mask_3d = combined_mask[None, :, :]
-
         # LHS samples provide a robust starting point
         lhs_U_surface = self.lhs[:, 0]
         lhs_bs_over_bm = self.lhs[:, 1]
@@ -1072,11 +1068,13 @@ class LossConeFitter:
             background=self.background,
             return_mask=True,
         )
-
-        # Combine with model validity (E >= U_spacecraft) just in case
-        combined_mask_3d = data_mask_3d & model_masks
-        diff = (norm2d[None, :, :] - models) * combined_mask_3d
-        chi2_vals = np.sum(diff**2, axis=(1, 2))
+        chi2_vals = compute_lillis_chi2_batch(
+            norm2d=norm2d,
+            models=models,
+            raw_flux=data.raw_flux,
+            pitches=pitches,
+            model_mask=model_masks,
+        )
         chi2_vals[~np.isfinite(chi2_vals)] = 1e30
 
         best_idx = int(np.argmin(chi2_vals))
@@ -1118,12 +1116,16 @@ class LossConeFitter:
             )
             if not np.all(np.isfinite(model)):
                 return 1e30
-
-            diff_local = (norm2d - model) * combined_mask
-            chi2_val = float(np.sum(diff_local * diff_local))
+            chi2_val = compute_lillis_chi2(
+                norm2d=norm2d,
+                model=model,
+                raw_flux=data.raw_flux,
+                pitches=pitches,
+                model_mask=data.valid_energy_mask,
+            )
             if not np.isfinite(chi2_val):
                 return 1e30
-            return chi2_val
+            return float(chi2_val)
 
         result = minimize(
             chi2_scalar,
@@ -1140,10 +1142,7 @@ class LossConeFitter:
         U_surface = float(np.clip(U_surface, bounds[0][0], bounds[0][1]))
         bs_over_bm = float(np.clip(bs_over_bm, bounds[1][0], bounds[1][1]))
         beam_amp = float(np.clip(beam_amp, bounds[2][0], bounds[2][1]))
-
-        dof = int(np.count_nonzero(combined_mask)) - 3
-        dof = max(dof, 1)
-        chi2_reduced = float(result.fun) / float(dof)
+        chi2_reduced = float(result.fun)
 
         if chi2_reduced > config.LILLIS_CHI2_REDUCED_MAX:
             return np.nan, np.nan, np.nan, chi2_reduced

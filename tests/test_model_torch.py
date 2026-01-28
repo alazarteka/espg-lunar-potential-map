@@ -233,9 +233,142 @@ class TestComputeChi2BatchTorch:
 
         chi2 = compute_chi2_batch_torch(model, data, mask)
 
-        # With all masked, chi2 should be 0
-        torch.testing.assert_close(
-            chi2, torch.zeros(n_params, dtype=torch.float64), atol=1e-10, rtol=0
+        # With all masked, chi2 should be NaN (no valid bins).
+        assert torch.isnan(chi2).all()
+
+
+class TestChi2NumpyTorchEquivalence:
+    """Cross-check torch chi2 vs NumPy reference implementations."""
+
+    def test_halekas_batch_matches_numpy(self):
+        """Torch compute_chi2_batch_torch matches NumPy Halekas log-chi2."""
+        from src import config
+        from src.losscone.chi2 import compute_halekas_chi2_batch
+        from src.model_torch import compute_chi2_batch_torch
+
+        rng = np.random.default_rng(0)
+        n_models, nE, nPitch = 7, 8, 9
+
+        data = rng.uniform(0.1, 10.0, (nE, nPitch)).astype(np.float64)
+        data[rng.random(data.shape) < 0.10] = -1.0
+        data[rng.random(data.shape) < 0.05] = np.nan
+
+        models = rng.uniform(0.1, 10.0, (n_models, nE, nPitch)).astype(np.float64)
+        model_mask = rng.random((n_models, nE, nPitch)) > 0.2
+
+        chi2_np = compute_halekas_chi2_batch(
+            norm2d=data, models=models, model_mask=model_mask, eps=config.EPS
+        )
+        data_mask = np.isfinite(data) & (data > 0)
+        chi2_torch = compute_chi2_batch_torch(
+            torch.tensor(models, dtype=torch.float64),
+            torch.tensor(data, dtype=torch.float64),
+            torch.tensor(data_mask, dtype=torch.bool),
+            eps=config.EPS,
+            model_mask=torch.tensor(model_mask, dtype=torch.bool),
+        ).cpu()
+
+        np.testing.assert_allclose(
+            chi2_torch.numpy(),
+            chi2_np,
+            rtol=1e-10,
+            atol=1e-10,
+            equal_nan=True,
+        )
+
+    def test_halekas_multi_chunk_matches_numpy(self):
+        """Torch compute_chi2_multi_chunk_torch matches NumPy Halekas log-chi2."""
+        from src import config
+        from src.losscone.chi2 import compute_halekas_chi2_batch
+        from src.model_torch import compute_chi2_multi_chunk_torch
+
+        rng = np.random.default_rng(1)
+        N_chunks, n_pop, nE, nPitch = 3, 4, 6, 7
+
+        data = rng.uniform(0.1, 10.0, (N_chunks, nE, nPitch)).astype(np.float64)
+        data[rng.random(data.shape) < 0.10] = -1.0
+        data[rng.random(data.shape) < 0.05] = np.nan
+
+        models = rng.uniform(0.1, 10.0, (N_chunks, n_pop, nE, nPitch)).astype(
+            np.float64
+        )
+        model_mask = rng.random((N_chunks, nE, nPitch)) > 0.3
+
+        data_mask = np.isfinite(data) & (data > 0)
+
+        chi2_torch = compute_chi2_multi_chunk_torch(
+            torch.tensor(models, dtype=torch.float64),
+            torch.tensor(data, dtype=torch.float64),
+            torch.tensor(data_mask, dtype=torch.bool),
+            eps=config.EPS,
+            model_mask=torch.tensor(model_mask, dtype=torch.bool).unsqueeze(1),
+        ).cpu()
+
+        chi2_np = np.stack(
+            [
+                compute_halekas_chi2_batch(
+                    norm2d=data[i],
+                    models=models[i],
+                    model_mask=model_mask[i],
+                    eps=config.EPS,
+                )
+                for i in range(N_chunks)
+            ]
+        )
+
+        np.testing.assert_allclose(
+            chi2_torch.numpy(),
+            chi2_np,
+            rtol=1e-10,
+            atol=1e-10,
+            equal_nan=True,
+        )
+
+    def test_lillis_batch_matches_numpy(self):
+        """Torch compute_lillis_chi2_batch_torch matches NumPy reduced chi2."""
+        from src import config
+        from src.losscone.chi2 import compute_lillis_chi2_batch
+        from src.losscone.masks import build_lillis_mask
+        from src.model_torch import compute_lillis_chi2_batch_torch
+
+        rng = np.random.default_rng(2)
+        n_models, nE, nPitch = 5, 6, 12
+
+        pitch_1d = np.linspace(0.0, 180.0, nPitch, dtype=np.float64)
+        pitches = np.tile(pitch_1d, (nE, 1))
+
+        raw_flux = np.full((nE, nPitch), 2.0, dtype=np.float64)
+        incident_idx = int(np.argmax(pitch_1d < 90.0))
+        raw_flux[:, incident_idx] = 10.0
+
+        norm2d = rng.uniform(0.1, 1.0, (nE, nPitch)).astype(np.float64)
+        models = rng.uniform(0.1, 1.0, (n_models, nE, nPitch)).astype(np.float64)
+        model_mask = rng.random((n_models, nE, nPitch)) > 0.05
+
+        chi2_np = compute_lillis_chi2_batch(
+            norm2d=norm2d,
+            models=models,
+            raw_flux=raw_flux,
+            pitches=pitches,
+            model_mask=model_mask,
+        )
+
+        data_mask = build_lillis_mask(raw_flux, pitches)
+        assert int(np.count_nonzero(data_mask)) >= config.LILLIS_MIN_VALID_BINS
+
+        chi2_torch = compute_lillis_chi2_batch_torch(
+            torch.tensor(models, dtype=torch.float64),
+            torch.tensor(norm2d, dtype=torch.float64),
+            torch.tensor(data_mask, dtype=torch.bool),
+            model_mask=torch.tensor(model_mask, dtype=torch.bool),
+        ).cpu()
+
+        np.testing.assert_allclose(
+            chi2_torch.numpy(),
+            chi2_np,
+            rtol=1e-10,
+            atol=1e-10,
+            equal_nan=True,
         )
 
 

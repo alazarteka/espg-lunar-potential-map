@@ -24,6 +24,7 @@ except ImportError:
     HAS_TORCH = False
     Tensor = None  # type: ignore[misc, assignment]
 
+from src import config
 from src.losscone.types import FitMethod, parse_fit_method, parse_normalization_mode
 from src.utils.losscone_lhs import generate_losscone_lhs
 from src.utils.optimization import (
@@ -268,11 +269,15 @@ def compute_chi2_batch_torch(
     else:
         combined_mask = data_mask_exp
 
+    combined_mask = combined_mask.expand_as(log_model)
+
     # Compute diff only where mask is True
     diff = torch.where(
         combined_mask, log_data_exp - log_model, torch.zeros_like(log_model)
     )
     chi2 = (diff**2).sum(dim=(1, 2))
+    n_valid = combined_mask.sum(dim=(1, 2))
+    chi2 = torch.where(n_valid > 0, chi2, torch.full_like(chi2, float("nan")))
 
     return chi2
 
@@ -303,11 +308,18 @@ def compute_lillis_chi2_batch_torch(
     else:
         combined_mask = data_mask_exp
 
+    combined_mask = combined_mask.expand_as(model)
     diff = torch.where(combined_mask, data_exp - model, torch.zeros_like(model))
     chi2 = (diff**2).sum(dim=(1, 2))
-    n_valid = combined_mask.sum(dim=(1, 2)).to(dtype=chi2.dtype)
-    dof = torch.clamp(n_valid - 3.0, min=1.0)
-    return chi2 / dof
+    n_valid = combined_mask.sum(dim=(1, 2))
+    dof = torch.clamp(n_valid.to(dtype=chi2.dtype) - 3.0, min=1.0)
+    reduced = chi2 / dof
+    reduced = torch.where(
+        n_valid >= config.LILLIS_MIN_VALID_BINS,
+        reduced,
+        torch.full_like(reduced, float("nan")),
+    )
+    return reduced
 
 
 def synth_losscone_multi_chunk_torch(
@@ -500,11 +512,15 @@ def compute_chi2_multi_chunk_torch(
     else:
         combined_mask = data_mask_exp
 
+    combined_mask = combined_mask.expand_as(log_model)
+
     # Compute diff only where mask is True
     diff = torch.where(
         combined_mask, log_data_exp - log_model, torch.zeros_like(log_model)
     )
     chi2 = (diff**2).sum(dim=(2, 3))  # Sum over (E, A) -> (N, P)
+    n_valid = combined_mask.sum(dim=(2, 3))
+    chi2 = torch.where(n_valid > 0, chi2, torch.full_like(chi2, float("nan")))
 
     return chi2
 
@@ -535,11 +551,18 @@ def compute_lillis_chi2_multi_chunk_torch(
     else:
         combined_mask = data_mask_exp
 
+    combined_mask = combined_mask.expand_as(models)
     diff = torch.where(combined_mask, data_exp - models, torch.zeros_like(models))
     chi2 = (diff**2).sum(dim=(2, 3))
-    n_valid = data_mask.sum(dim=(1, 2)).to(dtype=chi2.dtype)
-    dof = torch.clamp(n_valid - 3.0, min=1.0).unsqueeze(1)
-    return chi2 / dof
+    n_valid = combined_mask.sum(dim=(2, 3))
+    dof = torch.clamp(n_valid.to(dtype=chi2.dtype) - 3.0, min=1.0)
+    reduced = chi2 / dof
+    reduced = torch.where(
+        n_valid >= config.LILLIS_MIN_VALID_BINS,
+        reduced,
+        torch.full_like(reduced, float("nan")),
+    )
+    return reduced
 
 
 # Use shared BatchedDifferentialEvolution for backwards compatibility
@@ -758,7 +781,7 @@ class LossConeFitterTorch:
             beam_width = torch.full_like(U_surface, self.beam_width_ev)
 
             # Evaluate models
-            models = synth_losscone_batch_torch(
+            models, model_masks = synth_losscone_batch_torch(
                 energies_t,
                 pitches_t,
                 U_surface,
@@ -768,13 +791,18 @@ class LossConeFitterTorch:
                 beam_amp=beam_amp,
                 beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
                 background=torch.full_like(U_surface, self.background),
+                return_mask=True,
             )
 
             # Compute chi2
             if self.fit_method == FitMethod.LILLIS:
-                chi2 = compute_lillis_chi2_batch_torch(models, norm2d_t, data_mask_t)
+                chi2 = compute_lillis_chi2_batch_torch(
+                    models, norm2d_t, data_mask_t, model_mask=model_masks
+                )
             else:
-                chi2 = compute_chi2_batch_torch(models, norm2d_t, data_mask_t, eps)
+                chi2 = compute_chi2_batch_torch(
+                    models, norm2d_t, data_mask_t, eps, model_mask=model_masks
+                )
 
             # Penalize invalid models
             invalid = ~torch.isfinite(chi2)
@@ -1201,12 +1229,26 @@ class LossConeFitterTorch:
             background=torch.full_like(U_surface, self.background),
         )  # (N, n_lhs, nE, nPitch)
 
+        # Valid-energy mask (E >= U_spacecraft); broadcastable to
+        # (N, n_pop, nE, nPitch).
+        if sc_potential.dim() == 1:
+            valid_energy = energies >= sc_potential.view(N_chunks, 1)
+        else:
+            valid_energy = energies >= sc_potential
+        model_mask = valid_energy.view(N_chunks, 1, energies.size(1), 1)
+
         # Compute chi2 for all
         if self.fit_method == FitMethod.LILLIS:
-            chi2 = compute_lillis_chi2_multi_chunk_torch(models, norm2d, data_mask)
+            chi2 = compute_lillis_chi2_multi_chunk_torch(
+                models, norm2d, data_mask, model_mask=model_mask
+            )
         else:
             chi2 = compute_chi2_multi_chunk_torch(
-                models, norm2d, data_mask, log_data_precomputed=log_data_precomputed
+                models,
+                norm2d,
+                data_mask,
+                log_data_precomputed=log_data_precomputed,
+                model_mask=model_mask,
             )  # (N, n_lhs)
 
         # Penalize invalid
@@ -1301,11 +1343,23 @@ class LossConeFitterTorch:
                 background=torch.full_like(U_surface, self.background),
             )
 
+            if sc_potential.dim() == 1:
+                valid_energy = energies >= sc_potential.view(N_chunks, 1)
+            else:
+                valid_energy = energies >= sc_potential
+            model_mask = valid_energy.view(N_chunks, 1, energies.size(1), 1)
+
             if self.fit_method == FitMethod.LILLIS:
-                chi2 = compute_lillis_chi2_multi_chunk_torch(models, norm2d, data_mask)
+                chi2 = compute_lillis_chi2_multi_chunk_torch(
+                    models, norm2d, data_mask, model_mask=model_mask
+                )
             else:
                 chi2 = compute_chi2_multi_chunk_torch(
-                    models, norm2d, data_mask, log_data_precomputed=log_data_precomputed
+                    models,
+                    norm2d,
+                    data_mask,
+                    log_data_precomputed=log_data_precomputed,
+                    model_mask=model_mask,
                 )
             chi2 = torch.where(
                 torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
