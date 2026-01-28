@@ -190,7 +190,7 @@ Pre-commit runs:
 2. Ruff format
 3. Pytest (CPU-only; `CUDA_VISIBLE_DEVICES=""`)
 
-Note: Hooks are configured as local `uv run ...` commands (no network fetch). If
+Note: Hooks are configured as local `uv --no-cache run ...` commands (no network fetch). If
 your environment can't write to `~/.cache/pre-commit`, set
 `PRE_COMMIT_HOME=/tmp/pre-commit`.
 
