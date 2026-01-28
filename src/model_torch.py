@@ -25,6 +25,7 @@ except ImportError:
     Tensor = None  # type: ignore[misc, assignment]
 
 from src import config
+from src.losscone.fitter_base import LossConeFitterBase
 from src.losscone.types import FitMethod, parse_fit_method, parse_normalization_mode
 from src.utils.losscone_lhs import generate_losscone_lhs
 from src.utils.optimization import (
@@ -569,7 +570,7 @@ def compute_lillis_chi2_multi_chunk_torch(
 GPUDifferentialEvolution = BatchedDifferentialEvolution
 
 
-class LossConeFitterTorch:
+class LossConeFitterTorch(LossConeFitterBase):
     """
     PyTorch-accelerated loss cone fitter.
 
@@ -687,11 +688,17 @@ class LossConeFitterTorch:
             )
         return self._cpu_fitter
 
-    def _build_norm2d(self, measurement_chunk: int) -> np.ndarray:
+    def build_norm2d(self, measurement_chunk: int) -> np.ndarray:
         """Build normalized 2D flux array (delegates to cached CPU fitter)."""
         return self._get_cpu_fitter().build_norm2d(measurement_chunk)
 
-    def _fit_surface_potential_torch(
+    def build_norm2d_batch(self, chunk_indices: list[int]) -> np.ndarray:
+        """
+        Build normalized 2D flux arrays for multiple chunks at once (CPU vectorized).
+        """
+        return self._get_cpu_fitter().build_norm2d_batch(chunk_indices)
+
+    def fit_chunk_full(
         self, measurement_chunk: int
     ) -> tuple[float, float, float, float]:
         """
@@ -707,7 +714,7 @@ class LossConeFitterTorch:
             (U_surface, bs_over_bm, beam_amp, chi2)
         """
         eps = 1e-6
-        norm2d = self._build_norm2d(measurement_chunk)
+        norm2d = self.build_norm2d(measurement_chunk)
 
         if np.isnan(norm2d).all():
             return np.nan, np.nan, np.nan, np.nan
@@ -894,6 +901,14 @@ class LossConeFitterTorch:
         """
         Fit surface potential for all measurement chunks.
 
+        Defaults to the batched implementation for performance.
+        """
+        return self.fit_surface_potential_batched()
+
+    def fit_surface_potential_sequential(self) -> np.ndarray:
+        """
+        Fit surface potential for all measurement chunks.
+
         Returns:
             Array with columns [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
         """
@@ -908,7 +923,7 @@ class LossConeFitterTorch:
             unit="chunk",
             dynamic_ncols=True,
         ):
-            U_surface, bs_over_bm, beam_amp, chi2 = self._fit_surface_potential_torch(i)
+            U_surface, bs_over_bm, beam_amp, chi2 = self.fit_chunk_full(i)
             results[i] = [U_surface, bs_over_bm, beam_amp, chi2, i]
 
         return results

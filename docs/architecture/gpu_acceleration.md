@@ -31,6 +31,10 @@ When `--fast` is enabled in batch mode:
 
 The intent is functional parity with CPU fitting while trading memory for speed.
 
+`LossConeFitterTorch.fit_surface_potential()` uses the batched path by default.
+Use `LossConeFitterTorch.fit_surface_potential_sequential()` for debugging or
+per-chunk comparisons.
+
 ## Auto-Detection
 
 - **dtype**: float16 on Volta+ GPUs, float32 on older GPUs/CPU

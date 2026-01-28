@@ -312,10 +312,7 @@ class LossConeSession:
         cache_key = (chunk_idx, self.normalization_mode, self.incident_flux_stat)
         if cache_key in self._norm_cache:
             return self._norm_cache[cache_key]
-        if self.use_torch and hasattr(self.fitter, "_build_norm2d"):
-            norm2d = self.fitter._build_norm2d(chunk_idx)
-        else:
-            norm2d = self.fitter.build_norm2d(chunk_idx)
+        norm2d = self.fitter.build_norm2d(chunk_idx)
         self._norm_cache[cache_key] = norm2d
         return norm2d
 
@@ -424,9 +421,4 @@ class LossConeSession:
         )
 
     def fit_chunk_full(self, chunk_idx: int) -> tuple[float, float, float, float]:
-        if self.use_torch:
-            try:
-                return self.fitter._fit_surface_potential_torch(chunk_idx)
-            except Exception:
-                pass
-        return self.fitter._fit_surface_potential(chunk_idx)
+        return self.fitter.fit_chunk_full(chunk_idx)

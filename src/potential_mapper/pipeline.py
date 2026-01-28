@@ -872,8 +872,8 @@ def process_merged_data(
             device=None,  # Auto-detect: CUDA if available, else CPU
             fit_method=fit_method,
         )
-        # Use batched GPU processing (auto-detects dtype and batch_size)
-        fit_mat = fitter.fit_surface_potential_batched()
+        # Torch path defaults to batched processing (auto-detects dtype and batch_size)
+        fit_mat = fitter.fit_surface_potential()
         _apply_fit_results(
             fit_mat,
             proj_potential,

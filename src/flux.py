@@ -11,6 +11,7 @@ from src.losscone.chi2 import (
     compute_lillis_chi2,
     compute_lillis_chi2_batch,
 )
+from src.losscone.fitter_base import LossConeFitterBase
 from src.losscone.masks import build_lillis_mask
 from src.losscone.types import (
     FitChunkData,
@@ -339,7 +340,7 @@ class PitchAngle:
         self.pitch_angles = pitch_angles
 
 
-class LossConeFitter:
+class LossConeFitter(LossConeFitterBase):
     def __init__(
         self,
         er_data: ERData,
@@ -950,6 +951,11 @@ class LossConeFitter:
         beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
 
         return float(U_surface), bs_over_bm, beam_amp, float(result.fun)
+
+    def fit_chunk_full(
+        self, measurement_chunk: int
+    ) -> tuple[float, float, float, float]:
+        return self._fit_surface_potential(measurement_chunk)
 
     def fit_chunk_lhs(
         self,
