@@ -194,7 +194,7 @@ def _hour_ticks() -> tuple[list[float], list[str]]:
     return ticks, labels
 
 
-def _load_orbit_data(er_file: Path, theta_file: Path) -> OrbitData:
+def _load_orbit_data(er_file: Path) -> OrbitData:
     load_spice_files()
 
     er_data = ERData(str(er_file))
@@ -277,7 +277,7 @@ def _load_orbit_data(er_file: Path, theta_file: Path) -> OrbitData:
 
 
 def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
-    data = _load_orbit_data(args.er_file, args.theta_file)
+    data = _load_orbit_data(args.er_file)
 
     n_specs = len(data.spec_nos)
     time_hours = _hours_since_midnight(data.times)
@@ -663,12 +663,6 @@ def parse_args() -> argparse.Namespace:
         description="Launch Loss Cone Orbit Studio (multi-panel diagnostics)."
     )
     parser.add_argument("er_file", type=Path, help="Path to ER .TAB file")
-    parser.add_argument(
-        "--theta-file",
-        type=Path,
-        default=config.DATA_DIR / config.THETA_FILE,
-        help="Theta file for pitch-angle calculations",
-    )
     parser.add_argument("--port", type=int, default=5007, help="Server port")
     parser.add_argument(
         "--collapse",

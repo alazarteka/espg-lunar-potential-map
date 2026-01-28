@@ -37,7 +37,6 @@ def create_3panel_debug_plot(
     er_file: Path,
     spec_no: int,
     output_path: Path,
-    theta_file: Path,
     usc: float,
     normalization: str,
     fixed_beam_amp: float | None,
@@ -52,7 +51,6 @@ def create_3panel_debug_plot(
         er_file: Path to ER .TAB file
         spec_no: Spectrum number to plot
         output_path: Where to save the figure
-        theta_file: Path to theta table for pitch angle calculations
         usc: Spacecraft potential [V] applied to all rows
         normalization: Normalization mode ("global", "ratio", or "ratio2")
         fixed_beam_amp: If provided, fix Gaussian beam amplitude to this value
@@ -70,9 +68,8 @@ def create_3panel_debug_plot(
     # Create fitter with spacecraft potential correction
     fitter = LossConeFitter(
         er_data,
-        str(theta_file),
-        pitch_angle,
-        spacecraft_potential,
+        pitch_angle=pitch_angle,
+        spacecraft_potential=spacecraft_potential,
         normalization_mode=normalization,
         beam_amp_fixed=fixed_beam_amp,
         loss_cone_background=background,
@@ -101,9 +98,15 @@ def create_3panel_debug_plot(
             f"Warning: Expected {config.SWEEP_ROWS} rows for spectrum {spec_no}, got {len(chunk_data)}"
         )
 
+    spec_nos = er_data.data[config.SPEC_NO_COLUMN].unique()
+    chunk_matches = np.flatnonzero(spec_nos == spec_no)
+    if chunk_matches.size == 0:
+        raise ValueError(f"Spectrum number {spec_no} not found in data")
+    chunk_idx = int(chunk_matches[0])
+
     # Fit the specified spectrum
     print(f"Fitting spectrum {spec_no}...")
-    U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(spec_no)
+    U_surface, bs_bm, beam_amp, chi2 = fitter.fit_chunk_full(chunk_idx)
 
     # Get raw flux data
     flux_data = chunk_data[config.FLUX_COLS].to_numpy(dtype=np.float64)
@@ -133,7 +136,7 @@ def create_3panel_debug_plot(
     _, _, norm_reg = interpolate_to_regular_grid(energies, pitches, norm2d)
 
     # Create model on irregular grid first
-    beam_width = max(abs(U_surface) * config.LOSS_CONE_BEAM_WIDTH_FACTOR, 1.0)
+    beam_width = fitter.beam_width_ev
     model_irregular = synth_losscone(
         energies,
         pitches,
@@ -297,12 +300,6 @@ def parse_args() -> argparse.Namespace:
         help="Output path for PNG file",
     )
     parser.add_argument(
-        "--theta-file",
-        type=Path,
-        default=config.DATA_DIR / config.THETA_FILE,
-        help="Theta table for pitch angle calculations",
-    )
-    parser.add_argument(
         "--dpi",
         type=int,
         default=150,
@@ -348,15 +345,10 @@ def main() -> int:
         print(f"Error: Input file {args.input} not found")
         return 1
 
-    if not args.theta_file.exists():
-        print(f"Error: Theta file {args.theta_file} not found")
-        return 1
-
     create_3panel_debug_plot(
         args.input,
         args.spec_no,
         args.output,
-        args.theta_file,
         args.usc,
         args.normalization,
         args.fixed_beam_amp,

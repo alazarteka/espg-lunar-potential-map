@@ -34,12 +34,6 @@ def _parse_args() -> argparse.Namespace:
         help="Path to ER .TAB file.",
     )
     parser.add_argument(
-        "--theta-file",
-        type=Path,
-        default=config.DATA_DIR / config.THETA_FILE,
-        help="Theta table used for pitch-angle calculations (default: data/theta.tab).",
-    )
-    parser.add_argument(
         "--chunks",
         type=int,
         nargs="*",
@@ -75,9 +69,9 @@ def _select_chunks(total_chunks: int, args: argparse.Namespace) -> Iterable[int]
 
 
 def _make_fitter(
-    er: ERData, theta_file: Path, beam_min: float, beam_max: float
+    er: ERData, beam_min: float, beam_max: float
 ) -> LossConeFitter:
-    fitter = LossConeFitter(er, str(theta_file))
+    fitter = LossConeFitter(er)
     fitter.beam_amp_min = beam_min
     fitter.beam_amp_max = beam_max
     fitter.lhs = fitter._generate_latin_hypercube()
@@ -104,11 +98,10 @@ def main() -> int:
 
     fitter_beam = _make_fitter(
         er,
-        args.theta_file,
         config.LOSS_CONE_BEAM_AMP_MIN,
         config.LOSS_CONE_BEAM_AMP_MAX,
     )
-    fitter_nobeam = _make_fitter(er, args.theta_file, 0.0, 0.0)
+    fitter_nobeam = _make_fitter(er, 0.0, 0.0)
 
     comparisons: list[dict[str, float]] = []
 

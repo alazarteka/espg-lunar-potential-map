@@ -474,7 +474,7 @@ def main() -> None:
     args = parse_args()
     day_file = select_flux_day_file(args.year, args.month, args.day)
     er = ERData(str(day_file))
-    pa = PitchAngle(er, str(config.DATA_DIR / config.THETA_FILE))
+    pa = PitchAngle(er)
 
     data_by_spec, vmin, vmax, spec_nos, x_range, y_range, first_nonempty = (
         build_all_frames(er, pa)

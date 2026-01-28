@@ -16,6 +16,14 @@ from src import config
 from src.flux import ERData, LossConeFitter, PitchAngle
 
 
+def _spec_no_to_chunk_idx(er_data: ERData, spec_no: int) -> int:
+    spec_nos = er_data.data[config.SPEC_NO_COLUMN].unique()
+    matches = np.flatnonzero(spec_nos == spec_no)
+    if matches.size == 0:
+        raise ValueError(f"spec_no {spec_no} not found in data")
+    return int(matches[0])
+
+
 def run_cpu_fit(
     er_data: ERData,
     pitch_angle: PitchAngle,
@@ -25,15 +33,15 @@ def run_cpu_fit(
     """Run CPU fitter and return (results, elapsed_time)."""
     fitter = LossConeFitter(
         er_data,
-        str(config.DATA_DIR / config.THETA_FILE),
-        pitch_angle,
-        spacecraft_potential,
+        pitch_angle=pitch_angle,
+        spacecraft_potential=spacecraft_potential,
         normalization_mode="ratio",
         incident_flux_stat="mean",
     )
 
+    chunk_idx = _spec_no_to_chunk_idx(er_data, spec_no)
     start = time.perf_counter()
-    result = fitter._fit_surface_potential(spec_no)
+    result = fitter.fit_chunk_full(chunk_idx)
     elapsed = time.perf_counter() - start
 
     return result, elapsed
@@ -51,19 +59,19 @@ def run_gpu_fit(
 
     fitter = LossConeFitterTorch(
         er_data,
-        str(config.DATA_DIR / config.THETA_FILE),
-        pitch_angle,
-        spacecraft_potential,
+        pitch_angle=pitch_angle,
+        spacecraft_potential=spacecraft_potential,
         normalization_mode="ratio",
         incident_flux_stat="mean",
         device=device,
     )
 
+    chunk_idx = _spec_no_to_chunk_idx(er_data, spec_no)
     # Warm-up run (JIT compilation, CUDA initialization)
-    _ = fitter._fit_surface_potential_torch(spec_no)
+    _ = fitter.fit_chunk_full(chunk_idx)
 
     start = time.perf_counter()
-    result = fitter._fit_surface_potential_torch(spec_no)
+    result = fitter.fit_chunk_full(chunk_idx)
     elapsed = time.perf_counter() - start
 
     return result, elapsed
@@ -115,7 +123,6 @@ def main() -> int:
     # Load data
     print("Loading data...")
     er_data = ERData(str(args.input))
-    theta_file = str(config.DATA_DIR / config.THETA_FILE)
     pitch_angle = PitchAngle(er_data)
     spacecraft_potential = np.full(len(er_data.data), args.usc)
 

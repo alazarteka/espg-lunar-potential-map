@@ -132,12 +132,6 @@ def parse_args() -> argparse.Namespace:
         help="Spectrum number to visualize",
     )
     parser.add_argument(
-        "--theta-file",
-        type=Path,
-        default=config.DATA_DIR / config.THETA_FILE,
-        help="Theta file for pitch-angle calculations",
-    )
-    parser.add_argument(
         "--normalization",
         choices=["global", "ratio", "ratio2", "ratio_rescaled"],
         default="ratio2",
@@ -298,7 +292,6 @@ def main() -> int:
     # Load session
     session = LossConeSession(
         er_file=args.er_file,
-        theta_file=args.theta_file,
         normalization_mode=args.normalization,
         incident_flux_stat=args.incident_stat,
         use_torch=args.fast,

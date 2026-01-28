@@ -35,9 +35,7 @@ def plot_loss_cone_comparison(
     pitch_angle = PitchAngle(er_data)
 
     # Create fitter
-    fitter = LossConeFitter(
-        er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle
-    )
+    fitter = LossConeFitter(er_data, pitch_angle=pitch_angle)
 
     # Fit loss cone for all chunks (but catch failures)
     print("Fitting loss cones...")
@@ -85,7 +83,7 @@ def plot_loss_cone_comparison(
     normalized_obs = flux_data / incident_avg
 
     # Create model
-    beam_width = max(abs(U_surface) * config.LOSS_CONE_BEAM_WIDTH_FACTOR, 1.0)
+    beam_width = config.LOSS_CONE_BEAM_WIDTH_EV
     model = synth_losscone(
         energies,
         pitches,

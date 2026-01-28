@@ -205,7 +205,6 @@ def _build_image_figure(
 def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
     session = LossConeSession(
         er_file=args.er_file,
-        theta_file=args.theta_file,
         normalization_mode=args.normalization,
         incident_flux_stat=args.incident_stat,
         loss_cone_background=args.background,
@@ -544,12 +543,6 @@ def parse_args() -> argparse.Namespace:
         description="Launch Loss Cone Studio (interactive diagnostics UI)."
     )
     parser.add_argument("er_file", type=Path, help="Path to ER .TAB file")
-    parser.add_argument(
-        "--theta-file",
-        type=Path,
-        default=config.DATA_DIR / config.THETA_FILE,
-        help="Theta file for pitch-angle calculations",
-    )
     parser.add_argument("--port", type=int, default=5006, help="Server port")
     parser.add_argument("--chunk", type=int, default=0, help="Initial chunk index")
     parser.add_argument(

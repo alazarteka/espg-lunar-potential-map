@@ -53,7 +53,7 @@ def main() -> None:
     er = ERData(str(day_file))
 
     # Compute pitch angles for the whole file, then slice the spectrum rows
-    pa = PitchAngle(er, str(config.DATA_DIR / config.THETA_FILE))
+    pa = PitchAngle(er)
 
     energies, flux_mat = extract_spectrum(er, args.spec_no)
     # Find the row indices for this spectrum

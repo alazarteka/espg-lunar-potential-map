@@ -394,7 +394,6 @@ def main(argv: Iterable[str] | None = None) -> int:
     pitch_angle = PitchAngle(er_data)
     fitter = LossConeFitter(
         er_data,
-        str(config.DATA_DIR / config.THETA_FILE),
         pitch_angle=pitch_angle,
         normalization_mode=args.normalization,
         incident_flux_stat=args.incident_stat,

@@ -141,12 +141,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--noise-mode", choices=("log", "linear"), default="log")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
-        "--theta-file",
-        type=Path,
-        default=config.DATA_DIR / config.THETA_FILE,
-        help="Theta file for pitch-angle calculations",
-    )
-    parser.add_argument(
         "--normalization",
         choices=["global", "ratio", "ratio2", "ratio_rescaled"],
         default="ratio",
@@ -173,7 +167,6 @@ def main() -> int:
     studio = _load_losscone_studio()
     studio_args = argparse.Namespace(
         er_file=args.out_file,
-        theta_file=args.theta_file,
         normalization=args.normalization,
         incident_stat=args.incident_stat,
         background=args.background,

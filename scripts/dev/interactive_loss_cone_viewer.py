@@ -89,9 +89,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
     pitch_angle = PitchAngle(er_data)
 
     # Create fitter
-    fitter = LossConeFitter(
-        er_data, str(config.DATA_DIR / config.THETA_FILE), pitch_angle
-    )
+    fitter = LossConeFitter(er_data, pitch_angle=pitch_angle)
 
     # Fit loss cone for all chunks
     print("Fitting loss cones...")

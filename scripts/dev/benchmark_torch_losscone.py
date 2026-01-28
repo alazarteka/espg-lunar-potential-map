@@ -25,9 +25,8 @@ def benchmark_cpu(
     """Benchmark CPU fitter on n_chunks."""
     fitter = LossConeFitter(
         er_data,
-        str(config.DATA_DIR / config.THETA_FILE),
-        pitch_angle,
-        spacecraft_potential,
+        pitch_angle=pitch_angle,
+        spacecraft_potential=spacecraft_potential,
         normalization_mode="ratio",
         incident_flux_stat="mean",
     )
@@ -55,9 +54,8 @@ def benchmark_gpu(
 
     fitter = LossConeFitterTorch(
         er_data,
-        str(config.DATA_DIR / config.THETA_FILE),
-        pitch_angle,
-        spacecraft_potential,
+        pitch_angle=pitch_angle,
+        spacecraft_potential=spacecraft_potential,
         normalization_mode="ratio",
         incident_flux_stat="mean",
         device=device,
@@ -119,7 +117,6 @@ def main() -> int:
     # Load data
     print("Loading data...")
     er_data = ERData(str(args.input))
-    theta_file = str(config.DATA_DIR / config.THETA_FILE)
     pitch_angle = PitchAngle(er_data)
     spacecraft_potential = np.full(len(er_data.data), args.usc)
 

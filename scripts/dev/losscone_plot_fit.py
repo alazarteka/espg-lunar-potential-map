@@ -7,7 +7,6 @@ Usage
 uv run python scripts/dev/losscone_plot_fit.py \
     --file data/1998/060_090MAR/3D980323.TAB \
     --chunk 0 \
-    --theta-file data/theta.tab \
     --output scratch/losscone_chunk0.png
 
 The script computes the normalized flux matrix used by LossConeFitter,
@@ -46,12 +45,6 @@ def _parse_args() -> argparse.Namespace:
         help="Chunk index (0-based) to visualize.",
     )
     parser.add_argument(
-        "--theta-file",
-        type=Path,
-        default=config.DATA_DIR / config.THETA_FILE,
-        help="Theta table used for pitch-angle calculations.",
-    )
-    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -78,7 +71,7 @@ def main() -> int:
     args = _parse_args()
 
     er = ERData(str(args.file))
-    fitter = LossConeFitter(er, str(args.theta_file))
+    fitter = LossConeFitter(er)
 
     total_rows = len(er.data)
     chunk_slice = _get_chunk_ranges(total_rows, args.chunk)
@@ -97,12 +90,12 @@ def main() -> int:
     energies = er.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[chunk_slice]
     pitches = fitter.pitch_angle.pitch_angles[chunk_slice]
 
-    beam_width = max(abs(U_surface) * fitter.beam_width_factor, config.EPS)
+    beam_width = fitter.beam_width_ev
     model = synth_losscone(
         energies,
         pitches,
-        U_surface,
-        bs_over_bm,
+        U_surface=U_surface,
+        bs_over_bm=bs_over_bm,
         beam_width_eV=beam_width,
         beam_amp=beam_amp,
         beam_pitch_sigma_deg=fitter.beam_pitch_sigma_deg,

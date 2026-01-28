@@ -98,7 +98,6 @@ class LossConeSession:
     def __init__(
         self,
         er_file: Path,
-        theta_file: Path | None = None,
         normalization_mode: str = "ratio",
         incident_flux_stat: str = "mean",
         loss_cone_background: float | None = None,
@@ -108,11 +107,7 @@ class LossConeSession:
         fit_method: str | FitMethod | None = None,
     ) -> None:
         self.er_file = Path(er_file)
-        self.theta_file = (
-            Path(theta_file)
-            if theta_file is not None
-            else config.DATA_DIR / config.THETA_FILE
-        )
+        self.theta_file = config.DATA_DIR / config.THETA_FILE
         self.normalization_mode = normalization_mode
         self.incident_flux_stat = incident_flux_stat
         self.background = (

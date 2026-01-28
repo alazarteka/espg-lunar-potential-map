@@ -35,7 +35,7 @@ def main():
     er = prepare_synthetic_er()
 
     # 2) Compute pitch angles with the repo implementation
-    pa = PitchAngle(er, str(config.DATA_DIR / config.THETA_FILE))
+    pa = PitchAngle(er)
 
     # Choose one energy row to visualize
     row = 0

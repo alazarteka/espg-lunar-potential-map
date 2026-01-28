@@ -132,12 +132,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("er_file", type=Path, help="Path to ER .TAB file")
     parser.add_argument(
-        "--theta-file",
-        type=Path,
-        default=config.DATA_DIR / config.THETA_FILE,
-        help="Theta file for pitch-angle calculations",
-    )
-    parser.add_argument(
         "--u-spacecraft",
         type=float,
         default=10.0,
@@ -204,7 +198,6 @@ def main() -> int:
 
     session = LossConeSession(
         er_file=args.er_file,
-        theta_file=args.theta_file,
         normalization_mode=args.normalization,
         incident_flux_stat="mean",
         use_torch=args.fast,

@@ -108,7 +108,6 @@ def scan_file(er_file: Path) -> dict:
 
         session = LossConeSession(
             er_file=er_file,
-            theta_file=config.DATA_DIR / config.THETA_FILE,
             normalization_mode="ratio2",
             incident_flux_stat="mean",
             use_torch=False,

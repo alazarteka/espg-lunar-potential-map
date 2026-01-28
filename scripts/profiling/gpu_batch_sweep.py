@@ -110,7 +110,6 @@ def sweep_losscone(
     n_chunks = n_rows // config.SWEEP_ROWS
     print(f"Total chunks: {n_chunks}")
 
-    theta_path = str(config.DATA_DIR / config.THETA_FILE)
     pitch_angle = PitchAngle(er_data)
 
     results = []
@@ -122,7 +121,6 @@ def sweep_losscone(
         try:
             fitter = LossConeFitterTorch(
                 er_data=er_data,
-                thetas=theta_path,
                 pitch_angle=pitch_angle,
                 device="cuda",
             )

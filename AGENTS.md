@@ -41,7 +41,7 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
   - `potential_mapper/` - Mapping pipeline
   - `temporal/` - Spherical harmonic reconstruction
   - `engineering/` - GlobalStats, SiteStats, site analysis
-  - `losscone/` - Shared loss-cone helpers (masks, chi2, types, fitter interface)
+  - `losscone/` - Loss-cone core (cpu, model, masks, chi2, types, torch/)
   - `diagnostics/` - Loss cone session management
   - `physics/`, `utils/`, `visualization/` - Supporting modules
   - `utils/losscone_lhs.py` - Shared loss-cone LHS sampling helper
