@@ -126,6 +126,8 @@ Before declaring work complete:
 
 - Run `uv run ruff check src tests` and fix issues
 - Run `uv run pytest -q` to verify nothing broke
+- If running `pre-commit` in a sandboxed environment, set `PRE_COMMIT_HOME=/tmp/pre-commit`
+  (and note hooks use `uv --no-cache run ...` to avoid `~/.cache` write issues)
 - Add type hints to new functions
 - Follow existing patterns in the codebase (look at similar files)
 - Use `src.utils.units` for physical quantities with units
