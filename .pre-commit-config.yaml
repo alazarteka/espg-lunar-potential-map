@@ -3,24 +3,23 @@
 # Run manually: pre-commit run --all-files
 
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.10
-    hooks:
-      # Linter
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-        files: ^(src|tests)/
-      # Formatter (replaces Black)
-      - id: ruff-format
-        files: ^(src|tests)/
-
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff (check)
+        entry: uv --no-cache run ruff check --fix --exit-non-zero-on-fix
+        language: system
+        files: ^(src|tests)/
+
+      - id: ruff-format
+        name: ruff (format)
+        entry: uv --no-cache run ruff format
+        language: system
+        files: ^(src|tests)/
+
       - id: pytest
         name: pytest
-        entry: uv run pytest -m "not skip_ci" --tb=short
+        entry: 'env CUDA_VISIBLE_DEVICES="" uv --no-cache run pytest -m "not skip_ci" --tb=short'
         language: system
         pass_filenames: false
         always_run: true
-        env:
-          CUDA_VISIBLE_DEVICES: ""

@@ -188,9 +188,11 @@ pre-commit run --all-files
 Pre-commit runs:
 1. Ruff check + auto-fix
 2. Ruff format
-3. MyPy type checking
-4. Trailing whitespace removal
-5. YAML/TOML validation
+3. Pytest (CPU-only; `CUDA_VISIBLE_DEVICES=""`)
+
+Note: Hooks are configured as local `uv run ...` commands (no network fetch). If
+your environment can't write to `~/.cache/pre-commit`, set
+`PRE_COMMIT_HOME=/tmp/pre-commit`.
 
 ---
 

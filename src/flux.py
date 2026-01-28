@@ -970,13 +970,13 @@ class LossConeFitter:
         )
 
         if self.fit_method == FitMethod.LILLIS:
-            combined_mask = build_lillis_mask(data.raw_flux, pitches) & data.valid_energy_mask
+            combined_mask = (
+                build_lillis_mask(data.raw_flux, pitches) & data.valid_energy_mask
+            )
             if int(np.count_nonzero(combined_mask)) < config.LILLIS_MIN_VALID_BINS:
                 return np.nan, np.nan, np.nan, np.nan
         else:
-            combined_mask = (
-                np.isfinite(norm2d) & (norm2d > 0) & data.valid_energy_mask
-            )
+            combined_mask = np.isfinite(norm2d) & (norm2d > 0) & data.valid_energy_mask
             if not combined_mask.any():
                 return np.nan, np.nan, np.nan, np.nan
 
