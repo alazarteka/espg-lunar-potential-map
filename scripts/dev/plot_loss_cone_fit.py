@@ -44,7 +44,7 @@ def plot_loss_cone_comparison(
 
     for i in range(n_chunks):
         try:
-            U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
+            U_surface, bs_bm, beam_amp, chi2 = fitter.fit_chunk_full(i)
             results_list.append([U_surface, bs_bm, beam_amp, chi2, i])
         except Exception as e:
             print(f"  Chunk {i} failed: {e}")

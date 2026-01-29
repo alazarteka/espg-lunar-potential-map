@@ -14,6 +14,7 @@ from torch import Tensor
 from src import config
 from src.losscone.cpu import LossConeFitter, PitchAngle
 from src.losscone.fitter_base import LossConeFitterBase
+from src.losscone.params import losscone_lhs_samples, losscone_optimizer_bounds
 from src.losscone.torch.chi2 import (
     compute_chi2_batch_torch,
     compute_chi2_multi_chunk_torch,
@@ -33,7 +34,6 @@ from src.losscone.types import (
     parse_normalization_mode,
 )
 from src.utils import thetas as thetas_module
-from src.utils.losscone_lhs import generate_losscone_lhs
 from src.utils.optimization import BatchedDifferentialEvolution, get_torch_device
 
 if TYPE_CHECKING:
@@ -271,31 +271,28 @@ class LossConeFitterTorch(LossConeFitterBase):
 
             return chi2
 
-        # Bounds - U_surface capped at detection threshold
-        bounds = [
-            (self.u_surface_min, self.u_surface_max),  # U_surface
-            (
-                self.bs_over_bm_min,
-                self.bs_over_bm_max,
-            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
-            (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
-        ]
+        bounds = losscone_optimizer_bounds(
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+        )
 
-        # Phase 1: LHS grid search (matches CPU implementation)
+        # Phase 1: LHS grid search (NumPy + SciPy sampler; shared with CPU)
         n_lhs = 400
-        from torch.quasirandom import SobolEngine
-
-        sobol = SobolEngine(dimension=3, scramble=True, seed=42)
-        lhs_unit = sobol.draw(n_lhs).to(device=self.device, dtype=self.dtype)
-
-        # Scale to bounds
-        lower = torch.tensor(
-            [b[0] for b in bounds], device=self.device, dtype=self.dtype
+        lhs_np = losscone_lhs_samples(
+            n_samples=n_lhs,
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+            seed=config.LOSS_CONE_LHS_SEED,
         )
-        upper = torch.tensor(
-            [b[1] for b in bounds], device=self.device, dtype=self.dtype
-        )
-        lhs_samples = lower + lhs_unit * (upper - lower)
+        lhs_samples = torch.tensor(lhs_np, device=self.device, dtype=self.dtype)
 
         # Evaluate all LHS samples at once (GPU batch)
         lhs_chi2 = objective(lhs_samples)
@@ -305,18 +302,8 @@ class LossConeFitterTorch(LossConeFitterBase):
         best_lhs_chi2 = lhs_chi2[best_lhs_idx].item()
         x0 = lhs_samples[best_lhs_idx]
 
-        # Phase 2: DE refinement starting from best LHS point
-        de_bounds = [
-            (self.u_surface_min, self.u_surface_max),  # U_surface
-            (
-                self.bs_over_bm_min,
-                self.bs_over_bm_max,
-            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
-            (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
-        ]
-
         de = GPUDifferentialEvolution(
-            bounds=de_bounds,
+            bounds=bounds,
             popsize=50,
             mutation=0.5,
             crossover=0.9,
@@ -559,7 +546,7 @@ class LossConeFitterTorch(LossConeFitterBase):
             return ChunkFitResult.invalid(measurement_chunk)
         data_mask = data.combined_mask(self.fit_method)
 
-        samples = generate_losscone_lhs(
+        samples = losscone_lhs_samples(
             n_samples=n_samples,
             u_surface_min=self.u_surface_min,
             u_surface_max=self.u_surface_max,
@@ -567,11 +554,12 @@ class LossConeFitterTorch(LossConeFitterBase):
             bs_over_bm_max=self.bs_over_bm_max,
             beam_amp_min=self.beam_amp_min,
             beam_amp_max=self.beam_amp_max,
-            seed=self.config.LOSS_CONE_LHS_SEED,
+            seed=config.LOSS_CONE_LHS_SEED,
         )
-        u_surface = torch.tensor(samples[:, 0], device=self.device, dtype=self.dtype)
-        bs_over_bm = torch.tensor(samples[:, 1], device=self.device, dtype=self.dtype)
-        beam_amp = torch.tensor(samples[:, 2], device=self.device, dtype=self.dtype)
+        samples_t = torch.tensor(samples, device=self.device, dtype=self.dtype)
+        u_surface = samples_t[:, 0]
+        bs_over_bm = samples_t[:, 1]
+        beam_amp = samples_t[:, 2]
 
         width = self.beam_width_ev if beam_width_ev is None else beam_width_ev
         beam_width = torch.full_like(u_surface, width)
@@ -656,29 +644,20 @@ class LossConeFitterTorch(LossConeFitterBase):
         if self.fit_method != FitMethod.LILLIS:
             log_data_precomputed = precompute_log_data_torch(norm2d, data_mask)
 
-        # Bounds - U_surface capped at detection threshold
-        bounds = [
-            (self.u_surface_min, self.u_surface_max),  # U_surface
-            (
-                self.bs_over_bm_min,
-                self.bs_over_bm_max,
-            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
-            (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
-        ]
-
-        # Generate LHS samples (same for all chunks)
-        from torch.quasirandom import SobolEngine
-
-        sobol = SobolEngine(dimension=3, scramble=True, seed=42)
-        lhs_unit = sobol.draw(n_lhs).to(device=self.device, dtype=self.dtype)
-
-        lower = torch.tensor(
-            [b[0] for b in bounds], device=self.device, dtype=self.dtype
+        # Generate LHS samples (same for all chunks; shared with CPU)
+        lhs_np = losscone_lhs_samples(
+            n_samples=n_lhs,
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+            seed=config.LOSS_CONE_LHS_SEED,
         )
-        upper = torch.tensor(
-            [b[1] for b in bounds], device=self.device, dtype=self.dtype
-        )
-        lhs_samples = lower + lhs_unit * (upper - lower)  # (n_lhs, 3)
+        lhs_samples = torch.tensor(
+            lhs_np, device=self.device, dtype=self.dtype
+        )  # (n_lhs, 3)
 
         # Expand to (N_chunks, n_lhs, 3)
         lhs_expanded = lhs_samples.unsqueeze(0).expand(N_chunks, -1, -1)
@@ -780,15 +759,14 @@ class LossConeFitterTorch(LossConeFitterBase):
         if self.fit_method != FitMethod.LILLIS:
             log_data_precomputed = precompute_log_data_torch(norm2d, data_mask)
 
-        # Bounds - U_surface capped at detection threshold
-        bounds = [
-            (self.u_surface_min, self.u_surface_max),  # U_surface
-            (
-                self.bs_over_bm_min,
-                self.bs_over_bm_max,
-            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
-            (self.beam_amp_min, max(self.beam_amp_max, self.beam_amp_min + 1e-12)),
-        ]
+        bounds = losscone_optimizer_bounds(
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+        )
 
         def objective(params: Tensor) -> Tensor:
             """

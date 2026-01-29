@@ -98,7 +98,7 @@ def create_interactive_viewer(er_file: Path, output_path: Path = None):
 
     for i in range(n_chunks):
         try:
-            U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
+            U_surface, bs_bm, beam_amp, chi2 = fitter.fit_chunk_full(i)
             results_list.append([U_surface, bs_bm, beam_amp, chi2, i])
         except Exception:
             # Skip failed fits

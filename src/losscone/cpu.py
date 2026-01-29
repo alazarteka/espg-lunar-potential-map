@@ -14,6 +14,7 @@ from src.losscone.chi2 import (
 from src.losscone.fitter_base import LossConeFitterBase
 from src.losscone.masks import build_lillis_mask
 from src.losscone.model import synth_losscone, synth_losscone_batch
+from src.losscone.params import losscone_lhs_samples, losscone_optimizer_bounds
 from src.losscone.types import (
     ChunkFitResult,
     FitChunkData,
@@ -23,7 +24,6 @@ from src.losscone.types import (
     parse_normalization_mode,
 )
 from src.utils import thetas as thetas_module
-from src.utils.losscone_lhs import generate_losscone_lhs
 from src.utils.units import ureg
 
 __all__ = [
@@ -419,7 +419,7 @@ class LossConeFitter(LossConeFitterBase):
         Returns:
             np.ndarray: The Latin Hypercube sample.
         """
-        return generate_losscone_lhs(
+        return losscone_lhs_samples(
             n_samples=n_samples,
             u_surface_min=self.u_surface_min,
             u_surface_max=self.u_surface_max,
@@ -915,14 +915,14 @@ class LossConeFitter(LossConeFitterBase):
 
         # Use constrained bounds: U_surface capped at detection threshold (~+20V)
         # because electron reflectometry cannot measure positive potentials reliably
-        bounds = [
-            (self.u_surface_min, self.u_surface_max),  # U_surface
-            (
-                self.bs_over_bm_min,
-                self.bs_over_bm_max,
-            ),  # bs_over_bm (raised from 0.1 to avoid degenerate solutions)
-            (self.beam_amp_min, self.beam_amp_max),  # beam_amp
-        ]
+        bounds = losscone_optimizer_bounds(
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+        )
 
         result = differential_evolution(
             chi2_scalar,
@@ -1085,11 +1085,14 @@ class LossConeFitter(LossConeFitterBase):
         # Nelder-Mead optimization (bounds enforced via penalty)
         from scipy.optimize import minimize
 
-        bounds = [
-            (self.u_surface_min, self.u_surface_max),
-            (self.bs_over_bm_min, self.bs_over_bm_max),
-            (self.beam_amp_min, self.beam_amp_max),
-        ]
+        bounds = losscone_optimizer_bounds(
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+        )
 
         def chi2_scalar(params):
             U_surface, bs_over_bm, beam_amp = params
@@ -1104,6 +1107,7 @@ class LossConeFitter(LossConeFitterBase):
                 or beam_amp > bounds[2][1]
             ):
                 return 1e30
+            beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
 
             model = synth_losscone(
                 energy_grid=energies,

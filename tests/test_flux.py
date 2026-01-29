@@ -296,7 +296,7 @@ class TestLossConeFitterFitting:
         er = prepare_synthetic_er()
         fitter = LossConeFitter(er)
 
-        U_surface, bs_over_bm, beam_amp, chi2 = fitter._fit_surface_potential(0)
+        U_surface, bs_over_bm, beam_amp, chi2 = fitter.fit_chunk_full(0)
 
         # bs_over_bm should be in bounds
         if not np.isnan(bs_over_bm):
@@ -308,7 +308,7 @@ class TestLossConeFitterFitting:
         fitter = LossConeFitter(er)
 
         # Request chunk that doesn't exist
-        U_surface, bs_over_bm, beam_amp, chi2 = fitter._fit_surface_potential(999)
+        U_surface, bs_over_bm, beam_amp, chi2 = fitter.fit_chunk_full(999)
 
         assert np.isnan(U_surface)
         assert np.isnan(bs_over_bm)

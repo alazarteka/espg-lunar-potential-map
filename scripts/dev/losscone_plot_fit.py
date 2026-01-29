@@ -81,7 +81,7 @@ def main() -> int:
         raise RuntimeError(f"Chunk {args.chunk} contains no valid flux.")
 
     # Fit to retrieve the best parameters.
-    U_surface, bs_over_bm, beam_amp, chi2 = fitter._fit_surface_potential(args.chunk)
+    U_surface, bs_over_bm, beam_amp, chi2 = fitter.fit_chunk_full(args.chunk)
     print(
         f"Chunk {args.chunk}: U_surface={U_surface:.2f} V, Bs/Bm={bs_over_bm:.3f}, "
         f"beam_amp={beam_amp:.3f}, χ²={chi2:.3g}"

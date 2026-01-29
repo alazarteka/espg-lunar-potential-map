@@ -63,7 +63,7 @@ def main():
     t0 = time.perf_counter()
     results_seq = np.zeros((test_chunks, 5))
     for i in range(seq_test_chunks):
-        U, bs, amp, chi2 = fitter._fit_surface_potential_torch(i)
+        U, bs, amp, chi2 = fitter.fit_chunk_full(i)
         results_seq[i] = [U, bs, amp, chi2, i]
     t_seq = time.perf_counter() - t0
     print(f"Sequential: {t_seq:.2f}s ({t_seq/seq_test_chunks*1000:.1f}ms/chunk)")

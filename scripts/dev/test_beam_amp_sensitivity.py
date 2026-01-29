@@ -49,7 +49,7 @@ def fit_with_different_strategies(er_file: Path, n_chunks: int = 100):
             fitter = LossConeFitter(
                 er_data, pitch_angle=pitch_angle
             )
-            U_surface, bs_bm, beam_amp, chi2 = fitter._fit_surface_potential(i)
+            U_surface, bs_bm, beam_amp, chi2 = fitter.fit_chunk_full(i)
             results["free"].append([U_surface, bs_bm, beam_amp, chi2, i])
 
             # Strategy 2: Fixed beam_amp = 25
@@ -58,7 +58,7 @@ def fit_with_different_strategies(er_file: Path, n_chunks: int = 100):
             )
             fitter_fixed.beam_amp_min = 25.0
             fitter_fixed.beam_amp_max = 25.0
-            U_surface, bs_bm, beam_amp, chi2 = fitter_fixed._fit_surface_potential(i)
+            U_surface, bs_bm, beam_amp, chi2 = fitter_fixed.fit_chunk_full(i)
             results["fixed_25"].append([U_surface, bs_bm, beam_amp, chi2, i])
 
             # Strategy 3: No beam (beam_amp = 0)
@@ -67,7 +67,7 @@ def fit_with_different_strategies(er_file: Path, n_chunks: int = 100):
             )
             fitter_nobeam.beam_amp_min = 0.0
             fitter_nobeam.beam_amp_max = 0.0
-            U_surface, bs_bm, beam_amp, chi2 = fitter_nobeam._fit_surface_potential(i)
+            U_surface, bs_bm, beam_amp, chi2 = fitter_nobeam.fit_chunk_full(i)
             results["no_beam"].append([U_surface, bs_bm, beam_amp, chi2, i])
 
             # Strategy 4: High upper bound (100)
@@ -75,7 +75,7 @@ def fit_with_different_strategies(er_file: Path, n_chunks: int = 100):
                 er_data, pitch_angle=pitch_angle
             )
             fitter_high.beam_amp_max = 100.0
-            U_surface, bs_bm, beam_amp, chi2 = fitter_high._fit_surface_potential(i)
+            U_surface, bs_bm, beam_amp, chi2 = fitter_high.fit_chunk_full(i)
             results["high_bound"].append([U_surface, bs_bm, beam_amp, chi2, i])
 
         except Exception:

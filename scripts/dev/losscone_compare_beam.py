@@ -107,10 +107,10 @@ def main() -> int:
 
     for idx in chunk_indices:
         U_surface_b, bs_over_bm_b, beam_amp_b, chi2_b = (
-            fitter_beam._fit_surface_potential(idx)
+            fitter_beam.fit_chunk_full(idx)
         )
         U_surface_nb, bs_over_bm_nb, beam_amp_nb, chi2_nb = (
-            fitter_nobeam._fit_surface_potential(idx)
+            fitter_nobeam.fit_chunk_full(idx)
         )
 
         comparisons.append(
