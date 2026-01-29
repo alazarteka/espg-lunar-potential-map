@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import numpy as np
 
+    from src.losscone.types import ChunkFitResult
+
 
 class LossConeFitterBase(ABC):
     """
@@ -31,14 +33,12 @@ class LossConeFitterBase(ABC):
         beam_width_ev: float | None = None,
         u_spacecraft: float | None = None,
         n_samples: int = 400,
-    ) -> tuple[float, float, float, float]:
-        """Return (U_surface, bs_over_bm, beam_amp, chi2) from LHS-only search."""
+    ) -> ChunkFitResult:
+        """Return fit result from LHS-only search."""
 
     @abstractmethod
-    def fit_chunk_full(
-        self, measurement_chunk: int
-    ) -> tuple[float, float, float, float]:
-        """Return (U_surface, bs_over_bm, beam_amp, chi2) from full optimization."""
+    def fit_chunk_full(self, measurement_chunk: int) -> ChunkFitResult:
+        """Return fit result from full optimization."""
 
     @abstractmethod
     def fit_surface_potential(self) -> np.ndarray:

@@ -15,6 +15,7 @@ from src.losscone.fitter_base import LossConeFitterBase
 from src.losscone.masks import build_lillis_mask
 from src.losscone.model import synth_losscone, synth_losscone_batch
 from src.losscone.types import (
+    ChunkFitResult,
     FitChunkData,
     FitMethod,
     NormalizationMode,
@@ -26,6 +27,7 @@ from src.utils.losscone_lhs import generate_losscone_lhs
 from src.utils.units import ureg
 
 __all__ = [
+    "ChunkFitResult",
     "ERData",
     "FitChunkData",
     "FitMethod",
@@ -815,9 +817,7 @@ class LossConeFitter(LossConeFitterBase):
 
         return result
 
-    def _fit_surface_potential(
-        self, measurement_chunk: int
-    ) -> tuple[float, float, float, float]:
+    def _fit_surface_potential(self, measurement_chunk: int) -> ChunkFitResult:
         """
         Fit surface potential (U_surface) and B_s/B_m for one 15-row measurement chunk
         using chi2 minimisation. Method is controlled by fit_method.
@@ -826,18 +826,14 @@ class LossConeFitter(LossConeFitterBase):
             measurement_chunk (int): The index of the measurement chunk.
 
         Returns:
-            tuple[float, float, float, float]:
-                - U_surface: best-fit surface potential in volts
-                - bs_over_bm: best-fit B_s/B_m ratio
-                - beam_amp: best-fit Gaussian beam amplitude
-                - chi2: final chi2 value
+            ChunkFitResult: Fit result (unpackable as a 4-tuple for compatibility).
         """
         if self.fit_method == FitMethod.LILLIS:
             return self._fit_surface_potential_lillis(measurement_chunk)
 
         data = self._prepare_chunk_data(measurement_chunk)
         if data is None:
-            return np.nan, np.nan, np.nan, np.nan
+            return ChunkFitResult.invalid(measurement_chunk)
 
         eps = config.EPS
         norm2d = data.norm2d
@@ -845,9 +841,8 @@ class LossConeFitter(LossConeFitterBase):
         pitches = data.pitches
         spacecraft_slice = data.spacecraft_slice
 
-        data_mask = np.isfinite(norm2d) & (norm2d > 0)
-        if not data_mask.any():
-            return np.nan, np.nan, np.nan, np.nan
+        if not data.has_enough_valid_bins(FitMethod.HALEKAS):
+            return ChunkFitResult.invalid(measurement_chunk)
 
         # self.lhs is (N_samples, 3) -> [U_surface, bs_over_bm, beam_amp]
         lhs_U_surface = self.lhs[:, 0]
@@ -942,7 +937,13 @@ class LossConeFitter(LossConeFitterBase):
 
         if not result.success:
             # Fallback to best LHS if optimization fails
-            return float(x0[0]), float(x0[1]), float(x0[2]), float(best_lhs_chi2)
+            return ChunkFitResult(
+                u_surface=float(x0[0]),
+                bs_over_bm=float(x0[1]),
+                beam_amp=float(x0[2]),
+                chi2=float(best_lhs_chi2),
+                chunk_index=measurement_chunk,
+            )
 
         U_surface, bs_over_bm, beam_amp = result.x
 
@@ -952,11 +953,15 @@ class LossConeFitter(LossConeFitterBase):
         )
         beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
 
-        return float(U_surface), bs_over_bm, beam_amp, float(result.fun)
+        return ChunkFitResult(
+            u_surface=float(U_surface),
+            bs_over_bm=bs_over_bm,
+            beam_amp=beam_amp,
+            chi2=float(result.fun),
+            chunk_index=measurement_chunk,
+        )
 
-    def fit_chunk_full(
-        self, measurement_chunk: int
-    ) -> tuple[float, float, float, float]:
+    def fit_chunk_full(self, measurement_chunk: int) -> ChunkFitResult:
         return self._fit_surface_potential(measurement_chunk)
 
     def fit_chunk_lhs(
@@ -965,28 +970,21 @@ class LossConeFitter(LossConeFitterBase):
         beam_width_ev: float | None = None,
         u_spacecraft: float | None = None,
         n_samples: int = 400,
-    ) -> tuple[float, float, float, float]:
+    ) -> ChunkFitResult:
         data = self._prepare_chunk_data(measurement_chunk)
         if data is None:
-            return np.nan, np.nan, np.nan, np.nan
+            return ChunkFitResult.invalid(measurement_chunk)
+
+        if u_spacecraft is not None:
+            data = data.with_spacecraft_slice(float(u_spacecraft))
 
         norm2d = data.norm2d
         energies = data.energies
         pitches = data.pitches
-        spacecraft_slice = (
-            float(u_spacecraft) if u_spacecraft is not None else data.spacecraft_slice
-        )
+        spacecraft_slice = data.spacecraft_slice
 
-        if self.fit_method == FitMethod.LILLIS:
-            combined_mask = (
-                build_lillis_mask(data.raw_flux, pitches) & data.valid_energy_mask
-            )
-            if int(np.count_nonzero(combined_mask)) < config.LILLIS_MIN_VALID_BINS:
-                return np.nan, np.nan, np.nan, np.nan
-        else:
-            combined_mask = np.isfinite(norm2d) & (norm2d > 0) & data.valid_energy_mask
-            if not combined_mask.any():
-                return np.nan, np.nan, np.nan, np.nan
+        if not data.has_enough_valid_bins(self.fit_method):
+            return ChunkFitResult.invalid(measurement_chunk)
 
         samples = (
             self.lhs
@@ -1027,16 +1025,15 @@ class LossConeFitter(LossConeFitterBase):
 
         chi2[~np.isfinite(chi2)] = 1e30
         best_idx = int(np.argmin(chi2))
-        return (
-            float(u_surface[best_idx]),
-            float(bs_over_bm[best_idx]),
-            float(beam_amp[best_idx]),
-            float(chi2[best_idx]),
+        return ChunkFitResult(
+            u_surface=float(u_surface[best_idx]),
+            bs_over_bm=float(bs_over_bm[best_idx]),
+            beam_amp=float(beam_amp[best_idx]),
+            chi2=float(chi2[best_idx]),
+            chunk_index=measurement_chunk,
         )
 
-    def _fit_surface_potential_lillis(
-        self, measurement_chunk: int
-    ) -> tuple[float, float, float, float]:
+    def _fit_surface_potential_lillis(self, measurement_chunk: int) -> ChunkFitResult:
         """
         Fit surface potential using Lillis-style masked linear chi2 + Nelder-Mead.
 
@@ -1045,18 +1042,15 @@ class LossConeFitter(LossConeFitterBase):
         """
         data = self._prepare_chunk_data(measurement_chunk)
         if data is None:
-            return np.nan, np.nan, np.nan, np.nan
+            return ChunkFitResult.invalid(measurement_chunk)
 
         norm2d = data.norm2d
         energies = data.energies
         pitches = data.pitches
         spacecraft_slice = data.spacecraft_slice
 
-        lillis_mask = build_lillis_mask(data.raw_flux, pitches)
-        combined_mask = lillis_mask & data.valid_energy_mask
-
-        if int(np.count_nonzero(combined_mask)) < config.LILLIS_MIN_VALID_BINS:
-            return np.nan, np.nan, np.nan, np.nan
+        if not data.has_enough_valid_bins(FitMethod.LILLIS):
+            return ChunkFitResult.invalid(measurement_chunk)
 
         # LHS samples provide a robust starting point
         lhs_U_surface = self.lhs[:, 0]
@@ -1143,7 +1137,7 @@ class LossConeFitter(LossConeFitterBase):
         )
 
         if not result.success or not np.isfinite(result.fun):
-            return np.nan, np.nan, np.nan, np.nan
+            return ChunkFitResult.invalid(measurement_chunk)
 
         U_surface, bs_over_bm, beam_amp = result.x
         # Clip to bounds defensively
@@ -1153,9 +1147,15 @@ class LossConeFitter(LossConeFitterBase):
         chi2_reduced = float(result.fun)
 
         if chi2_reduced > config.LILLIS_CHI2_REDUCED_MAX:
-            return np.nan, np.nan, np.nan, chi2_reduced
+            return ChunkFitResult.invalid(measurement_chunk, chi2=chi2_reduced)
 
-        return U_surface, bs_over_bm, beam_amp, chi2_reduced
+        return ChunkFitResult(
+            u_surface=U_surface,
+            bs_over_bm=bs_over_bm,
+            beam_amp=beam_amp,
+            chi2=chi2_reduced,
+            chunk_index=measurement_chunk,
+        )
 
     def fit_surface_potential(self) -> np.ndarray:
         """
@@ -1180,8 +1180,8 @@ class LossConeFitter(LossConeFitterBase):
         for i in tqdm(
             range(n_chunks), desc="Fitting chunks", unit="chunk", dynamic_ncols=True
         ):
-            U_surface, bs_over_bm, beam_amp, chi2 = self._fit_surface_potential(i)
-            results[i] = [U_surface, bs_over_bm, beam_amp, chi2, i]
+            result = self.fit_chunk_full(i)
+            results[i] = result.as_row()
 
         return results
 

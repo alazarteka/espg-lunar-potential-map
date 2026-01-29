@@ -15,7 +15,7 @@ from src.flux import (
     compute_halekas_chi2,
     compute_lillis_chi2,
 )
-from src.losscone.types import FitMethod, parse_fit_method
+from src.losscone.types import ChunkFitResult, FitMethod, parse_fit_method
 from src.model import synth_losscone
 
 try:  # Optional GPU path
@@ -407,7 +407,7 @@ class LossConeSession:
         beam_width_ev: float,
         u_spacecraft: float,
         n_samples: int = 400,
-    ) -> tuple[float, float, float, float]:
+    ) -> ChunkFitResult:
         return self.fitter.fit_chunk_lhs(
             chunk_idx,
             beam_width_ev=beam_width_ev,
@@ -415,5 +415,5 @@ class LossConeSession:
             n_samples=n_samples,
         )
 
-    def fit_chunk_full(self, chunk_idx: int) -> tuple[float, float, float, float]:
+    def fit_chunk_full(self, chunk_idx: int) -> ChunkFitResult:
         return self.fitter.fit_chunk_full(chunk_idx)

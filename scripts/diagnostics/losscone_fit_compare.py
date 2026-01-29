@@ -380,10 +380,10 @@ def main() -> int:
                     break
                 continue
 
-            halekas_params = fitter_halekas._fit_surface_potential(chunk_idx)
-            lillis_params = fitter_lillis._fit_surface_potential(chunk_idx)
-            if not np.all(np.isfinite(halekas_params)) or not np.all(
-                np.isfinite(lillis_params)
+            halekas_params = fitter_halekas.fit_chunk_full(chunk_idx)
+            lillis_params = fitter_lillis.fit_chunk_full(chunk_idx)
+            if not np.all(np.isfinite(halekas_params.as_tuple())) or not np.all(
+                np.isfinite(lillis_params.as_tuple())
             ):
                 if args.chunk is not None:
                     break
@@ -430,12 +430,9 @@ def main() -> int:
                 energies, lil_u, lil_bs, float(args.u_spacecraft)
             )
 
-            output_path = (
-                args.outdir / f"{file_path.stem}_chunk{chunk_idx:04d}.png"
-            )
+            output_path = args.outdir / f"{file_path.stem}_chunk{chunk_idx:04d}.png"
             title = (
-                f"{file_path.name} | chunk {chunk_idx} | "
-                f"spec {spec_no} | {timestamp}"
+                f"{file_path.name} | chunk {chunk_idx} | spec {spec_no} | {timestamp}"
             )
 
             _render_comparison(

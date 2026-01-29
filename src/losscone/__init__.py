@@ -6,6 +6,7 @@ from src.losscone.fitter_base import LossConeFitterBase
 from src.losscone.masks import build_lillis_mask
 from src.losscone.model import synth_losscone, synth_losscone_batch
 from src.losscone.types import (
+    ChunkFitResult,
     FitChunkData,
     FitMethod,
     NormalizationMode,
@@ -14,6 +15,7 @@ from src.losscone.types import (
 )
 
 __all__ = [
+    "ChunkFitResult",
     "ERData",
     "FitChunkData",
     "FitMethod",

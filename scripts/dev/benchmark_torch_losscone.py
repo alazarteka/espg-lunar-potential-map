@@ -35,8 +35,7 @@ def benchmark_cpu(
     start = time.perf_counter()
 
     for chunk_idx in range(n_chunks):
-        result = fitter._fit_surface_potential(chunk_idx)
-        results.append(result)
+        results.append(fitter.fit_chunk_full(chunk_idx).as_tuple())
 
     elapsed = time.perf_counter() - start
     return np.array(results), elapsed
@@ -62,14 +61,13 @@ def benchmark_gpu(
     )
 
     # Warm-up
-    _ = fitter._fit_surface_potential_torch(0)
+    _ = fitter.fit_chunk_full(0)
 
     results = []
     start = time.perf_counter()
 
     for chunk_idx in range(n_chunks):
-        result = fitter._fit_surface_potential_torch(chunk_idx)
-        results.append(result)
+        results.append(fitter.fit_chunk_full(chunk_idx).as_tuple())
 
     elapsed = time.perf_counter() - start
     return np.array(results), elapsed
@@ -78,7 +76,9 @@ def benchmark_gpu(
 def main() -> int:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Benchmark GPU vs CPU loss-cone fitter")
+    parser = argparse.ArgumentParser(
+        description="Benchmark GPU vs CPU loss-cone fitter"
+    )
     parser.add_argument(
         "--input",
         type=Path,
@@ -166,8 +166,10 @@ def main() -> int:
     gpu_chi2 = gpu_results[:, 3]
     # Filter out NaN, Inf, and extreme values (penalty values)
     valid_mask = (
-        np.isfinite(cpu_chi2) & np.isfinite(gpu_chi2) &
-        (cpu_chi2 < 1e10) & (gpu_chi2 < 1e10)
+        np.isfinite(cpu_chi2)
+        & np.isfinite(gpu_chi2)
+        & (cpu_chi2 < 1e10)
+        & (gpu_chi2 < 1e10)
     )
 
     if valid_mask.sum() >= 2:
