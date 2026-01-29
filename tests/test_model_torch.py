@@ -18,12 +18,22 @@ except ImportError:
 pytestmark = pytest.mark.skipif(not HAS_TORCH, reason="PyTorch not installed")
 
 
+def test_model_torch_is_legacy_alias():
+    import src.losscone_torch as losscone_torch
+    import src.model_torch as model_torch
+
+    assert model_torch.LossConeFitterTorch is losscone_torch.LossConeFitterTorch
+    assert (
+        model_torch.compute_chi2_batch_torch is losscone_torch.compute_chi2_batch_torch
+    )
+
+
 class TestSynthLossconeBatchTorch:
     """Tests for synth_losscone_batch_torch."""
 
     def test_output_shape(self):
         """Test output has correct shape."""
-        from src.model_torch import synth_losscone_batch_torch
+        from src.losscone_torch import synth_losscone_batch_torch
 
         nE, nPitch = 20, 15
         n_params = 10
@@ -39,7 +49,7 @@ class TestSynthLossconeBatchTorch:
 
     def test_loss_cone_structure(self):
         """Test that model has loss cone structure: 1.0 inside, background outside."""
-        from src.model_torch import synth_losscone_batch_torch
+        from src.losscone_torch import synth_losscone_batch_torch
 
         nE, nPitch = 20, 30
         energy_grid = torch.logspace(1, 3, nE, dtype=torch.float64)
@@ -57,8 +67,8 @@ class TestSynthLossconeBatchTorch:
 
     def test_equivalence_with_numpy(self):
         """Test PyTorch implementation matches NumPy."""
+        from src.losscone_torch import synth_losscone_batch_torch
         from src.model import synth_losscone_batch as synth_losscone_batch_np
-        from src.model_torch import synth_losscone_batch_torch
 
         nE, nPitch = 15, 20
         n_params = 5
@@ -92,8 +102,8 @@ class TestSynthLossconeBatchTorch:
 
     def test_equivalence_with_beam(self):
         """Test PyTorch matches NumPy with secondary electron beam."""
+        from src.losscone_torch import synth_losscone_batch_torch
         from src.model import synth_losscone_batch as synth_losscone_batch_np
-        from src.model_torch import synth_losscone_batch_torch
 
         nE, nPitch = 15, 20
         energy_np = np.logspace(1, 3, nE)
@@ -137,8 +147,8 @@ class TestSynthLossconeBatchTorch:
 
     def test_spacecraft_potential_scalar(self):
         """Test with scalar spacecraft potential."""
+        from src.losscone_torch import synth_losscone_batch_torch
         from src.model import synth_losscone_batch as synth_losscone_batch_np
-        from src.model_torch import synth_losscone_batch_torch
 
         nE, nPitch = 10, 15
         energy_np = np.logspace(1, 3, nE)
@@ -163,8 +173,8 @@ class TestSynthLossconeBatchTorch:
 
     def test_spacecraft_potential_array(self):
         """Test with per-energy spacecraft potential."""
+        from src.losscone_torch import synth_losscone_batch_torch
         from src.model import synth_losscone_batch as synth_losscone_batch_np
-        from src.model_torch import synth_losscone_batch_torch
 
         nE, nPitch = 10, 15
         energy_np = np.logspace(1, 3, nE)
@@ -195,7 +205,7 @@ class TestComputeChi2BatchTorch:
 
     def test_chi2_zero_for_perfect_match(self):
         """Test chi² is zero when model equals data."""
-        from src.model_torch import compute_chi2_batch_torch
+        from src.losscone_torch import compute_chi2_batch_torch
 
         n_params, nE, nPitch = 3, 10, 15
         model = torch.rand(n_params, nE, nPitch, dtype=torch.float64) + 0.1
@@ -209,7 +219,7 @@ class TestComputeChi2BatchTorch:
 
     def test_chi2_positive_for_mismatch(self):
         """Test chi² is positive for mismatched model/data."""
-        from src.model_torch import compute_chi2_batch_torch
+        from src.losscone_torch import compute_chi2_batch_torch
 
         n_params, nE, nPitch = 3, 10, 15
         model = torch.rand(n_params, nE, nPitch, dtype=torch.float64) + 0.1
@@ -222,7 +232,7 @@ class TestComputeChi2BatchTorch:
 
     def test_masked_points_ignored(self):
         """Test that masked points don't contribute to chi²."""
-        from src.model_torch import compute_chi2_batch_torch
+        from src.losscone_torch import compute_chi2_batch_torch
 
         n_params, nE, nPitch = 2, 5, 5
         model = torch.ones(n_params, nE, nPitch, dtype=torch.float64)
@@ -244,7 +254,7 @@ class TestChi2NumpyTorchEquivalence:
         """Torch compute_chi2_batch_torch matches NumPy Halekas log-chi2."""
         from src import config
         from src.losscone.chi2 import compute_halekas_chi2_batch
-        from src.model_torch import compute_chi2_batch_torch
+        from src.losscone_torch import compute_chi2_batch_torch
 
         rng = np.random.default_rng(0)
         n_models, nE, nPitch = 7, 8, 9
@@ -280,7 +290,7 @@ class TestChi2NumpyTorchEquivalence:
         """Torch compute_chi2_multi_chunk_torch matches NumPy Halekas log-chi2."""
         from src import config
         from src.losscone.chi2 import compute_halekas_chi2_batch
-        from src.model_torch import compute_chi2_multi_chunk_torch
+        from src.losscone_torch import compute_chi2_multi_chunk_torch
 
         rng = np.random.default_rng(1)
         N_chunks, n_pop, nE, nPitch = 3, 4, 6, 7
@@ -329,7 +339,7 @@ class TestChi2NumpyTorchEquivalence:
         from src import config
         from src.losscone.chi2 import compute_lillis_chi2_batch
         from src.losscone.masks import build_lillis_mask
-        from src.model_torch import compute_lillis_chi2_batch_torch
+        from src.losscone_torch import compute_lillis_chi2_batch_torch
 
         rng = np.random.default_rng(2)
         n_models, nE, nPitch = 5, 6, 12
@@ -377,7 +387,7 @@ class TestSynthLossconeMultiChunkTorch:
 
     def test_output_shape(self):
         """Test multi-chunk output has correct shape."""
-        from src.model_torch import synth_losscone_multi_chunk_torch
+        from src.losscone_torch import synth_losscone_multi_chunk_torch
 
         N_chunks, nE, nPitch, n_pop = 4, 15, 20, 10
 
@@ -396,7 +406,7 @@ class TestSynthLossconeMultiChunkTorch:
 
     def test_multi_chunk_matches_single_chunk(self):
         """Test multi-chunk gives same results as single-chunk loop."""
-        from src.model_torch import (
+        from src.losscone_torch import (
             synth_losscone_batch_torch,
             synth_losscone_multi_chunk_torch,
         )
@@ -438,7 +448,7 @@ class TestComputeChi2MultiChunkTorch:
 
     def test_output_shape(self):
         """Test multi-chunk chi² has correct shape."""
-        from src.model_torch import compute_chi2_multi_chunk_torch
+        from src.losscone_torch import compute_chi2_multi_chunk_torch
 
         N_chunks, n_pop, nE, nPitch = 4, 8, 10, 12
 
@@ -452,7 +462,7 @@ class TestComputeChi2MultiChunkTorch:
 
     def test_multi_chunk_chi2_matches_single(self):
         """Test multi-chunk chi² matches single-chunk loop."""
-        from src.model_torch import (
+        from src.losscone_torch import (
             compute_chi2_batch_torch,
             compute_chi2_multi_chunk_torch,
         )
@@ -482,7 +492,7 @@ class TestLossConeFitterTorchLillis:
 
     def test_precompute_skips_low_valid_bins(self):
         """Low-information chunks should be filtered out in batched prep."""
-        from src.model_torch import LossConeFitterTorch
+        from src.losscone_torch import LossConeFitterTorch
         from src.utils.synthetic import prepare_synthetic_er
 
         er = prepare_synthetic_er()
@@ -503,7 +513,7 @@ class TestLossConeFitterTorchLillis:
 
     def test_fit_chunk_lhs_returns_nan_for_low_bins(self):
         """LHS fit should return NaN when Lillis mask is too small."""
-        from src.model_torch import LossConeFitterTorch
+        from src.losscone_torch import LossConeFitterTorch
         from src.utils.synthetic import prepare_synthetic_er
 
         er = prepare_synthetic_er()
@@ -524,7 +534,7 @@ class TestDeviceHandling:
 
     def test_cpu_device(self):
         """Test operations work on CPU."""
-        from src.model_torch import synth_losscone_batch_torch
+        from src.losscone_torch import synth_losscone_batch_torch
 
         energy = torch.logspace(1, 3, 10, dtype=torch.float64, device="cpu")
         pitch = torch.linspace(0, 180, 15).unsqueeze(0).expand(10, -1)
@@ -540,7 +550,7 @@ class TestDeviceHandling:
     )
     def test_cuda_device(self):
         """Test operations work on CUDA."""
-        from src.model_torch import synth_losscone_batch_torch
+        from src.losscone_torch import synth_losscone_batch_torch
 
         energy = torch.logspace(1, 3, 10, dtype=torch.float32, device="cuda")
         pitch = torch.linspace(0, 180, 15, device="cuda").unsqueeze(0).expand(10, -1)
@@ -557,7 +567,7 @@ class TestFloat32Precision:
 
     def test_float32_equivalence(self):
         """Test float32 gives reasonable results compared to float64."""
-        from src.model_torch import synth_losscone_batch_torch
+        from src.losscone_torch import synth_losscone_batch_torch
 
         nE, nPitch, n_params = 15, 20, 5
 

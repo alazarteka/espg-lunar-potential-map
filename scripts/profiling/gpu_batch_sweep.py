@@ -97,7 +97,7 @@ def sweep_losscone(
     """
     from src import config
     from src.flux import ERData, PitchAngle
-    from src.model_torch import LossConeFitterTorch
+    from src.losscone_torch import LossConeFitterTorch
 
     print(f"\n{'='*60}")
     print("LossConeFitter Batch Size Sweep")

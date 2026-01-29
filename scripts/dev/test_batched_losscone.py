@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore", message="Mean of empty slice")
 
 from src import config
 from src.flux import ERData, PitchAngle
-from src.model_torch import LossConeFitterTorch
+from src.losscone_torch import LossConeFitterTorch
 
 
 def main():

@@ -36,7 +36,7 @@ ER flux (.TAB)
 - Geometry + SPICE: `src/potential_mapper/coordinates.py`, `src/utils/spice_ops.py`
 - Spacecraft potential: `src/spacecraft_potential.py`
 - Loss-cone model + fitter: `src/losscone/model.py`, `src/losscone/cpu.py` (shims: `src/model.py`, `src/flux.py`)
-- GPU loss-cone fitting: `src/losscone/torch/` (shim: `src/model_torch.py`)
+- GPU loss-cone fitting: `src/losscone/torch/` (shim: `src/losscone_torch.py`, legacy: `src/model_torch.py`)
 - Batch cache: `src/potential_mapper/batch.py`
 - Temporal harmonics: `src/temporal/`
 - Engineering outputs: `src/engineering/`

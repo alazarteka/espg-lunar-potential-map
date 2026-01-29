@@ -36,7 +36,7 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
 ## Project Structure
 
 - `src/`: Core Python package
-  - `config.py`, `flux.py`, `kappa.py`, `model.py` - Core fitting
+  - `config.py`, `flux.py`, `kappa.py`, `model.py`, `losscone_torch.py` - Core fitting
   - `spacecraft_potential.py` - Spacecraft potential calculations
   - `potential_mapper/` - Mapping pipeline
   - `temporal/` - Spherical harmonic reconstruction

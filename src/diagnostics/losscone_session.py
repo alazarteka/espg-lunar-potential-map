@@ -21,7 +21,7 @@ from src.model import synth_losscone
 try:  # Optional GPU path
     import torch
 
-    from src.model_torch import (
+    from src.losscone_torch import (
         HAS_TORCH,
         _auto_detect_dtype,
         synth_losscone_batch_torch,
@@ -227,7 +227,7 @@ class LossConeSession:
         self._lillis_mask_cache.clear()
         if self.use_torch:
             try:
-                from src.model_torch import LossConeFitterTorch
+                from src.losscone_torch import LossConeFitterTorch
 
                 self.fitter = LossConeFitterTorch(
                     self.er_data,

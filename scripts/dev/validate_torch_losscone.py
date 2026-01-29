@@ -55,7 +55,7 @@ def run_gpu_fit(
     device: str | None = None,
 ) -> tuple[tuple[float, float, float, float], float]:
     """Run GPU fitter and return (results, elapsed_time)."""
-    from src.model_torch import LossConeFitterTorch
+    from src.losscone_torch import LossConeFitterTorch
 
     fitter = LossConeFitterTorch(
         er_data,

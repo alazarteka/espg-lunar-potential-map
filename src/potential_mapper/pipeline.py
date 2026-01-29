@@ -14,7 +14,7 @@ from src.flux import ERData, LossConeFitter, PitchAngle
 from src.losscone.types import FitMethod, parse_fit_method
 
 try:
-    from src.model_torch import HAS_TORCH, LossConeFitterTorch
+    from src.losscone_torch import HAS_TORCH, LossConeFitterTorch
 except ImportError:
     HAS_TORCH = False
     LossConeFitterTorch = None  # type: ignore[misc, assignment]

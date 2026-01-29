@@ -1,8 +1,7 @@
 """Torch loss-cone implementations.
 
-This subpackage requires PyTorch. For backward compatibility with older import paths,
-use `src.model_torch`, which conditionally imports these modules when PyTorch is
-available.
+This subpackage requires PyTorch. For optional import shims, prefer
+`src.losscone_torch`. `src.model_torch` remains as a legacy alias.
 """
 
 from src.losscone.torch.chi2 import (

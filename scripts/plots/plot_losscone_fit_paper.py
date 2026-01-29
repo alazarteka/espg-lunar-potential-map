@@ -24,7 +24,7 @@ from src.flux import ERData, LossConeFitter, PitchAngle
 from src.model import synth_losscone
 
 try:
-    from src.model_torch import LossConeFitterTorch
+    from src.losscone_torch import LossConeFitterTorch
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False

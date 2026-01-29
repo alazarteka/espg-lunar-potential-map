@@ -114,8 +114,8 @@ def profile_single_batch(batch_size: int, data_file) -> dict:
     """
     from src import config
     from src.flux import ERData, PitchAngle
-    from src import model_torch
-    from src.model_torch import (
+    from src import losscone_torch
+    from src.losscone_torch import (
         LossConeFitterTorch,
         synth_losscone_multi_chunk_torch,
         compute_chi2_multi_chunk_torch,
@@ -143,10 +143,10 @@ def profile_single_batch(batch_size: int, data_file) -> dict:
     # Wrap hot functions for profiling
     originals = {}
     originals["synth"] = wrap_function(
-        model_torch, "synth_losscone_multi_chunk_torch", "physics_model"
+        losscone_torch, "synth_losscone_multi_chunk_torch", "physics_model"
     )
     originals["chi2"] = wrap_function(
-        model_torch, "compute_chi2_multi_chunk_torch", "chi2_compute"
+        losscone_torch, "compute_chi2_multi_chunk_torch", "chi2_compute"
     )
 
     # Also wrap the phase methods on the fitter instance
@@ -206,8 +206,8 @@ def profile_single_batch(batch_size: int, data_file) -> dict:
     vram_peak = torch.cuda.max_memory_allocated() / 1024 / 1024
 
     # Restore original functions
-    model_torch.synth_losscone_multi_chunk_torch = originals["synth"]
-    model_torch.compute_chi2_multi_chunk_torch = originals["chi2"]
+    losscone_torch.synth_losscone_multi_chunk_torch = originals["synth"]
+    losscone_torch.compute_chi2_multi_chunk_torch = originals["chi2"]
 
     return {
         "batch_size": batch_size,

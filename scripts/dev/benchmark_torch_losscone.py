@@ -49,7 +49,7 @@ def benchmark_gpu(
     device: str,
 ) -> tuple[np.ndarray, float]:
     """Benchmark GPU fitter on n_chunks."""
-    from src.model_torch import LossConeFitterTorch
+    from src.losscone_torch import LossConeFitterTorch
 
     fitter = LossConeFitterTorch(
         er_data,

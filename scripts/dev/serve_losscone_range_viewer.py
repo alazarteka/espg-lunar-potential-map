@@ -37,7 +37,7 @@ from src.spacecraft_potential import calculate_potential
 try:
     import torch
 
-    from src.model_torch import HAS_TORCH, _auto_detect_dtype, synth_losscone_batch_torch
+    from src.losscone_torch import HAS_TORCH, _auto_detect_dtype, synth_losscone_batch_torch
 except Exception:  # pragma: no cover - optional GPU path
     HAS_TORCH = False
     torch = None  # type: ignore[assignment]

@@ -72,7 +72,7 @@ def test_batch_mask_returns_per_parameter():
 def test_mask_combines_with_data_mask_in_chi2():
     """Test that model validity mask combines with data mask in chi2 computation."""
     # This is an integration test concept - the actual combination happens
-    # in flux.py and model_torch.py chi2 functions
+    # in src.losscone (CPU) and src.losscone_torch (torch) chi2 functions
     n_energy = 10
     n_pitch = 20
 

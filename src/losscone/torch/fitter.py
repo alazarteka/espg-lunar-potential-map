@@ -1,6 +1,7 @@
 """Torch loss-cone fitter.
 
-Canonical torch implementation lives here; `src/model_torch.py` re-exports this API.
+Canonical torch implementation lives here; `src/losscone_torch.py` re-exports this
+API (`src/model_torch.py` remains as a legacy alias).
 """
 
 from __future__ import annotations

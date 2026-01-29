@@ -29,7 +29,7 @@ from src.model import synth_losscone_batch
 try:
     import torch
 
-    from src.model_torch import (
+    from src.losscone_torch import (
         HAS_TORCH,
         _auto_detect_dtype,
         compute_chi2_batch_torch,

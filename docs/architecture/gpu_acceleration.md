@@ -15,7 +15,7 @@ uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4
 
 ## What It Accelerates
 
-- Loss-cone forward model + chi² + fitter: `src/losscone/torch/` (shim: `src/model_torch.py`)
+- Loss-cone forward model + chi² + fitter: `src/losscone/torch/` (shim: `src/losscone_torch.py`, legacy: `src/model_torch.py`)
 - Kappa fitting: `src/kappa_torch.py`
 - Differential evolution optimizer: `src/utils/optimization.py`
 
