@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -412,13 +413,15 @@ class LossConeFitter(LossConeFitterBase):
 
         self.lhs = self._generate_latin_hypercube()
 
-    def _generate_latin_hypercube(self, n_samples: int = 400) -> np.ndarray:
+    def _generate_latin_hypercube(self, n_samples: int | None = None) -> np.ndarray:
         """
         Generate a Latin Hypercube sample.
 
         Returns:
             np.ndarray: The Latin Hypercube sample.
         """
+        if n_samples is None:
+            n_samples = int(config.LOSS_CONE_LHS_SAMPLES)
         return losscone_lhs_samples(
             n_samples=n_samples,
             u_surface_min=self.u_surface_min,
@@ -429,6 +432,57 @@ class LossConeFitter(LossConeFitterBase):
             beam_amp_max=self.beam_amp_max,
             seed=config.LOSS_CONE_LHS_SEED,
         )
+
+    def _run_differential_evolution(
+        self,
+        objective_fn: Callable[[np.ndarray], float],
+        bounds: list[tuple[float, float]],
+        *,
+        x0: np.ndarray,
+        best_lhs_chi2: float,
+    ) -> tuple[np.ndarray, float]:
+        """
+        Run SciPy differential evolution with shared (CPU/torch) optimizer settings.
+
+        SciPy defines popsize as a multiplier of dimension (popsize * n_params),
+        while our torch DE uses an absolute population size. We convert here so
+        config.LOSS_CONE_DE_POPSIZE has consistent semantics across backends.
+        """
+        from scipy.optimize import differential_evolution
+
+        n_params = len(bounds)
+        popsize_mult = max(
+            1, (int(config.LOSS_CONE_DE_POPSIZE) + n_params - 1) // n_params
+        )
+        result = differential_evolution(
+            objective_fn,
+            bounds,
+            strategy="best1bin",
+            popsize=popsize_mult,
+            mutation=float(config.LOSS_CONE_DE_MUTATION),
+            recombination=float(config.LOSS_CONE_DE_CROSSOVER),
+            seed=int(config.LOSS_CONE_DE_SEED),
+            maxiter=int(config.LOSS_CONE_DE_MAXITER),
+            atol=float(config.LOSS_CONE_DE_ATOL),
+            tol=float(config.LOSS_CONE_DE_TOL),
+            polish=bool(config.LOSS_CONE_DE_POLISH),
+            workers=1,  # Single-threaded for reproducibility
+            updating="deferred",  # Faster convergence
+            x0=np.asarray(x0, dtype=float),
+        )
+
+        if result.success and np.isfinite(result.fun):
+            best_params = np.asarray(result.x, dtype=float)
+            best_chi2 = float(result.fun)
+        else:
+            best_params = np.asarray(x0, dtype=float)
+            best_chi2 = float(best_lhs_chi2)
+
+        if best_lhs_chi2 < best_chi2:
+            best_params = np.asarray(x0, dtype=float)
+            best_chi2 = float(best_lhs_chi2)
+
+        return best_params, best_chi2
 
     def _get_normalized_flux(
         self, energy_bin: int, measurement_chunk: int
@@ -909,10 +963,6 @@ class LossConeFitter(LossConeFitterBase):
                 return 1e30
             return chi2
 
-        # Use differential_evolution (global optimizer with bounds)
-        # More robust than LHS + Nelder-Mead for avoiding local minima
-        from scipy.optimize import differential_evolution
-
         # Use constrained bounds: U_surface capped at detection threshold (~+20V)
         # because electron reflectometry cannot measure positive potentials reliably
         bounds = losscone_optimizer_bounds(
@@ -923,29 +973,14 @@ class LossConeFitter(LossConeFitterBase):
             beam_amp_min=self.beam_amp_min,
             beam_amp_max=self.beam_amp_max,
         )
-
-        result = differential_evolution(
+        best_params, best_chi2 = self._run_differential_evolution(
             chi2_scalar,
             bounds,
-            seed=42,
-            maxiter=1000,
-            atol=1e-3,
-            tol=1e-3,
-            workers=1,  # Single-threaded for reproducibility
-            updating="deferred",  # Faster convergence
+            x0=x0,
+            best_lhs_chi2=float(best_lhs_chi2),
         )
 
-        if not result.success:
-            # Fallback to best LHS if optimization fails
-            return ChunkFitResult(
-                u_surface=float(x0[0]),
-                bs_over_bm=float(x0[1]),
-                beam_amp=float(x0[2]),
-                chi2=float(best_lhs_chi2),
-                chunk_index=measurement_chunk,
-            )
-
-        U_surface, bs_over_bm, beam_amp = result.x
+        U_surface, bs_over_bm, beam_amp = best_params
 
         # Clip to ensure exact bounds (DE should respect them, but be safe)
         bs_over_bm = float(
@@ -957,7 +992,7 @@ class LossConeFitter(LossConeFitterBase):
             u_surface=float(U_surface),
             bs_over_bm=bs_over_bm,
             beam_amp=beam_amp,
-            chi2=float(result.fun),
+            chi2=float(best_chi2),
             chunk_index=measurement_chunk,
         )
 
@@ -969,7 +1004,7 @@ class LossConeFitter(LossConeFitterBase):
         measurement_chunk: int,
         beam_width_ev: float | None = None,
         u_spacecraft: float | None = None,
-        n_samples: int = 400,
+        n_samples: int | None = None,
     ) -> ChunkFitResult:
         data = self._prepare_chunk_data(measurement_chunk)
         if data is None:
@@ -986,6 +1021,8 @@ class LossConeFitter(LossConeFitterBase):
         if not data.has_enough_valid_bins(self.fit_method):
             return ChunkFitResult.invalid(measurement_chunk)
 
+        if n_samples is None:
+            n_samples = len(self.lhs)
         samples = (
             self.lhs
             if n_samples == len(self.lhs)
@@ -1035,7 +1072,7 @@ class LossConeFitter(LossConeFitterBase):
 
     def _fit_surface_potential_lillis(self, measurement_chunk: int) -> ChunkFitResult:
         """
-        Fit surface potential using Lillis-style masked linear chi2 + Nelder-Mead.
+        Fit surface potential using Lillis-style masked linear chi2 + DE refinement.
 
         Uses a relative-flux mask to exclude low/zero bins, then minimizes
         linear-space chi2. Returns reduced chi2 for quality control.
@@ -1080,10 +1117,8 @@ class LossConeFitter(LossConeFitterBase):
         chi2_vals[~np.isfinite(chi2_vals)] = 1e30
 
         best_idx = int(np.argmin(chi2_vals))
+        best_lhs_chi2 = float(chi2_vals[best_idx])
         x0 = self.lhs[best_idx]
-
-        # Nelder-Mead optimization (bounds enforced via penalty)
-        from scipy.optimize import minimize
 
         bounds = losscone_optimizer_bounds(
             u_surface_min=self.u_surface_min,
@@ -1097,15 +1132,6 @@ class LossConeFitter(LossConeFitterBase):
         def chi2_scalar(params):
             U_surface, bs_over_bm, beam_amp = params
             if not np.isfinite(params).all():
-                return 1e30
-            if (
-                U_surface < bounds[0][0]
-                or U_surface > bounds[0][1]
-                or bs_over_bm < bounds[1][0]
-                or bs_over_bm > bounds[1][1]
-                or beam_amp < bounds[2][0]
-                or beam_amp > bounds[2][1]
-            ):
                 return 1e30
             beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
 
@@ -1133,31 +1159,27 @@ class LossConeFitter(LossConeFitterBase):
                 return 1e30
             return float(chi2_val)
 
-        result = minimize(
+        best_params, best_chi2 = self._run_differential_evolution(
             chi2_scalar,
+            bounds,
             x0=x0,
-            method="Nelder-Mead",
-            options={"maxiter": 2000, "xatol": 1e-6, "fatol": 1e-6},
+            best_lhs_chi2=best_lhs_chi2,
         )
 
-        if not result.success or not np.isfinite(result.fun):
-            return ChunkFitResult.invalid(measurement_chunk)
-
-        U_surface, bs_over_bm, beam_amp = result.x
+        U_surface, bs_over_bm, beam_amp = best_params
         # Clip to bounds defensively
         U_surface = float(np.clip(U_surface, bounds[0][0], bounds[0][1]))
         bs_over_bm = float(np.clip(bs_over_bm, bounds[1][0], bounds[1][1]))
         beam_amp = float(np.clip(beam_amp, bounds[2][0], bounds[2][1]))
-        chi2_reduced = float(result.fun)
 
-        if chi2_reduced > config.LILLIS_CHI2_REDUCED_MAX:
-            return ChunkFitResult.invalid(measurement_chunk, chi2=chi2_reduced)
+        if not np.isfinite(best_chi2) or best_chi2 > config.LILLIS_CHI2_REDUCED_MAX:
+            return ChunkFitResult.invalid(measurement_chunk, chi2=float(best_chi2))
 
         return ChunkFitResult(
             u_surface=U_surface,
             bs_over_bm=bs_over_bm,
             beam_amp=beam_amp,
-            chi2=chi2_reduced,
+            chi2=float(best_chi2),
             chunk_index=measurement_chunk,
         )
 

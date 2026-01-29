@@ -71,6 +71,17 @@ ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 # Alternative: 215_000 (95th percentile) or 657_000 (99th percentile) for stricter quality control
 FIT_ERROR_THRESHOLD = 657000  # chi-squared threshold for a good fit (99th percentile)
 LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
+LOSS_CONE_LHS_SAMPLES = 400  # phase-1 samples per chunk (CPU + torch)
+
+# Differential Evolution settings (CPU + torch parity)
+LOSS_CONE_DE_SEED = 42
+LOSS_CONE_DE_POPSIZE = 50  # population size (torch); CPU converts to SciPy multiplier
+LOSS_CONE_DE_MAXITER = 500
+LOSS_CONE_DE_MUTATION = 0.5
+LOSS_CONE_DE_CROSSOVER = 0.9
+LOSS_CONE_DE_ATOL = 1e-3
+LOSS_CONE_DE_TOL = 1e-3  # SciPy-only relative tolerance
+LOSS_CONE_DE_POLISH = False  # SciPy-only local polishing step
 
 # Loss-cone fit method ("halekas" log-chi2 or "lillis" masked linear chi2)
 LOSS_CONE_FIT_METHOD = "halekas"

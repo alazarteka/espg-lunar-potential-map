@@ -32,7 +32,7 @@ class LossConeFitterBase(ABC):
         measurement_chunk: int,
         beam_width_ev: float | None = None,
         u_spacecraft: float | None = None,
-        n_samples: int = 400,
+        n_samples: int | None = None,
     ) -> ChunkFitResult:
         """Return fit result from LHS-only search."""
 

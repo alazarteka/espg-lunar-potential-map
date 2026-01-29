@@ -196,7 +196,8 @@ class LossConeFitterTorch(LossConeFitterBase):
         """
         Fit surface potential using GPU-accelerated two-phase optimization.
 
-        Phase 1: LHS grid search (400 samples) to find good starting region
+        Phase 1: LHS grid search (config.LOSS_CONE_LHS_SAMPLES samples) to find
+            a good starting region
         Phase 2: DE refinement from best LHS point
 
         Args:
@@ -282,7 +283,7 @@ class LossConeFitterTorch(LossConeFitterBase):
         )
 
         # Phase 1: LHS grid search (NumPy + SciPy sampler; shared with CPU)
-        n_lhs = 400
+        n_lhs = int(config.LOSS_CONE_LHS_SAMPLES)
         lhs_np = losscone_lhs_samples(
             n_samples=n_lhs,
             u_surface_min=self.u_surface_min,
@@ -305,12 +306,12 @@ class LossConeFitterTorch(LossConeFitterBase):
 
         de = GPUDifferentialEvolution(
             bounds=bounds,
-            popsize=50,
-            mutation=0.5,
-            crossover=0.9,
-            maxiter=500,
-            atol=1e-3,
-            seed=42,
+            popsize=int(config.LOSS_CONE_DE_POPSIZE),
+            mutation=float(config.LOSS_CONE_DE_MUTATION),
+            crossover=float(config.LOSS_CONE_DE_CROSSOVER),
+            maxiter=int(config.LOSS_CONE_DE_MAXITER),
+            atol=float(config.LOSS_CONE_DE_ATOL),
+            seed=int(config.LOSS_CONE_DE_SEED),
             device=str(self.device),
             dtype=self.dtype,
         )
@@ -526,7 +527,7 @@ class LossConeFitterTorch(LossConeFitterBase):
         measurement_chunk: int,
         beam_width_ev: float | None = None,
         u_spacecraft: float | None = None,
-        n_samples: int = 400,
+        n_samples: int | None = None,
     ) -> ChunkFitResult:
         """
         LHS-only fit for a single chunk (mirrors CPU implementation).
@@ -547,8 +548,10 @@ class LossConeFitterTorch(LossConeFitterBase):
             return ChunkFitResult.invalid(measurement_chunk)
         data_mask = data.combined_mask(self.fit_method)
 
+        if n_samples is None:
+            n_samples = int(config.LOSS_CONE_LHS_SAMPLES)
         samples = losscone_lhs_samples(
-            n_samples=n_samples,
+            n_samples=int(n_samples),
             u_surface_min=self.u_surface_min,
             u_surface_max=self.u_surface_max,
             bs_over_bm_min=self.bs_over_bm_min,
@@ -620,7 +623,7 @@ class LossConeFitterTorch(LossConeFitterBase):
         norm2d: Tensor,
         data_mask: Tensor,
         sc_potential: Tensor,
-        n_lhs: int = 400,
+        n_lhs: int | None = None,
     ) -> tuple[Tensor, Tensor]:
         """
         Run LHS grid search for multiple chunks simultaneously.
@@ -637,6 +640,9 @@ class LossConeFitterTorch(LossConeFitterBase):
             best_params: (N, 3) best parameters per chunk
             best_chi2: (N,) best chi2 per chunk
         """
+        if n_lhs is None:
+            n_lhs = int(config.LOSS_CONE_LHS_SAMPLES)
+        n_lhs = int(n_lhs)
         N_chunks = energies.size(0)
 
         # Precompute log(data) once to avoid redundant computation in chi2
@@ -731,8 +737,8 @@ class LossConeFitterTorch(LossConeFitterBase):
         data_mask: Tensor,
         sc_potential: Tensor,
         x0: Tensor,
-        popsize: int = 50,
-        maxiter: int = 500,
+        popsize: int | None = None,
+        maxiter: int | None = None,
     ) -> tuple[Tensor, Tensor, int]:
         """
         Run DE optimization for multiple chunks simultaneously.
@@ -752,6 +758,13 @@ class LossConeFitterTorch(LossConeFitterBase):
             best_chi2: (N,) best chi2 per chunk
             n_iter: Number of iterations run
         """
+        if popsize is None:
+            popsize = int(config.LOSS_CONE_DE_POPSIZE)
+        if maxiter is None:
+            maxiter = int(config.LOSS_CONE_DE_MAXITER)
+        popsize = int(popsize)
+        maxiter = int(maxiter)
+
         N_chunks = energies.size(0)
 
         # Precompute log(data) once to avoid redundant computation in chi2
@@ -827,11 +840,11 @@ class LossConeFitterTorch(LossConeFitterBase):
             bounds=bounds,
             n_spectra=N_chunks,
             popsize=popsize,
-            mutation=0.5,
-            crossover=0.9,
+            mutation=float(config.LOSS_CONE_DE_MUTATION),
+            crossover=float(config.LOSS_CONE_DE_CROSSOVER),
             maxiter=maxiter,
-            atol=1e-3,
-            seed=42,
+            atol=float(config.LOSS_CONE_DE_ATOL),
+            seed=int(config.LOSS_CONE_DE_SEED),
             device=str(self.device),
             dtype=self.dtype,
         )
@@ -843,7 +856,7 @@ class LossConeFitterTorch(LossConeFitterBase):
         return best_params, best_chi2, n_iter
 
     def fit_surface_potential_batched(
-        self, batch_size: int | None = None, n_lhs: int = 400
+        self, batch_size: int | None = None, n_lhs: int | None = None
     ) -> np.ndarray:
         """
         Fit surface potential for all chunks using batched GPU optimization.
@@ -854,7 +867,7 @@ class LossConeFitterTorch(LossConeFitterBase):
         Args:
             batch_size: Number of chunks to process simultaneously. If None,
                 auto-detects based on available VRAM and dtype.
-            n_lhs: Number of LHS samples for initial grid search
+            n_lhs: Number of LHS samples for initial grid search (defaults to config)
 
         Returns:
             Array with columns [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
