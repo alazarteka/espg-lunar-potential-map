@@ -16,6 +16,8 @@ from typing import ClassVar
 
 import numpy as np
 
+from src import config
+
 try:
     import torch
     from torch import Tensor
@@ -26,9 +28,6 @@ except ImportError:
     Tensor = None  # type: ignore[misc, assignment]
 
 from src.utils.optimization import BatchedDifferentialEvolution
-
-# Physical constant: electron mass in eV·s²/m²
-ELECTRON_MASS_EV_S2_M2 = 5.685630e-12
 
 
 def _auto_detect_dtype(device: torch.device) -> torch.dtype:
@@ -99,7 +98,7 @@ def omnidirectional_flux_batch_torch(
 
     # velocity = sqrt(2E/m_e) in m/s
     # Shape: (E,)
-    velocity = torch.sqrt(2.0 * energy / ELECTRON_MASS_EV_S2_M2)
+    velocity = torch.sqrt(2.0 * energy / config.ELECTRON_MASS_EV_S2_M2)
 
     # Reshape for broadcasting:
     # density: (N,) -> (N, 1, 1)
@@ -130,18 +129,18 @@ def omnidirectional_flux_batch_torch(
 
     # Directional flux: j(E) = f(v) · v² / m_e
     # Shape: (N, P, E)
-    directional_flux = distribution * (velocity_exp**2) / ELECTRON_MASS_EV_S2_M2
+    directional_flux = distribution * (velocity_exp**2) / config.ELECTRON_MASS_EV_S2_M2
 
     # Omnidirectional flux: J(E) = 4π · j(E) · (1e-4 for cm²->m²)
     # Shape: (N, P, E)
-    omni_flux = 4.0 * math.pi * 1e-4 * directional_flux
+    omni_flux = 4.0 * math.pi * config.CM2_TO_M2 * directional_flux
 
     return omni_flux
 
 
 def build_response_matrix_torch(
     energy: Tensor,
-    energy_window_width_relative: float = 0.5,
+    energy_window_width_relative: float = config.ENERGY_WINDOW_WIDTH_RELATIVE,
 ) -> Tensor:
     """
     Build log-energy response matrix for instrumental resolution effects.
@@ -182,7 +181,7 @@ def compute_kappa_chi2_batch_torch(
     data_flux: Tensor,
     weights: Tensor,
     response_matrix: Tensor | None = None,
-    eps: float = 1e-10,
+    eps: float = config.EPS,
 ) -> Tensor:
     """
     Compute chi² for batched kappa model fits.
@@ -243,7 +242,7 @@ class KappaFitterTorch:
         popsize: int = 30,
         maxiter: int = 100,
         use_convolution: bool = True,
-        energy_window_width_relative: float = 0.5,
+        energy_window_width_relative: float = config.ENERGY_WINDOW_WIDTH_RELATIVE,
     ):
         """
         Initialize batched Kappa fitter.
@@ -305,7 +304,8 @@ class KappaFitterTorch:
         )
 
         if weights is None:
-            # Use log-flux uncertainty as weights
+            # Default is unweighted. For CPU-parity, pass weights based on
+            # log-flux uncertainty: 1 / (sigma_log_flux + EPS).
             weights = np.ones_like(flux_data)
         weights_t = torch.tensor(weights, device=self.device, dtype=self.dtype)
 

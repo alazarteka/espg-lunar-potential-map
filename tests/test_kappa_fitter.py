@@ -229,34 +229,34 @@ class TestCorrectedFitDaylight:
     def mock_spice_daylight(self, monkeypatch):
         """Mock SPICE functions to simulate daylight geometry.
 
-        We must patch at src.kappa module level since that's where the
-        functions are imported and used.
+        We patch at src.spacecraft_potential module level since that's where the
+        illumination geometry is evaluated.
         """
         import spiceypy
 
-        import src.kappa as kappa_module
+        import src.spacecraft_potential as sc_module
 
         # Mock str2et to return some ephemeris time
         monkeypatch.setattr(spiceypy, "str2et", lambda s: 0.0)
 
-        # Mock geometry functions at the kappa module level
+        # Mock geometry functions at the spacecraft_potential module level
         lunar_radius = config.LUNAR_RADIUS.to(ureg.meter).magnitude
 
         # Position spacecraft on dayside: +X direction, sun also in +X
         # This means spacecraft can see sun directly (no lunar obstruction)
         monkeypatch.setattr(
-            kappa_module,
+            sc_module,
             "get_lp_position_wrt_moon",
             lambda et: np.array([lunar_radius + 100e3, 0.0, 0.0]),
         )
         monkeypatch.setattr(
-            kappa_module,
+            sc_module,
             "get_lp_vector_to_sun_in_lunar_frame",
             lambda et: np.array([1.0, 0.0, 0.0]),
         )
         # For daylight, get_intersection_or_none should return None (no intersection)
         monkeypatch.setattr(
-            kappa_module,
+            sc_module,
             "get_intersection_or_none",
             lambda pos, dir, r: None,
         )
@@ -287,12 +287,12 @@ class TestCorrectedFitNightside:
     def mock_spice_nightside(self, monkeypatch):
         """Mock SPICE functions to simulate nightside geometry.
 
-        We must patch at src.kappa module level since that's where the
-        functions are imported and used.
+        We patch at src.spacecraft_potential module level since that's where the
+        illumination geometry is evaluated.
         """
         import spiceypy
 
-        import src.kappa as kappa_module
+        import src.spacecraft_potential as sc_module
 
         monkeypatch.setattr(spiceypy, "str2et", lambda s: 0.0)
 
@@ -300,20 +300,20 @@ class TestCorrectedFitNightside:
 
         # Spacecraft in -X (behind moon relative to sun)
         monkeypatch.setattr(
-            kappa_module,
+            sc_module,
             "get_lp_position_wrt_moon",
             lambda et: np.array([-lunar_radius - 100e3, 0.0, 0.0]),
         )
         # Sun in +X direction → spacecraft occluded by moon
         monkeypatch.setattr(
-            kappa_module,
+            sc_module,
             "get_lp_vector_to_sun_in_lunar_frame",
             lambda et: np.array([1.0, 0.0, 0.0]),
         )
         # For nightside, get_intersection_or_none should return an intersection point
         # (meaning line-of-sight to sun is blocked by moon)
         monkeypatch.setattr(
-            kappa_module,
+            sc_module,
             "get_intersection_or_none",
             lambda pos, dir, r: np.array([lunar_radius, 0.0, 0.0]),
         )

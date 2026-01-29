@@ -183,7 +183,13 @@ def calculate_potential(
     spacecraft_potential_high: float = 0.0,
     sey_E_m: float = 500.0,
     sey_delta_m: float = 1.5,
-) -> tuple[KappaParams, VoltageType] | None:
+    *,
+    n_starts: int = 10,
+    use_fast: bool = True,
+    use_weights: bool = True,
+    use_convolution: bool = True,
+    return_fit: bool = False,
+) -> tuple[KappaParams, VoltageType] | tuple[FitResults, VoltageType] | None:
     """
     Estimate spacecraft potential for a given spectrum.
 
@@ -232,7 +238,12 @@ def calculate_potential(
     is_day = intersection is None
 
     # Perform initial fit
-    initial_fit_result = fitter.fit()
+    initial_fit_result = fitter.fit(
+        n_starts=n_starts,
+        use_fast=use_fast,
+        use_weights=use_weights,
+        use_convolution=use_convolution,
+    )
 
     if is_day:
         if not initial_fit_result:
@@ -263,7 +274,12 @@ def calculate_potential(
             ureg.particle / ureg.meter**3
         ).magnitude
 
-        refit_result = fitter.fit()
+        refit_result = fitter.fit(
+            n_starts=n_starts,
+            use_fast=use_fast,
+            use_weights=use_weights,
+            use_convolution=use_convolution,
+        )
 
         if not refit_result:
             return None  # Place holder for daytime potential calculation
@@ -276,6 +292,8 @@ def calculate_potential(
             J_target=corrected_spacecraft_current_density, U_min=0.0, U_max=150.0
         )
 
+        if return_fit:
+            return refit_result, corrected_spacecraft_potential * ureg.volt
         return corrected_fit_params, corrected_spacecraft_potential * ureg.volt
 
     else:
@@ -353,4 +371,12 @@ def calculate_potential(
             theta=theta_corrected_m_per_s * ureg.meter / ureg.second,
         )
 
+        if return_fit:
+            corrected_fit = FitResults(
+                params=corrected_fit_params,
+                params_uncertainty=initial_fit_result.params_uncertainty,
+                error=initial_fit_result.error,
+                is_good_fit=initial_fit_result.is_good_fit,
+            )
+            return corrected_fit, spacecraft_potential * ureg.volt
         return corrected_fit_params, spacecraft_potential * ureg.volt

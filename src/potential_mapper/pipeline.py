@@ -269,7 +269,7 @@ def _spacecraft_potential_per_row_parallel(
 
 def _prepare_kappa_batch_data(
     er_data: ERData,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[int], np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[int], np.ndarray]:
     """
     Prepare batched data for torch Kappa fitting.
 
@@ -282,6 +282,7 @@ def _prepare_kappa_batch_data(
         energy: (E,) energy grid [eV]
         flux_data: (N, E) omnidirectional flux per spectrum
         density_estimates: (N,) density estimates [particles/m³]
+        weights: (N, E) log-space fit weights (1/σ_log_flux)
         valid_spec_nos: list of valid spectrum numbers
         row_indices: (N,) first row index for each spectrum
     """
@@ -291,6 +292,7 @@ def _prepare_kappa_batch_data(
     energy = None
     flux_list = []
     density_list = []
+    weight_list = []
     valid_spec_nos = []
     row_indices = []
 
@@ -312,6 +314,14 @@ def _prepare_kappa_batch_data(
 
             flux_list.append(kappa_obj.omnidirectional_differential_particle_flux_mag)
             density_list.append(kappa_obj.density_estimate_mag)
+            try:
+                weight_list.append(kappa_obj.log_flux_weights())
+            except Exception:
+                weight_list.append(
+                    np.ones_like(
+                        kappa_obj.omnidirectional_differential_particle_flux_mag
+                    )
+                )
             valid_spec_nos.append(spec_no)
             # Store first row index for this spectrum
             mask_idx = np.flatnonzero(spec_values == spec_value)
@@ -320,12 +330,13 @@ def _prepare_kappa_batch_data(
             continue
 
     if energy is None or len(flux_list) == 0:
-        return np.array([]), np.array([]), np.array([]), [], np.array([])
+        return np.array([]), np.array([]), np.array([]), np.array([]), [], np.array([])
 
     return (
         energy,
         np.array(flux_list),
         np.array(density_list),
+        np.array(weight_list),
         valid_spec_nos,
         np.array(row_indices),
     )
@@ -372,9 +383,14 @@ def _spacecraft_potential_per_row_torch(
 
     # Prepare batch data
     logging.info("Preparing batch data for Kappa fitting...")
-    energy, flux_data, density_estimates, valid_spec_nos, _first_row_indices = (
-        _prepare_kappa_batch_data(er_data)
-    )
+    (
+        energy,
+        flux_data,
+        density_estimates,
+        weights,
+        valid_spec_nos,
+        _first_row_indices,
+    ) = _prepare_kappa_batch_data(er_data)
 
     if len(valid_spec_nos) == 0:
         logging.warning("No valid spectra for Kappa fitting")
@@ -389,7 +405,7 @@ def _spacecraft_potential_per_row_torch(
         maxiter=100,
     )
     kappa_vals, theta_vals, chi2_vals = fitter.fit_batch(
-        energy, flux_data, density_estimates
+        energy, flux_data, density_estimates, weights=weights
     )
 
     # Compute spacecraft potential for each spectrum
@@ -409,7 +425,7 @@ def _spacecraft_potential_per_row_torch(
             continue
 
         # Check fit quality
-        if chi2_vals[i] > 1e4:  # Poor fit, skip
+        if chi2_vals[i] > config.FIT_ERROR_THRESHOLD:
             continue
 
         kappa = kappa_vals[i]

@@ -23,6 +23,42 @@ class DummyER:
         self.er_data_file = "dummy"
 
 
+def test_prepare_kappa_batch_data_includes_weights(monkeypatch):
+    class FakeKappa:
+        def __init__(self, _er_data, spec_no: int):
+            self.is_data_valid = True
+            self.energy_centers_mag = np.array([10.0, 20.0], dtype=float)
+            self.omnidirectional_differential_particle_flux_mag = np.array(
+                [1.0, 2.0], dtype=float
+            )
+            self.density_estimate_mag = float(spec_no)
+            self._weights = np.array([spec_no, spec_no + 1], dtype=float)
+
+        def log_flux_weights(self) -> np.ndarray:
+            return self._weights
+
+    monkeypatch.setattr(pipeline, "Kappa", FakeKappa)
+
+    spec_sequence = np.repeat([1, 2], config.SWEEP_ROWS)
+    er = DummyER(spec_sequence)
+
+    (
+        energy,
+        flux,
+        density,
+        weights,
+        specs,
+        row_indices,
+    ) = pipeline._prepare_kappa_batch_data(er)
+
+    assert np.allclose(energy, [10.0, 20.0])
+    assert flux.shape == (2, 2)
+    assert np.allclose(density, [1.0, 2.0])
+    assert np.allclose(weights, [[1.0, 2.0], [2.0, 3.0]])
+    assert specs == [1, 2]
+    assert np.allclose(row_indices, [0, config.SWEEP_ROWS])
+
+
 def test_spacecraft_potential_per_row_assigns_values(monkeypatch):
     n_rows = 2 * config.SWEEP_ROWS
     spec_sequence = np.repeat([10, 11], config.SWEEP_ROWS)

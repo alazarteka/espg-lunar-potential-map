@@ -86,6 +86,31 @@ class TestOmnidirectionalFluxBatch:
         high_E_idx = -5
         assert flux[1, 0, high_E_idx] < flux[0, 0, high_E_idx]
 
+    def test_matches_numpy_omnidirectional_flux_magnitude(self):
+        """Torch kappa flux matches NumPy magnitude implementation."""
+        from src.kappa_torch import omnidirectional_flux_batch_torch
+        from src.physics.kappa import omnidirectional_flux_magnitude
+
+        energy_np = np.geomspace(10.0, 2.0e4, 32)
+        density_mag = 1e6
+        kappa = 4.5
+        theta_mag = 1e7
+
+        expected = omnidirectional_flux_magnitude(
+            density_mag=density_mag,
+            kappa=kappa,
+            theta_mag=theta_mag,
+            energy_mag=energy_np,
+        )
+
+        energy = torch.tensor(energy_np, dtype=torch.float64)
+        density = torch.tensor([density_mag], dtype=torch.float64)
+        kappa_t = torch.tensor([[kappa]], dtype=torch.float64)
+        theta = torch.tensor([[theta_mag]], dtype=torch.float64)
+
+        flux = omnidirectional_flux_batch_torch(density, kappa_t, theta, energy)
+        np.testing.assert_allclose(flux[0, 0].cpu().numpy(), expected, rtol=1e-6)
+
 
 class TestResponseMatrix:
     """Tests for build_response_matrix_torch."""
