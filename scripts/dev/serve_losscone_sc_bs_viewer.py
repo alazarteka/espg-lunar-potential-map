@@ -335,7 +335,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         "--normalization",
         choices=["global", "ratio", "ratio2", "ratio_rescaled"],
         default="ratio",
-        help="Flux normalization mode for data",
+        help="Flux normalization mode for data ('ratio'/'ratio2' recommended; 'global' and 'ratio_rescaled' deprecated)",
     )
     parser.add_argument(
         "--incident-stat",

@@ -347,7 +347,7 @@ def parse_args() -> argparse.Namespace:
         "--normalization",
         choices=["global", "ratio", "ratio2", "ratio_rescaled"],
         default="global",
-        help="Normalization mode: global (max incident), ratio (per-energy), ratio2 (pairwise), ratio_rescaled (ratio then rescale to [0,1])",
+        help="Loss-cone normalization mode ('ratio'/'ratio2' recommended; 'global' and 'ratio_rescaled' deprecated)",
     )
     parser.add_argument(
         "--background",

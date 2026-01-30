@@ -366,11 +366,13 @@ class LossConeFitter(LossConeFitterBase):
             spacecraft_potential (np.ndarray | None): Optional per-row spacecraft
                 potential [V] aligned with `er_data.data`; used in synthetic model.
             normalization_mode (str): How to normalize flux for fitting.
-                - "global": divide entire 2D array by max incident flux
-                - "ratio": per-energy ratio of reflected/incident flux (default)
-                - "ratio2": pairwise normalization
-                  (incident→1, reflected→reflected/incident)
+                - "ratio": per-energy normalization by an incident statistic
+                  (default; approximates reflected/incident normalization)
+                - "ratio2": pairwise normalization (incident→1,
+                  reflected→reflected/incident) (closest to Halekas 2008 wording)
+                - "global": divide entire 2D array by max incident flux (DEPRECATED)
                 - "ratio_rescaled": per-energy ratio, then rescale to [0, 1]
+                  (DEPRECATED)
             fit_method (str | None): Loss-cone fitting method ("halekas" or "lillis").
             beam_amp_fixed (float | None): If set, fix the Gaussian beam amplitude
                 to this value instead of fitting it.
@@ -540,10 +542,10 @@ class LossConeFitter(LossConeFitterBase):
         Build a 2D normalized flux distribution for a specific measurement chunk.
 
         Normalization modes:
-        - 'global': divide entire 2D array by max incident flux
-        - 'ratio': divide each energy by its own mean incident flux
+        - 'ratio': per-energy normalization by incident flux
         - 'ratio2': pairwise normalization (incident→1.0, reflected→reflected/incident)
-        - 'ratio_rescaled': per-energy ratio, then rescale to [0, 1]
+        - 'global': divide entire 2D array by max incident flux (DEPRECATED)
+        - 'ratio_rescaled': per-energy ratio, then rescale to [0, 1] (DEPRECATED)
 
         Args:
             measurement_chunk (int): The index of the measurement chunk.

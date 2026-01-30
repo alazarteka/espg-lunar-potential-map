@@ -201,10 +201,13 @@ class TestLossConeFitterNormalization:
     def test_normalization_mode_ratio_rescaled(self):
         """Ratio_rescaled: per-energy ratio then global [0,1] scaling."""
         er = prepare_synthetic_er()
-        fitter = LossConeFitter(
-            er,
-            normalization_mode="ratio_rescaled",
-        )
+        with pytest.warns(
+            FutureWarning, match="Normalization mode 'ratio_rescaled' is deprecated"
+        ):
+            fitter = LossConeFitter(
+                er,
+                normalization_mode="ratio_rescaled",
+            )
 
         norm2d = fitter.build_norm2d(0)
 
@@ -217,10 +220,13 @@ class TestLossConeFitterNormalization:
     def test_normalization_mode_global(self):
         """Global mode: divides by maximum incident flux."""
         er = prepare_synthetic_er()
-        fitter = LossConeFitter(
-            er,
-            normalization_mode="global",
-        )
+        with pytest.warns(
+            FutureWarning, match="Normalization mode 'global' is deprecated"
+        ):
+            fitter = LossConeFitter(
+                er,
+                normalization_mode="global",
+            )
 
         norm2d = fitter.build_norm2d(0)
 

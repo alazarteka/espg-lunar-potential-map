@@ -56,6 +56,10 @@ uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.T
 uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.TAB --spec-no 653 --row-mad 3 --smooth-pitch 5 --compare --filter-report
 ```
 
+**Normalization**: use `--normalization ratio2` (closest to reflected/incident) or
+`--normalization ratio`. The `global` and `ratio_rescaled` modes are deprecated
+and will be removed in a future release.
+
 ### beam_label_studio.py
 
 Blind browser-based labeling tool for **pre-rendered** sweep images (e.g., from

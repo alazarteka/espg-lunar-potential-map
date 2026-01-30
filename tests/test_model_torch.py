@@ -529,6 +529,65 @@ class TestLossConeFitterTorchLillis:
         assert np.isnan(chi2)
 
 
+class TestLossConeFitterTorchBatchedDE:
+    """Regression tests for batched DE edge cases."""
+
+    def test_batched_de_handles_single_spectrum(self, monkeypatch) -> None:
+        """A single valid chunk should not crash DE (n_spectra=1)."""
+        from types import SimpleNamespace
+
+        from src import config
+        from src.losscone.model import synth_losscone
+        from src.losscone_torch import LossConeFitterTorch
+        from src.utils.synthetic import prepare_synthetic_er
+
+        monkeypatch.setattr(config, "LOSS_CONE_LHS_SAMPLES", 64)
+        monkeypatch.setattr(config, "LOSS_CONE_DE_POPSIZE", 16)
+        monkeypatch.setattr(config, "LOSS_CONE_DE_MAXITER", 40)
+
+        er = prepare_synthetic_er()
+
+        energies = er.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)[
+            : config.SWEEP_ROWS
+        ]
+        pitch_1d = np.linspace(0.0, 180.0, config.CHANNELS, dtype=np.float64)
+        pitches = np.broadcast_to(
+            pitch_1d[None, :], (config.SWEEP_ROWS, config.CHANNELS)
+        )
+
+        norm2d = synth_losscone(
+            energy_grid=energies,
+            pitch_grid=pitches,
+            U_surface=-50.0,
+            U_spacecraft=0.0,
+            bs_over_bm=0.5,
+            beam_width_eV=config.LOSS_CONE_BEAM_WIDTH_EV,
+            beam_amp=2.0,
+            beam_pitch_sigma_deg=config.LOSS_CONE_BEAM_PITCH_SIGMA_DEG,
+            background=config.LOSS_CONE_BACKGROUND,
+        )
+        base_flux = np.geomspace(1e3, 1e4, config.SWEEP_ROWS, dtype=np.float64)
+        er.data.loc[: config.SWEEP_ROWS - 1, config.FLUX_COLS] = (
+            norm2d * base_flux[:, None]
+        )
+
+        pitch_angle = SimpleNamespace(pitch_angles=pitches)
+        fitter = LossConeFitterTorch(
+            er,
+            pitch_angle=pitch_angle,
+            normalization_mode="ratio",
+            fit_method="halekas",
+            device="cpu",
+            dtype="float64",
+        )
+
+        results = fitter.fit_surface_potential_batched(batch_size=1, n_lhs=32)
+
+        assert results.shape == (1, 5)
+        assert results[0, 4] == 0
+        assert np.isfinite(results[0, 3])
+
+
 class TestDeviceHandling:
     """Tests for device handling."""
 

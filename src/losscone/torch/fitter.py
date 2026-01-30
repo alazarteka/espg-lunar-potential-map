@@ -102,7 +102,8 @@ class LossConeFitterTorch(LossConeFitterBase):
             er_data: ERData object
             pitch_angle: Optional pre-computed PitchAngle object
             spacecraft_potential: Optional per-row spacecraft potential [V]
-            normalization_mode: Flux normalization mode
+            normalization_mode: Flux normalization mode ('ratio'/'ratio2' recommended;
+                'global' and 'ratio_rescaled' are deprecated)
             fit_method: Loss-cone fitting method ("halekas" or "lillis")
             beam_amp_fixed: Fixed beam amplitude (None to fit)
             incident_flux_stat: Statistic for incident flux ("mean" or "max")
@@ -787,11 +788,19 @@ class LossConeFitterTorch(LossConeFitterBase):
             Evaluate chi2 for all chunks × all population members.
 
             Args:
-                params: (N, popsize, 3) parameters
+                params: Either:
+                    - (N, popsize, 3) in multi-spectrum mode, or
+                    - (popsize, 3) in single-spectrum mode
 
             Returns:
-                chi2: (N, popsize)
+                chi2: Either:
+                    - (N, popsize) in multi-spectrum mode, or
+                    - (popsize,) in single-spectrum mode
             """
+            single_spectrum = params.dim() == 2
+            if single_spectrum:
+                params = params.unsqueeze(0)
+
             U_surface = params[:, :, 0]
             bs_over_bm = params[:, :, 1]
             beam_amp = params[:, :, 2]
@@ -833,6 +842,8 @@ class LossConeFitterTorch(LossConeFitterBase):
                 torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
             )
 
+            if single_spectrum:
+                return chi2.squeeze(0)
             return chi2
 
         # Create multi-spectrum DE optimizer
@@ -852,6 +863,13 @@ class LossConeFitterTorch(LossConeFitterBase):
         # Seed population with LHS results
         # Note: x0 is (N, 3), DE will use this as first member of each population
         best_params, best_chi2, n_iter = de.optimize(objective, x0=x0)
+
+        if best_params.dim() == 1:
+            best_params = best_params.unsqueeze(0)
+        if isinstance(best_chi2, float):
+            best_chi2 = torch.tensor([best_chi2], device=self.device, dtype=self.dtype)
+        elif best_chi2.dim() == 0:
+            best_chi2 = best_chi2.unsqueeze(0)
 
         return best_params, best_chi2, n_iter
 

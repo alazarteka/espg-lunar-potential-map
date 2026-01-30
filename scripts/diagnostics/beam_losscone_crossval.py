@@ -143,7 +143,7 @@ def parse_args() -> argparse.Namespace:
         "--normalization",
         choices=["global", "ratio", "ratio2", "ratio_rescaled"],
         default="ratio2",
-        help="Loss-cone normalization mode",
+        help="Loss-cone normalization mode ('ratio'/'ratio2' recommended; 'global' and 'ratio_rescaled' deprecated)",
     )
     parser.add_argument(
         "--min-peak",
