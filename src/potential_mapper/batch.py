@@ -37,7 +37,12 @@ def _to_unicode(arr) -> np.ndarray:
     return np.asarray(arr, dtype="U64")
 
 
-def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray]:
+def _prepare_payload(
+    er_data,
+    results: PotentialResults,
+    *,
+    u_width_identifiable_max_v: float | None = None,
+) -> dict[str, np.ndarray]:
     """
     Prepare NPZ payload from merged ERData and PotentialResults.
 
@@ -48,6 +53,8 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
     n_rows = len(df)
     if n_rows != len(results.spacecraft_latitude):
         raise ValueError("Row count mismatch between ERData and PotentialResults")
+
+    emit_u_width_qc = u_width_identifiable_max_v is not None
 
     spec_no = df[config.SPEC_NO_COLUMN].to_numpy(dtype=np.int64)
     utc_vals = _to_unicode(df.get(config.UTC_COLUMN))
@@ -83,6 +90,14 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
         "rows_environment_class": results.environment_class.astype(np.int8),
     }
 
+    if emit_u_width_qc:
+        payload["rows_u_width_lhs_dchi2red_0p001"] = (
+            results.u_width_lhs_dchi2red_0p001.astype(np.float64)
+        )
+        payload["rows_u_is_identifiable_lhs_dchi2red_0p001"] = (
+            results.u_is_identifiable_lhs_dchi2red_0p001.astype(bool)
+        )
+
     # Aggregate by spec_no
     uniq_specs, start_indices, counts = np.unique(
         spec_no, return_index=True, return_counts=True
@@ -96,6 +111,8 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
     spec_te = []
     spec_ne = []
     spec_env = []
+    spec_u_width_lhs: list[float] = []
+    spec_u_is_identifiable_lhs: list[bool] = []
 
     for idx, count in zip(start_indices, counts, strict=False):
         row_slice = slice(idx, idx + count)
@@ -108,6 +125,11 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
         spec_u_surface.append(u_chunk[0] if np.isfinite(u_chunk[0]) else np.nan)
         spec_bs_over_bm.append(results.bs_over_bm[idx])
         spec_chi2.append(results.fit_chi2[idx])
+        if emit_u_width_qc:
+            spec_u_width_lhs.append(results.u_width_lhs_dchi2red_0p001[idx])
+            spec_u_is_identifiable_lhs.append(
+                bool(results.u_is_identifiable_lhs_dchi2red_0p001[idx])
+            )
         spec_te.append(results.electron_temperature[idx])
         spec_ne.append(results.electron_density[idx])
         spec_env.append(results.environment_class[idx])
@@ -128,6 +150,18 @@ def _prepare_payload(er_data, results: PotentialResults) -> dict[str, np.ndarray
             "spec_environment_class": np.array(spec_env, dtype=np.int8),
         }
     )
+
+    if emit_u_width_qc:
+        payload["spec_u_width_lhs_dchi2red_0p001"] = np.array(
+            spec_u_width_lhs, dtype=np.float64
+        )
+        payload["spec_u_is_identifiable_lhs_dchi2red_0p001"] = np.array(
+            spec_u_is_identifiable_lhs, dtype=bool
+        )
+        payload["u_width_lhs_delta_reduced"] = np.array(0.001, dtype=np.float64)
+        payload["u_width_lhs_identifiable_max_v"] = np.array(
+            float(u_width_identifiable_max_v), dtype=np.float64
+        )
 
     return payload
 
@@ -171,6 +205,8 @@ def run_batch(
     use_torch: bool = False,
     fit_method: str | FitMethod | None = None,
     spacecraft_potential_override: float | None = None,
+    emit_u_width_qc: bool = False,
+    u_width_identifiable_max_v: float = 200.0,
 ) -> int:
     """
     Run batch processing with merged data loading.
@@ -238,6 +274,8 @@ def run_batch(
             use_torch=use_torch,
             fit_method=fit_method_parsed,
             spacecraft_potential_override=spacecraft_potential_override,
+            emit_u_width_qc=bool(emit_u_width_qc),
+            u_width_identifiable_max_v=float(u_width_identifiable_max_v),
         )
     except Exception as e:
         logging.exception(f"Failed to process merged data: {e}")
@@ -245,7 +283,13 @@ def run_batch(
 
     # Prepare and write output
     logging.info("Preparing output payload...")
-    payload = _prepare_payload(er_data, results)
+    payload = _prepare_payload(
+        er_data,
+        results,
+        u_width_identifiable_max_v=float(u_width_identifiable_max_v)
+        if bool(emit_u_width_qc)
+        else None,
+    )
 
     logging.info(f"Writing to {output_path}...")
     _write_npz_atomic(output_path, payload)
@@ -313,6 +357,20 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--emit-u-width-qc",
+        action="store_true",
+        help=(
+            "Emit an LHS-based U identifiability proxy into the batch NPZ "
+            "(adds rows/spec u_width + identifiable flag)"
+        ),
+    )
+    parser.add_argument(
+        "--u-width-identifiable-max-v",
+        type=float,
+        default=200.0,
+        help="Max U-width [V] considered identifiable (only with --emit-u-width-qc)",
+    )
+    parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing output file"
     )
     parser.add_argument(
@@ -338,6 +396,8 @@ def main() -> int:
         use_torch=args.fast,
         fit_method=args.losscone_fit_method,
         spacecraft_potential_override=args.u_spacecraft,
+        emit_u_width_qc=args.emit_u_width_qc,
+        u_width_identifiable_max_v=args.u_width_identifiable_max_v,
     )
 
 

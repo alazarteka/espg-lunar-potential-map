@@ -1072,16 +1072,21 @@ class LossConeFitter(LossConeFitterBase):
             chunk_index=measurement_chunk,
         )
 
-    def _fit_surface_potential_lillis(self, measurement_chunk: int) -> ChunkFitResult:
+    def _fit_surface_potential_lillis_with_u_width_qc(
+        self, measurement_chunk: int, *, delta_reduced: float = 0.001
+    ) -> tuple[ChunkFitResult, float]:
         """
         Fit surface potential using Lillis-style masked linear chi2 + DE refinement.
 
         Uses a relative-flux mask to exclude low/zero bins, then minimizes
         linear-space chi2. Returns reduced chi2 for quality control.
         """
+        delta_reduced = float(delta_reduced)
+        if delta_reduced <= 0:
+            raise ValueError("delta_reduced must be > 0")
         data = self._prepare_chunk_data(measurement_chunk)
         if data is None:
-            return ChunkFitResult.invalid(measurement_chunk)
+            return ChunkFitResult.invalid(measurement_chunk), float("nan")
 
         norm2d = data.norm2d
         energies = data.energies
@@ -1089,7 +1094,7 @@ class LossConeFitter(LossConeFitterBase):
         spacecraft_slice = data.spacecraft_slice
 
         if not data.has_enough_valid_bins(FitMethod.LILLIS):
-            return ChunkFitResult.invalid(measurement_chunk)
+            return ChunkFitResult.invalid(measurement_chunk), float("nan")
 
         # LHS samples provide a robust starting point
         lhs_U_surface = self.lhs[:, 0]
@@ -1175,15 +1180,35 @@ class LossConeFitter(LossConeFitterBase):
         beam_amp = float(np.clip(beam_amp, bounds[2][0], bounds[2][1]))
 
         if not np.isfinite(best_chi2) or best_chi2 > config.LILLIS_CHI2_REDUCED_MAX:
-            return ChunkFitResult.invalid(measurement_chunk, chi2=float(best_chi2))
+            return (
+                ChunkFitResult.invalid(measurement_chunk, chi2=float(best_chi2)),
+                float("nan"),
+            )
 
-        return ChunkFitResult(
-            u_surface=U_surface,
-            bs_over_bm=bs_over_bm,
-            beam_amp=beam_amp,
-            chi2=float(best_chi2),
-            chunk_index=measurement_chunk,
+        keep = chi2_vals <= (best_lhs_chi2 + delta_reduced)
+        keep = keep & np.isfinite(lhs_U_surface) & np.isfinite(chi2_vals)
+        u_width_lhs = float("nan")
+        if np.any(keep):
+            u_min = float(np.min(lhs_U_surface[keep]))
+            u_max = float(np.max(lhs_U_surface[keep]))
+            u_width_lhs = u_max - u_min
+
+        return (
+            ChunkFitResult(
+                u_surface=U_surface,
+                bs_over_bm=bs_over_bm,
+                beam_amp=beam_amp,
+                chi2=float(best_chi2),
+                chunk_index=measurement_chunk,
+            ),
+            u_width_lhs,
         )
+
+    def _fit_surface_potential_lillis(self, measurement_chunk: int) -> ChunkFitResult:
+        result, _u_width = self._fit_surface_potential_lillis_with_u_width_qc(
+            measurement_chunk, delta_reduced=0.001
+        )
+        return result
 
     def fit_surface_potential(self) -> np.ndarray:
         """
@@ -1212,6 +1237,47 @@ class LossConeFitter(LossConeFitterBase):
             results[i] = result.as_row()
 
         return results
+
+    def fit_surface_potential_with_u_width_qc(
+        self, *, delta_reduced: float = 0.001
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Fit surface potential and return a per-chunk identifiability proxy for
+        U_surface.
+
+        The proxy is computed from the LHS phase for the Lillis fitter:
+        U-width over LHS samples with chi2_red <= chi2_red_min + delta_reduced.
+
+        Returns:
+            results: (n_chunks, 5) array [U_surface, bs_over_bm, beam_amp, chi2,
+                chunk_index]
+            u_width_lhs: (n_chunks,) U-width [V] (NaN for non-Lillis or failed fits)
+        """
+        assert not self.er_data.data.empty, "Data not loaded."
+        delta_reduced = float(delta_reduced)
+        if delta_reduced <= 0:
+            raise ValueError("delta_reduced must be > 0")
+
+        n_chunks = len(self.er_data.data) // config.SWEEP_ROWS
+        results = np.zeros((n_chunks, 5))
+        u_width = np.full(n_chunks, np.nan, dtype=np.float64)
+
+        for i in tqdm(
+            range(n_chunks),
+            desc="Fitting chunks (+U QC)",
+            unit="chunk",
+            dynamic_ncols=True,
+        ):
+            if self.fit_method == FitMethod.LILLIS:
+                fit, u_w = self._fit_surface_potential_lillis_with_u_width_qc(
+                    i, delta_reduced=delta_reduced
+                )
+                u_width[i] = u_w
+            else:
+                fit = self.fit_chunk_full(i)
+            results[i] = fit.as_row()
+
+        return results, u_width
 
 
 class FluxData:

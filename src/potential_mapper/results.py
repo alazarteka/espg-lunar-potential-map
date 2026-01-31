@@ -92,6 +92,11 @@ class PotentialResults:
     - beam_amp: Fitted secondary beam amplitude; NaN if not fit.
     - fit_chi2: Chi-squared of the loss-cone fit; NaN if not fit.
 
+    Identifiability QC (optional; only when enabled in pipeline/batch):
+    - u_width_lhs_dchi2red_0p001: LHS-based U-width proxy [V]; NaN if disabled.
+    - u_is_identifiable_lhs_dchi2red_0p001: True if width <= threshold; False if
+      disabled or width is NaN.
+
     Kappa fit parameters (from spacecraft potential calculation):
     - electron_temperature: Electron temperature Te in eV; NaN if not fit.
     - electron_density: Electron density ne in particles/m³; NaN if not fit.
@@ -124,6 +129,12 @@ class PotentialResults:
     beam_amp: np.ndarray = field(default_factory=lambda: np.array([]))
     fit_chi2: np.ndarray = field(default_factory=lambda: np.array([]))
 
+    # Optional identifiability QC (new)
+    u_width_lhs_dchi2red_0p001: np.ndarray = field(default_factory=lambda: np.array([]))
+    u_is_identifiable_lhs_dchi2red_0p001: np.ndarray = field(
+        default_factory=lambda: np.array([])
+    )
+
     # Kappa fit parameters (new)
     electron_temperature: np.ndarray = field(default_factory=lambda: np.array([]))
     electron_density: np.ndarray = field(default_factory=lambda: np.array([]))
@@ -141,6 +152,10 @@ class PotentialResults:
             self.beam_amp = np.full(n, np.nan)
         if len(self.fit_chi2) == 0:
             self.fit_chi2 = np.full(n, np.nan)
+        if len(self.u_width_lhs_dchi2red_0p001) == 0:
+            self.u_width_lhs_dchi2red_0p001 = np.full(n, np.nan)
+        if len(self.u_is_identifiable_lhs_dchi2red_0p001) == 0:
+            self.u_is_identifiable_lhs_dchi2red_0p001 = np.zeros(n, dtype=bool)
         if len(self.electron_temperature) == 0:
             self.electron_temperature = np.full(n, np.nan)
         if len(self.electron_density) == 0:
@@ -186,6 +201,10 @@ def _concat_results(results: list[PotentialResults]) -> PotentialResults:
         bs_over_bm=cat("bs_over_bm"),
         beam_amp=cat("beam_amp"),
         fit_chi2=cat("fit_chi2"),
+        u_width_lhs_dchi2red_0p001=cat("u_width_lhs_dchi2red_0p001"),
+        u_is_identifiable_lhs_dchi2red_0p001=cat(
+            "u_is_identifiable_lhs_dchi2red_0p001"
+        ),
         electron_temperature=cat("electron_temperature"),
         electron_density=cat("electron_density"),
         kappa_value=cat("kappa_value"),

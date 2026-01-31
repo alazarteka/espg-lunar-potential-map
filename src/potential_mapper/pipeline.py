@@ -682,6 +682,8 @@ def process_merged_data(
     use_torch: bool = False,
     fit_method: str | FitMethod | None = None,
     spacecraft_potential_override: float | None = None,
+    emit_u_width_qc: bool = False,
+    u_width_identifiable_max_v: float = 200.0,
 ) -> PotentialResults:
     """
     Process the merged ER dataset.
@@ -855,6 +857,8 @@ def process_merged_data(
     bs_over_bm_arr = np.full(n, np.nan)
     beam_amp_arr = np.full(n, np.nan)
     fit_chi2_arr = np.full(n, np.nan)
+    u_width_lhs_dchi2red_0p001_arr = np.full(n, np.nan)
+    u_is_identifiable_lhs_dchi2red_0p001_arr = np.zeros(n, dtype=bool)
 
     # If the dataset is small, or ERData has been monkeypatched without
     # from_dataframe (as in some tests), fall back to sequential fitting.
@@ -874,6 +878,10 @@ def process_merged_data(
     else:
         logging.debug("Pitch-angle polarity skipped; required ER columns are missing.")
 
+    emit_u_width_qc = (
+        bool(emit_u_width_qc) and fit_method == FitMethod.LILLIS and not chunked
+    )
+
     if use_torch:
         # PyTorch-accelerated fitter (~5x faster)
         if not HAS_TORCH or LossConeFitterTorch is None:
@@ -889,15 +897,25 @@ def process_merged_data(
             fit_method=fit_method,
         )
         # Torch path defaults to batched processing (auto-detects dtype and batch_size)
-        fit_mat = fitter.fit_surface_potential()
+        if emit_u_width_qc:
+            fit_mat, u_width_chunks, u_is_identifiable_chunks = (
+                fitter.fit_surface_potential_with_u_width_qc(
+                    delta_reduced=0.001,
+                    identifiable_width_max_v=float(u_width_identifiable_max_v),
+                )
+            )
+        else:
+            fit_mat = fitter.fit_surface_potential()
+            u_width_chunks = None
+            u_is_identifiable_chunks = None
         _apply_fit_results(
             fit_mat,
             proj_potential,
             bs_over_bm_arr,
             beam_amp_arr,
             fit_chi2_arr,
-            row_offset=0,
-            n_total=n,
+            0,
+            n,
         )
     elif not chunked:
         logging.info("Running surface potential fitting (sequential)...")
@@ -907,17 +925,29 @@ def process_merged_data(
             spacecraft_potential=sc_potential,
             fit_method=fit_method,
         )
-        fit_mat = fitter.fit_surface_potential()
+        if emit_u_width_qc:
+            fit_mat, u_width_chunks = fitter.fit_surface_potential_with_u_width_qc(
+                delta_reduced=0.001
+            )
+            u_is_identifiable_chunks = np.isfinite(u_width_chunks) & (
+                u_width_chunks <= float(u_width_identifiable_max_v)
+            )
+        else:
+            fit_mat = fitter.fit_surface_potential()
+            u_width_chunks = None
+            u_is_identifiable_chunks = None
         _apply_fit_results(
             fit_mat,
             proj_potential,
             bs_over_bm_arr,
             beam_amp_arr,
             fit_chi2_arr,
-            row_offset=0,
-            n_total=n,
+            0,
+            n,
         )
     else:
+        u_width_chunks = None
+        u_is_identifiable_chunks = None
         logging.info("Starting parallel surface potential fitting...")
 
         chunks: list[tuple[pd.DataFrame, np.ndarray, np.ndarray | None, FitMethod]] = []
@@ -957,6 +987,22 @@ def process_merged_data(
                         n_total=n,
                     )
 
+    if (
+        emit_u_width_qc
+        and u_width_chunks is not None
+        and u_is_identifiable_chunks is not None
+    ):
+        n_chunks = len(er_data.data) // rows_per_sweep
+        for chunk_idx in range(n_chunks):
+            row_start = chunk_idx * rows_per_sweep
+            row_end = min(row_start + rows_per_sweep, n)
+            u_width_lhs_dchi2red_0p001_arr[row_start:row_end] = float(
+                u_width_chunks[chunk_idx]
+            )
+            u_is_identifiable_lhs_dchi2red_0p001_arr[row_start:row_end] = bool(
+                u_is_identifiable_chunks[chunk_idx]
+            )
+
     # Build results object
     results = PotentialResults(
         spacecraft_latitude=spacecraft_lat,
@@ -971,6 +1017,8 @@ def process_merged_data(
         bs_over_bm=bs_over_bm_arr,
         beam_amp=beam_amp_arr,
         fit_chi2=fit_chi2_arr,
+        u_width_lhs_dchi2red_0p001=u_width_lhs_dchi2red_0p001_arr,
+        u_is_identifiable_lhs_dchi2red_0p001=u_is_identifiable_lhs_dchi2red_0p001_arr,
         electron_temperature=electron_temp,
         electron_density=electron_dens,
         kappa_value=kappa_vals_arr,

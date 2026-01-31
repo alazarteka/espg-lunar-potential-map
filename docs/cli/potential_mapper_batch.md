@@ -20,6 +20,8 @@ uv run python -m src.potential_mapper.batch [OPTIONS]
 | `--fast` | flag | False | Use PyTorch-accelerated fitter (GPU/CPU) |
 | `--losscone-fit-method` | str | None | Loss-cone fitter (`halekas` or `lillis`, defaults to config) |
 | `--u-spacecraft` | float | None | Override spacecraft potential [V] (constant for all rows; skips estimation) |
+| `--emit-u-width-qc` | flag | False | Emit an LHS-based U identifiability proxy (adds `u_width` + `identifiable` fields) |
+| `--u-width-identifiable-max-v` | float | 200.0 | Max U-width [V] considered identifiable (only with `--emit-u-width-qc`) |
 | `--overwrite` | flag | False | Overwrite existing output file |
 | `-v`, `--verbose` | flag | False | Enable DEBUG-level logging |
 
@@ -51,6 +53,7 @@ Output filename is auto-generated based on date filters:
 - `rows_projection_latitude`, `rows_projection_longitude`
 - `rows_spacecraft_potential`, `rows_projected_potential`
 - `rows_bs_over_bm`, `rows_beam_amp`, `rows_fit_chi2`
+- `rows_u_width_lhs_dchi2red_0p001`, `rows_u_is_identifiable_lhs_dchi2red_0p001` (only with `--emit-u-width-qc`)
 - `rows_spacecraft_in_sun`, `rows_projection_in_sun`
 
 **Spectrum-level arrays** (aggregated per spectrum):
@@ -58,6 +61,7 @@ Output filename is auto-generated based on date filters:
 - `spec_time_start`, `spec_time_end` – time range
 - `spec_has_fit` – whether a valid fit was obtained
 - `spec_row_count` – rows per spectrum
+- `spec_u_width_lhs_dchi2red_0p001`, `spec_u_is_identifiable_lhs_dchi2red_0p001` (only with `--emit-u-width-qc`)
 
 ## Examples
 
@@ -80,6 +84,11 @@ uv run python -m src.potential_mapper.batch --year 1998 --losscone-fit-method li
 # Force spacecraft potential to 0 V for a single day
 uv run python -m src.potential_mapper.batch --year 1999 --month 4 --day 29 \
   --losscone-fit-method lillis --u-spacecraft 0
+
+# Emit U identifiability QC fields (LHS-based width proxy)
+uv run python -m src.potential_mapper.batch --year 1999 --month 4 --day 29 \
+  --losscone-fit-method lillis --u-spacecraft 0 \
+  --emit-u-width-qc --u-width-identifiable-max-v 200
 ```
 
 ## Loading Results
