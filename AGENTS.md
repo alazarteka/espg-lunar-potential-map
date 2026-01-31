@@ -25,6 +25,11 @@ uv run python -m src.data_acquisition   # Download data
 uv run python -m src.potential_mapper.batch --fast --year 1998 --month 4  # GPU batch
 uv run python -m src.potential_mapper.batch --fast --year 1999 --month 4 --day 29 \
   --losscone-fit-method lillis --u-spacecraft 0  # Lillis + U_sc override
+uv run python -m src.potential_mapper.batch --fast --year 1999 --month 4 --day 29 \
+  --losscone-fit-method lillis --u-spacecraft 0 --emit-u-width-qc  # Lillis + U identifiability QC
+uv run python scripts/diagnostics/losscone_u_profile.py --year 1999 --month 4 --day 29 \
+  --batch-npz artifacts/potential_cache/1999_04_29_u0_lillis/potential_batch_1999_04_29.npz \
+  --fit-method lillis --u-spacecraft 0  # Profile chi2(U) + plot
 ```
 
 Loss-cone fitting supports both Halekas (log-chi2) and Lillis (masked linear chi2).

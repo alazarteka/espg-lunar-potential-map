@@ -134,6 +134,42 @@ uv run python scripts/diagnostics/beam_losscone_crossval.py data/1999/091_120APR
 
 **Key insight**: The loss cone fitter's chi² landscape is often flat, leading to multiple local minima. Beam-based validation helps identify when the fitter finds physically unreasonable solutions.
 
+### losscone_u_profile.py
+
+Profile **U_surface identifiability** by evaluating a grid of U_surface values and
+minimizing the (Lillis) chi² over Bs/Bm and beam amplitude for each U. This gives
+`chi2(U_surface)` curves and simple width metrics that act as a loose analogue of
+confidence bounds (wide/flat profiles = weak constraints).
+
+This script expects a batch output NPZ from `src.potential_mapper.batch` so it can
+reuse the cached row-level polarity array (no SPICE needed).
+
+```bash
+uv run python scripts/diagnostics/losscone_u_profile.py \
+  --year 1999 --month 4 --day 29 \
+  --batch-npz artifacts/potential_cache/1999_04_29_u0_lillis/potential_batch_1999_04_29.npz \
+  --fit-method lillis --u-spacecraft 0 \
+  --u-count 61 --bs-count 41 \
+  --delta-reduced 0.001 --delta-reduced 0.002 --delta-reduced 0.005
+```
+
+Optional: write an augmented copy of the batch NPZ including a per-spectrum
+U-width QC metric (and boolean identifiability flag):
+
+```bash
+uv run python scripts/diagnostics/losscone_u_profile.py \
+  --year 1999 --month 4 --day 29 \
+  --batch-npz artifacts/potential_cache/1999_04_29_u0_lillis/potential_batch_1999_04_29.npz \
+  --fit-method lillis --u-spacecraft 0 \
+  --augment-batch-npz artifacts/potential_cache/1999_04_29_u0_lillis/potential_batch_1999_04_29_with_u_width.npz \
+  --augment-delta-reduced 0.001 \
+  --augment-width-max 200
+```
+
+Outputs:
+- A cached NPZ under `artifacts/potential_cache/daily/` (profiles + width metrics)
+- A time-series plot under `artifacts/potential_cache/plots/`
+
 ---
 
 ## Interactive Browser Tools
