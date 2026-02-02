@@ -21,6 +21,7 @@ uv run python -m src.temporal --start YYYY-MM-DD --end YYYY-MM-DD --output FILE 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--cache-dir` | path | `artifacts/potential_cache` | Directory with potential NPZ files |
+| `--require-u-identifiable` | flag | False | Only use measurements whose U-surface fit passes identifiability QC (requires `rows_u_is_identifiable_lhs_dchi2red_0p001` in cache NPZs) |
 | `--lmax` | int | 5 | Maximum spherical harmonic degree |
 | `--fit-mode` | str | `window` | Fitting mode: `window` or `basis` |
 | `--temporal-basis` | str | `constant,synodic` | Comma-separated basis (basis mode only) |

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 DEFAULT_SYNODIC_PERIOD_DAYS = 29.530588
 SIDEREAL_PERIOD_DAYS = 27.321661
+DEFAULT_U_IDENTIFIABLE_KEY = "rows_u_is_identifiable_lhs_dchi2red_0p001"
 
 
 @dataclass(slots=True)
@@ -69,6 +70,9 @@ def _load_all_data(
     files: list[Path],
     start_ts: np.datetime64,
     end_ts_exclusive: np.datetime64,
+    *,
+    require_u_identifiable: bool = False,
+    u_identifiable_key: str = DEFAULT_U_IDENTIFIABLE_KEY,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Load all measurements in the time range."""
     utc_parts: list[np.ndarray] = []
@@ -103,12 +107,25 @@ def _load_all_data(
             lon = data["rows_projection_longitude"].astype(np.float64)
             pot = data["rows_projected_potential"].astype(np.float64)
 
+            if require_u_identifiable:
+                try:
+                    u_identifiable = data[u_identifiable_key].astype(bool)
+                except KeyError:
+                    logging.warning(
+                        "Missing %s in %s; skipping (require_u_identifiable=True)",
+                        u_identifiable_key,
+                        path,
+                    )
+                    continue
+            else:
+                u_identifiable = np.ones_like(pot, dtype=bool)
+
             finite_mask = np.isfinite(lat) & np.isfinite(lon) & np.isfinite(pot)
-            mask_refined = mask & finite_mask
+            mask_refined = mask & finite_mask & u_identifiable
             if not np.any(mask_refined):
                 continue
 
-            utc_parts.append(utc_vals[finite_mask[mask]])
+            utc_parts.append(utc_vals[(finite_mask & u_identifiable)[mask]])
             lat_parts.append(lat[mask_refined])
             lon_parts.append(lon[mask_refined])
             pot_parts.append(pot[mask_refined])
@@ -796,6 +813,8 @@ def compute_temporal_harmonics(
     spatial_weight_exponent: float | None = None,
     max_lag: int = 1,
     decay_factor: float = 0.5,
+    require_u_identifiable: bool = False,
+    u_identifiable_key: str = DEFAULT_U_IDENTIFIABLE_KEY,
 ) -> list[HarmonicCoefficients]:
     """
     Compute time-dependent spherical harmonic coefficients a_lm(t).
@@ -833,7 +852,13 @@ def compute_temporal_harmonics(
     end_ts_exclusive = (end_date + np.timedelta64(1, "D")).astype("datetime64[s]")
 
     logging.info("Loading measurements from %s to %s", start_ts, end_ts_exclusive)
-    utc, lat, lon, potential = _load_all_data(files, start_ts, end_ts_exclusive)
+    utc, lat, lon, potential = _load_all_data(
+        files,
+        start_ts,
+        end_ts_exclusive,
+        require_u_identifiable=require_u_identifiable,
+        u_identifiable_key=u_identifiable_key,
+    )
     logging.info("Loaded %d measurements", utc.size)
 
     if utc.size == 0:

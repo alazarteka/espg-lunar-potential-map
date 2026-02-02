@@ -51,6 +51,14 @@ def parse_args() -> argparse.Namespace:
         help="Root directory with potential_cache NPZ files",
     )
     parser.add_argument(
+        "--require-u-identifiable",
+        action="store_true",
+        help=(
+            "Only use measurements whose per-row U-surface fit passes the "
+            "identifiability QC (rows_u_is_identifiable_lhs_dchi2red_0p001)"
+        ),
+    )
+    parser.add_argument(
         "--lmax",
         type=int,
         default=5,
@@ -200,7 +208,12 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
     try:
         files = _discover_npz(cache_dir)
         logging.info("Found %d NPZ files", len(files))
-        utc, lat, lon, potential = _load_all_data(files, start_ts, end_ts_exclusive)
+        utc, lat, lon, potential = _load_all_data(
+            files,
+            start_ts,
+            end_ts_exclusive,
+            require_u_identifiable=args.require_u_identifiable,
+        )
         logging.info("Loaded %d measurements", utc.size)
     except Exception as exc:
         logging.exception("Failed to load data: %s", exc)
@@ -300,6 +313,7 @@ def _main_window_mode(args: argparse.Namespace) -> int:
             spatial_weight_exponent=args.spatial_weight_exponent,
             max_lag=args.max_lag,
             decay_factor=args.decay_factor,
+            require_u_identifiable=args.require_u_identifiable,
         )
     except Exception as exc:
         logging.exception("Failed to compute temporal harmonics: %s", exc)

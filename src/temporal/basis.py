@@ -251,35 +251,55 @@ def fit_temporal_basis(
     # Build spatial design matrix: (N, n_coeffs)
     Y = _build_harmonic_design(lat, lon, lmax)
 
-    # Build full design matrix: (N, K * n_coeffs)
-    # Each column is Y_lm × T_k for all (l,m,k) combinations
-    # Layout: [Y_00*T_0, Y_00*T_1, ..., Y_lmax,lmax*T_{K-1}]
-    N = len(potential)
-    design = np.empty((N, K * n_coeffs), dtype=np.complex128)
-    for k in range(K):
-        design[:, k * n_coeffs : (k + 1) * n_coeffs] = Y * T[:, k : k + 1]
-
     potential_complex = potential.astype(np.complex128)
 
-    # Solve with optional ridge regularization using scipy.sparse.linalg.lsqr
-    # This avoids materializing the full augmented matrix
-    from scipy.sparse.linalg import lsqr
+    N = len(potential)
+    n_params = K * n_coeffs
+
+    # Solve with optional ridge regularization using scipy.sparse.linalg.lsqr.
+    #
+    # We intentionally avoid materializing the full dense design matrix of shape
+    # (N, K*n_coeffs); for month-scale datasets it can be multiple GB. Instead we
+    # represent it as a LinearOperator using the cached spatial design (Y) and
+    # temporal design (T).
+    from scipy.sparse.linalg import LinearOperator, lsqr
 
     logging.info(
-        "Solving system: %d equations, %d unknowns (%.1f MB dense)",
+        "Solving system: %d equations, %d unknowns (cached: Y=%.1f MB, T=%.1f MB)",
         N,
-        K * n_coeffs,
-        N * K * n_coeffs * 16 / 1e6,
+        n_params,
+        Y.nbytes / 1e6,
+        T.nbytes / 1e6,
+    )
+
+    def _matvec(x: np.ndarray) -> np.ndarray:
+        x_matrix = np.asarray(x, dtype=np.complex128).reshape(K, n_coeffs)
+        # A @ x = Σ_k T[:,k] * (Y @ x_k)
+        projected = Y @ x_matrix.T  # (N, K)
+        return np.sum(projected * T, axis=1)
+
+    def _rmatvec(y: np.ndarray) -> np.ndarray:
+        y_vec = np.asarray(y, dtype=np.complex128)
+        # Aᴴ @ y = [Yᴴ @ (T[:,0]*y), ..., Yᴴ @ (T[:,K-1]*y)]
+        weighted = y_vec[:, None] * T  # (N, K)
+        backprojected = Y.conj().T @ weighted  # (n_coeffs, K)
+        return backprojected.T.reshape(n_params)
+
+    design_op = LinearOperator(
+        shape=(N, n_params),
+        matvec=_matvec,
+        rmatvec=_rmatvec,
+        dtype=np.complex128,
     )
 
     if l2_penalty > 0.0:
         # Use lsqr with damp parameter instead of explicit augmented matrix
         # lsqr solves: min ||A @ x - b||^2 + damp^2 * ||x||^2
         damp = np.sqrt(l2_penalty)
-        result = lsqr(design, potential_complex, damp=damp, atol=1e-8, btol=1e-8)
+        result = lsqr(design_op, potential_complex, damp=damp, atol=1e-8, btol=1e-8)
         b_flat = result[0]
     else:
-        result = lsqr(design, potential_complex, atol=1e-8, btol=1e-8)
+        result = lsqr(design_op, potential_complex, atol=1e-8, btol=1e-8)
         b_flat = result[0]
 
     # Reshape to (K, n_coeffs)
@@ -290,7 +310,7 @@ def fit_temporal_basis(
         b[k] = _enforce_reality_condition(b[k], lmax)
 
     # Compute RMS residual
-    predicted = np.real(design @ b_flat)
+    predicted = np.real(design_op @ b_flat)
     residuals = potential - predicted
     rms_residual = float(np.sqrt(np.mean(residuals**2)))
 
