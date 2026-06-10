@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this research/provenance code, please cite the archived release."
+title: "espg-lunar-potential-map"
+version: "lp-er-derived-data-v1.0.0"
+date-released: "2026-06-10"
+type: software
+authors:
+  - family-names: Gemechu
+    given-names: Alazar Teka
+    affiliation: Korea Advanced Institute of Science and Technology
+  - family-names: Kim
+    given-names: Hyun Jung
+    affiliation: Korea Advanced Institute of Science and Technology
+repository-code: "https://github.com/alazarteka/espg-lunar-potential-map"
+abstract: "Research/provenance code used to generate derived Lunar Prospector Electron Reflectometer spacecraft-relative lunar surface potential products."
+license: MIT

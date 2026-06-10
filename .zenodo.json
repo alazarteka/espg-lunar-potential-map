@@ -1,0 +1,41 @@
+{
+  "title": "espg-lunar-potential-map",
+  "upload_type": "software",
+  "publication_date": "2026-06-10",
+  "creators": [
+    {
+      "name": "Gemechu, Alazar Teka",
+      "affiliation": "Korea Advanced Institute of Science and Technology"
+    },
+    {
+      "name": "Kim, Hyun Jung",
+      "affiliation": "Korea Advanced Institute of Science and Technology"
+    }
+  ],
+  "description": "Research/provenance code used to generate derived Lunar Prospector Electron Reflectometer spacecraft-relative lunar surface potential products for the manuscript \"Identifiability and Sampling Limits on Spacecraft-Relative Lunar Surface Potential from Lunar Prospector Electron Reflectometer Observations.\" This repository is provided as provenance code rather than as a polished manuscript reproduction package.",
+  "license": "MIT",
+  "keywords": [
+    "Lunar Prospector",
+    "Electron Reflectometer",
+    "lunar surface charging",
+    "spacecraft potential",
+    "loss cone inversion",
+    "identifiability",
+    "Moon",
+    "Python"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.20623229",
+      "relation": "isSupplementTo",
+      "resource_type": "dataset",
+      "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.20623399",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "doi"
+    }
+  ]
+}

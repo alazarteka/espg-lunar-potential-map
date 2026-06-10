@@ -1,5 +1,18 @@
 # Lunar Prospector Plasma Analysis
 
+## Manuscript provenance release
+
+Tag `lp-er-derived-data-v1.0.0` identifies the research-code state used as
+provenance for generating the derived LP ER spacecraft-relative potential cache
+archived with the manuscript "Identifiability and Sampling Limits on
+Spacecraft-Relative Lunar Surface Potential from Lunar Prospector Electron
+Reflectometer Observations."
+
+This repository is research/provenance code, not the polished manuscript
+reproduction package. The manuscript source, figure-regeneration scripts, and
+final figure inputs are archived separately in
+[`lp-er-lunar-potential`](https://github.com/alazarteka/lp-er-lunar-potential).
+
 ## Description
 
 This project analyzes data from the Lunar Prospector mission to model plasma flux and map lunar surface potential. It utilizes data from the NASA Planetary Data System and SPICE kernels for trajectory and orientation information.
