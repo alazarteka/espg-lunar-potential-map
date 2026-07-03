@@ -54,7 +54,12 @@ EXT_TPC = ".tpc"  # SPICE planetary constants kernel
 
 # ========== Download manager settings ==========
 MAX_DOWNLOAD_WORKERS = 20  # threads for parallel downloads (override via --max-workers)
-CHUNK_SIZE_BYTES = 16 * 1024 * 1024  # chunk size for streaming downloads
+# Streaming write granularity. Also the resume granularity: on an interrupted
+# download, bytes since the last full chunk are re-fetched. 1 MB keeps that
+# waste small and peak memory low (~workers x chunk) without costing throughput,
+# which is TCP/OS-bound well below this size. Data files are ~20-25 MB, kernels
+# up to ~100 MB, so a large chunk would coarsen resume with no upside.
+CHUNK_SIZE_BYTES = 1 * 1024 * 1024  # chunk size for streaming downloads
 REQUESTS_PER_SECOND = 10  # rate-limit threshold
 CONNECTION_POOL_SIZE = 50  # connection pool size for reuse
 DOWNLOAD_MAX_RETRIES = 5  # transient-failure retries per request
