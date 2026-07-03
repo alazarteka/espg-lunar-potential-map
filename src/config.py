@@ -53,10 +53,14 @@ EXT_TLS = ".tls"  # SPICE leap seconds kernel
 EXT_TPC = ".tpc"  # SPICE planetary constants kernel
 
 # ========== Download manager settings ==========
-MAX_DOWNLOAD_WORKERS = 20  # threads for parallel downloads
+MAX_DOWNLOAD_WORKERS = 20  # threads for parallel downloads (override via --max-workers)
 CHUNK_SIZE_BYTES = 16 * 1024 * 1024  # chunk size for streaming downloads
 REQUESTS_PER_SECOND = 10  # rate-limit threshold
 CONNECTION_POOL_SIZE = 50  # connection pool size for reuse
+DOWNLOAD_MAX_RETRIES = 5  # transient-failure retries per request
+# Exponential backoff between retries: sleep = backoff * (2 ** (retry - 1)).
+# With 1.0s this yields 0s, 1s, 2s, 4s, 8s so we back off politely on throttling.
+DOWNLOAD_BACKOFF_FACTOR = 1.0
 
 # ========== Numerical tolerances ==========
 EPS = 1e-6  # small epsilon to avoid division by zero

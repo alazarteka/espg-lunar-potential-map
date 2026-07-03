@@ -7,17 +7,33 @@ import numpy as np
 import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
+from urllib3.util.retry import Retry
 
 from . import config
 
 logger = logging.getLogger(__name__)
 
-# Create a session for connection reuse
+# Create a session for connection reuse.
+#
+# Retry with exponential backoff on transient/throttling responses so we back
+# off politely instead of hammering the server. respect_retry_after_header
+# honours the server's own `Retry-After` on 429/503, which is the correct
+# behaviour when NASA/PDS asks us to slow down.
 session = requests.Session()
+retry = Retry(
+    total=config.DOWNLOAD_MAX_RETRIES,
+    connect=config.DOWNLOAD_MAX_RETRIES,
+    read=config.DOWNLOAD_MAX_RETRIES,
+    backoff_factor=config.DOWNLOAD_BACKOFF_FACTOR,
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=("GET", "HEAD"),
+    respect_retry_after_header=True,
+    raise_on_status=False,
+)
 adapter = requests.adapters.HTTPAdapter(
     pool_connections=config.CONNECTION_POOL_SIZE,
     pool_maxsize=config.CONNECTION_POOL_SIZE,
-    max_retries=3,
+    max_retries=retry,
 )
 session.mount("http://", adapter)
 session.mount("https://", adapter)
@@ -76,6 +92,12 @@ class DataManager:
     def list_remote_dirs(self, remote_path: str = "") -> list[str]:
         """
         Return a list of subdirectory names under base_url/remote_path/.
+
+        Only *relative* directory links (e.g. ``1998/``) are kept. Navigation
+        and breadcrumb links (``../``, ``./``, and absolute hrefs such as
+        ``/data/lp-er-calibrated`` or ``http://...``) are filtered out by shape
+        rather than by position, so a real year/Julian-day folder is never
+        dropped just because it happens to be listed first.
         """
         url = f"{self.base_url}/{remote_path.rstrip('/')}/"
         logger.debug(f"Listing remote directories at {url}")
@@ -84,13 +106,14 @@ class DataManager:
         soup = BeautifulSoup(resp.text, "html.parser")
         dirs = []
         for a in soup.find_all("a", href=True):
-            href = a["href"]
+            href = str(a["href"])
+            # Skip parent/self links and absolute navigation/breadcrumb links.
+            if href in ("../", "./") or href.startswith(("/", "http://", "https://")):
+                continue
             # directory links end with '/'
-            if href.endswith("/") and href not in ("../", "./"):
+            if href.endswith("/"):
                 dirs.append(href.rstrip("/"))
 
-        if len(dirs):
-            dirs = dirs[1:]
         return dirs
 
     def list_remote_files(
@@ -105,9 +128,9 @@ class DataManager:
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         files = [
-            a["href"]
+            str(a["href"])
             for a in soup.find_all("a", href=True)
-            if a["href"].upper().endswith(ext.upper())
+            if str(a["href"]).upper().endswith(ext.upper())
         ]
         return files
 
@@ -115,7 +138,18 @@ class DataManager:
         self, url: str, dest: Path, chunk_size: int = config.CHUNK_SIZE_BYTES
     ) -> Path:
         """
-        Stream-download a file if not already present.
+        Stream-download a file if not already present, resuming partials.
+
+        Behaviour:
+        - A fully downloaded file (``dest``) is skipped.
+        - A partial ``dest.part`` is *resumed* via an HTTP ``Range`` request and
+          appended to; it is only opened for truncation when starting fresh or
+          when the server ignores ``Range``.
+        - On any failure the partial file is **kept** so the next run can resume
+          it. It is only removed when the server proves it invalid (416).
+        - The completed file's size is checked against the server's advertised
+          length before the atomic rename, so partial/corrupt data never gets
+          promoted to a final filename.
         """
         dest = Path(dest)
         temp_dest = dest.with_suffix(dest.suffix + ".part")
@@ -124,25 +158,73 @@ class DataManager:
             logger.debug(f"Skipping existing file: {dest}")
             return dest
 
-        if temp_dest.exists():
-            logger.debug("Partial download found, resuming...")
+        resume_pos = temp_dest.stat().st_size if temp_dest.exists() else 0
+        headers = {}
+        if resume_pos > 0:
+            headers["Range"] = f"bytes={resume_pos}-"
+            logger.debug(f"Resuming {url} from byte {resume_pos}")
         else:
             logger.debug(f"Starting download: {url} -> {temp_dest}")
 
         try:
-            resp = session.get(url, stream=True, timeout=60)
+            resp = session.get(url, stream=True, timeout=60, headers=headers)
+
+            # The server has the full file already; our .part is stale/complete
+            # but never got renamed. Discard it and restart cleanly.
+            if resp.status_code == 416:
+                logger.warning(f"Range not satisfiable for {url}; restarting file")
+                temp_dest.unlink(missing_ok=True)
+                resume_pos = 0
+                resp = session.get(url, stream=True, timeout=60)
+
             resp.raise_for_status()
-            with open(temp_dest, "wb") as f:
+
+            # We asked to resume but got a full 200 body instead of 206: the
+            # server ignored Range, so overwrite from the start.
+            if resume_pos > 0 and resp.status_code == 200:
+                logger.warning(f"Server ignored Range for {url}; restarting file")
+                resume_pos = 0
+
+            expected_size = self._expected_final_size(resp, resume_pos)
+            mode = "ab" if resume_pos > 0 else "wb"
+            with open(temp_dest, mode) as f:
                 for chunk in resp.iter_content(chunk_size):
                     if chunk:
                         f.write(chunk)
+
+            actual_size = temp_dest.stat().st_size
+            if expected_size is not None and actual_size != expected_size:
+                raise OSError(
+                    f"Incomplete download for {url}: got {actual_size} bytes, "
+                    f"expected {expected_size}; keeping partial for resume"
+                )
+
             temp_dest.rename(dest)
             logger.debug(f"Downloaded: {dest}")
             return dest
-        except Exception as e:
-            if temp_dest.exists():
-                temp_dest.unlink()
-            raise e
+        except Exception:
+            # Keep the partial file so the next run can resume it.
+            logger.warning(f"Download interrupted; keeping partial file: {temp_dest}")
+            raise
+
+    @staticmethod
+    def _expected_final_size(resp: requests.Response, resume_pos: int) -> int | None:
+        """
+        Best-effort total size of the completed file, or None if unknown.
+
+        For a 206 response the total is taken from ``Content-Range``; for a 200
+        response it is ``Content-Length``. Returns None when neither header is
+        present so callers skip size verification rather than fail spuriously.
+        """
+        content_range = resp.headers.get("Content-Range")
+        if content_range and "/" in content_range:
+            total = content_range.rsplit("/", 1)[-1].strip()
+            if total.isdigit():
+                return int(total)
+        content_length = resp.headers.get("Content-Length")
+        if content_length and content_length.isdigit():
+            return resume_pos + int(content_length)
+        return None
 
     def fetch_directory(
         self, remote_path: str, ext: str = config.EXT_TAB
@@ -244,6 +326,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Increase output verbosity to DEBUG.",
     )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=config.MAX_DOWNLOAD_WORKERS,
+        help="Parallel download threads. Lower this if the server throttles.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -329,7 +417,9 @@ if __name__ == "__main__":
         spice_tasks + generic_tasks + lpephemu_tasks + attitude_tasks + theta_tasks
     )
     spice_mgr.download_files_in_parallel(
-        initial_tasks, folder_desc="Downloading initial files"
+        initial_tasks,
+        max_workers=args.max_workers,
+        folder_desc="Downloading initial files",
     )
 
     # Generate solid angles after theta file is downloaded
@@ -348,7 +438,7 @@ if __name__ == "__main__":
     # Download all files in parallel across all years/julian days
     data_mgr.download_files_in_parallel(
         all_download_tasks,
-        max_workers=config.MAX_DOWNLOAD_WORKERS,
+        max_workers=args.max_workers,
         folder_desc="Downloading all 3D electron flux data",
     )
 

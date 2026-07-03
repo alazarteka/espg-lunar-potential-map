@@ -13,6 +13,7 @@ uv run python -m src.data_acquisition [-v]
 | Flag | Description |
 |------|-------------|
 | `-v`, `--verbose` | Enable DEBUG-level logging |
+| `--max-workers N` | Parallel download threads (default `20`). Lower it if the server throttles. |
 
 ## What It Downloads
 
@@ -56,10 +57,29 @@ data/
 
 ## Notes
 
-- Downloads are parallelized (up to 20 threads by default)
-- Existing files are skipped automatically
-- Partial downloads are resumed
-- Connection pooling is used for efficiency
+- Downloads are parallelized (up to 20 threads by default; tune with `--max-workers`).
+- Fully downloaded files are skipped automatically.
+- **Partial downloads are truly resumed.** In-progress files are written to a
+  `<name>.part` sidecar and only atomically renamed to the final name once the
+  full download completes and its size matches the server's advertised length.
+  Interrupted files keep their `.part` and continue via an HTTP `Range` request
+  on the next run — killing and restarting the job is safe and loses no progress.
+- The completed size is verified before the rename, so a truncated or corrupt
+  download is never promoted to a final filename.
+- Transient failures and throttling (HTTP 429/500/502/503/504) are retried with
+  exponential backoff that honours the server's `Retry-After` header, so the
+  downloader backs off politely instead of hammering NASA/PDS.
+- Connection pooling is used for efficiency.
+
+## Reliability & Politeness
+
+For a large (~30 GB) redownload:
+
+- Run inside `tmux` or `screen` so a dropped SSH session doesn't kill the job.
+- The job is idempotent and safe to kill/restart at any time — it resumes
+  partial files and skips completed ones.
+- If the server starts throttling, re-run with a lower `--max-workers` (e.g.
+  `--max-workers 8`); the automatic backoff already handles transient 429/503s.
 
 ## Example
 
@@ -69,4 +89,7 @@ uv run python -m src.data_acquisition
 
 # Verbose mode for debugging download issues
 uv run python -m src.data_acquisition -v
+
+# Gentler on the server (fewer parallel connections)
+uv run python -m src.data_acquisition --max-workers 8
 ```
