@@ -79,7 +79,7 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
 | Batch Processing | [potential_mapper_batch.md](docs/cli/potential_mapper_batch.md) | GPU-accelerated batch mode |
 | Engineering | [engineering.md](docs/cli/engineering.md) | Engineering maps and site summaries |
 | Diagnostics | [diagnostics.md](docs/cli/diagnostics.md) | Beam detection tools |
-| Temporal | [temporal.md](docs/cli/temporal.md) | Spherical harmonics fitting |
+| Temporal | [temporal.md](docs/cli/temporal.md) | Temporal harmonics: identifiability / sampling-limits analysis (the paper's negative result) |
 | Data Acquisition | [data_acquisition.md](docs/cli/data_acquisition.md) | Download SPICE kernels + ER flux data |
 | Potential Mapper | [potential_mapper.md](docs/cli/potential_mapper.md) | Interactive single-day mapping CLI |
 | Analysis Scripts | [analysis.md](docs/cli/analysis.md) | Analysis & publication plotting scripts |
