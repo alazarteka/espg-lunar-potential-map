@@ -9,7 +9,7 @@ User-facing documentation for the command-line interfaces.
 | [Data Acquisition](cli/data_acquisition.md) | `uv run python -m src.data_acquisition` | Download SPICE kernels and ER flux data |
 | [Potential Mapper](cli/potential_mapper.md) | `uv run python -m src.potential_mapper` | Interactive potential mapping |
 | [Batch Processing](cli/potential_mapper_batch.md) | `uv run python -m src.potential_mapper.batch` | Parallel batch processing with NPZ output |
-| [Temporal Harmonics](cli/temporal.md) | `uv run python -m src.temporal` | Spherical harmonic coefficient fitting |
+| [Temporal Harmonics](cli/temporal.md) | `uv run python -m src.temporal` | Spherical-harmonic identifiability / sampling-limits analysis (tests whether a global spatiotemporal potential map is recoverable from LP ER data) |
 | [Engineering Products](cli/engineering.md) | `uv run python -m src.engineering` | Engineering maps and site summaries |
 | [Diagnostics Tools](cli/diagnostics.md) | — | Beam detection and loss cone analysis |
 | [Analysis & Plots](cli/analysis.md) | — | Exploration + publication plotting scripts |

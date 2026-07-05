@@ -4,13 +4,21 @@
 
 ## Project Overview
 
-This project maps the lunar surface electrostatic potential using physics-based models. It processes SPICE kernel data, applies temporal reconstruction techniques, and generates potential maps accounting for plasma interactions.
+This project analyzes Lunar Prospector electron reflectometer data to estimate
+spacecraft-relative lunar surface electrostatic potential from individual
+measurements (loss-cone fitting), aggregates those measurements into
+engineering statistics, and runs a temporal spherical-harmonic reconstruction
+as an identifiability / sampling-limits analysis — its headline finding is
+that a global spatiotemporal surface-potential map **cannot** be recovered
+from Lunar Prospector ER data, because the spacecraft's instantaneous spatial
+coverage is too sparse to constrain the joint space-time reconstruction (and
+this is further entangled with the spacecraft's own floating potential).
 
 ### Strategic Directions
 
 1. **Diagnostics & Validation** - Interactive tools for loss cone analysis, beam detection, and cross-validation of fitting methods. Key: `src/diagnostics/`, `scripts/diagnostics/`
 
-2. **Production Mapping** - Batch processing pipeline, temporal harmonics reconstruction, and engineering statistics. Key: `src/potential_mapper/`, `src/temporal/`, `src/engineering/`
+2. **Production Mapping** - Batch processing pipeline and per-measurement engineering statistics, plus the temporal spherical-harmonic reconstruction run as an identifiability / sampling-limits analysis (it demonstrates that a global spatiotemporal surface-potential map is not recoverable from LP ER data, rather than producing one). Key: `src/potential_mapper/`, `src/temporal/`, `src/engineering/`
 
 3. **Physics Refinement** - Improving loss cone fitting accuracy, kappa distribution modeling, and spacecraft potential corrections. Key: `src/model.py`, `src/kappa.py`, `src/physics/`
 
@@ -44,7 +52,7 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
   - `config.py`, `flux.py`, `kappa.py`, `model.py`, `losscone_torch.py` - Core fitting
   - `spacecraft_potential.py` - Spacecraft potential calculations
   - `potential_mapper/` - Mapping pipeline
-  - `temporal/` - Spherical harmonic reconstruction
+  - `temporal/` - Spherical-harmonic reconstruction; used as the identifiability / sampling-limits analysis (tests whether a global spatiotemporal potential map is recoverable from LP ER data)
   - `engineering/` - GlobalStats, SiteStats, site analysis
   - `losscone/` - Loss-cone core (cpu, model, masks, chi2, types, params, torch/)
   - `diagnostics/` - Loss cone session management
@@ -115,9 +123,9 @@ Understand which workstream your current task belongs to:
 - Work primarily in: `src/diagnostics/`, `scripts/diagnostics/`
 
 **Production Mapping**
-- Batch processing for full dataset
-- Temporal reconstruction with spherical harmonics
-- Engineering statistics (GlobalStats, SiteStats)
+- Batch processing for full dataset (per-measurement spacecraft-relative potential + NPZ cache)
+- Temporal spherical-harmonic reconstruction as an identifiability / sampling-limits analysis — demonstrates that a global spatiotemporal surface-potential map is not recoverable from LP ER data, not a mapping deliverable
+- Engineering statistics over individual measurements (GlobalStats, SiteStats)
 - Work primarily in: `src/potential_mapper/`, `src/temporal/`, `src/engineering/`
 
 **Physics Refinement**

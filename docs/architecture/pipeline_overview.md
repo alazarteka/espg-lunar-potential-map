@@ -11,11 +11,20 @@ ER flux (.TAB)
   -> coordinate transforms (SCD -> J2000 -> IAU_MOON)
   -> B-field line intersection (surface footpoint)
   -> spacecraft potential U_sc (day/night branches)
-  -> surface potential U_surface (loss-cone fitting)
+  -> surface potential U_surface (loss-cone fitting, per measurement)
   -> NPZ cache (batch)
-  -> temporal harmonics a_lm(t)
-  -> global maps + engineering products
+  -> temporal harmonics a_lm(t) (identifiability / sampling-limits test)
+  -> engineering products (per-measurement statistics)
 ```
+
+The temporal harmonics step fits spherical-harmonic coefficients jointly in
+space and time, but that joint fit is the paper's identifiability test, not a
+mapping deliverable: Lunar Prospector's instantaneous spatial coverage is too
+sparse to constrain the joint space-time reconstruction, so a global
+spatiotemporal surface-potential map is not recoverable from LP ER data (this
+is further entangled with the spacecraft's own floating potential). The
+per-measurement loss-cone potential estimate and the aggregate/per-site
+measurement statistics remain valid outputs.
 
 ## Forward vs Inverse Steps
 
@@ -45,7 +54,7 @@ ER flux (.TAB)
 
 - Interactive map (small slices): `uv run python -m src.potential_mapper`
 - Batch cache: `uv run python -m src.potential_mapper.batch --year 1998 --month 6`
-- Harmonics: `uv run python -m src.temporal --start 1998-01-01 --end 1998-01-31 --output out.npz`
+- Harmonics (identifiability / sampling-limits test): `uv run python -m src.temporal --start 1998-01-01 --end 1998-01-31 --output out.npz`
 - Engineering: `uv run python -m src.engineering out.npz`
 
 ## Archived Deep Dives
