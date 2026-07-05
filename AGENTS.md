@@ -132,8 +132,12 @@ When working in an area, reference existing code patterns and tests.
 
 Before declaring work complete:
 
-- Run `uv run ruff check src tests` and fix issues
+- Run `uv run ruff check src tests` **and** `uv run ruff format --check src tests`,
+  then fix issues. These are two *separate* CI gates — the formatter is not covered
+  by `ruff check`, so a clean `ruff check` can still fail CI on formatting.
 - Run `uv run pytest -q` to verify nothing broke
+- `.pre-commit-config.yaml` runs all three (ruff check, ruff format, pytest)
+  automatically on commit. Install once with `uv tool install pre-commit && pre-commit install`.
 - If running `pre-commit` in a sandboxed environment, set `PRE_COMMIT_HOME=/tmp/pre-commit`
   (and note hooks use `uv --no-cache run ...` to avoid `~/.cache` write issues)
 - Add type hints to new functions

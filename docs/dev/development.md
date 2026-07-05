@@ -268,6 +268,7 @@ refactor(model): extract common loss cone calculation
 
 Before merging:
 - [ ] `uv run ruff check .` passes
+- [ ] `uv run ruff format --check src tests` passes (separate CI gate from `ruff check`)
 - [ ] `uv run mypy src` — advisory only (known type-hygiene backlog; don't regress)
 - [ ] `uv run pytest -q` passes
 - [ ] Update docs if interfaces changed
