@@ -102,6 +102,16 @@ def _prepare_payload(
     uniq_specs, start_indices, counts = np.unique(
         spec_no, return_index=True, return_counts=True
     )
+    # The (start, count) slicing below assumes each spec_no occupies one
+    # contiguous block. That holds for per-file ER data (15 ordered rows per
+    # sweep); guard against silently mixing spectra if unsorted/merged data
+    # ever reaches here.
+    n_runs = 1 + int(np.count_nonzero(np.diff(spec_no) != 0)) if spec_no.size else 0
+    if n_runs != len(uniq_specs):
+        raise ValueError(
+            f"spec_no rows are not contiguous per spectrum ({n_runs} runs vs "
+            f"{len(uniq_specs)} unique); refusing to aggregate."
+        )
     spec_time_start = []
     spec_time_end = []
     spec_valid = []
@@ -121,8 +131,9 @@ def _prepare_payload(
 
         # Get first valid value from the spectrum rows (all rows have same fit)
         u_chunk = results.projected_potential[row_slice]
-        spec_valid.append(bool(np.isfinite(u_chunk).any()))
-        spec_u_surface.append(u_chunk[0] if np.isfinite(u_chunk[0]) else np.nan)
+        finite_u = u_chunk[np.isfinite(u_chunk)]
+        spec_valid.append(bool(finite_u.size))
+        spec_u_surface.append(float(finite_u[0]) if finite_u.size else np.nan)
         spec_bs_over_bm.append(results.bs_over_bm[idx])
         spec_chi2.append(results.fit_chi2[idx])
         if emit_u_width_qc:

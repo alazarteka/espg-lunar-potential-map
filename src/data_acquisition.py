@@ -259,9 +259,11 @@ class DataManager:
         urls_and_dests: list[tuple[str, Path]],
         max_workers: int = config.MAX_DOWNLOAD_WORKERS,
         folder_desc: str = "Downloading files",
-    ) -> None:
+    ) -> int:
         """
         Download multiple (url, dest) pairs in parallel.
+
+        Returns the number of downloads that failed.
         """
         # Filter out already existing files
         remaining_tasks = [
@@ -270,7 +272,7 @@ class DataManager:
 
         if not remaining_tasks:
             logger.info("All files already exist, skipping downloads")
-            return
+            return 0
 
         existing = len(urls_and_dests) - len(remaining_tasks)
         logger.info(
@@ -279,6 +281,7 @@ class DataManager:
             existing,
         )
 
+        failures = 0
         with (
             ThreadPoolExecutor(max_workers=max_workers) as executor,
             tqdm(total=len(remaining_tasks), desc=folder_desc, unit="file") as pbar,
@@ -291,9 +294,14 @@ class DataManager:
                 try:
                     future.result()
                 except Exception as e:
+                    failures += 1
                     logger.error(f"Download failed: {e}")
                 finally:
                     pbar.update(1)
+
+        if failures:
+            logger.error("%d of %d downloads failed", failures, len(remaining_tasks))
+        return failures
 
 
 if __name__ == "__main__":
@@ -398,7 +406,7 @@ if __name__ == "__main__":
     initial_tasks = (
         spice_tasks + generic_tasks + lpephemu_tasks + attitude_tasks + theta_tasks
     )
-    spice_mgr.download_files_in_parallel(
+    initial_failures = spice_mgr.download_files_in_parallel(
         initial_tasks,
         max_workers=args.max_workers,
         folder_desc="Downloading initial files",
@@ -418,10 +426,18 @@ if __name__ == "__main__":
     logger.info(f"Found {len(all_download_tasks)} total files to potentially download")
 
     # Download all files in parallel across all years/julian days
-    data_mgr.download_files_in_parallel(
+    data_failures = data_mgr.download_files_in_parallel(
         all_download_tasks,
         max_workers=args.max_workers,
         folder_desc="Downloading all 3D electron flux data",
     )
+
+    total_failures = initial_failures + data_failures
+    if total_failures:
+        logger.error(
+            "%d download(s) failed; see errors above. Re-run to resume.",
+            total_failures,
+        )
+        raise SystemExit(1)
 
     logger.info("All downloads completed.")

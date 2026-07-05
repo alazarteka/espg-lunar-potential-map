@@ -215,7 +215,9 @@ Assumed current density: {args.current_density * 1e6:.1f} µA/m².
 {df_sites.to_markdown(index=False)}
 
 ## Interpretation
-Maps indicate that while extreme charging events (>1 kV) are widespread, specific regions (e.g., near terminator or poles depending on model) offer consistent ESPG resource potential with manageable risk profiles.
+See the Global Key Findings and Site Highlights above for the computed metrics.
+This report does not assert site-specific conclusions beyond those statistics;
+interpretation is left to the analyst.
 """
     summary_path.write_text(summary_text)
     logging.info("Saved summary report to %s", summary_path)

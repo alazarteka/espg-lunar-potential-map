@@ -125,10 +125,22 @@ def _make_sidereal4_basis(
     return _make_harmonic_basis("sidereal4", period_days, harmonic=4)
 
 
+def _linear_basis(t: np.ndarray) -> np.ndarray:
+    """Linear trend normalized by a FIXED scale (hours per synodic period).
+
+    The divisor must be data-independent: ``fit_temporal_basis`` evaluates this
+    on the full time array, while ``reconstruct_at_times`` evaluates it one time
+    at a time. A ``t / t.max()`` normalization collapses to ~1.0 at
+    reconstruction (each call sees a single element), silently dropping the
+    linear trend from every reconstructed coefficient.
+    """
+    return t / (24.0 * DEFAULT_SYNODIC_PERIOD_DAYS)
+
+
 # Available basis function factories (for parsing user input)
 AVAILABLE_BASES: dict[str, Callable[[], list[BasisFunction]]] = {
     "constant": lambda: [BasisFunction("constant", lambda t: np.ones_like(t))],
-    "linear": lambda: [BasisFunction("linear", lambda t: t / max(t.max(), 1.0))],
+    "linear": lambda: [BasisFunction("linear", _linear_basis)],
     "synodic": _make_synodic_basis,
     "synodic2": _make_synodic2_basis,
     "synodic3": _make_synodic3_basis,

@@ -59,7 +59,7 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main():
+def main() -> int:
     args = parse_arguments()
 
     setup_logging(args.verbose)
@@ -67,9 +67,9 @@ def main():
     # Load SPICE kernels once up front
     load_spice_files()
 
-    # Run the pipeline with provided arguments
-    run(args)
+    # Run the pipeline with provided arguments and propagate its exit code
+    return run(args)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
