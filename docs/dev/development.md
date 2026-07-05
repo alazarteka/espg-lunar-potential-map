@@ -27,20 +27,22 @@ uv sync --group dev
 | `notebook` | `uv sync --extra notebook` | Jupyter notebook support |
 | `export` | `uv sync --extra export` | Image/video export (Kaleido, imageio) |
 | `diagnostics` | `uv sync --extra diagnostics` | Interactive browser tools (Panel, Bokeh) |
-| `gpu` | `./scripts/select-env.sh cuda12` | PyTorch GPU acceleration (CUDA 12.8, RTX 20xx+) |
-| `gpu-legacy` | `./scripts/select-env.sh cuda11` | PyTorch for older GPUs (CUDA 11.8, GTX 10xx) |
+| `gpu` | `./scripts/bootstrap.sh` (auto) or `./scripts/bootstrap.sh modern` | PyTorch GPU acceleration (CUDA 12.8, RTX 20xx+) |
+| `gpu-legacy` | `./scripts/bootstrap.sh legacy` | PyTorch for older GPUs (CUDA 11.8, GTX 10xx) |
 
 ### GPU Lockfiles
 
 This repo tracks CUDA-specific lockfiles under `locks/`. `uv.lock` is
-machine-local (gitignored) and copied from `locks/` via the selector script.
+machine-local (gitignored) and copied from `locks/` by `bootstrap.sh`, which
+detects the GPU architecture and picks the right stack.
 
 ```bash
-# Modern GPUs (RTX 20xx, 30xx, 40xx, 50xx)
-./scripts/select-env.sh cuda12
+# Auto-detect (default): sm_70+ -> modern CUDA 12.8, sm_61 -> legacy CUDA 11.8
+./scripts/bootstrap.sh
 
-# Legacy GPUs (GTX 10xx series)
-./scripts/select-env.sh cuda11
+# Force a stack (mixed fleet, GPU-less build node, etc.)
+./scripts/bootstrap.sh modern   # RTX 20xx, 30xx, 40xx, 50xx
+./scripts/bootstrap.sh legacy   # GTX 10xx / TITAN Xp (Pascal, sm_61)
 ```
 
 ### Upgrading Dependencies
@@ -201,11 +203,12 @@ your environment can't write to `~/.cache/pre-commit`, set
 ### Setup
 
 ```bash
-# Modern GPUs (RTX 20xx, 30xx, 40xx, 50xx)
-./scripts/select-env.sh cuda12
+# Auto-detect the GPU and sync the matching PyTorch build
+./scripts/bootstrap.sh
 
-# Legacy GPUs (GTX 10xx series)
-./scripts/select-env.sh cuda11
+# Or force a stack explicitly
+./scripts/bootstrap.sh modern   # RTX 20xx, 30xx, 40xx, 50xx
+./scripts/bootstrap.sh legacy   # GTX 10xx series (Pascal, sm_61)
 ```
 
 ### Usage

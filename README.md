@@ -121,15 +121,18 @@ and exploratory outputs that should stay out of version control.
 
 3.  **GPU acceleration (optional, recommended workflow):**
     ```bash
-    # Modern GPU (RTX 20xx+, CUDA 12.x)
-    ./scripts/select-env.sh cuda12
+    # Detects your GPU and syncs the right PyTorch build automatically:
+    #   sm_70+ (RTX 20xx and newer) -> modern CUDA 12.8 stack (default)
+    #   sm_61  (GTX 10xx / TITAN Xp) -> legacy CUDA 11.8 stack
+    ./scripts/bootstrap.sh
 
-    # Legacy GPU (GTX 10xx, CUDA 11.8)
-    ./scripts/select-env.sh cuda11
+    # Force a specific stack (e.g. on a GPU-less build node):
+    ./scripts/bootstrap.sh modern
+    ./scripts/bootstrap.sh legacy
     ```
 
-    This copies the appropriate lockfile from `locks/` into `uv.lock` and runs
-    `uv sync --frozen` with the matching extra.
+    This detects the GPU architecture, copies the matching lockfile from
+    `locks/` into `uv.lock`, and runs `uv sync --frozen` with the right extra.
 
 4.  **Download necessary data:**
     ```bash

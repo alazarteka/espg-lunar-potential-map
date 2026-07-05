@@ -17,8 +17,8 @@ This project maps the lunar surface electrostatic potential using physics-based 
 ## Quick Reference
 
 ```bash
-./scripts/select-env.sh cuda12         # Sync modern GPU env
-./scripts/select-env.sh cuda11         # Sync legacy GPU env
+./scripts/bootstrap.sh                 # Auto-detect GPU and sync the right env
+./scripts/bootstrap.sh legacy          # Force the legacy (Pascal/sm_61) env
 uv run pytest -q                        # Run tests
 uv run ruff check src tests             # Lint
 uv run python -m src.data_acquisition   # Download data
