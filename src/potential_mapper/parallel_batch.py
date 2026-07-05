@@ -106,7 +106,6 @@ def process_single_day(
         # Process the data
         results = process_merged_data(
             er_data,
-            use_parallel=False,  # No sub-parallelism within day
             use_torch=use_torch,
         )
 

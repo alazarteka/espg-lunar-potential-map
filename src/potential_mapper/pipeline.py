@@ -1,6 +1,5 @@
 import argparse
 import logging
-import multiprocessing
 import numbers
 import os
 from pathlib import Path
@@ -46,89 +45,6 @@ from src.potential_mapper.results import PotentialResults
 from src.utils.attitude import load_attitude_data
 from src.utils.geometry import get_intersections_or_none_batch
 from src.utils.units import ureg
-
-
-def _init_worker_spice():
-    """Initialize SPICE kernels in worker process for thread-safety."""
-    from src.potential_mapper.spice import load_spice_files
-
-    load_spice_files()
-
-
-def spacecraft_potential_worker(
-    args: tuple[int, pd.DataFrame],
-) -> tuple[int, np.ndarray, float | None]:
-    """
-    Calculate spacecraft potential for one spectrum in parallel.
-
-    Args:
-        args: Tuple of (spec_no, spectrum_rows_df)
-
-    Returns:
-        Tuple of (spec_no, row_indices, potential_value)
-    """
-    import warnings
-
-    # Suppress RuntimeWarnings (e.g. from geometry.py) to avoid interfering with tqdm
-    warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-    from src.spacecraft_potential import calculate_potential
-
-    spec_no, rows_df = args
-
-    # Create isolated ERData for this spectrum only
-    # The copy ensures mutations don't affect shared state
-    er_data_subset = ERData.from_dataframe(rows_df.copy(), f"spec_{spec_no}")
-
-    try:
-        result = calculate_potential(er_data_subset, spec_no)
-
-        if result is None:
-            return spec_no, rows_df.index.to_numpy(), None
-
-        _, potential_quantity = result
-        potential_value = float(potential_quantity.to(ureg.volt).magnitude)
-
-        return spec_no, rows_df.index.to_numpy(), potential_value
-
-    except Exception as e:
-        logging.debug(f"SC potential failed for spec {spec_no}: {e}")
-        return spec_no, rows_df.index.to_numpy(), None
-
-
-def fit_worker(
-    args: tuple[pd.DataFrame, np.ndarray, np.ndarray | None, FitMethod | str],
-) -> np.ndarray:
-    """
-    Worker function for parallel fitting.
-
-    Args:
-        args: Tuple containing (chunk_df, sc_pot, polarity, fit_method).
-
-    Returns:
-        Fitting results array from LossConeFitter.
-    """
-    chunk_df, sc_pot, polarity, fit_method = args
-    fit_method = parse_fit_method(fit_method)
-
-    # Create ERData from the chunk.
-    # Note: This might re-trigger cleaning/counting if not handled in ERData,
-    # but for now we assume it's acceptable or handled.
-    # To avoid double-counting if columns exist, we could check in ERData,
-    # but here we just pass it.
-    er_data = ERData.from_dataframe(chunk_df, "batch_chunk")
-
-    # Initialize fitter with the chunk
-    pitch_angle = (
-        PitchAngle(er_data, polarity=polarity) if polarity is not None else None
-    )
-    fitter = LossConeFitter(
-        er_data,
-        pitch_angle=pitch_angle,
-        spacecraft_potential=sc_pot,
-        fit_method=fit_method,
-    )
-    return fitter.fit_surface_potential()
 
 
 def _spacecraft_potential_per_row(er_data: ERData, n_rows: int) -> np.ndarray:
@@ -185,84 +101,6 @@ def _spacecraft_potential_per_row(er_data: ERData, n_rows: int) -> np.ndarray:
         except Exception:
             potential_value = float(potential_quantity)
         potentials[mask_idx] = potential_value
-
-    return potentials
-
-
-def _spacecraft_potential_per_row_parallel(
-    er_data: ERData, n_rows: int, num_workers: int | None = None
-) -> np.ndarray:
-    """
-    Return spacecraft potential per ER row using parallel processing.
-
-    Distributes spectrum-level calculations across multiple worker processes
-    to accelerate computation for large datasets.
-
-    Args:
-        er_data: ERData object containing the full dataset
-        n_rows: Total number of rows
-        num_workers: Number of worker processes (default: cpu_count - 1)
-
-    Returns:
-        Array of spacecraft potentials per row
-    """
-    potentials = np.full(n_rows, np.nan)
-    if n_rows == 0:
-        return potentials
-
-    # Group data by spec_no
-    df = er_data.data.reset_index(drop=True)
-    spec_groups = df.groupby(config.SPEC_NO_COLUMN, sort=False)
-
-    # Prepare tasks for workers
-    tasks = []
-    for spec_value, group_df in spec_groups:
-        if isinstance(spec_value, numbers.Real) and np.isnan(spec_value):
-            continue
-        try:
-            spec_no = int(spec_value)
-        except (TypeError, ValueError):
-            logging.debug(f"Skipping non-integer spec_no {spec_value}")
-            continue
-
-        # Each task is (spec_no, rows_for_this_spectrum)
-        tasks.append((spec_no, group_df))
-
-    if not tasks:
-        return potentials
-
-    # Determine worker count
-    num_workers = num_workers or max(1, multiprocessing.cpu_count() - 1)
-
-    logging.debug(
-        f"Starting parallel SC potential with {num_workers} workers, "
-        f"{len(tasks)} spectra"
-    )
-
-    # Execute in parallel with SPICE initialization per worker.
-    # Use "spawn" context to ensure SPICE thread-safety and avoid global state
-    # corruption.
-    ctx = multiprocessing.get_context("spawn")
-    with ctx.Pool(processes=num_workers, initializer=_init_worker_spice) as pool:
-        # Use imap_unordered for better memory efficiency
-        # Chunksize: distribute work in reasonable batches
-        chunksize = max(1, len(tasks) // (num_workers * 4))
-
-        results_iter = pool.imap_unordered(
-            spacecraft_potential_worker, tasks, chunksize=chunksize
-        )
-
-        # Collect results with progress bar
-        for _spec_no, row_indices, potential_value in tqdm(
-            results_iter,
-            total=len(tasks),
-            desc="SC Potential (parallel)",
-            unit="spec",
-            leave=False,
-            dynamic_ncols=True,
-        ):
-            if potential_value is not None and np.isfinite(potential_value):
-                potentials[row_indices] = potential_value
 
     return potentials
 
@@ -678,7 +516,6 @@ def load_all_data(files: list[Path]) -> ERData:
 def process_merged_data(
     er_data: ERData,
     *,
-    use_parallel: bool = False,
     use_torch: bool = False,
     fit_method: str | FitMethod | None = None,
     spacecraft_potential_override: float | None = None,
@@ -690,14 +527,12 @@ def process_merged_data(
 
     Steps:
     1. Load attitude and calculate coordinates (vectorized).
-    2. Calculate spacecraft potential (parallel if use_parallel=True).
-    3. Run surface potential fitting (parallel or torch-accelerated).
+    2. Calculate spacecraft potential.
+    3. Run surface potential fitting (sequential or torch-accelerated).
     4. Assemble results.
 
     Args:
         er_data: Merged ERData object
-        use_parallel: Enable multiprocessing for SC and surface potential
-            (default: False; deprecated for CPU path)
         use_torch: Use PyTorch-accelerated fitter (~5x faster, default: False)
         fit_method: Loss-cone fitting method ("halekas" or "lillis")
         spacecraft_potential_override: Optional constant spacecraft potential [V].
@@ -708,13 +543,6 @@ def process_merged_data(
         PotentialResults with all computed fields
     """
     logging.info("Processing merged dataset...")
-
-    if use_parallel and not use_torch:
-        logging.warning(
-            "CPU parallel fitting is deprecated; falling back to sequential. "
-            "Use --fast for torch acceleration."
-        )
-        use_parallel = False
 
     fit_method = parse_fit_method(fit_method)
 
@@ -841,14 +669,6 @@ def process_merged_data(
                         e,
                     )
                     sc_potential = _spacecraft_potential_per_row(er_data, n)
-        elif use_parallel:
-            try:
-                sc_potential = _spacecraft_potential_per_row_parallel(er_data, n)
-            except (PermissionError, OSError) as e:
-                logging.warning(
-                    "Parallel SC potential failed (%s); falling back to sequential", e
-                )
-                sc_potential = _spacecraft_potential_per_row(er_data, n)
         else:
             sc_potential = _spacecraft_potential_per_row(er_data, n)
 
@@ -860,27 +680,15 @@ def process_merged_data(
     u_width_lhs_dchi2red_0p001_arr = np.full(n, np.nan)
     u_is_identifiable_lhs_dchi2red_0p001_arr = np.zeros(n, dtype=bool)
 
-    # If the dataset is small, or ERData has been monkeypatched without
-    # from_dataframe (as in some tests), fall back to sequential fitting.
-    can_chunk = hasattr(ERData, "from_dataframe")
     rows_per_sweep = config.SWEEP_ROWS
-    sweeps_per_chunk = 100
-    rows_per_chunk = sweeps_per_chunk * rows_per_sweep
-    # Torch mode uses its own vectorization, so don't use parallel chunking
-    chunked = use_parallel and can_chunk and n > rows_per_chunk and not use_torch
     pitch_angle = None
-    use_polarity = False
     required_cols = set(config.PHI_COLS + config.MAG_COLS)
     if required_cols.issubset(er_data.data.columns):
-        use_polarity = True
-        if not chunked:
-            pitch_angle = PitchAngle(er_data, polarity=projection_polarity)
+        pitch_angle = PitchAngle(er_data, polarity=projection_polarity)
     else:
         logging.debug("Pitch-angle polarity skipped; required ER columns are missing.")
 
-    emit_u_width_qc = (
-        bool(emit_u_width_qc) and fit_method == FitMethod.LILLIS and not chunked
-    )
+    emit_u_width_qc = bool(emit_u_width_qc) and fit_method == FitMethod.LILLIS
 
     if use_torch:
         # PyTorch-accelerated fitter (~5x faster)
@@ -917,7 +725,7 @@ def process_merged_data(
             0,
             n,
         )
-    elif not chunked:
+    else:
         logging.info("Running surface potential fitting (sequential)...")
         fitter = LossConeFitter(
             er_data,
@@ -945,47 +753,6 @@ def process_merged_data(
             0,
             n,
         )
-    else:
-        u_width_chunks = None
-        u_is_identifiable_chunks = None
-        logging.info("Starting parallel surface potential fitting...")
-
-        chunks: list[tuple[pd.DataFrame, np.ndarray, np.ndarray | None, FitMethod]] = []
-        for i in range(0, n, rows_per_chunk):
-            end = min(i + rows_per_chunk, n)
-            chunk_df = er_data.data.iloc[i:end].copy()
-            chunk_sc_pot = sc_potential[i:end]
-            chunk_pol = projection_polarity[i:end] if use_polarity else None
-            chunks.append((chunk_df, chunk_sc_pot, chunk_pol, fit_method))
-
-        if chunks:
-            num_workers = max(1, multiprocessing.cpu_count() - 1)
-
-            # Use 'spawn' context to ensure thread-safety for SPICE
-            ctx = multiprocessing.get_context("spawn")
-            with ctx.Pool(
-                processes=num_workers, initializer=_init_worker_spice
-            ) as pool:
-                results_iter = pool.imap(fit_worker, chunks)
-                for chunk_idx, chunk_res in enumerate(
-                    tqdm(
-                        results_iter,
-                        total=len(chunks),
-                        desc="Fitting chunks",
-                        unit="chunk",
-                        dynamic_ncols=True,
-                    )
-                ):
-                    row_offset = chunk_idx * rows_per_chunk
-                    _apply_fit_results(
-                        chunk_res,
-                        proj_potential,
-                        bs_over_bm_arr,
-                        beam_amp_arr,
-                        fit_chi2_arr,
-                        row_offset,
-                        n_total=n,
-                    )
 
     if (
         emit_u_width_qc
@@ -1045,7 +812,6 @@ def process_lp_file(
     er_data = ERData(str(file_path))
     return process_merged_data(
         er_data,
-        use_parallel=False,
         fit_method=fit_method,
         spacecraft_potential_override=spacecraft_potential_override,
     )

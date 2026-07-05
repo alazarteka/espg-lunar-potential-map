@@ -200,9 +200,7 @@ def run_pipeline_injection_test(cfg: InjectionConfig) -> pipeline.PotentialResul
     er_data = ERData.from_dataframe(df, "synthetic_pipeline")
 
     with _patched_pipeline(cfg.u_spacecraft):
-        results = pipeline.process_merged_data(
-            er_data, use_parallel=False, use_torch=False
-        )
+        results = pipeline.process_merged_data(er_data, use_torch=False)
     return results
 
 

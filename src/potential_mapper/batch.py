@@ -199,7 +199,6 @@ def run_batch(
     year: int | None = None,
     month: int | None = None,
     day: int | None = None,
-    use_parallel: bool = True,
     overwrite: bool = False,
     use_torch: bool = False,
     fit_method: str | FitMethod | None = None,
@@ -215,7 +214,6 @@ def run_batch(
         year: Optional year filter
         month: Optional month filter (1-12)
         day: Optional day filter (1-31)
-        use_parallel: Whether to use parallel fitting (default: True)
         overwrite: Whether to overwrite existing output file
         use_torch: Use PyTorch-accelerated fitter (~5x faster)
         fit_method: Loss-cone fit method ("halekas" or "lillis")
@@ -261,15 +259,12 @@ def run_batch(
 
     # Process merged data
     try:
-        logging.info(
-            f"Processing merged data (parallel={use_parallel}, torch={use_torch})..."
-        )
+        logging.info(f"Processing merged data (torch={use_torch})...")
         fit_method_parsed = (
             parse_fit_method(fit_method) if fit_method is not None else None
         )
         results = process_merged_data(
             er_data,
-            use_parallel=use_parallel,
             use_torch=use_torch,
             fit_method=fit_method_parsed,
             spacecraft_potential_override=spacecraft_potential_override,
@@ -321,13 +316,6 @@ def _parse_args() -> argparse.Namespace:
     )
     add_common_batch_args(parser)
     parser.add_argument(
-        "--parallel",
-        action="store_true",
-        help=(
-            "Enable legacy CPU parallel fitting (deprecated; falls back to sequential)."
-        ),
-    )
-    parser.add_argument(
         "--fast",
         action="store_true",
         help=(
@@ -378,7 +366,6 @@ def main() -> int:
         year=args.year,
         month=args.month,
         day=args.day,
-        use_parallel=args.parallel,
         overwrite=args.overwrite,
         use_torch=args.fast,
         fit_method=args.losscone_fit_method,
