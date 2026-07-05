@@ -149,6 +149,10 @@ LILLIS_RELATIVE_FLUX_MAX = 0.79
 LILLIS_MIN_VALID_BINS = 5
 LILLIS_CHI2_REDUCED_MAX = 2.0
 
+# Cash / Poisson-deviance acceptance: reduced deviance (D / max(n_valid-3,1))
+# above this rejects the fit. Expected ~1 for a good fit; a few is generous.
+LOSS_CONE_DEVIANCE_REDUCED_MAX = 3.0
+
 
 # ========== Data Column names ==========
 UTC_COLUMN = "UTC"  # column name for UTC time in dataframes - unique per row

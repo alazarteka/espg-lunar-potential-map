@@ -95,6 +95,38 @@ def count_scale(
     )
 
 
+def chunk_noise(
+    raw_flux: np.ndarray,
+    norm2d: np.ndarray,
+    energies: np.ndarray,
+    dt: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Per-bin (counts λ, count-scale κ, background b) for one sweep.
+
+    Uses the identity ``κ = λ / norm2d`` (since ``norm2d = F_raw / F_scale`` and
+    ``λ = F_raw·G·E·Δt``, so ``κ = F_scale·G·E·Δt = λ/norm2d``) — this recovers
+    the per-bin count scale, including the per-channel Δt, without re-deriving
+    ``F_scale``. Bins where ``norm2d ≤ 0`` (always masked out) get κ = 1.
+
+    Args:
+        raw_flux: (nE, nPitch) directional flux.
+        norm2d: (nE, nPitch) incident-normalized flux (paper Eq 1).
+        energies: (nE,) center energies [eV].
+        dt: (nPitch,) per-channel integration time [s].
+
+    Returns:
+        (counts, count_scale, background): counts/scale shape (nE, nPitch),
+        background shape (nPitch,).
+    """
+    if dt is None:
+        dt = channel_integration_times()
+    lam = reconstruct_counts(raw_flux, energies, dt)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        kappa = lam / np.asarray(norm2d, dtype=np.float64)
+    kappa = np.where(np.isfinite(kappa) & (kappa > 0.0), kappa, 1.0)
+    return lam, kappa, background_counts(dt)
+
+
 def background_counts(dt: np.ndarray | None = None) -> np.ndarray:
     """Per-channel background counts ``b = N_bg · Δt`` [counts], shape ``(nPitch,)``.
 
