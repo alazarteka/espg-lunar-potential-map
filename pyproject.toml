@@ -100,7 +100,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "B", "I", "UP", "SIM", "C4", "PT", "RUF", "TCH", "PERF"]
+select = ["E", "F", "W", "B", "I", "UP", "SIM", "C4", "PT", "RUF", "TC", "PERF"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
@@ -138,7 +138,6 @@ explicit_package_bases = true
 [[tool.mypy.overrides]]
 module = [
     "spiceypy.*",
-    "plotly.*",
     "numba.*",
     "scipy.*",
     "pandas.*",
