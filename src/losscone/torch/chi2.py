@@ -125,6 +125,112 @@ def compute_lillis_chi2_batch_torch(
     return reduced
 
 
+def _cash_deviance_per_bin(
+    models: Tensor, counts: Tensor, count_scale: Tensor, background: Tensor
+) -> Tensor:
+    """Per-bin Poisson deviance 2[μ − C + C·ln(C/μ)], μ = model·κ + b.
+
+    ``counts``/``count_scale``/``background`` broadcast against ``models``.
+    ``μ > 0`` (model floor + positive κ), so log is safe; ``C·ln(C/μ) = 0`` at
+    ``C = 0``.
+    """
+    mu = models * count_scale + background
+    c_ln = torch.where(
+        counts > 0, counts * torch.log(counts / mu), torch.zeros_like(mu)
+    )
+    return 2.0 * (mu - counts + c_ln)
+
+
+def compute_cash_deviance_batch_torch(
+    model: Tensor,
+    counts: Tensor,
+    count_scale: Tensor,
+    background: Tensor,
+    data_mask: Tensor,
+    model_mask: Tensor | None = None,
+    *,
+    reduced: bool = False,
+) -> Tensor:
+    """Poisson-deviance (Cash) objective for a batch of models, single chunk.
+
+    Args:
+        model: (n_params, nE, nPitch) normalized model flux.
+        counts, count_scale, background: (nE, nPitch) per-bin C, κ, b.
+        data_mask: (nE, nPitch) loss-cone bin mask.
+        model_mask: optional (n_params, nE, nPitch) validity mask.
+        reduced: divide by max(n_valid − 3, 1).
+
+    Returns:
+        (n_params,) deviance; NaN where fewer than LILLIS_MIN_VALID_BINS valid.
+    """
+    dev = _cash_deviance_per_bin(
+        model,
+        counts.unsqueeze(0),
+        count_scale.unsqueeze(0),
+        background.unsqueeze(0),
+    )
+    combined = data_mask.unsqueeze(0)
+    if model_mask is not None:
+        combined = combined & model_mask
+    combined = combined.expand_as(model)
+    dev = torch.where(combined, dev, torch.zeros_like(dev))
+    total = dev.sum(dim=(1, 2))
+    n_valid = combined.sum(dim=(1, 2))
+    if reduced:
+        dof = torch.clamp(n_valid.to(dtype=total.dtype) - 3.0, min=1.0)
+        total = total / dof
+    return torch.where(
+        n_valid >= config.LILLIS_MIN_VALID_BINS,
+        total,
+        torch.full_like(total, float("nan")),
+    )
+
+
+def compute_cash_deviance_multi_chunk_torch(
+    models: Tensor,
+    counts: Tensor,
+    count_scale: Tensor,
+    background: Tensor,
+    data_mask: Tensor,
+    model_mask: Tensor | None = None,
+    *,
+    reduced: bool = False,
+) -> Tensor:
+    """Poisson-deviance (Cash) objective for multiple chunks × candidates.
+
+    Args:
+        models: (N_chunks, n_pop, nE, nPitch) normalized model flux.
+        counts, count_scale, background: (N_chunks, nE, nPitch) per-bin C, κ, b.
+        data_mask: (N_chunks, nE, nPitch) loss-cone bin mask per chunk.
+        model_mask: optional (N_chunks, n_pop, nE, nPitch) validity mask.
+        reduced: divide by max(n_valid − 3, 1).
+
+    Returns:
+        (N_chunks, n_pop) deviance; NaN where too few valid bins.
+    """
+    dev = _cash_deviance_per_bin(
+        models,
+        counts.unsqueeze(1),
+        count_scale.unsqueeze(1),
+        background.unsqueeze(1),
+    )
+    combined = data_mask.unsqueeze(1)
+    if model_mask is not None:
+        combined = combined & model_mask
+    combined = combined.expand_as(models)
+    dev = torch.where(combined, dev, torch.zeros_like(dev))
+    total = dev.sum(dim=(2, 3))
+    n_valid = combined.sum(dim=(2, 3))
+    if reduced:
+        dof = torch.clamp(n_valid.to(dtype=total.dtype) - 3.0, min=1.0)
+        total = total / dof
+    return torch.where(
+        n_valid >= config.LILLIS_MIN_VALID_BINS,
+        total,
+        torch.full_like(total, float("nan")),
+    )
+
+
 def compute_chi2_multi_chunk_torch(
     models: Tensor,
     data: Tensor,
