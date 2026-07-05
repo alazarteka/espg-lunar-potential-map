@@ -104,7 +104,10 @@ def build_norm2d(
         norm2d = np.vstack(
             [
                 get_normalized_flux(
-                    er_data, pitch_angle, incident_flux_stat, energy_bin,
+                    er_data,
+                    pitch_angle,
+                    incident_flux_stat,
+                    energy_bin,
                     measurement_chunk,
                 )
                 for energy_bin in range(config.SWEEP_ROWS)
@@ -262,7 +265,10 @@ def build_norm2d_batch(
         # ratio2 - complex pairwise normalization; fall back to per-chunk
         for i in valid_chunk_idx:
             result[i] = build_norm2d(
-                er_data, pitch_angle, normalization_mode, incident_flux_stat,
+                er_data,
+                pitch_angle,
+                normalization_mode,
+                incident_flux_stat,
                 chunk_indices[i],
             )
 

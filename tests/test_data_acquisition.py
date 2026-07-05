@@ -162,7 +162,5 @@ def test_list_remote_dirs_filters_navigation(dm: DataManager, monkeypatch) -> No
         def raise_for_status(self) -> None:
             pass
 
-    monkeypatch.setattr(
-        "src.data_acquisition.session.get", lambda *a, **k: _Resp()
-    )
+    monkeypatch.setattr("src.data_acquisition.session.get", lambda *a, **k: _Resp())
     assert dm.list_remote_dirs("") == ["1998", "1999"]

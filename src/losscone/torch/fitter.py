@@ -977,9 +977,7 @@ class LossConeFitterTorch(LossConeFitterBase):
 
         n_chunks = len(self.er_data.data) // self.config.SWEEP_ROWS
         results = np.full((n_chunks, 5), np.nan)
-        u_width = (
-            np.full(n_chunks, np.nan, dtype=np.float64) if compute_width else None
-        )
+        u_width = np.full(n_chunks, np.nan, dtype=np.float64) if compute_width else None
 
         desc = (
             f"Fitting batches (+U QC) (GPU: {self.device})"

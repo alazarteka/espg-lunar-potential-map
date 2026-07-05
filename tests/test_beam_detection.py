@@ -19,9 +19,9 @@ from src.diagnostics.beam_detection import (
 from src.utils.synthetic import prepare_flux, prepare_phis, prepare_synthetic_er
 
 
-def _energy_profile_and_grids() -> (
-    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
-):
+def _energy_profile_and_grids() -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
     """Build a norm2d/pitches grid with an injected beam, then reduce it to the
     energy profile via the module's own `_build_energy_profile` helper (the
     same pipeline used by `scripts/diagnostics/losscone_peak_scan.py`)."""

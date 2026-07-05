@@ -126,12 +126,8 @@ class TestGammaRatioParity:
 
         kappa_grid = np.linspace(2.5, 6.0, 12).reshape(3, 4)
 
-        cpu = np.array(
-            [[_gamma_ratio(float(k)) for k in row] for row in kappa_grid]
-        )
-        torch_result = _torch_gamma_ratio(
-            torch.tensor(kappa_grid, dtype=torch.float64)
-        )
+        cpu = np.array([[_gamma_ratio(float(k)) for k in row] for row in kappa_grid])
+        torch_result = _torch_gamma_ratio(torch.tensor(kappa_grid, dtype=torch.float64))
 
         assert tuple(torch_result.shape) == kappa_grid.shape
         np.testing.assert_allclose(cpu, torch_result.cpu().numpy(), rtol=1e-10)
