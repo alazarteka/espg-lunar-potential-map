@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 from src import config
+from src.potential_mapper.cli_args import add_common_batch_args
 from src.potential_mapper.date_utils import MONTH_INT_TO_ABBREV, parse_3d_filename
 from src.potential_mapper.logging_utils import setup_logging
 
@@ -256,18 +257,7 @@ def parse_args() -> argparse.Namespace:
         description="Parallel batch processing for lunar potential mapping",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument(
-        "--year",
-        type=int,
-        required=True,
-        help="Year to process",
-    )
-    parser.add_argument(
-        "--month",
-        type=int,
-        default=None,
-        help="Optional month filter (1-12)",
-    )
+    add_common_batch_args(parser, year_required=True, include_day=False)
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -284,17 +274,6 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=None,
         help="Number of parallel workers (default: CPU count)",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing output files",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Enable verbose logging",
     )
     return parser.parse_args()
 

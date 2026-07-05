@@ -1,5 +1,6 @@
 import argparse
 
+from src.potential_mapper.cli_args import add_common_batch_args
 from src.potential_mapper.logging_utils import setup_logging
 from src.potential_mapper.pipeline import run
 from src.potential_mapper.spice import load_spice_files
@@ -21,28 +22,10 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument(
-        "--year", type=int, default=None, help="Year to process (one of 1998, 1999)"
-    )
-
-    parser.add_argument(
-        "--month", type=int, default=None, help="Month to process (one of 1-12)"
-    )
-
-    parser.add_argument(
-        "--day", type=int, default=None, help="Day to process (one of 1-31)"
-    )
+    add_common_batch_args(parser, include_overwrite=False)
 
     parser.add_argument(
         "--output", type=str, default=None, help="Path to the output file"
-    )
-
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="Enable verbose output",
     )
 
     parser.add_argument(

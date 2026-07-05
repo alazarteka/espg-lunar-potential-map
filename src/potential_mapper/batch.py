@@ -20,6 +20,7 @@ import numpy as np
 
 import src.config as config
 from src.losscone.types import parse_fit_method
+from src.potential_mapper.cli_args import add_common_batch_args
 from src.potential_mapper.logging_utils import setup_logging
 from src.potential_mapper.npz_io import write_npz_atomic
 from src.potential_mapper.pipeline import DataLoader, load_all_data, process_merged_data
@@ -318,13 +319,7 @@ def _parse_args() -> argparse.Namespace:
             "(default: artifacts/potential_cache)"
         ),
     )
-    parser.add_argument("--year", type=int, default=None, help="Optional year filter")
-    parser.add_argument(
-        "--month", type=int, default=None, help="Optional month filter (1-12)"
-    )
-    parser.add_argument(
-        "--day", type=int, default=None, help="Optional day filter (1-31)"
-    )
+    add_common_batch_args(parser)
     parser.add_argument(
         "--parallel",
         action="store_true",
@@ -367,12 +362,6 @@ def _parse_args() -> argparse.Namespace:
         type=float,
         default=200.0,
         help="Max U-width [V] considered identifiable (only with --emit-u-width-qc)",
-    )
-    parser.add_argument(
-        "--overwrite", action="store_true", help="Overwrite existing output file"
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Enable verbose logging"
     )
     return parser.parse_args()
 
