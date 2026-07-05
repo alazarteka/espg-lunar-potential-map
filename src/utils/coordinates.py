@@ -107,15 +107,8 @@ def build_scd_to_j2000(spin_vecs: np.ndarray, sun_vecs: np.ndarray) -> np.ndarra
 
     y_hat = np.cross(z_hat, x_hat)
 
-    # Stack columns [x_hat, y_hat, z_hat] to form (N, 3, 3) matrices
-    # x_hat is (N, 3), y_hat is (N, 3), z_hat is (N, 3)
-    # Result should be (N, 3, 3) where mat[i] = [x_hat[i], y_hat[i], z_hat[i]] (columns)
-    # So we stack along last axis? No, stack along axis 2.
-    # np.stack([x, y, z], axis=1) creates (N, 3, 3) where axis 1 is the column index?
-    # Let's verify: mat[i, :, 0] should be x_hat[i].
-    # np.stack([x, y, z], axis=2) -> shape (N, 3, 3).
-    # mat[i, :, 0] -> x[i, :] Correct.
-
+    # Stack the unit vectors as columns: axis=2 gives (N, 3, 3) where
+    # mat[i, :, k] is the k-th basis vector, so mat[i, :, 0] == x_hat[i].
     mats = np.stack([x_hat, y_hat, z_hat], axis=2)
 
     # Set invalid matrices to NaN

@@ -226,24 +226,6 @@ class DataManager:
             return resume_pos + int(content_length)
         return None
 
-    def fetch_directory(
-        self, remote_path: str, ext: str = config.EXT_TAB
-    ) -> list[Path]:
-        """
-        Download all files with the given extension in base_url/remote_path/.
-        """
-        files = self.list_remote_files(remote_path, ext)
-        local_dir = self.ensure_dir(*remote_path.split("/"))
-
-        urls_and_dests = [
-            (f"{self.base_url}/{remote_path}/{fname}", local_dir / fname)
-            for fname in files
-        ]
-        self.download_files_in_parallel(
-            urls_and_dests, folder_desc=f"Downloading {remote_path}"
-        )
-        return [dest for url, dest in urls_and_dests]
-
     def collect_all_download_tasks(
         self, years: list[str], ext: str = config.EXT_TAB
     ) -> list[tuple[str, Path]]:

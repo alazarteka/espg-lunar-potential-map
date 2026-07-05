@@ -119,16 +119,8 @@ def load_date_range_data_with_sza(
             utcs = data["rows_utc"]
             in_sun = data["rows_projection_in_sun"]
 
-            # Compute SZA for each measurement
-            # Vectorized approach would be better but keeping original loop for
-            # fidelity first.
-            # Or wait, the original loop was slow?
-            # Original code in plot_terminator_profile_paper.py:
-            # for lat, lon, pot, utc_str, sun_flag in zip(...)
-
-            # I'll stick to the original implementation logic to ensure correctness,
-            # but maybe try to be slightly more robust with try/except
-
+            # Compute SZA per measurement (row-wise; mirrors the reference
+            # implementation in plot_terminator_profile_paper.py).
             for lat, lon, pot, utc_str, sun_flag in zip(
                 lats, lons, pots, utcs, in_sun, strict=False
             ):

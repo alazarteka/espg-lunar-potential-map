@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -21,21 +21,6 @@ class TemporalDataset:
     n_samples: np.ndarray | None = None
     spatial_coverage: np.ndarray | None = None
     rms_residuals: np.ndarray | None = None
-
-    def as_dict(self) -> dict[str, Any]:
-        """Return a dictionary representation useful for np.savez."""
-        payload: dict[str, Any] = {
-            "times": self.times,
-            "lmax": np.int32(self.lmax),
-            "coeffs": self.coeffs,
-        }
-        if self.n_samples is not None:
-            payload["n_samples"] = self.n_samples
-        if self.spatial_coverage is not None:
-            payload["spatial_coverage"] = self.spatial_coverage
-        if self.rms_residuals is not None:
-            payload["rms_residuals"] = self.rms_residuals
-        return payload
 
 
 def load_temporal_coefficients(path: Path) -> TemporalDataset:

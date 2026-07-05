@@ -25,19 +25,6 @@ class PlasmaEnvironment(IntEnum):
     WAKE = 5
 
     @classmethod
-    def from_temperature(cls, te_ev: float) -> "PlasmaEnvironment":
-        """Classify environment from electron temperature in eV (legacy method)."""
-        if not np.isfinite(te_ev) or te_ev <= 0:
-            return cls.UNKNOWN
-        if te_ev < 30:
-            return cls.SOLAR_WIND
-        if te_ev < 80:
-            return cls.MAGNETOSHEATH
-        if te_ev < 150:
-            return cls.TAIL_LOBES
-        return cls.PLASMA_SHEET
-
-    @classmethod
     def from_temperature_and_illumination(
         cls, te_ev: float, projection_in_sun: bool
     ) -> "PlasmaEnvironment":

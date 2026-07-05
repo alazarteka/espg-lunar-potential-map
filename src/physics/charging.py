@@ -180,25 +180,3 @@ def kappa_current_density_analytic(params: KappaParams) -> CurrentDensityType:
         density_mag * config.ELECTRON_CHARGE_MAGNITUDE * thermal_term * correction
     )
     return current_mag * (ureg.ampere / ureg.meter**2)
-
-
-def kappa_current_density_analytic_magnitude(
-    density: float,
-    kappa: float,
-    theta: float,
-) -> float:
-    """
-    Analytic one-sided current density for a kappa distribution (magnitudes).
-
-    Expects:
-        density: particles / m^3
-        kappa: dimensionless
-        theta: m / s
-    """
-    temperature_ev = theta_to_temperature_ev(theta, kappa)
-    kT_joule = temperature_ev * config.ELECTRON_CHARGE_MAGNITUDE
-    thermal_term = math.sqrt(
-        kT_joule / (2.0 * math.pi * config.ELECTRON_MASS_MAGNITUDE)
-    )
-    correction = _kappa_current_factor(kappa)
-    return density * config.ELECTRON_CHARGE_MAGNITUDE * thermal_term * correction

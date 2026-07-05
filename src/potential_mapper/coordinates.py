@@ -10,7 +10,6 @@ from src.utils.attitude import get_current_ra_dec_batch
 from src.utils.coordinates import build_scd_to_j2000, ra_dec_to_unit
 from src.utils.geometry import (
     get_connections_and_polarity_batch,
-    get_intersections_or_none_batch,
 )
 from src.utils.spice_ops import (
     get_j2000_iau_moon_transform_matrix_batch,
@@ -206,23 +205,6 @@ def project_magnetic_fields(
         "nij,nj->ni", coordinate_arrays.scd_to_iau_moon_mats, unit_magnetic_field
     )
     return projected_magnetic_field
-
-
-def find_surface_intersection(
-    coordinate_arrays: CoordinateArrays, projected_magnetic_field: np.ndarray
-):
-    """
-    Compute ray–sphere intersections for LP positions along projected B-field.
-
-    Returns (points, mask) from get_intersections_or_none_batch.
-    """
-    intersections = get_intersections_or_none_batch(
-        pos=coordinate_arrays.lp_positions,
-        direction=projected_magnetic_field,
-        radius=config.LUNAR_RADIUS,
-    )
-
-    return intersections
 
 
 def find_surface_intersection_with_polarity(
