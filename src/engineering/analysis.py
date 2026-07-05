@@ -137,25 +137,13 @@ def extract_site_stats(
     Compute statistics for a single specific site.
     Evaluating spherical harmonics exactly at the site coordinates.
     """
-    from ..temporal.reconstruction import _sph_harm
+    from ..temporal.coefficients import _build_harmonic_design
 
-    # Reconstruct time series at specific point
-    # U(t) = sum(a_lm(t) * Y_lm(phi, theta))
-    # theta = colatitude, phi = longitude (radians)
-
-    lat_rad = np.deg2rad(site.lat)
-    lon_rad = np.deg2rad(site.lon)
-    colat = (np.pi / 2.0) - lat_rad
-
-    lmax = dataset.lmax
-    n_coeffs = (lmax + 1) ** 2
-    basis_vec = np.empty(n_coeffs, dtype=np.complex128)
-
-    idx = 0
-    for l in range(lmax + 1):
-        for m in range(-l, l + 1):
-            basis_vec[idx] = _sph_harm(m, l, lon_rad, colat)
-            idx += 1
+    # Reconstruct the time series at the site: U(t) = sum_lm a_lm(t) Y_lm.
+    # Evaluate the spherical-harmonic basis exactly at this single point.
+    basis_vec = _build_harmonic_design(
+        np.array([site.lat]), np.array([site.lon]), dataset.lmax
+    )[0]
 
     # Matrix multiply: (n_times, n_coeffs) @ (n_coeffs,) -> (n_times,)
     potential_series = np.real(dataset.coeffs @ basis_vec)

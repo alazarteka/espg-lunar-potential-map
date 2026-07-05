@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ._harmonics import _sph_harm
+from .coefficients import _build_harmonic_design
 
 
 def format_timestamp(ts: np.datetime64) -> str:
@@ -23,19 +23,7 @@ def reconstruct_global_map(
     longitudes = np.linspace(-180.0, 180.0, lon_steps)
     lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
 
-    lat_rad = np.deg2rad(lat_grid.ravel())
-    lon_rad = np.deg2rad(lon_grid.ravel())
-    colatitudes = (np.pi / 2.0) - lat_rad
-
-    n_points = lat_rad.size
-    n_coeffs = coeffs.size
-    design = np.empty((n_points, n_coeffs), dtype=np.complex128)
-
-    col_idx = 0
-    for l in range(lmax + 1):
-        for m in range(-l, l + 1):
-            design[:, col_idx] = _sph_harm(m, l, lon_rad, colatitudes)
-            col_idx += 1
+    design = _build_harmonic_design(lat_grid.ravel(), lon_grid.ravel(), lmax)
 
     potential_flat = np.real(design @ coeffs)
     potential_map = potential_flat.reshape(lat_grid.shape)
