@@ -617,7 +617,7 @@ class LossConeFitterTorch(LossConeFitterBase):
             chunk_index=measurement_chunk,
         )
 
-    def _fit_batch_lhs(
+    def _fit_batch_lhs_core(
         self,
         energies: Tensor,
         pitches: Tensor,
@@ -625,7 +625,7 @@ class LossConeFitterTorch(LossConeFitterBase):
         data_mask: Tensor,
         sc_potential: Tensor,
         n_lhs: int | None = None,
-    ) -> tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         """
         Run LHS grid search for multiple chunks simultaneously.
 
@@ -640,6 +640,8 @@ class LossConeFitterTorch(LossConeFitterBase):
         Returns:
             best_params: (N, 3) best parameters per chunk
             best_chi2: (N,) best chi2 per chunk
+            chi2: (N, n_lhs) full chi2 matrix (with 1e30 for non-finite entries)
+            lhs_samples: (n_lhs, 3) shared LHS sample grid
         """
         if n_lhs is None:
             n_lhs = int(config.LOSS_CONE_LHS_SAMPLES)
@@ -728,7 +730,52 @@ class LossConeFitterTorch(LossConeFitterBase):
             1, best_idx.view(N_chunks, 1, 1).expand(-1, -1, 3)
         ).squeeze(1)  # (N, 3)
 
+        return best_params, best_chi2, chi2, lhs_samples
+
+    def _fit_batch_lhs(
+        self,
+        energies: Tensor,
+        pitches: Tensor,
+        norm2d: Tensor,
+        data_mask: Tensor,
+        sc_potential: Tensor,
+        n_lhs: int | None = None,
+    ) -> tuple[Tensor, Tensor]:
+        """Run LHS grid search, returning only the best params/chi2 per chunk."""
+        best_params, best_chi2, _chi2, _lhs = self._fit_batch_lhs_core(
+            energies, pitches, norm2d, data_mask, sc_potential, n_lhs=n_lhs
+        )
         return best_params, best_chi2
+
+    def _u_width_from_lhs_chi2(
+        self,
+        chi2: Tensor,
+        best_chi2: Tensor,
+        lhs_samples: Tensor,
+        delta_reduced: float,
+    ) -> Tensor:
+        """
+        Compute the U-width identifiability proxy from an LHS chi2 matrix.
+
+        U-width is the span of U_surface over LHS samples with
+        chi2 <= chi2_min + delta_reduced. Returns NaN outside the Lillis fitter.
+        """
+        N_chunks = chi2.size(0)
+        u_width_lhs = torch.full(
+            (N_chunks,), torch.nan, device=self.device, dtype=self.dtype
+        )
+        if self.fit_method == FitMethod.LILLIS:
+            u_samples = lhs_samples[:, 0]
+            threshold = best_chi2 + delta_reduced
+            keep = chi2 <= threshold[:, None]
+
+            u_min = torch.where(keep, u_samples[None, :], torch.inf).min(dim=1).values
+            u_max = torch.where(keep, u_samples[None, :], -torch.inf).max(dim=1).values
+            u_width_lhs = u_max - u_min
+            nan = torch.tensor(float("nan"), device=self.device, dtype=self.dtype)
+            u_width_lhs = torch.where(torch.isfinite(u_width_lhs), u_width_lhs, nan)
+
+        return u_width_lhs
 
     def _fit_batch_lhs_with_u_width_qc(
         self,
@@ -751,90 +798,12 @@ class LossConeFitterTorch(LossConeFitterBase):
         if delta_reduced <= 0:
             raise ValueError("delta_reduced must be > 0")
 
-        # Run the standard LHS path but keep the full chi2 matrix so we can compute
-        # the width proxy.
-        if n_lhs is None:
-            n_lhs = int(config.LOSS_CONE_LHS_SAMPLES)
-        n_lhs = int(n_lhs)
-        N_chunks = energies.size(0)
-
-        log_data_precomputed = None
-        if self.fit_method != FitMethod.LILLIS:
-            log_data_precomputed = precompute_log_data_torch(norm2d, data_mask)
-
-        lhs_np = losscone_lhs_samples(
-            n_samples=n_lhs,
-            u_surface_min=self.u_surface_min,
-            u_surface_max=self.u_surface_max,
-            bs_over_bm_min=self.bs_over_bm_min,
-            bs_over_bm_max=self.bs_over_bm_max,
-            beam_amp_min=self.beam_amp_min,
-            beam_amp_max=self.beam_amp_max,
-            seed=config.LOSS_CONE_LHS_SEED,
+        best_params, best_chi2, chi2, lhs_samples = self._fit_batch_lhs_core(
+            energies, pitches, norm2d, data_mask, sc_potential, n_lhs=n_lhs
         )
-        lhs_samples = torch.tensor(lhs_np, device=self.device, dtype=self.dtype)
-        lhs_expanded = lhs_samples.unsqueeze(0).expand(N_chunks, -1, -1)
-
-        U_surface = lhs_expanded[:, :, 0]
-        bs_over_bm = lhs_expanded[:, :, 1]
-        beam_amp = lhs_expanded[:, :, 2]
-        beam_width = torch.full_like(U_surface, self.beam_width_ev)
-
-        models = synth_losscone_multi_chunk_torch(
-            energies,
-            pitches,
-            U_surface,
-            U_spacecraft=sc_potential,
-            bs_over_bm=bs_over_bm,
-            beam_width_eV=beam_width,
-            beam_amp=beam_amp,
-            beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
-            background=torch.full_like(U_surface, self.background),
+        u_width_lhs = self._u_width_from_lhs_chi2(
+            chi2, best_chi2, lhs_samples, delta_reduced
         )
-
-        if sc_potential.dim() == 1:
-            valid_energy = energies >= sc_potential.view(N_chunks, 1)
-        else:
-            valid_energy = energies >= sc_potential
-        model_mask = valid_energy.view(N_chunks, 1, energies.size(1), 1)
-
-        if self.fit_method == FitMethod.LILLIS:
-            chi2 = compute_lillis_chi2_multi_chunk_torch(
-                models, norm2d, data_mask, model_mask=model_mask
-            )
-        else:
-            chi2 = compute_chi2_multi_chunk_torch(
-                models,
-                norm2d,
-                data_mask,
-                log_data_precomputed=log_data_precomputed,
-                model_mask=model_mask,
-            )
-
-        chi2 = torch.where(
-            torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
-        )
-
-        best_idx = torch.argmin(chi2, dim=1)
-        best_chi2 = chi2.gather(1, best_idx.unsqueeze(1)).squeeze(1)
-        best_params = lhs_expanded.gather(
-            1, best_idx.view(N_chunks, 1, 1).expand(-1, -1, 3)
-        ).squeeze(1)
-
-        u_width_lhs = torch.full(
-            (N_chunks,), torch.nan, device=self.device, dtype=self.dtype
-        )
-        if self.fit_method == FitMethod.LILLIS:
-            u_samples = lhs_samples[:, 0]
-            threshold = best_chi2 + delta_reduced
-            keep = chi2 <= threshold[:, None]
-
-            u_min = torch.where(keep, u_samples[None, :], torch.inf).min(dim=1).values
-            u_max = torch.where(keep, u_samples[None, :], -torch.inf).max(dim=1).values
-            u_width_lhs = u_max - u_min
-            nan = torch.tensor(float("nan"), device=self.device, dtype=self.dtype)
-            u_width_lhs = torch.where(torch.isfinite(u_width_lhs), u_width_lhs, nan)
-
         return best_params, best_chi2, u_width_lhs
 
     def _fit_batch_de(
@@ -980,24 +949,27 @@ class LossConeFitterTorch(LossConeFitterBase):
 
         return best_params, best_chi2, n_iter
 
-    def fit_surface_potential_batched(
-        self, batch_size: int | None = None, n_lhs: int | None = None
-    ) -> np.ndarray:
+    def _fit_batched_impl(
+        self,
+        *,
+        batch_size: int | None,
+        n_lhs: int | None,
+        delta_reduced: float | None,
+    ) -> tuple[np.ndarray, np.ndarray | None]:
         """
-        Fit surface potential for all chunks using batched GPU optimization.
+        Shared mega-batch driver for the batched GPU fits.
 
         Processes chunks in mega-batches to manage VRAM, with all chunks in a
-        batch optimized simultaneously using multi-spectrum DE.
-
-        Args:
-            batch_size: Number of chunks to process simultaneously. If None,
-                auto-detects based on available VRAM and dtype.
-            n_lhs: Number of LHS samples for initial grid search (defaults to config)
+        batch optimized simultaneously using multi-spectrum DE. The U-width
+        identifiability proxy is only computed when ``delta_reduced`` is not None.
 
         Returns:
-            Array with columns [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
+            results: (n_chunks, 5) [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
+            u_width: (n_chunks,) U-width [V], or None when delta_reduced is None
         """
         from tqdm import tqdm
+
+        compute_width = delta_reduced is not None
 
         # Auto-detect batch size if not specified
         if batch_size is None:
@@ -1005,11 +977,20 @@ class LossConeFitterTorch(LossConeFitterBase):
 
         n_chunks = len(self.er_data.data) // self.config.SWEEP_ROWS
         results = np.full((n_chunks, 5), np.nan)
+        u_width = (
+            np.full(n_chunks, np.nan, dtype=np.float64) if compute_width else None
+        )
+
+        desc = (
+            f"Fitting batches (+U QC) (GPU: {self.device})"
+            if compute_width
+            else f"Fitting batches (GPU: {self.device})"
+        )
 
         # Process in mega-batches
         for batch_start in tqdm(
             range(0, n_chunks, batch_size),
-            desc=f"Fitting batches (GPU: {self.device})",
+            desc=desc,
             unit="batch",
         ):
             batch_end = min(batch_start + batch_size, n_chunks)
@@ -1024,9 +1005,20 @@ class LossConeFitterTorch(LossConeFitterBase):
                 continue
 
             # Phase 1: LHS grid search
-            lhs_params, lhs_chi2 = self._fit_batch_lhs(
-                energies, pitches, norm2d, mask, sc_pot, n_lhs=n_lhs
-            )
+            if compute_width:
+                lhs_params, lhs_chi2, lhs_u_width = self._fit_batch_lhs_with_u_width_qc(
+                    energies,
+                    pitches,
+                    norm2d,
+                    mask,
+                    sc_pot,
+                    delta_reduced=delta_reduced,
+                    n_lhs=n_lhs,
+                )
+            else:
+                lhs_params, lhs_chi2 = self._fit_batch_lhs(
+                    energies, pitches, norm2d, mask, sc_pot, n_lhs=n_lhs
+                )
 
             # Phase 2: DE refinement
             de_params, de_chi2, _ = self._fit_batch_de(
@@ -1041,6 +1033,7 @@ class LossConeFitterTorch(LossConeFitterBase):
             # Extract and clip results
             final_params_np = final_params.cpu().numpy()
             final_chi2_np = final_chi2.cpu().numpy()
+            lhs_u_width_np = lhs_u_width.cpu().numpy() if compute_width else None
 
             for i, chunk_idx in enumerate(valid_indices):
                 U_surface = final_params_np[i, 0]
@@ -1070,7 +1063,31 @@ class LossConeFitterTorch(LossConeFitterBase):
                     chi2,
                     chunk_idx,
                 ]
+                if compute_width and self.fit_method == FitMethod.LILLIS:
+                    u_width[chunk_idx] = float(lhs_u_width_np[i])
 
+        return results, u_width
+
+    def fit_surface_potential_batched(
+        self, batch_size: int | None = None, n_lhs: int | None = None
+    ) -> np.ndarray:
+        """
+        Fit surface potential for all chunks using batched GPU optimization.
+
+        Processes chunks in mega-batches to manage VRAM, with all chunks in a
+        batch optimized simultaneously using multi-spectrum DE.
+
+        Args:
+            batch_size: Number of chunks to process simultaneously. If None,
+                auto-detects based on available VRAM and dtype.
+            n_lhs: Number of LHS samples for initial grid search (defaults to config)
+
+        Returns:
+            Array with columns [U_surface, bs_over_bm, beam_amp, chi2, chunk_index]
+        """
+        results, _ = self._fit_batched_impl(
+            batch_size=batch_size, n_lhs=n_lhs, delta_reduced=None
+        )
         return results
 
     def fit_surface_potential_with_u_width_qc(
@@ -1095,75 +1112,9 @@ class LossConeFitterTorch(LossConeFitterBase):
         if delta_reduced <= 0:
             raise ValueError("delta_reduced must be > 0")
 
-        if batch_size is None:
-            batch_size = _auto_detect_batch_size(self.device, self.dtype)
-
-        n_chunks = len(self.er_data.data) // self.config.SWEEP_ROWS
-        results = np.full((n_chunks, 5), np.nan)
-        u_width = np.full(n_chunks, np.nan, dtype=np.float64)
-
-        from tqdm import tqdm
-
-        for batch_start in tqdm(
-            range(0, n_chunks, batch_size),
-            desc=f"Fitting batches (+U QC) (GPU: {self.device})",
-            unit="batch",
-        ):
-            batch_end = min(batch_start + batch_size, n_chunks)
-            chunk_indices = list(range(batch_start, batch_end))
-
-            energies, pitches, norm2d, mask, sc_pot, valid_indices = (
-                self._precompute_chunk_data(chunk_indices)
-            )
-            if len(valid_indices) == 0:
-                continue
-
-            lhs_params, lhs_chi2, lhs_u_width = self._fit_batch_lhs_with_u_width_qc(
-                energies,
-                pitches,
-                norm2d,
-                mask,
-                sc_pot,
-                delta_reduced=delta_reduced,
-                n_lhs=n_lhs,
-            )
-
-            de_params, de_chi2, _ = self._fit_batch_de(
-                energies, pitches, norm2d, mask, sc_pot, x0=lhs_params
-            )
-
-            use_lhs = lhs_chi2 < de_chi2
-            final_params = torch.where(use_lhs.unsqueeze(-1), lhs_params, de_params)
-            final_chi2 = torch.where(use_lhs, lhs_chi2, de_chi2)
-
-            final_params_np = final_params.cpu().numpy()
-            final_chi2_np = final_chi2.cpu().numpy()
-            lhs_u_width_np = lhs_u_width.cpu().numpy()
-
-            for i, chunk_idx in enumerate(valid_indices):
-                U_surface = final_params_np[i, 0]
-                bs_over_bm = float(
-                    np.clip(
-                        final_params_np[i, 1],
-                        self.bs_over_bm_min,
-                        self.bs_over_bm_max,
-                    )
-                )
-                beam_amp = float(
-                    np.clip(final_params_np[i, 2], self.beam_amp_min, self.beam_amp_max)
-                )
-                chi2 = final_chi2_np[i]
-
-                if (
-                    self.fit_method == FitMethod.LILLIS
-                    and chi2 > self.config.LILLIS_CHI2_REDUCED_MAX
-                ):
-                    results[chunk_idx] = [np.nan, np.nan, np.nan, chi2, chunk_idx]
-                    continue
-
-                results[chunk_idx] = [U_surface, bs_over_bm, beam_amp, chi2, chunk_idx]
-                if self.fit_method == FitMethod.LILLIS:
-                    u_width[chunk_idx] = float(lhs_u_width_np[i])
+        results, u_width = self._fit_batched_impl(
+            batch_size=batch_size, n_lhs=n_lhs, delta_reduced=delta_reduced
+        )
 
         u_is_identifiable = np.isfinite(u_width) & (
             u_width <= float(identifiable_width_max_v)
