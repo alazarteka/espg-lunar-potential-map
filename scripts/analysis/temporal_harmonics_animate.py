@@ -2,7 +2,7 @@
 Generate animated visualizations of time-dependent spherical harmonic reconstructions.
 
 The script consumes the same NPZ temporal coefficient bundles produced by
-`scripts/dev/temporal_harmonic_coefficients.py` and generates two animations:
+`python -m src.temporal` and generates two animations:
 
 1. Hemispheric view (polar projection of northern and southern hemispheres)
 2. Global equirectangular map

@@ -106,7 +106,6 @@ LOSS_CONE_BS_OVER_BM_MAX = 1.1
 # Beam width: fixed at ~15 eV (LP energy resolution), NOT scaling with |U_surface|
 # The previous scaling (0.5 * |U|) caused runaway at extreme potentials.
 LOSS_CONE_BEAM_WIDTH_EV = 15.0  # fixed beam width in eV (instrument resolution)
-LOSS_CONE_BEAM_WIDTH_FACTOR = 0.5  # DEPRECATED: kept for backward compatibility
 LOSS_CONE_BEAM_AMP_MIN = 0.0  # lower bound for normalized beam amplitude
 LOSS_CONE_BEAM_AMP_MAX = 5.0  # upper bound (reduced from 100; data is normalized 0-1)
 # Pitch sigma: reasonable angular spread for secondary electron beam
