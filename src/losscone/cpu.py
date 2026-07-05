@@ -370,9 +370,6 @@ class LossConeFitter(LossConeFitterBase):
                   (default; approximates reflected/incident normalization)
                 - "ratio2": pairwise normalization (incident→1,
                   reflected→reflected/incident) (closest to Halekas 2008 wording)
-                - "global": divide entire 2D array by max incident flux (DEPRECATED)
-                - "ratio_rescaled": per-energy ratio, then rescale to [0, 1]
-                  (DEPRECATED)
             fit_method (str | None): Loss-cone fitting method ("halekas" or "lillis").
             beam_amp_fixed (float | None): If set, fix the Gaussian beam amplitude
                 to this value instead of fitting it.
@@ -544,8 +541,6 @@ class LossConeFitter(LossConeFitterBase):
         Normalization modes:
         - 'ratio': per-energy normalization by incident flux
         - 'ratio2': pairwise normalization (incident→1.0, reflected→reflected/incident)
-        - 'global': divide entire 2D array by max incident flux (DEPRECATED)
-        - 'ratio_rescaled': per-energy ratio, then rescale to [0, 1] (DEPRECATED)
 
         Args:
             measurement_chunk (int): The index of the measurement chunk.
@@ -619,48 +614,10 @@ class LossConeFitter(LossConeFitterBase):
                 mid = int(np.argmin(np.abs(pitch_row - 90.0)))
                 norm2d[row, mid] = 1.0
 
-        elif self.normalization_mode == NormalizationMode.RATIO_RESCALED:
-            # Two-step hybrid: per-energy ratio, then global rescale to [0, 1]
-            # Step 1: Per-energy normalization (same as "ratio")
-            norm2d = np.vstack(
-                [
-                    self._get_normalized_flux(energy_bin, measurement_chunk)
-                    for energy_bin in range(config.SWEEP_ROWS)
-                ]
+        else:
+            raise ValueError(
+                f"Unsupported normalization_mode: {self.normalization_mode}"
             )
-
-            # Step 2: Global rescale to [0, 1]
-            # Find max across all finite values
-            finite_vals = norm2d[np.isfinite(norm2d)]
-            if len(finite_vals) > 0:
-                global_max = np.max(finite_vals)
-                if global_max > 0:
-                    norm2d = norm2d / global_max
-            # Now norm2d is in [0, 1] while preserving ratio structure
-
-        else:  # "global"
-            # Global normalization: divide entire 2D array by maximum incident flux
-            # First build the 2D flux array
-            s = measurement_chunk * config.SWEEP_ROWS
-            e = min((measurement_chunk + 1) * config.SWEEP_ROWS, len(self.er_data.data))
-
-            flux_2d = self.er_data.data[config.FLUX_COLS].to_numpy(dtype=np.float64)[
-                s:e
-            ]
-            pitches_2d = self.pitch_angle.pitch_angles[s:e]
-
-            # Find maximum incident flux across all energies
-            incident_mask = pitches_2d < 90
-            incident_flux_vals = flux_2d[incident_mask]
-            incident_flux_vals = incident_flux_vals[
-                incident_flux_vals > 0
-            ]  # Remove zeros/negatives
-
-            if len(incident_flux_vals) == 0:
-                return np.full((config.SWEEP_ROWS, config.CHANNELS), np.nan)
-
-            global_incident_flux = float(np.max(incident_flux_vals))
-            norm2d = flux_2d / max(global_incident_flux, config.EPS)
 
         return norm2d
 
@@ -804,72 +761,15 @@ class LossConeFitter(LossConeFitterBase):
                 # Normalize: flux / norm_factor (broadcast over columns)
                 result[i, :actual_rows, :] = flux_chunk / norm_factors[:, np.newaxis]
 
-        elif self.normalization_mode == NormalizationMode.GLOBAL:
-            # Vectorized global normalization
-            for i in valid_chunk_idx:
-                chunk_idx = chunk_indices[i]
-                s = chunk_idx * nE
-                e = min(s + nE, n_rows)
-                actual_rows = e - s
-
-                flux_chunk = flux_all[s:e]
-                pitch_chunk = pitches_all[s:e]
-
-                # Incident mask
-                incident_mask = pitch_chunk < 90.0
-                valid_flux = np.isfinite(flux_chunk) & (flux_chunk > 0)
-                valid_incident = incident_mask & valid_flux
-
-                # Get max incident flux
-                incident_vals = flux_chunk[valid_incident]
-                if len(incident_vals) == 0:
-                    continue
-
-                global_norm = np.max(incident_vals)
-                result[i, :actual_rows, :] = flux_chunk / max(global_norm, config.EPS)
-
-        elif self.normalization_mode == NormalizationMode.RATIO_RESCALED:
-            # Per-energy ratio then global rescale
-            for i in valid_chunk_idx:
-                chunk_idx = chunk_indices[i]
-                s = chunk_idx * nE
-                e = min(s + nE, n_rows)
-                actual_rows = e - s
-
-                flux_chunk = flux_all[s:e]
-                pitch_chunk = pitches_all[s:e]
-
-                incident_mask = pitch_chunk < 90.0
-                valid_flux = np.isfinite(flux_chunk) & (flux_chunk > 0)
-                valid_incident = incident_mask & valid_flux
-
-                flux_for_norm = np.where(valid_incident, flux_chunk, np.nan)
-
-                if self.incident_flux_stat == "mean":
-                    norm_factors = np.nanmean(flux_for_norm, axis=1)
-                else:
-                    norm_factors = np.nanmax(flux_for_norm, axis=1)
-
-                norm_factors = np.where(
-                    np.isfinite(norm_factors) & (norm_factors > 0), norm_factors, np.nan
-                )
-                norm_factors = np.maximum(norm_factors, config.EPS)
-
-                chunk_result = flux_chunk / norm_factors[:, np.newaxis]
-
-                # Global rescale
-                finite_vals = chunk_result[np.isfinite(chunk_result)]
-                if len(finite_vals) > 0:
-                    global_max = np.max(finite_vals)
-                    if global_max > 0:
-                        chunk_result = chunk_result / global_max
-
-                result[i, :actual_rows, :] = chunk_result
-
-        else:  # ratio2 - complex pairwise normalization
-            # Fall back to per-chunk for ratio2
+        elif self.normalization_mode == NormalizationMode.RATIO2:
+            # ratio2 - complex pairwise normalization; fall back to per-chunk
             for i in valid_chunk_idx:
                 result[i] = self.build_norm2d(chunk_indices[i])
+
+        else:
+            raise ValueError(
+                f"Unsupported normalization_mode: {self.normalization_mode}"
+            )
 
         return result
 

@@ -78,8 +78,8 @@ def _parse_args() -> argparse.Namespace:
         "--normalization",
         type=str,
         default="ratio",
-        choices=["global", "ratio", "ratio2", "ratio_rescaled"],
-        help="Loss-cone normalization mode ('ratio'/'ratio2' recommended; 'global' and 'ratio_rescaled' deprecated)",
+        choices=["ratio", "ratio2"],
+        help="Loss-cone normalization mode ('ratio' or 'ratio2')",
     )
     parser.add_argument(
         "--incident-flux-stat",

@@ -57,8 +57,7 @@ uv run python scripts/diagnostics/view_norm2d.py data/1999/091_120APR/3D990429.T
 ```
 
 **Normalization**: use `--normalization ratio2` (closest to reflected/incident) or
-`--normalization ratio`. The `global` and `ratio_rescaled` modes are deprecated
-and will be removed in a future release.
+`--normalization ratio`.
 
 ### beam_label_studio.py
 

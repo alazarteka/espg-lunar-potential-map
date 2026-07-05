@@ -102,8 +102,7 @@ class LossConeFitterTorch(LossConeFitterBase):
             er_data: ERData object
             pitch_angle: Optional pre-computed PitchAngle object
             spacecraft_potential: Optional per-row spacecraft potential [V]
-            normalization_mode: Flux normalization mode ('ratio'/'ratio2' recommended;
-                'global' and 'ratio_rescaled' are deprecated)
+            normalization_mode: Flux normalization mode ('ratio' or 'ratio2')
             fit_method: Loss-cone fitting method ("halekas" or "lillis")
             beam_amp_fixed: Fixed beam amplitude (None to fit)
             incident_flux_stat: Statistic for incident flux ("mean" or "max")

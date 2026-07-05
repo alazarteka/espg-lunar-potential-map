@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -22,16 +21,15 @@ class FitMethod(StrEnum):
 
 
 class NormalizationMode(StrEnum):
-    """Flux normalization strategy."""
+    """Flux normalization strategy.
 
-    # NOTE: `GLOBAL` and `RATIO_RESCALED` are deprecated. The Halekas (2008)
-    # methodology describes fitting reflected/incident ratios, which is most
-    # directly represented by `RATIO2` (pairwise) and approximately by `RATIO`
-    # (per-energy normalization).
-    GLOBAL = "global"
+    The Halekas (2008) methodology describes fitting reflected/incident ratios,
+    which is most directly represented by ``RATIO2`` (pairwise) and
+    approximately by ``RATIO`` (per-energy normalization).
+    """
+
     RATIO = "ratio"
     RATIO2 = "ratio2"
-    RATIO_RESCALED = "ratio_rescaled"
 
 
 @dataclass(frozen=True)
@@ -147,13 +145,4 @@ def parse_normalization_mode(value: NormalizationMode | str) -> NormalizationMod
             mode = NormalizationMode(str(value))
         except ValueError:
             raise ValueError(f"Unknown normalization_mode: {value}") from None
-    if mode in {NormalizationMode.GLOBAL, NormalizationMode.RATIO_RESCALED}:
-        warnings.warn(
-            (
-                f"Normalization mode '{mode.value}' is deprecated and will be "
-                "removed in a future release. Use 'ratio' or 'ratio2' instead."
-            ),
-            FutureWarning,
-            stacklevel=2,
-        )
     return mode

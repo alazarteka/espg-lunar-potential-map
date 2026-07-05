@@ -198,40 +198,6 @@ class TestLossConeFitterNormalization:
         # Incident angles should be exactly 1.0 (except NaN)
         assert norm2d.shape == (config.SWEEP_ROWS, config.CHANNELS)
 
-    def test_normalization_mode_ratio_rescaled(self):
-        """Ratio_rescaled: per-energy ratio then global [0,1] scaling."""
-        er = prepare_synthetic_er()
-        with pytest.warns(
-            FutureWarning, match="Normalization mode 'ratio_rescaled' is deprecated"
-        ):
-            fitter = LossConeFitter(
-                er,
-                normalization_mode="ratio_rescaled",
-            )
-
-        norm2d = fitter.build_norm2d(0)
-
-        # All finite values should be in [0, 1]
-        finite_vals = norm2d[np.isfinite(norm2d)]
-        if len(finite_vals) > 0:
-            assert np.all(finite_vals >= 0)
-            assert np.all(finite_vals <= 1.0 + 1e-10)
-
-    def test_normalization_mode_global(self):
-        """Global mode: divides by maximum incident flux."""
-        er = prepare_synthetic_er()
-        with pytest.warns(
-            FutureWarning, match="Normalization mode 'global' is deprecated"
-        ):
-            fitter = LossConeFitter(
-                er,
-                normalization_mode="global",
-            )
-
-        norm2d = fitter.build_norm2d(0)
-
-        assert norm2d.shape == (config.SWEEP_ROWS, config.CHANNELS)
-
     def test_invalid_normalization_mode_raises(self):
         """Unknown normalization mode raises ValueError."""
         er = prepare_synthetic_er()

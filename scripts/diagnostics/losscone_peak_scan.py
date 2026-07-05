@@ -47,15 +47,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("er_file", type=Path, help="Path to ER .TAB file")
     parser.add_argument(
         "--normalization",
-        choices=["global", "ratio", "ratio2", "ratio_rescaled"],
+        choices=["ratio", "ratio2"],
         default="ratio2",
-        help="Loss-cone normalization mode ('ratio'/'ratio2' recommended; 'global' and 'ratio_rescaled' deprecated)",
+        help="Loss-cone normalization mode ('ratio' or 'ratio2')",
     )
     parser.add_argument(
         "--incident-stat",
         choices=["mean", "max"],
         default="mean",
-        help="Incident flux statistic (used in ratio/global modes)",
+        help="Incident flux statistic (used in ratio mode)",
     )
     parser.add_argument("--pitch-min", type=float, default=150.0)
     parser.add_argument("--pitch-max", type=float, default=180.0)

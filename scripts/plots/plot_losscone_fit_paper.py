@@ -107,7 +107,7 @@ def create_losscone_comparison_plot(
         spec_no: Spectrum number to plot
         output_path: Where to save the figure
         usc: Spacecraft potential [V] applied to all rows
-        normalization: Loss cone normalization mode ("global" or "ratio")
+        normalization: Loss cone normalization mode ("ratio" or "ratio2")
         fixed_beam_amp: If provided, fix Gaussian beam amplitude to this value
         background: Model background outside the loss cone
         incident_flux_stat: Statistic for incident flux ("mean" or "max")
@@ -345,9 +345,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--normalization",
-        choices=["global", "ratio", "ratio2", "ratio_rescaled"],
-        default="global",
-        help="Loss-cone normalization mode ('ratio'/'ratio2' recommended; 'global' and 'ratio_rescaled' deprecated)",
+        choices=["ratio", "ratio2"],
+        default="ratio",
+        help="Loss-cone normalization mode ('ratio' or 'ratio2')",
     )
     parser.add_argument(
         "--background",

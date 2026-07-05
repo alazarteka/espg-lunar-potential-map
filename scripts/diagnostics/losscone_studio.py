@@ -233,7 +233,7 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
 
     normalization = pn.widgets.Select(
         name="Normalization",
-        options=["global", "ratio", "ratio2", "ratio_rescaled"],
+        options=["ratio", "ratio2"],
         value=args.normalization,
     )
     incident_stat = pn.widgets.Select(
@@ -550,9 +550,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chunk", type=int, default=0, help="Initial chunk index")
     parser.add_argument(
         "--normalization",
-        choices=["global", "ratio", "ratio2", "ratio_rescaled"],
+        choices=["ratio", "ratio2"],
         default="ratio",
-        help="Loss-cone normalization mode ('ratio'/'ratio2' recommended; 'global' and 'ratio_rescaled' deprecated)",
+        help="Loss-cone normalization mode ('ratio' or 'ratio2')",
     )
     parser.add_argument(
         "--incident-stat",
