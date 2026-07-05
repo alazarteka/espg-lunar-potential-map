@@ -12,6 +12,7 @@ User-facing documentation for the command-line interfaces.
 | [Temporal Harmonics](cli/temporal.md) | `uv run python -m src.temporal` | Spherical harmonic coefficient fitting |
 | [Engineering Products](cli/engineering.md) | `uv run python -m src.engineering` | Engineering maps and site summaries |
 | [Diagnostics Tools](cli/diagnostics.md) | — | Beam detection and loss cone analysis |
+| [Analysis & Plots](cli/analysis.md) | — | Exploration + publication plotting scripts |
 | [Visualization Style](visualization/visualization.md) | — | Colormap categories, fonts, and paper styling |
 | [Development](dev/development.md) | — | Build, test, lint workflow reference |
 

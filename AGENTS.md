@@ -72,6 +72,9 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
 | Engineering | [engineering.md](docs/cli/engineering.md) | Engineering maps and site summaries |
 | Diagnostics | [diagnostics.md](docs/cli/diagnostics.md) | Beam detection tools |
 | Temporal | [temporal.md](docs/cli/temporal.md) | Spherical harmonics fitting |
+| Data Acquisition | [data_acquisition.md](docs/cli/data_acquisition.md) | Download SPICE kernels + ER flux data |
+| Potential Mapper | [potential_mapper.md](docs/cli/potential_mapper.md) | Interactive single-day mapping CLI |
+| Analysis Scripts | [analysis.md](docs/cli/analysis.md) | Analysis & publication plotting scripts |
 | Visualization | [visualization.md](docs/visualization/visualization.md) | Plot styling |
 | Spacecraft Potential | [spacecraft_potential.md](docs/physics/spacecraft_potential.md) | U_sc estimation details |
 

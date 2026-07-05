@@ -171,6 +171,18 @@ Outputs:
 
 ---
 
+### losscone_fit_compare.py
+
+Fit a spectrum with both loss-cone methods — Halekas (log-χ²) and Lillis (masked
+linear χ²) — and plot them side by side, so the two fitters' `U_surface` and fit
+quality can be compared directly on the same data.
+
+```bash
+uv run python scripts/diagnostics/losscone_fit_compare.py --help
+```
+
+---
+
 ## Interactive Browser Tools
 
 These tools require the `diagnostics` extra: `uv sync --extra diagnostics`
