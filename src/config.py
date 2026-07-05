@@ -20,9 +20,20 @@ ACCUMULATION_TIME = 2.5 * ureg.second  # accumulation time (half spin) for ER fl
 GEOMETRIC_FACTOR = (
     0.02 * ureg.centimeter**2 * ureg.steradian
 )  # geometric factor (folds in ΔΩ and ΔE/E≈0.25)
-# ER background count rate (~10 counts/s per the PDS descriptor); NOT subtracted
-# in the archive, so it enters the Poisson expectation μ = model·κ + N_bg·Δt.
-LOSS_CONE_BACKGROUND_RATE_CPS = 10.0
+# Fallback ER background count rate (counts/s per bin). The Poisson noise model
+# primarily estimates background empirically per sweep from the top energy
+# channel (noise.estimate_background_counts); this constant is used only where
+# that estimate is unavailable or rejected as signal-contaminated. Set to ~25
+# cps per verification against real data (PDS nominal ~10 cps, but the
+# background-dominated top channel implies ~22-40 cps/bin). Background enters
+# μ = model·κ + b.
+LOSS_CONE_BACKGROUND_RATE_CPS = 25.0
+# Physical ceiling on the empirical background rate. If the top energy channel
+# implies a per-band rate above this, it is treated as contaminated by real
+# high-energy electron flux (e.g. SEP events, magnetotail) and the fixed
+# fallback rate is used for that band instead. Instrumental background is a
+# hardware property and cannot physically be this large.
+LOSS_CONE_BACKGROUND_RATE_MAX_CPS = 200.0
 BINS_BY_LATITUDE = {
     78.75: 4,
     56.25: 8,

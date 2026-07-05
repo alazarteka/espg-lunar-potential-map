@@ -36,13 +36,27 @@ def test_reconstruct_counts_formula_and_clamp():
 def test_chunk_noise_kappa_identity():
     energies = np.array([100.0, 1000.0])
     dt = np.array([0.3, 0.6, 0.15])
+    thetas = np.array([10.0, 20.0, 20.0])
     raw = np.array([[10.0, 20.0, 30.0], [1.0, 2.0, 3.0]])
     f_scale = np.array([12.0, 4.0])  # per-row incident normalization
     norm2d = raw / f_scale[:, None]
-    counts, kappa, bg = noise.chunk_noise(raw, norm2d, energies, dt)
+    counts, kappa, bg = noise.chunk_noise(raw, norm2d, energies, dt, thetas)
     # κ should equal F_scale·G·E·Δt (independent of the per-bin flux)
     np.testing.assert_allclose(kappa, noise.count_scale(f_scale, energies, dt))
-    np.testing.assert_allclose(bg, config.LOSS_CONE_BACKGROUND_RATE_CPS * dt)
+    assert bg.shape == (3,)
+    assert np.all(bg > 0) and np.all(np.isfinite(bg))
+
+
+def test_estimate_background_from_top_channel_per_band():
+    energies = np.array([100.0, 1000.0])  # top energy row = index 1
+    dt = np.array([0.3, 0.6, 0.15])
+    thetas = np.array([10.0, 20.0, 20.0])  # band 10: ch0; band 20: ch1, ch2
+    raw = np.array([[999.0, 999.0, 999.0], [1.0, 2.0, 3.0]])  # top row = [1, 2, 3]
+    b = noise.estimate_background_counts(raw, energies, dt, thetas)
+    lam_top = noise.reconstruct_counts(raw, energies, dt)[1]
+    assert np.isclose(b[0], lam_top[0])  # single-channel band
+    assert np.isclose(b[1], np.mean(lam_top[1:3]))  # per-band mean
+    assert np.isclose(b[2], np.mean(lam_top[1:3]))
 
 
 def _rng_case(seed=0):
