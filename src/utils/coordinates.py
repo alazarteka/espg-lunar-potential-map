@@ -1,4 +1,3 @@
-import warnings
 
 import numpy as np
 
@@ -38,31 +37,6 @@ def cartesian_to_lat_lon(coordinate: np.ndarray) -> tuple[float, float]:
     lat = np.rad2deg(np.arcsin(z / np.linalg.norm(coordinate)))
     lon = np.rad2deg(np.arctan2(y, x))
     return lat, lon
-
-
-def lat_lon_to_cartesian(lat_long: np.ndarray) -> np.ndarray:
-    """
-    Convert latitude and longitude to Cartesian coordinates.
-
-    Args:
-        lat_long: Array of shape (N, 2) with [latitude, longitude] in degrees
-
-    Returns:
-        Array of shape (N, 3) with Cartesian coordinates [x, y, z]
-    """
-    warnings.warn(
-        "lat_lon_to_cartesian is deprecated and will be removed in a future version",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    lat_rad = np.deg2rad(lat_long[:, 0])
-    lon_rad = np.deg2rad(lat_long[:, 1])
-
-    x = np.cos(lat_rad) * np.cos(lon_rad)
-    y = np.cos(lat_rad) * np.sin(lon_rad)
-    z = np.sin(lat_rad)
-
-    return np.column_stack((x, y, z))
 
 
 def build_scd_to_j2000(spin_vecs: np.ndarray, sun_vecs: np.ndarray) -> np.ndarray:

@@ -12,15 +12,13 @@ For backward compatibility, commonly used functions are imported at package leve
 """
 
 # Import commonly used functions for backward compatibility
-from .attitude import get_current_ra_dec, get_time_range, load_attitude_data
+from .attitude import get_current_ra_dec, load_attitude_data
 from .coordinates import (
     build_scd_to_j2000,
     cartesian_to_lat_lon,
-    lat_lon_to_cartesian,
     ra_dec_to_unit,
 )
 from .energy import make_relative_energy_bounds
-from .file_ops import list_files, list_folder_files
 from .flux_files import select_flux_day_file
 from .geometry import (
     get_connection_and_polarity,
@@ -58,11 +56,6 @@ __all__ = [
     "get_sun_vector_wrt_moon",
     # Theta loader
     "get_thetas",
-    "get_time_range",
-    "lat_lon_to_cartesian",
-    # File operations
-    "list_files",
-    "list_folder_files",
     # Attitude operations
     "load_attitude_data",
     # Energy helpers

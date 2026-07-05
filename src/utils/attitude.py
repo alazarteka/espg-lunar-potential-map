@@ -1,7 +1,5 @@
 import logging
-import warnings
 from bisect import bisect_right
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -98,28 +96,3 @@ def get_current_ra_dec_batch(
         dec_out[valid_mask] = dec_vals[valid_idxs]
 
     return ra_out, dec_out
-
-
-def get_time_range(flux_data: Any) -> tuple[str, str]:
-    """
-    Get the time range from the flux data.
-
-    Args:
-        flux_data: FluxData object with loaded data
-
-    Returns:
-        Tuple of (start_time, end_time) as strings, or ("", "") if error
-    """
-    warnings.warn(
-        "get_time_range is deprecated and will be removed in a future version",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    if flux_data.data is None:
-        logging.error("Flux data is not loaded.")
-        return "", ""
-
-    start_time = flux_data.data["UTC"].iloc[0]
-    end_time = flux_data.data["UTC"].iloc[-1]
-
-    return start_time, end_time
