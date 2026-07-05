@@ -59,34 +59,23 @@ All dependencies are managed through [UV](https://docs.astral.sh/uv/) and specif
 ├── data/                   # Processed data (created/populated by src/data_acquisition.py)
 │   └── spice_kernels/      # SPICE kernel files
 │       └── kernels.lock    # SHA-1 for SPICE kernels
-└── src/                    # Source code
-    ├── config.py           # Configuration file
-    ├── data_acquisition.py # Handles data and SPICE kernel acquisition
-    ├── flux.py             # ER flux + loss-cone fitting
-    ├── kappa.py            # Kappa distribution fitting utilities
-    ├── kappa_torch.py      # PyTorch-accelerated Kappa fitter
-    ├── model.py            # Core modeling components
-    ├── model_torch.py      # PyTorch-accelerated loss-cone model
-    ├── potential_mapper/   # Modular potential mapping package
-    │   ├── __init__.py
-    │   ├── __main__.py     # Enables `python -m src.potential_mapper`
-    │   ├── cli.py          # CLI argument parsing and entrypoint
-    │   ├── pipeline.py     # File discovery, processing, orchestration
-    │   ├── coordinates.py  # Frame transforms, projections, intersections
-    │   ├── plot.py         # Plotting utilities
-    │   └── results.py      # Typed results container
-    └── utils/              # Utility functions module
-        ├── __init__.py
-        ├── attitude.py
-        ├── coordinates.py
-        ├── file_ops.py
-        ├── geometry.py
-        ├── optimization.py # Batched differential evolution optimizer
-        └── spice_ops.py
+└── src/                    # Core Python package (see AGENTS.md for the full map)
+    ├── config.py           # Central configuration constants
+    ├── data_acquisition.py # NASA/PDS data + SPICE kernel download
+    ├── flux.py, kappa.py, model.py, spacecraft_potential.py  # core fitting
+    ├── losscone/           # Loss-cone fitting core (cpu, model, chi2, masks, torch/)
+    ├── potential_mapper/   # Mapping pipeline + GPU batch runner
+    ├── temporal/           # Spherical-harmonic temporal reconstruction
+    ├── engineering/        # GlobalStats, SiteStats, site analysis
+    ├── diagnostics/        # Loss-cone session management
+    ├── physics/            # Kappa physics, spacecraft charging, J–U curves
+    ├── utils/              # SPICE, geometry, attitude, units helpers
+    └── visualization/      # Plot styling and loaders
 ```
 
 Generated plots and reports now live under `artifacts/`; use `scratch/` for ad-hoc runs
-and exploratory outputs that should stay out of version control.
+and exploratory outputs that should stay out of version control. See
+[docs/README.md](docs/README.md) for the full documentation index.
 
 ## Installation
 
@@ -222,23 +211,23 @@ uv run pytest
 
 ### Batch potential cache generation
 
-The batch runner in `scripts/dev/potential_mapper_batch.py` processes ER files and
-writes per-file NPZ caches under `artifacts/potential_cache/`. Each cache contains
-row-aligned spacecraft and surface potentials along with spectrum rollups.
+The batch runner (`python -m src.potential_mapper.batch`) processes ER files and
+writes a single NPZ cache per run under `artifacts/potential_cache/`, containing
+row-aligned spacecraft and surface potentials plus per-spectrum rollups.
 
 ```bash
-# Compute caches for a single day (writes to artifacts/potential_cache by default)
-uv run python scripts/dev/potential_mapper_batch.py \
-  --year 1998 --month 9 --day 16 --limit 1 --workers 1
+# Compute a day of caches on the GPU (writes potential_batch_1998_09_16.npz)
+uv run python -m src.potential_mapper.batch --fast --year 1998 --month 9 --day 16
 ```
 
 Key options:
-- `--year/--month/--day`: filter ER files by tokenised date.
-- `--limit`: stop after processing the first *N* files (useful for quick checks).
-- `--output-dir`: target directory for NPZ artefacts.
+- `--year/--month/--day`: filter ER files by date (month and day optional).
+- `--fast`: use the GPU (torch) fitter; `--parallel` selects the CPU multi-process path.
+- `--losscone-fit-method {halekas,lillis}`, `--u-spacecraft`: fitting overrides.
+- `--output-dir`: target directory for the NPZ artefact; `--overwrite` to recompute.
 
-The command loads SPICE kernels as needed and is CPU-heavy; consider reducing the
-sample size (via `--limit`) when iterating locally.
+See [docs/cli/potential_mapper_batch.md](docs/cli/potential_mapper_batch.md) for the
+full option reference.
 
 ### Visualising cached potentials
 
@@ -271,7 +260,7 @@ is debiasing the loss-cone fits with the spacecraft charging term:
 uv run python - <<'PY'
 import numpy as np
 from pathlib import Path
-path = Path('artifacts/potential_cache/1998/244_273SEP/3D980916.npz')
+path = Path('artifacts/potential_cache/potential_batch_1998_09_16.npz')
 with np.load(path) as data:
     sc = data['rows_spacecraft_potential']
     proj = data['rows_projected_potential']
