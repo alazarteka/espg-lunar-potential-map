@@ -163,38 +163,11 @@ def _passes_pitch_contiguity(
     return _max_true_run(mask) >= min_bins
 
 
-def detect_peak(
-    profile: np.ndarray,
-    *,
-    energies: np.ndarray | None = None,
-    norm2d: np.ndarray | None = None,
-    pitches: np.ndarray | None = None,
-    contrast: float = DEFAULT_PEAK_CONTRAST,
-    min_peak: float = DEFAULT_MIN_PEAK,
-    neighbor_window: int = DEFAULT_NEIGHBOR_WINDOW,
-    edge_skip: int = DEFAULT_EDGE_SKIP,
-    min_neighbor: float = DEFAULT_MIN_NEIGHBOR,
-    check_high_energy: bool = True,
-    high_energy_floor: float = DEFAULT_HIGH_ENERGY_FLOOR,
-    high_energy_factor: float = DEFAULT_HIGH_ENERGY_FACTOR,
-    high_energy_ratio_max: float = DEFAULT_HIGH_ENERGY_RATIO_MAX,
-    high_energy_min_points: int = DEFAULT_HIGH_ENERGY_MIN_POINTS,
-    check_peak_width: bool = True,
-    peak_half_fraction: float = DEFAULT_PEAK_HALF_FRACTION,
-    peak_width_max: int = DEFAULT_PEAK_WIDTH_MAX,
-    check_pitch_contiguity: bool = False,
-    contiguity_pitch_min: float = DEFAULT_PITCH_MIN,
-    contiguity_min_value: float | None = None,
-    contiguity_min_bins: int = DEFAULT_CONTIGUITY_MIN_BINS,
-) -> BeamDetectionResult:
-    """Detect if the energy profile has a valid peak.
+@dataclass(frozen=True)
+class PeakCriteria:
+    """Tunable thresholds controlling :func:`detect_peak`.
 
-    Args:
-        profile: Energy profile (mean normalized flux per energy)
-        energies: Sorted energy values matching profile (optional)
-        energies: Sorted energy values matching profile (optional)
-        norm2d: Normalized flux grid for pitch contiguity checks (optional)
-        pitches: Pitch angle grid for pitch contiguity checks (optional)
+    Attributes:
         contrast: Peak must exceed neighbors by this multiplicative factor
         min_peak: Minimum normalized value to qualify as a peak
         neighbor_window: Number of energy bins on each side for peak comparison
@@ -212,16 +185,55 @@ def detect_peak(
         contiguity_pitch_min: Minimum pitch angle for contiguity check
         contiguity_min_value: Minimum normalized value for contiguity check
         contiguity_min_bins: Minimum contiguous bins required
+    """
+
+    contrast: float = DEFAULT_PEAK_CONTRAST
+    min_peak: float = DEFAULT_MIN_PEAK
+    neighbor_window: int = DEFAULT_NEIGHBOR_WINDOW
+    edge_skip: int = DEFAULT_EDGE_SKIP
+    min_neighbor: float = DEFAULT_MIN_NEIGHBOR
+    check_high_energy: bool = True
+    high_energy_floor: float = DEFAULT_HIGH_ENERGY_FLOOR
+    high_energy_factor: float = DEFAULT_HIGH_ENERGY_FACTOR
+    high_energy_ratio_max: float = DEFAULT_HIGH_ENERGY_RATIO_MAX
+    high_energy_min_points: int = DEFAULT_HIGH_ENERGY_MIN_POINTS
+    check_peak_width: bool = True
+    peak_half_fraction: float = DEFAULT_PEAK_HALF_FRACTION
+    peak_width_max: int = DEFAULT_PEAK_WIDTH_MAX
+    check_pitch_contiguity: bool = False
+    contiguity_pitch_min: float = DEFAULT_PITCH_MIN
+    contiguity_min_value: float | None = None
+    contiguity_min_bins: int = DEFAULT_CONTIGUITY_MIN_BINS
+
+
+def detect_peak(
+    profile: np.ndarray,
+    *,
+    energies: np.ndarray | None = None,
+    norm2d: np.ndarray | None = None,
+    pitches: np.ndarray | None = None,
+    criteria: PeakCriteria | None = None,
+) -> BeamDetectionResult:
+    """Detect if the energy profile has a valid peak.
+
+    Args:
+        profile: Energy profile (mean normalized flux per energy)
+        energies: Sorted energy values matching profile (optional)
+        norm2d: Normalized flux grid for pitch contiguity checks (optional)
+        pitches: Pitch angle grid for pitch contiguity checks (optional)
+        criteria: Tunable detection thresholds (defaults to ``PeakCriteria()``)
 
     Returns:
         BeamDetectionResult with detection status and peak details.
     """
+    c = criteria if criteria is not None else PeakCriteria()
+
     if profile.size == 0:
         return BeamDetectionResult(False, None, None, None)
 
-    window = max(1, neighbor_window)
-    start = max(edge_skip, window)
-    end = profile.size - max(edge_skip, window)
+    window = max(1, c.neighbor_window)
+    start = max(c.edge_skip, window)
+    end = profile.size - max(c.edge_skip, window)
     if end <= start:
         return BeamDetectionResult(False, None, None, None)
 
@@ -230,7 +242,7 @@ def detect_peak(
 
     for idx in range(start, end):
         value = profile[idx]
-        if not np.isfinite(value) or value < min_peak:
+        if not np.isfinite(value) or value < c.min_peak:
             continue
         left = profile[idx - window : idx]
         right = profile[idx + 1 : idx + 1 + window]
@@ -243,24 +255,24 @@ def detect_peak(
         if not left_finite and not right_finite:
             continue
 
-        if left_finite and value < left_max * contrast:
+        if left_finite and value < left_max * c.contrast:
             continue
-        if right_finite and value < right_max * contrast:
+        if right_finite and value < right_max * c.contrast:
             continue
 
         if not (
-            (left_finite and left_max >= min_neighbor)
-            or (right_finite and right_max >= min_neighbor)
+            (left_finite and left_max >= c.min_neighbor)
+            or (right_finite and right_max >= c.min_neighbor)
         ):
             continue
 
-        if check_peak_width:
-            width = _peak_width_bins(profile, idx, value, peak_half_fraction)
-            if width > peak_width_max:
+        if c.check_peak_width:
+            width = _peak_width_bins(profile, idx, value, c.peak_half_fraction)
+            if width > c.peak_width_max:
                 continue
 
         if (
-            check_high_energy
+            c.check_high_energy
             and energies is not None
             and len(energies) > idx
             and not _passes_high_energy_deficit(
@@ -268,27 +280,27 @@ def detect_peak(
                 energies,
                 idx,
                 value,
-                high_energy_floor=high_energy_floor,
-                high_energy_factor=high_energy_factor,
-                max_high_ratio=high_energy_ratio_max,
-                min_points=high_energy_min_points,
+                high_energy_floor=c.high_energy_floor,
+                high_energy_factor=c.high_energy_factor,
+                max_high_ratio=c.high_energy_ratio_max,
+                min_points=c.high_energy_min_points,
             )
         ):
             continue
 
-        if check_pitch_contiguity and norm2d is not None and pitches is not None:
+        if c.check_pitch_contiguity and norm2d is not None and pitches is not None:
             floor = (
-                float(contiguity_min_value)
-                if contiguity_min_value is not None
-                else min_neighbor
+                float(c.contiguity_min_value)
+                if c.contiguity_min_value is not None
+                else c.min_neighbor
             )
             if not _passes_pitch_contiguity(
                 norm2d,
                 pitches,
                 idx,
-                pitch_min=contiguity_pitch_min,
+                pitch_min=c.contiguity_pitch_min,
                 value_floor=floor,
-                min_bins=contiguity_min_bins,
+                min_bins=c.contiguity_min_bins,
             ):
                 continue
 

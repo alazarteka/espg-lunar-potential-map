@@ -2,6 +2,7 @@
 
 from src.diagnostics.beam_detection import (
     BeamDetectionResult,
+    PeakCriteria,
     _build_energy_profile,
     detect_peak,
 )
@@ -14,6 +15,7 @@ from src.diagnostics.losscone_session import (
 __all__ = [
     "BeamDetectionResult",
     "LossConeSession",
+    "PeakCriteria",
     "_build_energy_profile",
     "compute_loss_cone_boundary",
     "detect_peak",

@@ -20,7 +20,12 @@ from pathlib import Path
 import numpy as np
 
 from src import config
-from src.diagnostics import LossConeSession, _build_energy_profile, detect_peak
+from src.diagnostics import (
+    LossConeSession,
+    PeakCriteria,
+    _build_energy_profile,
+    detect_peak,
+)
 from src.diagnostics.beam_detection import (
     DEFAULT_ENERGY_MAX,
     DEFAULT_ENERGY_MIN,
@@ -232,23 +237,25 @@ def main() -> int:
             energies=energies_sorted,
             norm2d=norm2d,
             pitches=chunk.pitches,
-            contrast=args.peak_contrast,
-            min_peak=args.min_peak,
-            neighbor_window=args.neighbor_window,
-            edge_skip=args.edge_skip,
-            min_neighbor=args.min_neighbor,
-            check_high_energy=not args.no_high_energy_check,
-            high_energy_floor=args.high_energy_floor,
-            high_energy_factor=args.high_energy_factor,
-            high_energy_ratio_max=args.high_energy_ratio_max,
-            high_energy_min_points=args.high_energy_min_points,
-            check_peak_width=not args.no_peak_width_check,
-            peak_half_fraction=args.peak_half_fraction,
-            peak_width_max=args.peak_width_max,
-            check_pitch_contiguity=not args.no_contiguity_check,
-            contiguity_pitch_min=args.pitch_min,
-            contiguity_min_value=args.contiguity_min_value,
-            contiguity_min_bins=args.contiguity_min_bins,
+            criteria=PeakCriteria(
+                contrast=args.peak_contrast,
+                min_peak=args.min_peak,
+                neighbor_window=args.neighbor_window,
+                edge_skip=args.edge_skip,
+                min_neighbor=args.min_neighbor,
+                check_high_energy=not args.no_high_energy_check,
+                high_energy_floor=args.high_energy_floor,
+                high_energy_factor=args.high_energy_factor,
+                high_energy_ratio_max=args.high_energy_ratio_max,
+                high_energy_min_points=args.high_energy_min_points,
+                check_peak_width=not args.no_peak_width_check,
+                peak_half_fraction=args.peak_half_fraction,
+                peak_width_max=args.peak_width_max,
+                check_pitch_contiguity=not args.no_contiguity_check,
+                contiguity_pitch_min=args.pitch_min,
+                contiguity_min_value=args.contiguity_min_value,
+                contiguity_min_bins=args.contiguity_min_bins,
+            ),
         )
         if result.has_peak and result.peak_idx is not None and result.peak_value is not None:
             beam_energy = float(energies_sorted[result.peak_idx])

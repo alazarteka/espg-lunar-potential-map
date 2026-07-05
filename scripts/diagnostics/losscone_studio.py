@@ -25,6 +25,7 @@ from bokeh.plotting import figure
 from src import config
 from src.diagnostics import (
     LossConeSession,
+    PeakCriteria,
     _build_energy_profile,
     compute_loss_cone_boundary,
     detect_peak,
@@ -85,11 +86,13 @@ def _find_beam_chunks(
         )
         result = detect_peak(
             profile,
-            contrast=peak_contrast,
-            min_peak=min_peak,
-            neighbor_window=neighbor_window,
-            edge_skip=edge_skip,
-            min_neighbor=min_neighbor,
+            criteria=PeakCriteria(
+                contrast=peak_contrast,
+                min_peak=min_peak,
+                neighbor_window=neighbor_window,
+                edge_skip=edge_skip,
+                min_neighbor=min_neighbor,
+            ),
         )
         if result.has_peak:
             beam_chunks.append(chunk_idx)
