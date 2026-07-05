@@ -16,7 +16,7 @@ Conventions
   Map to a plane with a 1/4 factor (isotropic cosine-weighted incidence) and
   convert to m^-2 via ×1e4.
 
-See docs/analysis/spacecraft_potential_analysis.md for a deeper discussion.
+See docs/archive/analysis/spacecraft_potential_analysis.md for a deeper discussion.
 """
 
 import numpy as np

@@ -1,7 +1,6 @@
 # Pipeline Overview
 
-High-level map of the ESPG lunar potential pipeline. This replaces the older
-`Calculation.md` and `WALKTHROUGH.md` (now archived) with a concise summary.
+High-level map of the ESPG lunar potential pipeline.
 
 ## End-to-End Flow
 
@@ -56,8 +55,3 @@ measurement statistics remain valid outputs.
 - Batch cache: `uv run python -m src.potential_mapper.batch --year 1998 --month 6`
 - Harmonics (identifiability / sampling-limits test): `uv run python -m src.temporal --start 1998-01-01 --end 1998-01-31 --output out.npz`
 - Engineering: `uv run python -m src.engineering out.npz`
-
-## Archived Deep Dives
-
-- `docs/archive/legacy/Calculation.md`
-- `docs/archive/legacy/WALKTHROUGH.md`

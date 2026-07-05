@@ -38,5 +38,5 @@ uv run python -m src.potential_mapper.batch --year 1998 --month 1
 
 ## Archived Documentation
 
-Previous documentation (analysis notes, technical deep-dives) is preserved in
-[`archive/`](archive/).
+Analysis notes and decision rationale (the "why" behind current thresholds and
+methods) are preserved in [`archive/analysis/`](archive/analysis/).

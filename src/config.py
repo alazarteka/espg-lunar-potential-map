@@ -72,7 +72,7 @@ N_BG = 0.0  # background noise
 ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 
 # ========== Fitting parameters ==========
-# See docs/analysis/fitter_error_analysis.md for the threshold-decision discussion.
+# See docs/archive/analysis/fitter_error_analysis.md for the threshold-decision discussion.
 # Options considered: 215_000 (95th pct) or 657_000 (99th pct, current) for QC strictness.
 FIT_ERROR_THRESHOLD = 657000  # chi-squared threshold for a good fit (99th percentile)
 LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
