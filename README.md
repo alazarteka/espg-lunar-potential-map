@@ -1,276 +1,200 @@
-# Lunar Prospector Plasma Analysis
+# Lunar Prospector Surface-Potential Mapping
 
-## Manuscript provenance release
+Invert the magnetic loss cone in Lunar Prospector electron-reflectometer (ER)
+spectra to estimate the Moon's surface electrostatic potential — and map the
+limits of what that data can actually constrain. The central result is a
+**negative one**: a global spatiotemporal potential map is *not* recoverable from
+these observations.
 
-Tag `lp-er-derived-data-v1.0.0` identifies the research-code state used as
-provenance for generating the derived LP ER spacecraft-relative potential cache
-archived with the manuscript "Identifiability and Sampling Limits on
-Spacecraft-Relative Lunar Surface Potential from Lunar Prospector Electron
-Reflectometer Observations."
+[![CI](https://github.com/alazarteka/espg-lunar-potential-map/actions/workflows/ci.yml/badge.svg)](https://github.com/alazarteka/espg-lunar-potential-map/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20623399-blue.svg)](https://doi.org/10.5281/zenodo.20623399)
 
-This repository is research/provenance code, not the polished manuscript
-reproduction package. The manuscript source, figure-regeneration scripts, and
-final figure inputs are archived separately in
-[`lp-er-lunar-potential`](https://github.com/alazarteka/lp-er-lunar-potential).
+> **Research / provenance code.** This is the analysis code behind the manuscript
+> *"Identifiability and Sampling Limits on Spacecraft-Relative Lunar Surface
+> Potential from Lunar Prospector Electron Reflectometer Observations."* It is
+> not a polished reproduction package — see [Citation](#citation) for the
+> archived manuscript inputs and DOIs.
 
-## Description
+## What it does
 
-This project analyzes data from the Lunar Prospector mission to model plasma flux and map lunar surface potential. It utilizes data from the NASA Planetary Data System and SPICE kernels for trajectory and orientation information.
+The lunar surface charges to an electrostatic potential set by its local plasma
+and photoelectron environment. That potential leaves a fingerprint in the
+electrons Lunar Prospector measured: a magnetic **loss cone** whose shape depends
+on how strongly returning electrons were reflected versus absorbed or accelerated
+at the surface (Halekas et al., 2008). This project inverts that signal per
+spectrum. The manuscript's central conclusion is that those per-spectrum
+estimates **cannot be assembled into a map**: the surface potential changes over
+time, while each epoch illuminates only a small patch of the Moon — so recovering
+it as a field means reconstructing joint variation in *both* space and time from
+data that cannot constrain that joint variation. That reconstruction is not
+identifiable. What the data *do* support is statistics over the measurements
+themselves (aggregate and per-site distributions), not a coherent global map.
 
-Currently in active development—major revisions ongoing.
+## How it works
 
-## Dependencies
+The pipeline runs in stages, each backed by a `src/` subpackage:
 
-This project uses modern Python scientific computing libraries:
+| Stage | What happens | Module |
+|-------|--------------|--------|
+| **1. Acquire** | Download LP ER 3D electron flux, SPICE kernels, and attitude tables from NASA PDS/NAIF | `src.data_acquisition` |
+| **2. Fit** | Per-spectrum loss-cone inversion → surface potential `U_surface` (Halekas log-χ² or Lillis masked-χ²) | `src.losscone` |
+| **3. Correct** | Estimate the spacecraft's own floating potential from a κ-distribution charging balance and debias the fits | `src.spacecraft_potential`, `src.physics` |
+| **4. Project** | Trace each measurement's magnetic footprint to lunar-surface coordinates via SPICE geometry | `src.potential_mapper` |
+| **5. Aggregate** | Batch the fits into per-run NPZ caches (row- and spectrum-level) | `src.potential_mapper.batch` |
+| **6. Assess** | Statistics over the measurements (aggregate + per-site) plus the joint spatiotemporal reconstruction that the paper shows is *not* identifiable | `src.engineering`, `src.temporal` |
 
-- **Core Scientific:** `numpy`, `pandas`, `scipy`, `matplotlib`, `numba`
-- **Space Science:** `spiceypy` (NASA SPICE toolkit)
-- **Data Processing:** `requests`, `beautifulsoup4`, `tqdm`, `pint`
-- **Visualization:** `plotly`, `tabulate`
+See [docs/architecture/pipeline_overview.md](docs/architecture/pipeline_overview.md)
+for the end-to-end detail and [coordinate_frames.md](docs/architecture/coordinate_frames.md)
+for the SPICE/frame conventions.
 
-Optional dependencies:
-- **Notebooks:** `jupyter`, `ipykernel`, `ipython` (install with `--extra notebook`)
-- **Export:** `imageio[ffmpeg]`, `kaleido` (install with `--extra export`)
-- **GPU Acceleration:** `torch` (install with `--extra gpu` or `--extra gpu-legacy`)
+## Getting started
 
-Development tools:
-- **Testing:** `pytest`, `pytest-cov`
-- **Linting/Formatting:** `ruff`
-- **Type Checking:** `mypy`
-
-All dependencies are managed through [UV](https://docs.astral.sh/uv/) and specified in `pyproject.toml`.
-
-## Project Structure
-
-```
-.
-├── README.md               # This file
-├── pyproject.toml          # UV project configuration and dependencies
-├── locks/                  # Tracked lockfiles for GPU variants
-│   ├── uv.lock.cuda11       # Legacy GPU (CUDA 11.8)
-│   └── uv.lock.cuda12       # Modern GPU (CUDA 12.x)
-├── uv.lock                 # Machine-local lockfile (gitignored; copied from locks/)
-├── .gitignore              # Git ignore file
-├── artifacts/              # Generated outputs (plots, reports, caches)
-│   ├── plots/              # Figures, animations, HTML exports
-│   ├── reports/            # Generated analysis summaries
-│   └── potential_cache/    # Default output for NPZ caches (was data/potential_cache)
-├── scratch/                # Ad-hoc scratch space for experiments (gitignored)
-├── data/                   # Processed data (created/populated by src/data_acquisition.py)
-│   └── spice_kernels/      # SPICE kernel files
-│       └── kernels.lock    # SHA-1 for SPICE kernels
-└── src/                    # Core Python package (see AGENTS.md for the full map)
-    ├── config.py           # Central configuration constants
-    ├── data_acquisition.py # NASA/PDS data + SPICE kernel download
-    ├── flux.py, kappa.py, model.py, spacecraft_potential.py  # core fitting
-    ├── losscone/           # Loss-cone fitting core (cpu, model, chi2, masks, torch/)
-    ├── potential_mapper/   # Mapping pipeline + GPU batch runner
-    ├── temporal/           # Spherical-harmonic temporal reconstruction
-    ├── engineering/        # GlobalStats, SiteStats, site analysis
-    ├── diagnostics/        # Loss-cone session management
-    ├── physics/            # Kappa physics, spacecraft charging, J–U curves
-    ├── utils/              # SPICE, geometry, attitude, units helpers
-    └── visualization/      # Plot styling and loaders
-```
-
-Generated plots and reports now live under `artifacts/`; use `scratch/` for ad-hoc runs
-and exploratory outputs that should stay out of version control. See
-[docs/README.md](docs/README.md) for the full documentation index.
-
-## Installation
-
-### Prerequisites
-- Python 3.12 (required; 3.13 is not supported yet)
-- [UV package manager](https://docs.astral.sh/uv/)
-
-### Setup
-
-1.  **Install UV** (if not already installed):
-    ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
-
-2.  **Clone and set up the project:**
-    ```bash
-    git clone https://github.com/alazarteka/espg-lunar-potential-map.git
-    cd espg-lunar-potential-map
-
-    # Install core dependencies
-    uv sync
-
-    # Or install with development tools
-    uv sync --group dev
-
-    # Or install with notebook support
-    uv sync --extra notebook
-
-    # Or install everything (dev + notebooks + export)
-    uv sync --group dev --extra notebook --extra export
-    ```
-
-3.  **GPU acceleration (optional, recommended workflow):**
-    ```bash
-    # Detects your GPU and syncs the right PyTorch build automatically:
-    #   sm_70+ (RTX 20xx and newer) -> modern CUDA 12.8 stack (default)
-    #   sm_61  (GTX 10xx / TITAN Xp) -> legacy CUDA 11.8 stack
-    ./scripts/bootstrap.sh
-
-    # Force a specific stack (e.g. on a GPU-less build node):
-    ./scripts/bootstrap.sh modern
-    ./scripts/bootstrap.sh legacy
-    ```
-
-    This detects the GPU architecture, copies the matching lockfile from
-    `locks/` into `uv.lock`, and runs `uv sync --frozen` with the right extra.
-
-4.  **Download necessary data:**
-    ```bash
-    uv run python -m src.data_acquisition
-    ```
-
-## Development
-
-### Running Tests
+**Prerequisites:** Python 3.12 (3.13 is not yet supported) and the
+[uv](https://docs.astral.sh/uv/) package manager
+(`curl -LsSf https://astral.sh/uv/install.sh | sh`).
 
 ```bash
-# Run all tests
-uv run pytest
+# 1. Clone and install
+git clone https://github.com/alazarteka/espg-lunar-potential-map.git
+cd espg-lunar-potential-map
+uv sync                              # core deps (add --group dev --extra notebook as needed)
 
-# Run with coverage
-uv run pytest --cov=src
+# 2. GPU acceleration (optional but recommended) — auto-detects your GPU
+./scripts/bootstrap.sh               # sm_70+ -> CUDA 12.8; sm_61 (GTX 10xx) -> CUDA 11.8
 
-# Run tests excluding slow/CI-skipped tests
-uv run pytest -m "not skip_ci and not slow"
+# 3. Download the data (~13 GB; parallel, resumable)
+uv run python -m src.data_acquisition
 
-# Run specific test file
-uv run pytest tests/test_model_torch.py -v
-```
-
-### Linting and Formatting
-
-```bash
-# Check for lint errors
-uv run ruff check src tests
-
-# Auto-fix fixable issues
-uv run ruff check src tests --fix
-
-# Check formatting
-uv run ruff format --check src tests
-
-# Apply formatting
-uv run ruff format src tests
-```
-
-### Type Checking
-
-```bash
-uv run mypy src
-```
-
-### Adding Dependencies
-
-```bash
-# Add a runtime dependency
-uv add package-name
-
-# Add to a dependency group (dev tools)
-uv add --group dev package-name
-
-# Add to an optional extra
-uv add --optional notebook package-name
-
-# Update all dependencies
-uv sync --upgrade
-```
-
-## Data
-
-*   Data required by the core modules are expected in `data/`.
-*   SPICE kernels are expected in `data/spice_kernels/`.
-*   Running `src/data_acquisition.py` will download the files in the appropriate directory if they are not locally available.
-*   SHA-1 for SPICE kernels used in `data/spice_kernels/kernels.lock`, generated by running ```shasum -a 1 data/spice_kernels/*.* > data/spice_kernels/kernels.lock``` in the home directory.
-
-## Usage
-
-After setting up and downloading data, run the desired module using UV. For example:
-
-```bash
-# Run the potential mapper
-uv run python -m src.potential_mapper
-
-# Start Jupyter Lab for interactive analysis (requires --extra notebook)
-uv run jupyter lab
-
-# Start Jupyter Notebook
-uv run jupyter notebook
-
-# Run tests
-uv run pytest
-```
-
-### Batch potential cache generation
-
-The batch runner (`python -m src.potential_mapper.batch`) processes ER files and
-writes a single NPZ cache per run under `artifacts/potential_cache/`, containing
-row-aligned spacecraft and surface potentials plus per-spectrum rollups.
-
-```bash
-# Compute a day of caches on the GPU (writes potential_batch_1998_09_16.npz)
+# 4. Map a day of observations
 uv run python -m src.potential_mapper.batch --fast --year 1998 --month 9 --day 16
 ```
 
-Key options:
-- `--year/--month/--day`: filter ER files by date (month and day optional).
-- `--fast`: use the GPU (torch) fitter; `--parallel` selects the CPU multi-process path.
-- `--losscone-fit-method {halekas,lillis}`, `--u-spacecraft`: fitting overrides.
-- `--output-dir`: target directory for the NPZ artefact; `--overwrite` to recompute.
+That writes `artifacts/potential_cache/potential_batch_1998_09_16.npz`, ready to
+visualise (below).
 
-See [docs/cli/potential_mapper_batch.md](docs/cli/potential_mapper_batch.md) for the
-full option reference.
+`bootstrap.sh` picks the matching lockfile from `locks/` and runs
+`uv sync --frozen`; pass `modern` / `legacy` to override detection. See
+[docs/dev/lockfiles.md](docs/dev/lockfiles.md) for the GPU-stack details and
+[docs/cli/data_acquisition.md](docs/cli/data_acquisition.md) for download options.
+
+## Usage
+
+### Batch potential-cache generation
+
+`python -m src.potential_mapper.batch` fits ER files and writes one NPZ cache per
+run under `artifacts/potential_cache/`, with row-aligned spacecraft and surface
+potentials plus per-spectrum rollups.
+
+```bash
+uv run python -m src.potential_mapper.batch --fast --year 1998 --month 9 --day 16
+```
+
+Key options: `--year/--month/--day` (month/day optional) · `--fast` (GPU fitter;
+`--parallel` for the CPU path) · `--losscone-fit-method {halekas,lillis}` ·
+`--u-spacecraft` · `--output-dir` · `--overwrite`. Full reference:
+[docs/cli/potential_mapper_batch.md](docs/cli/potential_mapper_batch.md).
 
 ### Visualising cached potentials
-
-Two analysis CLIs load the cached NPZ artefacts for plotting:
 
 ```bash
 # Static Matplotlib sphere projection
 uv run python scripts/analysis/potential_map_matplotlib_sphere.py \
   --start 1998-09-16 --end 1998-09-16 \
-  --cache-dir artifacts/potential_cache --sample 5000 --output artifacts/plots/1998-09-16.png
+  --cache-dir artifacts/potential_cache --sample 5000 \
+  --output artifacts/plots/1998-09-16.png
 
-# Interactive Plotly globe with optional animation/MP4 export
+# Interactive Plotly globe, with optional animation / MP4 export
 uv run python scripts/analysis/potential_map_plotly_static.py \
   --start 1998-09-16 --end 1998-09-16 \
   --cache-dir artifacts/potential_cache --sample 5000 \
   --output artifacts/plots/1998-09-16.html --animate
 ```
 
-For large animations, prefer modest sampling (`--sample`) and frame counts. MP4
-export requires Kaleido plus `imageio[ffmpeg]`; ensure Chrome/Chromium is
-available for Kaleido on headless systems.
+MP4 export needs Kaleido plus `imageio[ffmpeg]` (the `export` extra) and a
+Chrome/Chromium binary on headless systems. More plotting and analysis scripts
+are indexed in [docs/cli/analysis.md](docs/cli/analysis.md).
 
-### Validating spacecraft potential outputs
-
-Cached files expose `rows_spacecraft_potential` and
-`rows_projected_potential`. Inspect a representative NPZ to confirm the pipeline
-is debiasing the loss-cone fits with the spacecraft charging term:
+### Inspecting a cache
 
 ```bash
 uv run python - <<'PY'
 import numpy as np
 from pathlib import Path
-path = Path('artifacts/potential_cache/potential_batch_1998_09_16.npz')
-with np.load(path) as data:
-    sc = data['rows_spacecraft_potential']
-    proj = data['rows_projected_potential']
+with np.load(Path("artifacts/potential_cache/potential_batch_1998_09_16.npz")) as d:
+    sc, proj = d["rows_spacecraft_potential"], d["rows_projected_potential"]
     print(f"rows={sc.size}")
-    print(f"spacecraft phi range: {np.nanmin(sc):.2f} -> {np.nanmax(sc):.2f} V")
-    finite_proj = np.isfinite(proj)
-    print(f"surface phi samples: {finite_proj.sum()} / {proj.size}")
+    print(f"spacecraft phi: {np.nanmin(sc):.1f} -> {np.nanmax(sc):.1f} V")
+    print(f"surface phi samples: {np.isfinite(proj).sum()} / {proj.size}")
 PY
 ```
 
-The example above reports approximately -74 V to +39 V spacecraft potentials and
-strong negative surface potentials for the September 16, 1998 pass, indicating
-the median spacecraft bias is being removed before fitting ΔU.
+## Documentation
+
+Full CLI and design docs live under [`docs/`](docs/README.md):
+
+| Topic | Doc |
+|-------|-----|
+| Data acquisition | [cli/data_acquisition.md](docs/cli/data_acquisition.md) |
+| Potential mapper (single day / batch) | [cli/potential_mapper.md](docs/cli/potential_mapper.md) · [cli/potential_mapper_batch.md](docs/cli/potential_mapper_batch.md) |
+| Temporal harmonics | [cli/temporal.md](docs/cli/temporal.md) |
+| Engineering products | [cli/engineering.md](docs/cli/engineering.md) |
+| Diagnostics (beam / loss-cone) | [cli/diagnostics.md](docs/cli/diagnostics.md) |
+| Analysis & plotting scripts | [cli/analysis.md](docs/cli/analysis.md) |
+| Architecture, frames, GPU | [architecture/](docs/architecture/) |
+
+## Project layout
+
+```
+src/               Core package (see AGENTS.md for the full module map)
+  losscone/          Loss-cone inversion (CPU + torch backends)
+  potential_mapper/  Geometry projection, batch runner, NPZ output
+  temporal/          Spherical-harmonic temporal reconstruction
+  engineering/       Site statistics and engineering maps
+  physics/           κ-distribution physics, spacecraft charging
+scripts/           CLI tools: diagnostics/, analysis/, plots/, profiling/, dev/
+locks/             Tracked CUDA 11/12 lockfiles (copied to uv.lock by bootstrap.sh)
+docs/              CLI and architecture documentation
+data/              Downloaded ER data + SPICE kernels (gitignored)
+artifacts/         Generated caches, plots, reports (gitignored)
+```
+
+## Development
+
+```bash
+uv sync --group dev
+uv run pytest -q                       # tests
+uv run ruff check src tests            # lint
+uv run ruff format --check src tests   # format check (a separate CI gate)
+```
+
+Install the git hooks so these run automatically on commit:
+
+```bash
+uv tool install pre-commit && pre-commit install
+```
+
+See [docs/dev/development.md](docs/dev/development.md) and [AGENTS.md](AGENTS.md)
+for the full contributor workflow and coding standards. (`mypy` is advisory —
+there is a known type-hygiene backlog it is not yet a hard gate.)
+
+## Citation
+
+If you use this code, please cite the manuscript and the archived software/data:
+
+- **Manuscript:** Gemechu, A. T., & Kim, H. J. *Identifiability and Sampling
+  Limits on Spacecraft-Relative Lunar Surface Potential from Lunar Prospector
+  Electron Reflectometer Observations.*
+- **Software:** [10.5281/zenodo.20623399](https://doi.org/10.5281/zenodo.20623399)
+- **Derived dataset:** [10.5281/zenodo.20623229](https://doi.org/10.5281/zenodo.20623229)
+
+The manuscript source, figure-regeneration scripts, and final figure inputs are
+archived separately in
+[`lp-er-lunar-potential`](https://github.com/alazarteka/lp-er-lunar-potential).
+The tag `lp-er-derived-data-v1.0.0` marks the code state used to generate the
+archived derived-potential cache.
+
+## License
+
+[MIT](LICENSE) © Alazar Teka Gemechu, Hyun Jung Kim (KAIST).
