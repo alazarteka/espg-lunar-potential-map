@@ -273,32 +273,27 @@ class LossConeFitter(LossConeFitterBase):
             chunk_indices,
         )
 
-    def _fit_surface_potential(self, measurement_chunk: int) -> ChunkFitResult:
+    def _fit_chunk_two_phase(
+        self,
+        data: FitChunkData,
+        chi2_batch_fn: Callable[[np.ndarray, np.ndarray], np.ndarray],
+        chi2_scalar_fn: Callable[[np.ndarray], float],
+    ) -> tuple[np.ndarray, float, np.ndarray, float]:
         """
-        Fit surface potential (U_surface) and B_s/B_m for one 15-row measurement chunk
-        using chi2 minimisation. Method is controlled by fit_method.
+        Shared LHS -> differential-evolution skeleton for chunk fitting.
 
-        Args:
-            measurement_chunk (int): The index of the measurement chunk.
+        The per-method chi2 batch/scalar callables carry the only differences
+        between the Halekas and Lillis fits.
 
         Returns:
-            ChunkFitResult: Fit result (unpackable as a 4-tuple for compatibility).
+            best_params: (3,) optimized [U_surface, bs_over_bm, beam_amp]
+            best_chi2: scalar chi2 at best_params
+            lhs_chi2_vals: (N_samples,) LHS chi2 values (with 1e30 for non-finite)
+            best_lhs_chi2: scalar best LHS chi2 (starting point for DE)
         """
-        if self.fit_method == FitMethod.LILLIS:
-            return self._fit_surface_potential_lillis(measurement_chunk)
-
-        data = self._prepare_chunk_data(measurement_chunk)
-        if data is None:
-            return ChunkFitResult.invalid(measurement_chunk)
-
-        eps = config.EPS
-        norm2d = data.norm2d
         energies = data.energies
         pitches = data.pitches
         spacecraft_slice = data.spacecraft_slice
-
-        if not data.has_enough_valid_bins(FitMethod.HALEKAS):
-            return ChunkFitResult.invalid(measurement_chunk)
 
         # self.lhs is (N_samples, 3) -> [U_surface, bs_over_bm, beam_amp]
         lhs_U_surface = self.lhs[:, 0]
@@ -321,19 +316,63 @@ class LossConeFitter(LossConeFitterBase):
             background=self.background,
             return_mask=True,
         )
-        chi2_vals = compute_halekas_chi2_batch(
-            norm2d=norm2d, models=models, model_mask=model_masks, eps=eps
-        )
-
-        bad_mask = ~np.isfinite(chi2_vals)
-        chi2_vals[bad_mask] = 1e30
+        chi2_vals = chi2_batch_fn(models, model_masks)
+        chi2_vals[~np.isfinite(chi2_vals)] = 1e30
 
         best_idx = int(np.argmin(chi2_vals))
-        best_lhs_chi2 = chi2_vals[best_idx]
+        best_lhs_chi2 = float(chi2_vals[best_idx])
         x0 = self.lhs[best_idx]
 
-        # 2) Global optimization with differential_evolution
-        # Objective for optimizer (scalar)
+        # Use constrained bounds: U_surface capped at detection threshold (~+20V)
+        # because electron reflectometry cannot measure positive potentials reliably
+        bounds = losscone_optimizer_bounds(
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+        )
+        best_params, best_chi2 = self._run_differential_evolution(
+            chi2_scalar_fn,
+            bounds,
+            x0=x0,
+            best_lhs_chi2=best_lhs_chi2,
+        )
+        return best_params, best_chi2, chi2_vals, best_lhs_chi2
+
+    def _fit_surface_potential(self, measurement_chunk: int) -> ChunkFitResult:
+        """
+        Fit surface potential (U_surface) and B_s/B_m for one 15-row measurement chunk
+        using chi2 minimisation. Method is controlled by fit_method.
+
+        Args:
+            measurement_chunk (int): The index of the measurement chunk.
+
+        Returns:
+            ChunkFitResult: Fit result (unpackable as a 4-tuple for compatibility).
+        """
+        if self.fit_method == FitMethod.LILLIS:
+            return self._fit_surface_potential_lillis(measurement_chunk)
+
+        data = self._prepare_chunk_data(measurement_chunk)
+        if data is None:
+            return ChunkFitResult.invalid(measurement_chunk)
+
+        if not data.has_enough_valid_bins(FitMethod.HALEKAS):
+            return ChunkFitResult.invalid(measurement_chunk)
+
+        eps = config.EPS
+        norm2d = data.norm2d
+        energies = data.energies
+        pitches = data.pitches
+        spacecraft_slice = data.spacecraft_slice
+
+        def chi2_batch_fn(models: np.ndarray, model_masks: np.ndarray) -> np.ndarray:
+            return compute_halekas_chi2_batch(
+                norm2d=norm2d, models=models, model_mask=model_masks, eps=eps
+            )
+
         def chi2_scalar(params):
             U_surface, bs_over_bm, beam_amp = params
             beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
@@ -365,26 +404,14 @@ class LossConeFitter(LossConeFitterBase):
                 return 1e30
             return chi2
 
-        # Use constrained bounds: U_surface capped at detection threshold (~+20V)
-        # because electron reflectometry cannot measure positive potentials reliably
-        bounds = losscone_optimizer_bounds(
-            u_surface_min=self.u_surface_min,
-            u_surface_max=self.u_surface_max,
-            bs_over_bm_min=self.bs_over_bm_min,
-            bs_over_bm_max=self.bs_over_bm_max,
-            beam_amp_min=self.beam_amp_min,
-            beam_amp_max=self.beam_amp_max,
-        )
-        best_params, best_chi2 = self._run_differential_evolution(
-            chi2_scalar,
-            bounds,
-            x0=x0,
-            best_lhs_chi2=float(best_lhs_chi2),
+        best_params, best_chi2, _chi2_vals, _best_lhs_chi2 = self._fit_chunk_two_phase(
+            data, chi2_batch_fn, chi2_scalar
         )
 
         U_surface, bs_over_bm, beam_amp = best_params
 
-        # Clip to ensure exact bounds (DE should respect them, but be safe)
+        # Clip to ensure exact bounds (DE should respect them, but be safe).
+        # Halekas intentionally does NOT clip U_surface.
         bs_over_bm = float(
             np.clip(bs_over_bm, self.bs_over_bm_min, self.bs_over_bm_max)
         )
@@ -488,53 +515,22 @@ class LossConeFitter(LossConeFitterBase):
         if data is None:
             return ChunkFitResult.invalid(measurement_chunk), float("nan")
 
+        if not data.has_enough_valid_bins(FitMethod.LILLIS):
+            return ChunkFitResult.invalid(measurement_chunk), float("nan")
+
         norm2d = data.norm2d
         energies = data.energies
         pitches = data.pitches
         spacecraft_slice = data.spacecraft_slice
 
-        if not data.has_enough_valid_bins(FitMethod.LILLIS):
-            return ChunkFitResult.invalid(measurement_chunk), float("nan")
-
-        # LHS samples provide a robust starting point
-        lhs_U_surface = self.lhs[:, 0]
-        lhs_bs_over_bm = self.lhs[:, 1]
-        lhs_beam_amp = self.lhs[:, 2]
-        lhs_beam_width = np.full_like(lhs_U_surface, self.beam_width_ev)
-
-        models, model_masks = synth_losscone_batch(
-            energy_grid=energies,
-            pitch_grid=pitches,
-            U_surface=lhs_U_surface,
-            U_spacecraft=spacecraft_slice,
-            bs_over_bm=lhs_bs_over_bm,
-            beam_width_eV=lhs_beam_width,
-            beam_amp=lhs_beam_amp,
-            beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
-            background=self.background,
-            return_mask=True,
-        )
-        chi2_vals = compute_lillis_chi2_batch(
-            norm2d=norm2d,
-            models=models,
-            raw_flux=data.raw_flux,
-            pitches=pitches,
-            model_mask=model_masks,
-        )
-        chi2_vals[~np.isfinite(chi2_vals)] = 1e30
-
-        best_idx = int(np.argmin(chi2_vals))
-        best_lhs_chi2 = float(chi2_vals[best_idx])
-        x0 = self.lhs[best_idx]
-
-        bounds = losscone_optimizer_bounds(
-            u_surface_min=self.u_surface_min,
-            u_surface_max=self.u_surface_max,
-            bs_over_bm_min=self.bs_over_bm_min,
-            bs_over_bm_max=self.bs_over_bm_max,
-            beam_amp_min=self.beam_amp_min,
-            beam_amp_max=self.beam_amp_max,
-        )
+        def chi2_batch_fn(models: np.ndarray, model_masks: np.ndarray) -> np.ndarray:
+            return compute_lillis_chi2_batch(
+                norm2d=norm2d,
+                models=models,
+                raw_flux=data.raw_flux,
+                pitches=pitches,
+                model_mask=model_masks,
+            )
 
         def chi2_scalar(params):
             U_surface, bs_over_bm, beam_amp = params
@@ -566,15 +562,22 @@ class LossConeFitter(LossConeFitterBase):
                 return 1e30
             return float(chi2_val)
 
-        best_params, best_chi2 = self._run_differential_evolution(
-            chi2_scalar,
-            bounds,
-            x0=x0,
-            best_lhs_chi2=best_lhs_chi2,
+        best_params, best_chi2, chi2_vals, best_lhs_chi2 = self._fit_chunk_two_phase(
+            data, chi2_batch_fn, chi2_scalar
+        )
+
+        lhs_U_surface = self.lhs[:, 0]
+        bounds = losscone_optimizer_bounds(
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
         )
 
         U_surface, bs_over_bm, beam_amp = best_params
-        # Clip to bounds defensively
+        # Clip to bounds defensively (Lillis clips all three parameters)
         U_surface = float(np.clip(U_surface, bounds[0][0], bounds[0][1]))
         bs_over_bm = float(np.clip(bs_over_bm, bounds[1][0], bounds[1][1]))
         beam_amp = float(np.clip(beam_amp, bounds[2][0], bounds[2][1]))
