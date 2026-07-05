@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pandas as pd
 
 from src import config
-from src.flux import ERData
 from src.physics.kappa import KappaParams, omnidirectional_flux
 from src.utils.units import ureg
+
+if TYPE_CHECKING:
+    # Runtime `ERData` is imported lazily inside the functions below to avoid a
+    # circular import; this annotation-only import keeps static typing intact.
+    from src.flux import ERData
 
 __all__ = [
     "prepare_flux",
@@ -88,6 +94,11 @@ def prepare_synthetic_er(
 ) -> ERData:
     """Construct a synthetic `ERData` instance for deterministic tests."""
 
+    # Deferred import: `src.flux` re-exports from `src.losscone`, which imports
+    # `src.config` -> `src.utils`; importing at module level would create a
+    # circular import when `src.losscone` is the first project import.
+    from src.flux import ERData
+
     phis, _solid_angles = prepare_phis()
     omnidirectional_particle_flux, energy_centers = prepare_flux(
         density=density, kappa=kappa, theta=theta
@@ -132,6 +143,8 @@ def prepare_synthetic_er_poisson(
     This simulates Poisson counting statistics by sampling counts per channel
     from the expected flux and then reconstructing the flux from those counts.
     """
+
+    from src.flux import ERData
 
     base = prepare_synthetic_er(density=density, kappa=kappa, theta=theta)
     df = base.data.copy()
