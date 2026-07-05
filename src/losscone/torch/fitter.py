@@ -777,6 +777,103 @@ class LossConeFitterTorch(LossConeFitterBase):
 
         return u_width_lhs
 
+    def _u_width_profile(
+        self,
+        energies: Tensor,
+        pitches: Tensor,
+        norm2d: Tensor,
+        data_mask: Tensor,
+        sc_potential: Tensor,
+        *,
+        delta_chi2: float,
+        n_u: int,
+        n_bs: int,
+        n_beam: int,
+        u_chunk: int = 8,
+    ) -> tuple[Tensor, Tensor]:
+        """
+        Profile-likelihood U-width per chunk (Lillis only).
+
+        Scans U on a grid; at each U the objective is minimized over the nuisance
+        parameters (bs/bm, beam_amp) on a sub-grid, giving a profiled chi2(U).
+        The U-width is the extent of U with chi2_profile(U) - min_U chi2_profile
+        <= delta_chi2 (a proper 1-parameter Delta-chi2 interval for Lillis' masked
+        linear chi2). The U-grid is processed in chunks to bound peak memory.
+
+        Returns:
+            width: (N,) U-width in volts (NaN outside Lillis or when empty)
+            edge: (N,) bool, True where the interval reaches the U-grid boundary
+                (the width is then a lower bound / truncated).
+        """
+        N = energies.size(0)
+        device, dtype = self.device, self.dtype
+        nan_n = torch.full((N,), float("nan"), device=device, dtype=dtype)
+        false_n = torch.zeros(N, dtype=torch.bool, device=device)
+        if self.fit_method != FitMethod.LILLIS:
+            return nan_n, false_n
+
+        u_grid = torch.linspace(
+            self.u_surface_min, self.u_surface_max, n_u, device=device, dtype=dtype
+        )
+        bs_grid = torch.linspace(
+            self.bs_over_bm_min, self.bs_over_bm_max, n_bs, device=device, dtype=dtype
+        )
+        beam_grid = torch.linspace(
+            self.beam_amp_min, self.beam_amp_max, n_beam, device=device, dtype=dtype
+        )
+        n_ab = n_bs * n_beam
+        bs_ab = bs_grid.view(n_bs, 1).expand(n_bs, n_beam).reshape(n_ab)
+        beam_ab = beam_grid.view(1, n_beam).expand(n_bs, n_beam).reshape(n_ab)
+
+        if sc_potential.dim() == 1:
+            valid_energy = energies >= sc_potential.view(N, 1)
+        else:
+            valid_energy = energies >= sc_potential
+        model_mask = valid_energy.view(N, 1, energies.size(1), 1)
+        big = torch.tensor(1e30, device=device, dtype=dtype)
+
+        chi2_prof = torch.empty((N, n_u), device=device, dtype=dtype)
+        for u0 in range(0, n_u, u_chunk):
+            u1 = min(u0 + u_chunk, n_u)
+            nu = u1 - u0
+            n_pop = nu * n_ab
+            u_c = u_grid[u0:u1].view(nu, 1).expand(nu, n_ab).reshape(n_pop)
+            bs_c = bs_ab.view(1, n_ab).expand(nu, n_ab).reshape(n_pop)
+            beam_c = beam_ab.view(1, n_ab).expand(nu, n_ab).reshape(n_pop)
+            u_surface = u_c.view(1, n_pop).expand(N, n_pop)
+            bs_over_bm = bs_c.view(1, n_pop).expand(N, n_pop)
+            beam_amp = beam_c.view(1, n_pop).expand(N, n_pop)
+            beam_width = torch.full_like(u_surface, self.beam_width_ev)
+            models = synth_losscone_multi_chunk_torch(
+                energies,
+                pitches,
+                u_surface,
+                U_spacecraft=sc_potential,
+                bs_over_bm=bs_over_bm,
+                beam_width_eV=beam_width,
+                beam_amp=beam_amp,
+                beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
+                background=torch.full_like(u_surface, self.background),
+            )
+            chi2_c = compute_lillis_chi2_multi_chunk_torch(
+                models, norm2d, data_mask, model_mask=model_mask
+            )
+            chi2_c = torch.where(torch.isfinite(chi2_c), chi2_c, big)
+            chi2_prof[:, u0:u1] = chi2_c.view(N, nu, n_ab).min(dim=2).values
+            del models, chi2_c
+
+        ref = chi2_prof.min(dim=1).values
+        keep = chi2_prof <= (ref.view(N, 1) + float(delta_chi2))
+        u_row = u_grid.view(1, n_u).expand(N, n_u)
+        inf = torch.tensor(float("inf"), device=device, dtype=dtype)
+        u_min = torch.where(keep, u_row, inf).min(dim=1).values
+        u_max = torch.where(keep, u_row, -inf).max(dim=1).values
+        width = u_max - u_min
+        has_any = keep.any(dim=1)
+        width = torch.where(has_any, width, nan_n)
+        edge = (keep[:, 0] | keep[:, -1]) & has_any
+        return width, edge
+
     def _fit_batch_lhs_with_u_width_qc(
         self,
         energies: Tensor,

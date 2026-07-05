@@ -61,9 +61,40 @@ class TestSynthLossconeBatchTorch:
 
         model = synth_losscone_batch_torch(energy_grid, pitch_grid, U_surface)
 
-        # Check we have both 1.0 (inside cone) and background (outside)
-        assert torch.any(model == 1.0)
-        assert torch.any(torch.abs(model - 0.05) < 0.01)  # background ~ 0.05
+        # Smooth boundary: the sigmoid saturates to ~1.0 deep inside the cone and
+        # to the background level well outside it (it asymptotes, not an exact
+        # step). Values stay within [background, 1.0].
+        assert model.max() > 0.99
+        assert model.min() < 0.06
+        assert model.min() >= 0.05 - 1e-9
+        assert model.max() <= 1.0 + 1e-9
+
+    def test_tau_zero_recovers_hard_step(self):
+        """boundary_tau_deg=0 must reproduce the exact hard-step model."""
+        from src.losscone_torch import synth_losscone_batch_torch
+
+        nE, nPitch = 20, 30
+        energy_grid = torch.logspace(1, 3, nE, dtype=torch.float64)
+        pitch_grid = torch.linspace(0, 180, nPitch).unsqueeze(0).expand(nE, -1)
+        pitch_grid = pitch_grid.clone().to(dtype=torch.float64)
+        U_surface = torch.tensor([-50.0], dtype=torch.float64)
+
+        hard = synth_losscone_batch_torch(
+            energy_grid, pitch_grid, U_surface, boundary_tau_deg=0.0
+        )
+        # Hard step: values are exactly 1.0 (inside) or background (outside).
+        uniq = torch.unique(hard)
+        assert torch.any(hard == 1.0)
+        near_one = torch.abs(hard - 1.0) < 1e-12
+        near_bg = torch.abs(hard - 0.05) < 1e-12
+        assert torch.all(near_one | near_bg)
+        assert uniq.numel() == 2
+        # Smooth model produces intermediate values the hard step never does.
+        smooth = synth_losscone_batch_torch(
+            energy_grid, pitch_grid, U_surface, boundary_tau_deg=5.0
+        )
+        assert smooth.shape == hard.shape
+        assert ((smooth > 0.06) & (smooth < 0.99)).any()
 
     def test_equivalence_with_numpy(self):
         """Test PyTorch implementation matches NumPy."""

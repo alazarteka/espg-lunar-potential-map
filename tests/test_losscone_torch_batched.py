@@ -96,14 +96,22 @@ def test_u_width_qc_golden(monkeypatch) -> None:
     assert bool(is_identifiable[0]) == GOLDEN_IDENTIFIABLE
 
 
+# Golden values for the smooth (sigmoid) loss-cone boundary, tau=5 deg.
+# The synthetic signal is injected with U=-50.0, bs/bm=0.5, beam_amp=2.0. The
+# smooth model recovers all three to <1% (-50.19, 0.501, 1.94), whereas the
+# earlier hard-step model settled at a degenerate near-zero-chi2 solution with
+# the wrong parameters (-47.69, 0.637, 2.99) - the step's location alone is
+# under-determined in (U, bs/bm). The smooth boundary's shape breaks that
+# degeneracy. (u_width here is still the LHS max-min proxy; it is replaced by
+# the profile-likelihood estimator in task A3.)
 GOLDEN_RESULTS = np.array(
     [
-        -47.69267912954092,
-        0.6370961951557548,
-        2.986507052792149,
-        2.915135477729938e-09,
+        -50.194507520354819,
+        0.50099934343088515,
+        1.9429386978140428,
+        2.2965844248213052e-06,
         0.0,
     ]
 )
-GOLDEN_U_WIDTH = 0.0
+GOLDEN_U_WIDTH = 31.25
 GOLDEN_IDENTIFIABLE = True
