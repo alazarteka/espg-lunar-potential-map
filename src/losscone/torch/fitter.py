@@ -13,9 +13,10 @@ import torch
 from torch import Tensor
 
 from src import config
-from src.losscone.cpu import LossConeFitter, PitchAngle
+from src.losscone.cpu import LossConeFitter
 from src.losscone.fitter_base import LossConeFitterBase
 from src.losscone.params import losscone_lhs_samples, losscone_optimizer_bounds
+from src.losscone.pitch_angle import PitchAngle
 from src.losscone.torch.chi2 import (
     compute_chi2_batch_torch,
     compute_chi2_multi_chunk_torch,

@@ -1,8 +1,6 @@
-import logging
 from collections.abc import Callable
 
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 
 from src import config
@@ -12,10 +10,12 @@ from src.losscone.chi2 import (
     compute_lillis_chi2,
     compute_lillis_chi2_batch,
 )
+from src.losscone.er_data import ERData
 from src.losscone.fitter_base import LossConeFitterBase
 from src.losscone.masks import build_lillis_mask
 from src.losscone.model import synth_losscone, synth_losscone_batch
 from src.losscone.params import losscone_lhs_samples, losscone_optimizer_bounds
+from src.losscone.pitch_angle import PitchAngle
 from src.losscone.types import (
     ChunkFitResult,
     FitChunkData,
@@ -25,14 +25,12 @@ from src.losscone.types import (
     parse_normalization_mode,
 )
 from src.utils import thetas as thetas_module
-from src.utils.units import ureg
 
 __all__ = [
     "ChunkFitResult",
     "ERData",
     "FitChunkData",
     "FitMethod",
-    "FluxData",
     "LossConeFitter",
     "NormalizationMode",
     "PitchAngle",
@@ -40,307 +38,6 @@ __all__ = [
     "compute_halekas_chi2",
     "compute_lillis_chi2",
 ]
-
-logger = logging.getLogger(__name__)
-
-
-class ERData:
-    def __init__(self, er_data_file: str):
-        """
-        Initialize the ERData class with the path to the ER data file.
-        """
-        self.er_data_file = er_data_file
-        self.data: pd.DataFrame = pd.DataFrame()
-
-        self._load_data()
-        self._add_count_columns()
-
-    @classmethod
-    def from_dataframe(cls, data: pd.DataFrame, er_data_file: str):
-        """
-        Create an ERData instance from existing DataFrame data.
-
-        Args:
-            data: The pandas DataFrame containing the ER data
-            er_data_file: The original file path for reference
-
-        Returns:
-            ERData instance with the provided data
-        """
-        instance = cls.__new__(cls)
-        instance.er_data_file = er_data_file
-        instance.data = data
-        instance._clean_sweep_data()
-        instance._add_count_columns()
-        return instance
-
-    def _load_data(self) -> None:
-        """
-        Load the ER data from the specified file.
-
-        Reads the specified file into a pandas DataFrame, using the column names
-        defined in ALL_COLS. If the file is not found, or if there is an error
-        parsing the file, the data attribute is set to None.
-        """
-        try:
-            self.data = pd.read_csv(
-                self.er_data_file,
-                sep=" ",
-                engine="c",
-                skipinitialspace=True,
-                header=None,
-                names=config.ALL_COLS,
-            )
-            self._clean_sweep_data()
-        except FileNotFoundError:
-            logger.error(f"Error: The file {self.er_data_file} was not found.")
-            self.data = pd.DataFrame()
-        except pd.errors.ParserError:
-            logger.error(
-                f"Error: The file {self.er_data_file} could not be parsed. "
-                "Please check the file format."
-            )
-            self.data = pd.DataFrame()
-        except Exception as e:
-            logger.error(f"An unexpected error occurred: {e}")
-            self.data = pd.DataFrame()
-
-    def _clean_sweep_data(self) -> None:
-        """
-        Remove entire sweeps that contain any invalid rows.
-
-        Identifies sweeps with invalid timestamps or magnetic field data,
-        then removes all rows belonging to those spec_no values.
-        """
-        if self.data.empty:
-            return
-
-        original_rows = len(self.data)
-
-        # Identify invalid rows
-        magnetic_field = self.data[config.MAG_COLS].to_numpy(dtype=np.float64)
-        magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1)
-
-        invalid_mag_mask = (magnetic_field_magnitude <= 1e-9) | (
-            magnetic_field_magnitude >= 1e3
-        )
-        invalid_time_mask = self.data[config.TIME_COLUMN] == "1970-01-01T00:00:00"
-        invalid_rows_mask = invalid_mag_mask | invalid_time_mask
-
-        # Get spec_no values for invalid rows
-        invalid_spec_nos = set(
-            self.data[config.SPEC_NO_COLUMN][invalid_rows_mask].unique()
-        )
-
-        if invalid_spec_nos:
-            logger.debug(f"Removing {len(invalid_spec_nos)} sweeps with invalid data")
-
-            # Remove all rows belonging to invalid spec_nos
-            valid_mask = ~self.data[config.SPEC_NO_COLUMN].isin(list(invalid_spec_nos))
-            self.data = self.data[valid_mask].reset_index(drop=True)
-
-            removed_rows = original_rows - len(self.data)
-            logger.debug(
-                ("Removed %d rows (%.1f%%) from %d invalid sweeps"),
-                removed_rows,
-                (removed_rows / original_rows * 100.0),
-                len(invalid_spec_nos),
-            )
-
-    def _add_count_columns(self) -> None:
-        """
-        Reconstruct integer electron counts from the flux columns.
-
-        Adds two new DataFrame blocks:
-            - `count`: Integer electron counts for each energy bin.
-            - `count_err`: Estimated error in the electron counts.
-        """
-        theta_path = config.DATA_DIR / config.THETA_FILE
-        try:
-            thetas = np.loadtxt(theta_path, dtype=np.float64)
-        except OSError as exc:
-            logger.warning(
-                "Theta table %s unavailable (%s); skipping count reconstruction.",
-                theta_path,
-                exc,
-            )
-            return
-
-        if self.data.empty:
-            return
-
-        F = self.data[config.FLUX_COLS].to_numpy(dtype=np.float64) * (
-            ureg.particle
-            / (ureg.centimeter**2 * ureg.second * ureg.steradian * ureg.electron_volt)
-        )
-
-        negative_flux_mask = F.magnitude < 0
-        if np.any(negative_flux_mask):
-            n_negative = np.sum(negative_flux_mask)
-            total_values = negative_flux_mask.size
-            logger.debug(
-                ("Found %d negative flux values (%.2f%%) - clamping to zero"),
-                n_negative,
-                (n_negative / total_values * 100.0),
-            )
-
-            F = np.maximum(F, 0 * F.units)
-
-        energies = self.data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)
-        energies = energies[:, None] * ureg.electron_volt  # Reshape for broadcasting
-        integration_time = (
-            np.array([1 / config.BINS_BY_LATITUDE[x] for x in thetas])
-            * config.ACCUMULATION_TIME
-        )
-        integration_time = integration_time[None, :]  # Reshape for broadcasting
-        count_estimate = F * config.GEOMETRIC_FACTOR * energies * integration_time
-        count_estimate = np.rint(count_estimate.to(ureg.particle).magnitude).astype(int)
-
-        count_estimate_sum = count_estimate.sum(axis=1)
-        if np.any(count_estimate_sum < 0):
-            logger.debug(
-                "Negative count sums encountered; clamping to zero before sqrt"
-            )
-        count_estimate_sum = np.clip(count_estimate_sum, 0, None)
-        count_err = np.sqrt(count_estimate_sum.astype(np.float64, copy=False))
-
-        count_df = pd.DataFrame(
-            {config.COUNT_COLS[0]: count_estimate_sum, config.COUNT_COLS[1]: count_err}
-        )
-
-        self.data = pd.concat([self.data, count_df], axis=1)
-
-
-class PitchAngle:
-    """
-    Initialize the PitchAngle class with the ER data and theta values.
-
-    Data rows with invalid B-field are retained; all such rows are flagged via
-    valid_mask and their derived quantities are NaN. Down-stream algorithms
-    must honor this mask.
-
-    Attributes:
-        er_data: The ER data object.
-        thetas: The theta values in degrees.
-        cartesian_coords: The Cartesian coordinates of the data points.
-        pitch_angles: The pitch angles in degrees.
-        unit_magnetic_field: The unit magnetic field vectors.
-        polarity: Optional per-row polarity sign (+1/-1/0).
-        valid_mask: A mask indicating valid data points.
-    """
-
-    def __init__(
-        self,
-        er_data: ERData,
-        polarity: np.ndarray | None = None,
-    ):
-        """
-        Initialize the PitchAngle class with the ER data and theta values.
-
-        Args:
-            er_data (ERData): The ER data object.
-            polarity (np.ndarray | None): Optional per-row polarity sign (+1/-1/0).
-                Use +1 for Moonward along +B, -1 for Moonward along -B, and 0 to
-                mark rows as disconnected (pitch angles set to NaN).
-
-        Notes:
-            Theta values are loaded from config via get_thetas(); custom theta
-            files require updating config or extending this API.
-        """
-        self.er_data = er_data
-        self.thetas = thetas_module.get_thetas()
-        self.polarity = polarity
-        self.cartesian_coords = np.array([])
-        self.pitch_angles = np.array([])
-        self.unit_magnetic_field = np.array([])
-        self.valid_mask = np.array([])
-
-        self._process_data()
-
-    def _get_cartesian_coords(self, phis: np.ndarray, thetas: np.ndarray) -> np.ndarray:
-        """
-        Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z).
-
-        Args:
-            phis (np.ndarray): The phi values in radians.
-            thetas (np.ndarray): The theta values in radians.
-
-        Returns:
-            np.ndarray: The Cartesian coordinates (X, Y, Z).
-        """
-        X = np.cos(phis) * np.cos(thetas)
-        Y = np.sin(phis) * np.cos(thetas)
-        z_base = np.sin(thetas)
-        Z = np.broadcast_to(z_base, X.shape)
-        return np.stack((X, Y, Z), axis=-1)
-
-    def _process_data(self) -> None:
-        """
-        Process the ER data to calculate the Cartesian coordinates and prepare
-        the unit magnetic field vectors for pitch angle calculation.
-
-        This function performs data validation and transformation from spherical
-        to Cartesian coordinates. It also normalizes the magnetic field vectors
-        and stores indices of valid and invalid data points.
-        """
-
-        assert not self.er_data.data.empty, (
-            "Data not loaded. Please load the data first."
-        )
-        assert len(self.thetas) == config.CHANNELS, (
-            f"Theta values must match the number of channels {config.CHANNELS}."
-        )
-
-        # Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z)
-        phis = np.deg2rad(self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64))
-        thetas = np.deg2rad(self.thetas)
-        self.cartesian_coords = self._get_cartesian_coords(phis, thetas)
-
-        magnetic_field = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
-        magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
-        # ER convention points +B roughly sunward; loss-cone tracing expects
-        # Moonward orientation. If polarity is provided, use it as the sign.
-        if self.polarity is None:
-            unit_magnetic_field = -magnetic_field / magnetic_field_magnitude
-        else:
-            polarity = np.asarray(self.polarity)
-            if polarity.shape[0] != magnetic_field.shape[0]:
-                raise ValueError("polarity must match the number of ER rows")
-            unit_magnetic_field = (
-                magnetic_field / magnetic_field_magnitude
-            ) * polarity[:, None]
-            # Rows with polarity=0 are treated as disconnected; downstream masks
-            # should ignore the resulting NaNs.
-            invalid_polarity = ~np.isfinite(polarity) | (polarity == 0)
-            if np.any(invalid_polarity):
-                unit_magnetic_field[invalid_polarity] = np.nan
-        unit_magnetic_field = np.tile(
-            unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1)
-        )
-        self.unit_magnetic_field = unit_magnetic_field
-
-        self.calculate_pitch_angles()
-
-    def calculate_pitch_angles(self) -> None:
-        """
-        Calculate the pitch angles based on the loaded ER data and theta values.
-
-        The pitch angle is the angle between the magnetic field line and the
-        radial direction. It is calculated as the arccosine of the dot product
-        between the unit magnetic field vector and the radial direction vector.
-        """
-        # Check if data is loaded
-        assert not self.er_data.data.empty, (
-            "Data not loaded. Please load the data first."
-        )
-
-        dot_product = np.einsum(
-            "ijk,ijk->ij", self.unit_magnetic_field, self.cartesian_coords
-        ).clip(-1, 1)
-        pitch_angles = np.arccos(dot_product)
-        pitch_angles = np.rad2deg(pitch_angles)
-
-        self.pitch_angles = pitch_angles
 
 
 class LossConeFitter(LossConeFitterBase):
@@ -1178,52 +875,3 @@ class LossConeFitter(LossConeFitterBase):
             results[i] = fit.as_row()
 
         return results, u_width
-
-
-class FluxData:
-    def __init__(self, er_data_file: str):
-        """
-        Backwards-compatible orchestrator for ER data + pitch angles + fitter.
-
-        Args:
-            er_data_file (str): Path to the ER data file
-        """
-        # Use the new class structure
-        self.er_data = ERData(er_data_file)
-        self.pitch_angle = PitchAngle(self.er_data)
-        self.loss_cone_fitter = LossConeFitter(
-            self.er_data, pitch_angle=self.pitch_angle
-        )
-
-        # Expose data for backward compatibility
-        self.data = self.er_data.data
-
-    def get_normalized_flux(
-        self, energy_bin: int, measurement_chunk: int
-    ) -> np.ndarray:
-        """
-        Get the normalized flux for a specific energy bin and measurement chunk.
-        Delegates to LossConeFitter.
-        """
-        return self.loss_cone_fitter._get_normalized_flux(energy_bin, measurement_chunk)
-
-    def build_norm2d(self, measurement_chunk: int):
-        """
-        Build a 2D normalized flux distribution for a specific measurement chunk.
-        Delegates to LossConeFitter.
-        """
-        return self.loss_cone_fitter.build_norm2d(measurement_chunk)
-
-    def _fit_surface_potential(self, measurement_chunk: int):
-        """
-        Fit surface potential for one measurement chunk.
-        Delegates to LossConeFitter.
-        """
-        return self.loss_cone_fitter._fit_surface_potential(measurement_chunk)
-
-    def fit_surface_potential(self):
-        """
-        Fit surface potential for all measurement chunks.
-        Delegates to LossConeFitter.
-        """
-        return self.loss_cone_fitter.fit_surface_potential()
