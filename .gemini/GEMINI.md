@@ -1,1 +1,0 @@
-/home/al/espg/AGENTS.md

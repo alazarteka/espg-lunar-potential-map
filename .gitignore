@@ -39,6 +39,16 @@ temp/
 *~ 
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+
+# AI assistant tool configs (personal, machine-specific — keep out of the repo)
+.gemini/
+.qwen/
+.claude/
+.cursor/
+.aider*
+.windsurf/
+.codeium/
 
 # =============================================================================
 # OS Files
