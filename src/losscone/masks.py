@@ -1,3 +1,5 @@
+"""Validity masks for loss-cone fitting (Lillis relative-flux band selection)."""
+
 from __future__ import annotations
 
 import numpy as np

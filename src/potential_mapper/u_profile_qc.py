@@ -1,3 +1,6 @@
+"""U-surface identifiability QC: LHS-based chi²(U) width metrics and spec/row
+alignment helpers for augmenting batch NPZ output."""
+
 from __future__ import annotations
 
 from pathlib import Path

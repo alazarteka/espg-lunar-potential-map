@@ -1,3 +1,6 @@
+"""Chi-squared objective functions for loss-cone fitting: Halekas log-χ² and
+Lillis masked linear χ²."""
+
 from __future__ import annotations
 
 import numpy as np

@@ -1,3 +1,6 @@
+"""SHA-based integrity locking for SPICE kernels: record and verify kernel
+hashes so the pipeline fails loudly on a changed or missing kernel."""
+
 from __future__ import annotations
 
 import hashlib

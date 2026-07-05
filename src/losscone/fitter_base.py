@@ -1,3 +1,6 @@
+"""Abstract base class defining the shared loss-cone fitter interface
+implemented by the CPU and torch backends."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
