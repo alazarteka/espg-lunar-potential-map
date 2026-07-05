@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -14,14 +14,14 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-class FitMethod(str, Enum):
+class FitMethod(StrEnum):
     """Loss-cone fitting method."""
 
     HALEKAS = "halekas"
     LILLIS = "lillis"
 
 
-class NormalizationMode(str, Enum):
+class NormalizationMode(StrEnum):
     """Flux normalization strategy."""
 
     # NOTE: `GLOBAL` and `RATIO_RESCALED` are deprecated. The Halekas (2008)

@@ -29,7 +29,6 @@ BINS_BY_LATITUDE = {
 
 
 # ========== Physical parameters ==========
-LUNAR_RADIUS_KM: float = 1737.400  # average radius of the Moon in kilometers
 LUNAR_RADIUS: LengthType = 1737.400 * ureg.kilometer  # average radius of the Moon
 ELECTRON_MASS: MassType = scipy.constants.electron_mass * ureg.kilogram  # electron
 ELECTRON_MASS_MAGNITUDE: float = scipy.constants.electron_mass  # electron mass in kg
@@ -42,7 +41,6 @@ ELECTRON_CHARGE: ChargeType = (
 ELECTRON_CHARGE_MAGNITUDE: float = (
     scipy.constants.e
 )  # Charge of an electron in Coulombs
-BOLTZMANN_CONSTANT_MAGNITUDE: float = scipy.constants.Boltzmann  # Unit J/K
 PROTON_MASS_MAGNITUDE: float = scipy.constants.proton_mass  # Unit kg
 CM2_TO_M2: float = 1e-4  # cm^2 to m^2 conversion factor
 
@@ -60,7 +58,6 @@ MAX_DOWNLOAD_WORKERS = 20  # threads for parallel downloads (override via --max-
 # which is TCP/OS-bound well below this size. Data files are ~20-25 MB, kernels
 # up to ~100 MB, so a large chunk would coarsen resume with no upside.
 CHUNK_SIZE_BYTES = 1 * 1024 * 1024  # chunk size for streaming downloads
-REQUESTS_PER_SECOND = 10  # rate-limit threshold
 CONNECTION_POOL_SIZE = 50  # connection pool size for reuse
 DOWNLOAD_MAX_RETRIES = 5  # transient-failure retries per request
 # Exponential backoff between retries: sleep = backoff * (2 ** (retry - 1)).
@@ -75,9 +72,8 @@ N_BG = 0.0  # background noise
 ENERGY_WINDOW_WIDTH_RELATIVE = 0.5
 
 # ========== Fitting parameters ==========
-# TODO: See docs/analysis/fitter_error_analysis.md for threshold decision discussion
-# Current value (2.15e10) is very permissive (~99th+ percentile, accepts almost all fits)
-# Alternative: 215_000 (95th percentile) or 657_000 (99th percentile) for stricter quality control
+# See docs/analysis/fitter_error_analysis.md for the threshold-decision discussion.
+# Options considered: 215_000 (95th pct) or 657_000 (99th pct, current) for QC strictness.
 FIT_ERROR_THRESHOLD = 657000  # chi-squared threshold for a good fit (99th percentile)
 LOSS_CONE_LHS_SEED = 42  # ensures deterministic Latin hypercube sampling
 LOSS_CONE_LHS_SAMPLES = 400  # phase-1 samples per chunk (CPU + torch)
@@ -101,7 +97,6 @@ LOSS_CONE_FIT_METHOD = "halekas"
 # Detection threshold is ~20V; values within ±20V are "below threshold".
 LOSS_CONE_U_SURFACE_MIN = -2000.0  # lower bound in volts (extreme plasma sheet)
 LOSS_CONE_U_SURFACE_MAX = 20.0  # upper bound in volts (detection threshold)
-LOSS_CONE_DETECTION_THRESHOLD = 20.0  # values within ±threshold are unreliable
 
 # B_s/B_m bounds: avoid unrealistically low ratios that can cause degenerate fits.
 LOSS_CONE_BS_OVER_BM_MIN = 0.3
