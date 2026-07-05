@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+from src.potential_mapper.npz_io import write_npz_atomic
 
 
 def _delta_key(delta_reduced: float) -> str:
@@ -67,6 +67,9 @@ def broadcast_spec_to_rows(
     """
     Broadcast spec-level values to row-level by matching `rows_spec_no`.
 
+    Thin wrapper over :func:`align_by_spec_no` (the rows are the alignment
+    target, the spectra are the source).
+
     Args:
         rows_spec_no: (N_rows,) row spec numbers
         spec_spec_no: (N_specs,) spec numbers corresponding to spec_values
@@ -76,25 +79,12 @@ def broadcast_spec_to_rows(
     Returns:
         (N_rows, ...) values broadcast per row
     """
-    rows_spec_no = np.asarray(rows_spec_no, dtype=np.int64)
-    spec_spec_no = np.asarray(spec_spec_no, dtype=np.int64)
-    spec_values = np.asarray(spec_values)
-
-    if spec_spec_no.shape[0] != spec_values.shape[0]:
-        raise ValueError("spec_spec_no and spec_values must match in length")
-
-    order = np.argsort(spec_spec_no)
-    spec_sorted = spec_spec_no[order]
-    values_sorted = spec_values[order]
-
-    idx = np.searchsorted(spec_sorted, rows_spec_no)
-    match = (idx < spec_sorted.size) & (spec_sorted[idx] == rows_spec_no)
-
-    out_shape = (rows_spec_no.size, *spec_values.shape[1:])
-    out = np.full(out_shape, fill_value, dtype=spec_values.dtype)
-    if match.any():
-        out[match] = values_sorted[idx[match]]
-    return out
+    return align_by_spec_no(
+        target_spec_no=rows_spec_no,
+        source_spec_no=spec_spec_no,
+        source_values=spec_values,
+        fill_value=fill_value,
+    )
 
 
 def augment_batch_arrays_with_u_width(
@@ -179,20 +169,6 @@ def augment_batch_arrays_with_u_width(
         ).astype(bool, copy=False)
 
     return out
-
-
-def write_npz_atomic(out_path: Path, payload: dict[str, np.ndarray]) -> None:
-    """Write NPZ file atomically using a temp file + rename."""
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        dir=out_path.parent, suffix=".tmp", delete=False
-    ) as tmp:
-        np.savez_compressed(tmp, **payload)
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        tmp_path = Path(tmp.name)
-    os.replace(tmp_path, out_path)
 
 
 def augment_batch_npz_with_u_width(

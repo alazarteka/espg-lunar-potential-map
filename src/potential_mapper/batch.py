@@ -12,7 +12,6 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 import argparse
 import logging
-import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -22,6 +21,7 @@ import numpy as np
 import src.config as config
 from src.losscone.types import parse_fit_method
 from src.potential_mapper.logging_utils import setup_logging
+from src.potential_mapper.npz_io import write_npz_atomic
 from src.potential_mapper.pipeline import DataLoader, load_all_data, process_merged_data
 from src.potential_mapper.spice import load_spice_files
 
@@ -177,19 +177,6 @@ def _prepare_payload(
     return payload
 
 
-def _write_npz_atomic(out_path: Path, payload: dict[str, np.ndarray]) -> None:
-    """Write NPZ file atomically using temporary file and rename."""
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        dir=out_path.parent, suffix=".tmp", delete=False
-    ) as tmp:
-        np.savez_compressed(tmp, **payload)
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        tmp_path = Path(tmp.name)
-    os.replace(tmp_path, out_path)
-
-
 def _build_output_filename(year: int | None, month: int | None, day: int | None) -> str:
     """Build output filename based on date filters."""
     parts = []
@@ -303,7 +290,7 @@ def run_batch(
     )
 
     logging.info(f"Writing to {output_path}...")
-    _write_npz_atomic(output_path, payload)
+    write_npz_atomic(output_path, payload)
 
     duration = datetime.now() - start
     logging.info(
