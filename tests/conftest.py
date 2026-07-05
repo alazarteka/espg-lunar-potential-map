@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from src import config
+from src.utils.synthetic import prepare_phis
 
 
 @pytest.fixture(autouse=True)
@@ -11,33 +12,23 @@ def mock_data_files(monkeypatch):
     This ensures tests don't fail due to missing data files.
     """
 
-    # Reconstruct the theta values and solid angles as in src/utils/synthetic.py
-    # We copy the logic here to avoid importing synthetic which imports flux/erdata
+    # Solid angles come straight from the canonical generator in
+    # src/utils/synthetic.py (prepare_phis), so this stays in sync with the
+    # values ERData/PitchAngle actually use when building synthetic data.
+    # prepare_phis() doesn't return the paired theta array, so we rebuild it
+    # here using the same (theta -> channel count) mapping and abs-latitude
+    # ordering that prepare_phis() uses internally. config.BINS_BY_LATITUDE is
+    # the canonical source for those counts (it's also what ERData uses), so
+    # no physical constants are duplicated here -- only the merge/sort order.
+    _phis, mock_solid_angles = prepare_phis()
 
-    phis_by_latitude = {
-        78.75: ([], 4, 0.119570),
-        56.25: ([], 8, 0.170253),
-        33.75: ([], 16, 0.127401),
-        11.25: ([], 16, 0.150279),
-        -11.25: ([], 16, 0.150279),
-        -33.75: ([], 16, 0.127401),
-        -56.25: ([], 8, 0.170253),
-        -78.75: ([], 4, 0.119570),
-    }
-
-    temp_thetas = []
-    for key, (_, count, _) in phis_by_latitude.items():
-        temp_thetas.extend([key] * count)
-
-    # Sort by absolute latitude
-    sorted_thetas = sorted(np.array(temp_thetas), key=lambda x: abs(x))
-
-    # Map theta back to solid angle
-    theta_to_sa = {k: v[2] for k, v in phis_by_latitude.items()}
-    sorted_solid_angles = [theta_to_sa[t] for t in sorted_thetas]
+    temp_thetas: list[float] = []
+    for latitude, count in config.BINS_BY_LATITUDE.items():
+        temp_thetas.extend([latitude] * count)
+    sorted_thetas = sorted(temp_thetas, key=lambda x: abs(x))
 
     mock_thetas = np.array(sorted_thetas, dtype=np.float64)
-    mock_solid_angles = np.array(sorted_solid_angles, dtype=np.float64)
+    mock_solid_angles = np.asarray(mock_solid_angles, dtype=np.float64)
 
     original_loadtxt = np.loadtxt
 
