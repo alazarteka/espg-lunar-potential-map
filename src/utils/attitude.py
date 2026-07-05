@@ -1,12 +1,15 @@
 import logging
 from bisect import bisect_right
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import spiceypy as spice
 
 
-def load_attitude_data(path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def load_attitude_data(
+    path: str | Path,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | tuple[None, None, None]:
     """
     Load attitude data from the specified file.
 
@@ -14,7 +17,8 @@ def load_attitude_data(path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         path: Path to the attitude data file
 
     Returns:
-        Tuple of (et_spin, ra_vals, dec_vals) arrays, or (None, None, None) if error
+        Tuple of (et_spin, ra_vals, dec_vals) arrays, or (None, None, None) on
+        error. Callers must check for the None case (they already do).
     """
     try:
         attitude_data = pd.read_csv(

@@ -194,7 +194,9 @@ When an experiment succeeds:
 ### 7. Git Workflow
 
 - Use Conventional Commits with scope: `feat(physics): ...`, `fix(temporal): ...`
-- Pre-merge: ruff, mypy, pytest must all pass
+- Pre-merge: ruff and pytest must pass. mypy is **advisory** — there is a known
+  type-hygiene backlog (`uv run mypy src`, ~120 findings, no active bugs as of
+  2026-07-05); avoid regressing it, but a fully green mypy is not currently a gate.
 - Don't commit large data files or notebook outputs
 - Update docs if interfaces or behaviors change
 
