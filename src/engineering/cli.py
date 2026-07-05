@@ -1,4 +1,11 @@
-"""Command-line interface for engineering analysis."""
+"""Command-line interface for engineering analysis.
+
+Produces per-site engineering statistics (the supported deliverable) plus
+diagnostic visualizations of the `src.temporal` spatiotemporal reconstruction.
+Those reconstruction-derived maps are not a validated global potential-map
+product — see `src.engineering.analysis` and `src.temporal` docstrings for
+the identifiability analysis behind that distinction.
+"""
 
 import argparse
 import logging
@@ -69,7 +76,8 @@ def plot_global_map(
     output_path: Path,
     cmap: str = style.CMAP_MAGNITUDE,
 ) -> None:
-    """Helper to plot and save a global map."""
+    """Helper to plot and save a reconstruction-diagnostic map (not a validated
+    global potential map; see `GlobalStats` docstring)."""
     fig, ax = plt.subplots(figsize=(10, 5))
 
     # Construct meshgrid for pcolormesh

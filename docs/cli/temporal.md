@@ -1,6 +1,15 @@
 # Temporal Harmonics
 
-Computes time-dependent spherical harmonic coefficients a_lm(t) for lunar surface potential.
+Fits time-dependent spherical harmonic coefficients a_lm(t) to Lunar Prospector
+ER surface-potential measurements. Lunar Prospector's instantaneous spatial
+coverage is small relative to the surface, so recovering a_lm(t) requires
+resolving joint space-time variation from data that cannot identify it: this
+tool is the identifiability / sampling-limits analysis behind the paper's
+negative result that **a global spatiotemporal lunar surface-potential map
+cannot be recovered from LP ER data** — it is not a working map-reconstruction
+deliverable. Per-measurement loss-cone inversion and the aggregate/per-site
+statistics in `src.engineering` (see [engineering.md](engineering.md)) remain
+valid and are unaffected by this limitation.
 
 ## Usage
 
@@ -47,6 +56,14 @@ uv run python -m src.temporal --start YYYY-MM-DD --end YYYY-MM-DD --output FILE 
 5. Fits spherical harmonic coefficients up to degree `lmax`
 6. Optionally applies temporal smoothing between windows
 7. Saves coefficients to compressed NPZ file
+
+The fitted coefficients are the artifact this identifiability analysis
+operates on — the `--min-coverage`, `--min-samples`, `--l2-penalty`, and
+`--temporal-lambda` knobs exist to probe how much regularization is needed
+to make the joint space-time fit tractable, which is itself evidence of the
+underdetermination the paper reports. Use `--require-u-identifiable` to
+additionally exclude measurements where the fit is entangled with an
+unidentifiable spacecraft potential.
 
 ## Fit Modes
 

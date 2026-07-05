@@ -1,4 +1,13 @@
-"""Reconstruction helpers for temporal spherical harmonic datasets."""
+"""Reconstruction helpers for temporal spherical harmonic datasets.
+
+These helpers evaluate the fitted a_lm(t) coefficients on a lat/lon grid.
+That joint space-time fit is the identifiability / sampling-limits analysis
+behind the paper's negative result — Lunar Prospector's instantaneous
+spatial coverage is too sparse to jointly identify the surface potential in
+space and time, so the evaluated field is not a recoverable global potential
+map. These functions exist to probe and visualize that non-identifiability,
+not to deliver a validated map product.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +27,12 @@ def reconstruct_global_map(
     lat_steps: int = 181,
     lon_steps: int = 361,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Reconstruct global potential map from spherical harmonic coefficients."""
+    """Evaluate fitted spherical harmonic coefficients on a lat/lon grid.
+
+    This produces a single time slice of the joint space-time reconstruction
+    used to test spatiotemporal identifiability (see module docstring); it is
+    not a validated global potential map.
+    """
     latitudes = np.linspace(-90.0, 90.0, lat_steps)
     longitudes = np.linspace(-180.0, 180.0, lon_steps)
     lon_grid, lat_grid = np.meshgrid(longitudes, latitudes)
@@ -36,7 +50,12 @@ def compute_potential_series(
     lat_steps: int,
     lon_steps: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Compute reconstructed potential map for each time index."""
+    """Evaluate the reconstructed (non-identifiable) field for each time index.
+
+    See `reconstruct_global_map`: this stacks that per-slice evaluation over
+    all coefficient rows for diagnostic/visualization use, not as a
+    recoverable global potential map.
+    """
     latitudes: np.ndarray | None = None
     longitudes: np.ndarray | None = None
     maps = np.empty((coeffs.shape[0], lat_steps, lon_steps), dtype=np.float32)

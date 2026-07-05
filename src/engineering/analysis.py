@@ -1,4 +1,13 @@
-"""Core analysis logic for ESPG maps and statistics."""
+"""Core analysis logic for ESPG per-site statistics and reconstruction diagnostics.
+
+`SiteStats`/`extract_site_stats` are the supported engineering deliverable:
+aggregate statistics at named site coordinates. `GlobalStats`/
+`compute_global_stats` evaluate the `src.temporal` spatiotemporal
+reconstruction on a grid for visualization; per that module's identifiability
+analysis, the joint space-time fit underlying those grids is not recoverable
+as a global potential map, so treat the grid outputs as diagnostics rather
+than a validated map product.
+"""
 
 import logging
 from dataclasses import dataclass
@@ -16,7 +25,15 @@ DEFAULT_CURRENT_DENSITY = 1e-6
 
 @dataclass(slots=True)
 class GlobalStats:
-    """Global statistical maps over the analysis period.
+    """Grid evaluations of the temporal reconstruction, for diagnostic maps.
+
+    These grids are computed by evaluating the `src.temporal` spatiotemporal
+    coefficient fit at each lat/lon cell. That fit is not identifiable as a
+    global surface-potential map from LP ER data (see `src.temporal`
+    docstrings for the identifiability analysis), so these attributes should
+    be read as diagnostic/illustrative visualizations of the reconstruction,
+    not a validated global potential map. `SiteStats` / `extract_site_stats`
+    is the supported per-site statistics deliverable.
 
     Attributes:
         latitudes: 1D array of latitude values (degrees).
@@ -81,7 +98,13 @@ def compute_global_stats(
     lon_steps: int = 360,
 ) -> GlobalStats:
     """
-    Compute global statistical maps from temporal coefficients.
+    Evaluate the temporal reconstruction on a grid and summarize it statistically.
+
+    Note: this grids up the `src.temporal` spatiotemporal coefficient fit,
+    which is not identifiable as a global potential map from LP ER data (see
+    `src.temporal` docstrings). Treat the returned grids as diagnostics of
+    that reconstruction rather than a validated map product; per-site
+    statistics from `extract_site_stats` are the supported deliverable.
 
     Args:
         dataset: Loaded TemporalDataset with coefficients.
@@ -90,7 +113,7 @@ def compute_global_stats(
         lon_steps: Number of longitude steps for the grid.
 
     Returns:
-        GlobalStats object containing 2D maps.
+        GlobalStats object containing 2D diagnostic grids.
     """
     logging.info("Computing potential series on %dx%d grid...", lat_steps, lon_steps)
     lats, lons, maps = compute_potential_series(

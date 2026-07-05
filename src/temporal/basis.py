@@ -5,6 +5,11 @@ Implements the expansion:
 
 where T_k are temporal basis functions (constant, linear, sinusoidal, etc.)
 and b_lmk are the parameters fitted to all data jointly.
+
+Like the per-window fit in `coefficients.py`, this is a joint space-time fit
+used to probe identifiability of the surface potential from LP ER data, not
+a global-map reconstruction pipeline; see `src/temporal/coefficients.py` for
+the underlying negative result.
 """
 
 from __future__ import annotations

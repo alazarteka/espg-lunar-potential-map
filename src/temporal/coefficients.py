@@ -6,6 +6,14 @@ Implements the expansion:
     U(φ, θ, t) = Σ_{l,m} a_lm(t) Y_lm(φ, θ)
 
 where a_lm(t) are fitted in temporal windows with spatial coverage validation.
+
+This joint space-time fit is the identifiability / sampling-limits analysis
+underlying the paper's negative result: Lunar Prospector's instantaneous
+spatial coverage is too sparse to jointly identify a_lm(t) in space and time
+from ER data, so the fitted coefficients demonstrate that a global
+spatiotemporal potential map cannot be recovered rather than deliver one.
+Per-measurement loss-cone inversion and the measurement statistics in
+`src.engineering` are unaffected and remain valid.
 """
 
 from __future__ import annotations
