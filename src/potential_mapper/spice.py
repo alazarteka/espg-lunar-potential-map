@@ -1,3 +1,5 @@
+"""SPICE kernel discovery and loading for the potential mapping pipeline."""
+
 import logging
 
 import spiceypy as spice

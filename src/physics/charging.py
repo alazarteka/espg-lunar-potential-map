@@ -1,3 +1,6 @@
+"""Charging current physics: Sternglass secondary-electron yield and electron
+current densities (integrated and analytic) for kappa-distributed plasmas."""
+
 import math
 
 import numpy as np

@@ -1,3 +1,5 @@
+"""Argument parsing and entry point for the `python -m src.potential_mapper` CLI."""
+
 import argparse
 
 from src.potential_mapper.cli_args import add_common_batch_args

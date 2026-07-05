@@ -1,3 +1,6 @@
+"""Per-row geometry for ER data: SCD/J2000/IAU_MOON transforms, magnetic field
+projection, and field-line surface intersections with polarity."""
+
 import logging
 from dataclasses import dataclass
 

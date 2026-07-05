@@ -1,3 +1,6 @@
+"""CPU (NumPy/SciPy) loss-cone fitter: LHS seeding plus differential-evolution
+refinement of U_surface, Bs/Bm, and beam amplitude per 15-row ER sweep."""
+
 from collections.abc import Callable
 
 import numpy as np

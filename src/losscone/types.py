@@ -1,3 +1,6 @@
+"""Core loss-cone fitting types: fit-method and normalization enums, per-sweep
+chunk data, per-sweep fit results, and parsing helpers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -34,6 +37,12 @@ class NormalizationMode(StrEnum):
 
 @dataclass(frozen=True)
 class FitChunkData:
+    """
+    Prepared inputs for fitting a single sweep (15-row measurement chunk):
+    normalized flux, energies, pitch angles, raw flux, and the spacecraft
+    potential with its derived E >= U_spacecraft validity mask.
+    """
+
     norm2d: np.ndarray
     energies: np.ndarray
     pitches: np.ndarray
@@ -98,6 +107,7 @@ class ChunkFitResult:
 
     @classmethod
     def invalid(cls, chunk_index: int, *, chi2: float = float("nan")) -> ChunkFitResult:
+        """Return an all-NaN result marking a failed/skipped fit for a chunk."""
         nan = float("nan")
         return cls(
             u_surface=nan,
@@ -108,9 +118,11 @@ class ChunkFitResult:
         )
 
     def as_tuple(self) -> tuple[float, float, float, float]:
+        """Return (u_surface, bs_over_bm, beam_amp, chi2)."""
         return (self.u_surface, self.bs_over_bm, self.beam_amp, self.chi2)
 
     def as_row(self) -> np.ndarray:
+        """Return [u_surface, bs_over_bm, beam_amp, chi2, chunk_index] as floats."""
         return np.array(
             [
                 self.u_surface,
@@ -127,6 +139,7 @@ class ChunkFitResult:
 
 
 def parse_fit_method(value: FitMethod | str | None) -> FitMethod:
+    """Coerce a string/enum/None to FitMethod (None uses the config default)."""
     if value is None:
         value = config.LOSS_CONE_FIT_METHOD
     if isinstance(value, FitMethod):
@@ -138,6 +151,7 @@ def parse_fit_method(value: FitMethod | str | None) -> FitMethod:
 
 
 def parse_normalization_mode(value: NormalizationMode | str) -> NormalizationMode:
+    """Coerce a string or enum to NormalizationMode, raising on unknown values."""
     if isinstance(value, NormalizationMode):
         mode = value
     else:

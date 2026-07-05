@@ -1,3 +1,6 @@
+"""Fit kappa distributions to LP ER electron spectra, estimating density,
+kappa, and thermal speed (theta) via LHS-seeded chi-squared minimization."""
+
 import logging
 import math
 from dataclasses import dataclass

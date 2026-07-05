@@ -1,3 +1,6 @@
+"""End-to-end potential mapping pipeline: per-ER-file kappa fits, spacecraft
+potential, loss-cone surface potential fits, and surface footprint projection."""
+
 import argparse
 import logging
 import numbers

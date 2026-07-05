@@ -1,3 +1,6 @@
+"""Stateful loss-cone analysis session for diagnostics tools: loads an ER file,
+computes pitch angles/polarity, caches per-sweep data, and wraps the fitters."""
+
 from __future__ import annotations
 
 import logging
@@ -37,6 +40,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ChunkData:
+    """Raw data for one sweep: energies, pitch angles, flux, spec_no, timestamp."""
+
     energies: np.ndarray
     pitches: np.ndarray
     flux: np.ndarray
@@ -50,6 +55,12 @@ def interpolate_to_regular_grid(
     flux_data: np.ndarray,
     n_pitch_bins: int = 100,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Interpolate per-energy flux onto a regular pitch-angle grid for plotting.
+
+    Returns (energies, regular_pitch_grid, interpolated_flux); rows with fewer
+    than two valid samples become NaN.
+    """
     pitch_min = np.nanmin(pitches)
     pitch_max = np.nanmax(pitches)
     pitches_reg = np.linspace(pitch_min, pitch_max, n_pitch_bins)
@@ -82,6 +93,10 @@ def compute_loss_cone_boundary(
     bs_over_bm: float,
     u_spacecraft: float,
 ) -> np.ndarray:
+    """
+    Compute the loss-cone boundary pitch angle (deg) per energy for given
+    U_surface, Bs/Bm, and U_spacecraft. NaN where E - U_spacecraft <= 0.
+    """
     e_corr = energies - u_spacecraft
     loss_cone = np.full_like(energies, np.nan, dtype=float)
     valid = e_corr > 0
@@ -95,6 +110,12 @@ def compute_loss_cone_boundary(
 
 
 class LossConeSession:
+    """
+    Loads an ER file with pitch angles (optionally polarity-corrected), caches
+    per-sweep raw/normalized data, and exposes model evaluation, chi-squared,
+    and fitting through a CPU or torch loss-cone fitter.
+    """
+
     def __init__(
         self,
         er_file: Path,
@@ -264,6 +285,7 @@ class LossConeSession:
         return mapping
 
     def set_normalization(self, mode: str, incident_stat: str) -> None:
+        """Switch normalization mode/statistic, rebuilding the fitter if changed."""
         if mode == self.normalization_mode and incident_stat == self.incident_flux_stat:
             return
         self.normalization_mode = mode
@@ -271,12 +293,15 @@ class LossConeSession:
         self._init_fitter()
 
     def chunk_count(self) -> int:
+        """Return the number of complete sweeps in the loaded ER data."""
         return len(self.er_data.data) // config.SWEEP_ROWS
 
     def spec_to_chunk(self, spec_no: int) -> int | None:
+        """Map a spectrum number to its chunk index, or None if not present."""
         return self._spec_to_chunk.get(int(spec_no))
 
     def get_chunk_data(self, chunk_idx: int) -> ChunkData:
+        """Return (cached) raw energies/pitches/flux for one sweep."""
         if chunk_idx in self._raw_cache:
             return self._raw_cache[chunk_idx]
 
@@ -304,6 +329,7 @@ class LossConeSession:
         return data
 
     def get_norm2d(self, chunk_idx: int) -> np.ndarray:
+        """Return (cached) normalized flux for a sweep under current settings."""
         cache_key = (chunk_idx, self.normalization_mode, self.incident_flux_stat)
         if cache_key in self._norm_cache:
             return self._norm_cache[cache_key]
@@ -312,6 +338,7 @@ class LossConeSession:
         return norm2d
 
     def get_lillis_mask(self, chunk_idx: int) -> np.ndarray:
+        """Return (cached) Lillis validity mask for a sweep's raw flux/pitches."""
         if chunk_idx in self._lillis_mask_cache:
             return self._lillis_mask_cache[chunk_idx]
         chunk = self.get_chunk_data(chunk_idx)
@@ -331,6 +358,10 @@ class LossConeSession:
         u_spacecraft: float,
         return_mask: bool = False,
     ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+        """
+        Evaluate the synthetic loss-cone model on an energy/pitch grid, using
+        the torch backend when enabled. Optionally also return the model mask.
+        """
         if (
             self.use_torch
             and synth_losscone_batch_torch is not None
@@ -386,6 +417,10 @@ class LossConeSession:
         raw_flux: np.ndarray | None = None,
         raw_pitches: np.ndarray | None = None,
     ) -> float:
+        """
+        Compute chi-squared between normalized data and model using the
+        session's fit method (Lillis needs raw flux/pitches; NaN if missing).
+        """
         if self.fit_method == FitMethod.LILLIS:
             if raw_flux is None or raw_pitches is None:
                 return float("nan")
@@ -408,6 +443,7 @@ class LossConeSession:
         u_spacecraft: float,
         n_samples: int = 400,
     ) -> ChunkFitResult:
+        """Fit one sweep via Latin hypercube sampling with fixed beam width."""
         return self.fitter.fit_chunk_lhs(
             chunk_idx,
             beam_width_ev=beam_width_ev,
@@ -416,4 +452,5 @@ class LossConeSession:
         )
 
     def fit_chunk_full(self, chunk_idx: int) -> ChunkFitResult:
+        """Fit one sweep with the fitter's full optimization pipeline."""
         return self.fitter.fit_chunk_full(chunk_idx)

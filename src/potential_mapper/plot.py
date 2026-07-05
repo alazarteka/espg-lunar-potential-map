@@ -1,3 +1,5 @@
+"""Scatter-map plotting of projected lunar surface potentials over a moon map."""
+
 import logging
 from pathlib import Path
 

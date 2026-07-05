@@ -1,3 +1,4 @@
+"""RA/DEC and Cartesian conversions plus spacecraft (SCD) to J2000 rotations."""
 
 import numpy as np
 

@@ -1,3 +1,6 @@
+"""SPICE lookups of LP/Moon/Sun geometry: positions, Sun vectors, and
+J2000-to-IAU_MOON transforms, in scalar and NaN-tolerant batch forms."""
+
 import logging
 from collections.abc import Callable
 

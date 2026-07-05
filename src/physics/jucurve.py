@@ -1,3 +1,6 @@
+"""Photoemission J-U curve (double exponential, Halekas et al. 2008) and its
+inversion to obtain spacecraft potential from a target current density."""
+
 import math
 from dataclasses import dataclass
 

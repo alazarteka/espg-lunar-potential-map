@@ -1,3 +1,6 @@
+"""Shared pint unit registry, Quantity validation, and annotated type aliases
+for the physical quantities used across the project."""
+
 from typing import Annotated, Any
 
 import pint

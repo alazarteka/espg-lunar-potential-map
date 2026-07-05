@@ -1,3 +1,6 @@
+"""Download Lunar Prospector ER flux data, SPICE kernels, and ancillary tables
+from NASA PDS/NAIF archives via parallel, resumable, retry-friendly HTTP."""
+
 import argparse
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed

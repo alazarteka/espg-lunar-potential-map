@@ -1,3 +1,6 @@
+"""Row-aligned result containers for potential mapping outputs, including
+plasma-environment classification from temperature and illumination."""
+
 from dataclasses import dataclass, field
 from enum import IntEnum
 

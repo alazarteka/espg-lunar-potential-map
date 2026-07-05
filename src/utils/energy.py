@@ -1,3 +1,5 @@
+"""Build relative-width energy windows around ER channel center energies."""
+
 import numpy as np
 
 from src import config

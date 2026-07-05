@@ -1,3 +1,6 @@
+"""Kappa distribution physics: phase-space density, directional and
+omnidirectional fluxes, and energy/velocity/temperature conversions."""
+
 import math
 from dataclasses import dataclass
 

@@ -1,3 +1,6 @@
+"""Ray-sphere intersection helpers (scalar and batched) for projecting
+field lines onto the lunar surface, with moonward polarity detection."""
+
 import numpy as np
 
 from src.utils.units import LengthType, ureg

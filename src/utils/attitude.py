@@ -1,3 +1,6 @@
+"""Load LP attitude tables (UTC, RPM, RA, DEC) and look up spin-axis
+right ascension/declination at query ephemeris times."""
+
 import logging
 from bisect import bisect_right
 from pathlib import Path
