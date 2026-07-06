@@ -13,11 +13,14 @@ import torch
 from torch import Tensor
 
 from src import config
+from src.losscone import noise
 from src.losscone.cpu import LossConeFitter
 from src.losscone.fitter_base import LossConeFitterBase
 from src.losscone.params import losscone_lhs_samples, losscone_optimizer_bounds
 from src.losscone.pitch_angle import PitchAngle
 from src.losscone.torch.chi2 import (
+    compute_cash_deviance_batch_torch,
+    compute_cash_deviance_multi_chunk_torch,
     compute_chi2_batch_torch,
     compute_chi2_multi_chunk_torch,
     compute_lillis_chi2_batch_torch,
@@ -166,6 +169,13 @@ class LossConeFitterTorch(LossConeFitterBase):
 
         self.config = config
         self._cpu_fitter = None  # Lazy-initialized for normalization
+        # Per-batch Poisson noise tensors for the Cash objective, set by
+        # _precompute_chunk_data and consumed by the LHS/DE/profile paths.
+        # Each is (N_valid, nE, nPitch) aligned with the batch's valid chunks,
+        # or None when the active fit method is not CASH.
+        self._cash_counts: Tensor | None = None
+        self._cash_count_scale: Tensor | None = None
+        self._cash_background: Tensor | None = None
 
     def _get_cpu_fitter(self) -> LossConeFitter:
         """Get or create cached CPU fitter for normalization."""
@@ -234,6 +244,18 @@ class LossConeFitterTorch(LossConeFitterBase):
         else:
             spacecraft_t = float(spacecraft_slice)
 
+        # Per-bin Poisson noise tensors for the Cash objective (single chunk).
+        cash_counts_t = cash_scale_t = cash_bg_t = None
+        if self.fit_method == FitMethod.CASH:
+            counts, kappa, bg = noise.chunk_noise(data.raw_flux, norm2d, energies)
+            cash_counts_t = torch.tensor(counts, device=self.device, dtype=self.dtype)
+            cash_scale_t = torch.tensor(kappa, device=self.device, dtype=self.dtype)
+            cash_bg_t = torch.tensor(
+                np.broadcast_to(bg, norm2d.shape).copy(),
+                device=self.device,
+                dtype=self.dtype,
+            )
+
         # Define objective function
         def objective(params: Tensor) -> Tensor:
             """Evaluate chi2 for population of parameters."""
@@ -259,7 +281,17 @@ class LossConeFitterTorch(LossConeFitterBase):
             )
 
             # Compute chi2
-            if self.fit_method == FitMethod.LILLIS:
+            if self.fit_method == FitMethod.CASH:
+                chi2 = compute_cash_deviance_batch_torch(
+                    models,
+                    cash_counts_t,
+                    cash_scale_t,
+                    cash_bg_t,
+                    data_mask_t,
+                    model_mask=model_masks,
+                    reduced=True,
+                )
+            elif self.fit_method == FitMethod.LILLIS:
                 chi2 = compute_lillis_chi2_batch_torch(
                     models, norm2d_t, data_mask_t, model_mask=model_masks
                 )
@@ -336,6 +368,12 @@ class LossConeFitterTorch(LossConeFitterBase):
         if (
             self.fit_method == FitMethod.LILLIS
             and best_chi2 > self.config.LILLIS_CHI2_REDUCED_MAX
+        ) or (
+            self.fit_method == FitMethod.CASH
+            and (
+                not np.isfinite(best_chi2)
+                or best_chi2 > self.config.LOSS_CONE_DEVIANCE_REDUCED_MAX
+            )
         ):
             return ChunkFitResult.invalid(measurement_chunk, chi2=float(best_chi2))
 
@@ -405,12 +443,18 @@ class LossConeFitterTorch(LossConeFitterBase):
                 - sc_potential: (N_valid,) spacecraft potential per chunk
                 - valid_indices: List of chunk indices that had valid data
         """
+        # Reset per-batch Cash noise state; repopulated below when CASH is active.
+        self._cash_counts = None
+        self._cash_count_scale = None
+        self._cash_background = None
+
         if not chunk_indices:
             empty = torch.zeros(0, device=self.device, dtype=self.dtype)
             return empty, empty, empty, empty, empty, []
 
         nE = self.config.SWEEP_ROWS
         max_rows = len(self.er_data.data)
+        want_cash = self.fit_method == FitMethod.CASH
 
         # Get batched norm2d from CPU fitter (uses vectorized implementation)
         cpu_fitter = self._get_cpu_fitter()
@@ -430,6 +474,9 @@ class LossConeFitterTorch(LossConeFitterBase):
         mask_list = []
         sc_pot_list = []
         valid_indices = []
+        cash_counts_list: list[np.ndarray] = []
+        cash_scale_list: list[np.ndarray] = []
+        cash_bg_list: list[np.ndarray] = []
 
         for i, chunk_idx in enumerate(chunk_indices):
             norm2d = norm2d_all[i]
@@ -502,6 +549,17 @@ class LossConeFitterTorch(LossConeFitterBase):
             sc_pot_list.append(sc_pot)
             valid_indices.append(chunk_idx)
 
+            if want_cash:
+                # Reconstruct per-bin Poisson counts, count-scale, and empirical
+                # background (mirrors the CPU Cash path: noise.chunk_noise on the
+                # raw flux + norm2d). bg is per-channel; broadcast across energy
+                # rows so it stacks to (N, nE, nPitch) for the multi-chunk kernel.
+                counts, kappa, bg = noise.chunk_noise(flux_chunk, norm2d, energies)
+                bg2d = np.broadcast_to(bg, norm2d.shape)
+                cash_counts_list.append(np.ascontiguousarray(counts, dtype=np.float64))
+                cash_scale_list.append(np.ascontiguousarray(kappa, dtype=np.float64))
+                cash_bg_list.append(np.ascontiguousarray(bg2d, dtype=np.float64))
+
         if not valid_indices:
             empty = torch.zeros(0, device=self.device, dtype=self.dtype)
             return empty, empty, empty, empty, empty, []
@@ -520,6 +578,17 @@ class LossConeFitterTorch(LossConeFitterBase):
         sc_pot_t = torch.tensor(
             np.array(sc_pot_list), device=self.device, dtype=self.dtype
         )
+
+        if want_cash:
+            self._cash_counts = torch.tensor(
+                np.stack(cash_counts_list), device=self.device, dtype=self.dtype
+            )
+            self._cash_count_scale = torch.tensor(
+                np.stack(cash_scale_list), device=self.device, dtype=self.dtype
+            )
+            self._cash_background = torch.tensor(
+                np.stack(cash_bg_list), device=self.device, dtype=self.dtype
+            )
 
         return energies_t, pitches_t, norm2d_t, mask_t, sc_pot_t, valid_indices
 
@@ -595,7 +664,22 @@ class LossConeFitterTorch(LossConeFitterBase):
             return_mask=True,
         )
 
-        if self.fit_method == FitMethod.LILLIS:
+        if self.fit_method == FitMethod.CASH:
+            counts, kappa, bg = noise.chunk_noise(data.raw_flux, norm2d, energies)
+            chi2 = compute_cash_deviance_batch_torch(
+                models,
+                torch.tensor(counts, device=self.device, dtype=self.dtype),
+                torch.tensor(kappa, device=self.device, dtype=self.dtype),
+                torch.tensor(
+                    np.broadcast_to(bg, norm2d.shape).copy(),
+                    device=self.device,
+                    dtype=self.dtype,
+                ),
+                data_mask_t,
+                model_mask=model_masks,
+                reduced=True,
+            )
+        elif self.fit_method == FitMethod.LILLIS:
             chi2 = compute_lillis_chi2_batch_torch(
                 models, norm2d_t, data_mask_t, model_mask=model_masks
             )
@@ -703,7 +787,17 @@ class LossConeFitterTorch(LossConeFitterBase):
         model_mask = valid_energy.view(N_chunks, 1, energies.size(1), 1)
 
         # Compute chi2 for all
-        if self.fit_method == FitMethod.LILLIS:
+        if self.fit_method == FitMethod.CASH:
+            chi2 = compute_cash_deviance_multi_chunk_torch(
+                models,
+                self._cash_counts,
+                self._cash_count_scale,
+                self._cash_background,
+                data_mask,
+                model_mask=model_mask,
+                reduced=True,
+            )
+        elif self.fit_method == FitMethod.LILLIS:
             chi2 = compute_lillis_chi2_multi_chunk_torch(
                 models, norm2d, data_mask, model_mask=model_mask
             )
@@ -792,16 +886,17 @@ class LossConeFitterTorch(LossConeFitterBase):
         u_chunk: int = 8,
     ) -> tuple[Tensor, Tensor]:
         """
-        Profile-likelihood U-width per chunk (Lillis only).
+        Profile-likelihood U-width per chunk (Lillis or Cash).
 
         Scans U on a grid; at each U the objective is minimized over the nuisance
         parameters (bs/bm, beam_amp) on a sub-grid, giving a profiled chi2(U).
         The U-width is the extent of U with chi2_profile(U) - min_U chi2_profile
         <= delta_chi2 (a proper 1-parameter Delta-chi2 interval for Lillis' masked
-        linear chi2). The U-grid is processed in chunks to bound peak memory.
+        linear chi2, or the raw Poisson deviance for Cash — ΔD ≤ 1 → 68% via
+        Wilks). The U-grid is processed in chunks to bound peak memory.
 
         Returns:
-            width: (N,) U-width in volts (NaN outside Lillis or when empty)
+            width: (N,) U-width in volts (NaN outside Lillis/Cash or when empty)
             edge: (N,) bool, True where the interval reaches the U-grid boundary
                 (the width is then a lower bound / truncated).
         """
@@ -809,7 +904,7 @@ class LossConeFitterTorch(LossConeFitterBase):
         device, dtype = self.device, self.dtype
         nan_n = torch.full((N,), float("nan"), device=device, dtype=dtype)
         false_n = torch.zeros(N, dtype=torch.bool, device=device)
-        if self.fit_method != FitMethod.LILLIS:
+        if self.fit_method not in (FitMethod.LILLIS, FitMethod.CASH):
             return nan_n, false_n
 
         u_grid = torch.linspace(
@@ -855,9 +950,22 @@ class LossConeFitterTorch(LossConeFitterBase):
                 beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
                 background=torch.full_like(u_surface, self.background),
             )
-            chi2_c = compute_lillis_chi2_multi_chunk_torch(
-                models, norm2d, data_mask, model_mask=model_mask
-            )
+            if self.fit_method == FitMethod.CASH:
+                # Raw (non-reduced) Poisson deviance: ΔD ≤ delta_chi2 is the
+                # Wilks 68% interval on U (mirrors CPU _u_width_profile_cash).
+                chi2_c = compute_cash_deviance_multi_chunk_torch(
+                    models,
+                    self._cash_counts,
+                    self._cash_count_scale,
+                    self._cash_background,
+                    data_mask,
+                    model_mask=model_mask,
+                    reduced=False,
+                )
+            else:
+                chi2_c = compute_lillis_chi2_multi_chunk_torch(
+                    models, norm2d, data_mask, model_mask=model_mask
+                )
             chi2_c = torch.where(torch.isfinite(chi2_c), chi2_c, big)
             chi2_prof[:, u0:u1] = chi2_c.view(N, nu, n_ab).min(dim=2).values
             del models, chi2_c
@@ -999,7 +1107,17 @@ class LossConeFitterTorch(LossConeFitterBase):
                 valid_energy = energies >= sc_potential
             model_mask = valid_energy.view(N_chunks, 1, energies.size(1), 1)
 
-            if self.fit_method == FitMethod.LILLIS:
+            if self.fit_method == FitMethod.CASH:
+                chi2 = compute_cash_deviance_multi_chunk_torch(
+                    models,
+                    self._cash_counts,
+                    self._cash_count_scale,
+                    self._cash_background,
+                    data_mask,
+                    model_mask=model_mask,
+                    reduced=True,
+                )
+            elif self.fit_method == FitMethod.LILLIS:
                 chi2 = compute_lillis_chi2_multi_chunk_torch(
                     models, norm2d, data_mask, model_mask=model_mask
                 )
@@ -1125,6 +1243,31 @@ class LossConeFitterTorch(LossConeFitterBase):
             final_params = torch.where(use_lhs.unsqueeze(-1), lhs_params, de_params)
             final_chi2 = torch.where(use_lhs, lhs_chi2, de_chi2)
 
+            # For CASH the U-width is a profile-likelihood CI (ΔD ≤ 1), computed
+            # on a fixed grid independent of the DE best-fit — not the LHS max-min
+            # proxy used for Lillis. Truncated intervals become the full U span
+            # (non-identifiable), mirroring CPU _u_width_profile_cash.
+            profile_width_np = None
+            if compute_width and self.fit_method == FitMethod.CASH:
+                width_t, edge_t = self._u_width_profile(
+                    energies,
+                    pitches,
+                    norm2d,
+                    mask,
+                    sc_pot,
+                    delta_chi2=float(config.LOSS_CONE_U_WIDTH_DELTA_CHI2),
+                    n_u=int(config.LOSS_CONE_U_WIDTH_N_U),
+                    n_bs=int(config.LOSS_CONE_U_WIDTH_N_BS),
+                    n_beam=int(config.LOSS_CONE_U_WIDTH_N_BEAM),
+                )
+                full_span = float(self.u_surface_max - self.u_surface_min)
+                width_t = torch.where(
+                    edge_t & torch.isfinite(width_t),
+                    torch.full_like(width_t, full_span),
+                    width_t,
+                )
+                profile_width_np = width_t.cpu().numpy()
+
             # Extract and clip results
             final_params_np = final_params.cpu().numpy()
             final_chi2_np = final_chi2.cpu().numpy()
@@ -1147,6 +1290,12 @@ class LossConeFitterTorch(LossConeFitterBase):
                 if (
                     self.fit_method == FitMethod.LILLIS
                     and chi2 > self.config.LILLIS_CHI2_REDUCED_MAX
+                ) or (
+                    self.fit_method == FitMethod.CASH
+                    and (
+                        not np.isfinite(chi2)
+                        or chi2 > self.config.LOSS_CONE_DEVIANCE_REDUCED_MAX
+                    )
                 ):
                     results[chunk_idx] = [np.nan, np.nan, np.nan, chi2, chunk_idx]
                     continue
@@ -1160,6 +1309,8 @@ class LossConeFitterTorch(LossConeFitterBase):
                 ]
                 if compute_width and self.fit_method == FitMethod.LILLIS:
                     u_width[chunk_idx] = float(lhs_u_width_np[i])
+                elif compute_width and self.fit_method == FitMethod.CASH:
+                    u_width[chunk_idx] = float(profile_width_np[i])
 
         return results, u_width
 
@@ -1194,13 +1345,17 @@ class LossConeFitterTorch(LossConeFitterBase):
         n_lhs: int | None = None,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Fit surface potential and return an LHS-based identifiability proxy for
+        Fit surface potential and return a per-chunk identifiability width for
         U_surface.
+
+        For Lillis the width is the LHS-based max−min proxy; for Cash it is the
+        profile-likelihood ΔD≤1 (68%) confidence interval (see
+        ``_u_width_profile``). NaN for other methods or failed fits.
 
         Returns:
             results: (n_chunks, 5) array [U_surface, bs_over_bm, beam_amp, chi2,
                 chunk_index]
-            u_width_lhs: (n_chunks,) U-width [V] (NaN for non-Lillis or failed fits)
+            u_width: (n_chunks,) U-width [V] (NaN for non-Lillis/Cash or failed fits)
             u_is_identifiable: (n_chunks,) True if width <= identifiable_width_max_v
         """
         delta_reduced = float(delta_reduced)

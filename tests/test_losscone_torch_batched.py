@@ -115,3 +115,57 @@ GOLDEN_RESULTS = np.array(
 )
 GOLDEN_U_WIDTH = 31.25
 GOLDEN_IDENTIFIABLE = True
+
+
+def test_cash_cpu_torch_parity(monkeypatch) -> None:
+    """The torch Cash path must match the CPU Cash path on a synthetic sweep.
+
+    Both run in float64, so the deterministic profile-likelihood U-width scan
+    should agree to numerical precision; the DE-driven fit parameters agree
+    closely for this well-constrained single chunk. Guards the torch Cash
+    threading (noise tensors + deviance dispatch + profile width) against drift.
+    """
+    pytest.importorskip("torch")
+    monkeypatch.setattr(config, "LOSS_CONE_LHS_SAMPLES", 128)
+    monkeypatch.setattr(config, "LOSS_CONE_DE_POPSIZE", 32)
+    monkeypatch.setattr(config, "LOSS_CONE_DE_MAXITER", 80)
+    # Keep every fit so widths/results are populated (the acceptance cut is
+    # identical config-driven logic on both paths).
+    monkeypatch.setattr(config, "LOSS_CONE_DEVIANCE_REDUCED_MAX", 1e12)
+
+    from src.losscone.cpu import LossConeFitter
+    from src.losscone_torch import LossConeFitterTorch
+
+    er, pitch_angle = _build_losscone_er()
+    cpu = LossConeFitter(
+        er,
+        pitch_angle=pitch_angle,
+        normalization_mode="ratio",
+        fit_method="cash",
+    )
+    res_cpu, w_cpu = cpu.fit_surface_potential_with_u_width_qc()
+
+    tor = LossConeFitterTorch(
+        er,
+        pitch_angle=pitch_angle,
+        normalization_mode="ratio",
+        fit_method="cash",
+        device="cpu",
+        dtype="float64",
+    )
+    res_tor, w_tor, ident_tor = tor.fit_surface_potential_with_u_width_qc()
+
+    assert res_cpu.shape == res_tor.shape == (1, 5)
+    assert np.isfinite(res_cpu[0, 0]) and np.isfinite(res_tor[0, 0])
+
+    # Deterministic profile-likelihood width scan -> tight parity.
+    np.testing.assert_allclose(w_tor, w_cpu, rtol=0, atol=1e-6)
+    # Identifiability classification must agree exactly.
+    id_cpu = np.isfinite(w_cpu) & (w_cpu <= 200.0)
+    assert np.array_equal(id_cpu, ident_tor)
+    # Fit parameters land near each other and near the injected truth (U=-50).
+    # The tolerance absorbs DE-optimizer variance (SciPy vs batched DE); tight
+    # bit-parity is not expected, unlike the deterministic width scan above.
+    np.testing.assert_allclose(res_tor[0, 0], res_cpu[0, 0], atol=6.0)  # U [V]
+    np.testing.assert_allclose(res_tor[0, 1], res_cpu[0, 1], atol=0.15)  # bs/bm
+    assert -60.0 < res_tor[0, 0] < -40.0  # torch recovers near truth
