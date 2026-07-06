@@ -55,7 +55,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "Only use measurements whose per-row U-surface fit passes the "
-            "identifiability QC (rows_u_is_identifiable_lhs_dchi2red_0p001)"
+            "identifiability QC. The QC key is auto-resolved from the cache, "
+            "preferring the Cash profile-CI flag (rows_u_is_identifiable_profile) "
+            "over the legacy LHS proxy (rows_u_is_identifiable_lhs_dchi2red_0p001)."
+        ),
+    )
+    parser.add_argument(
+        "--u-identifiable-key",
+        type=str,
+        default=None,
+        help=(
+            "Override the per-row identifiability NPZ key used by "
+            "--require-u-identifiable (default: auto-resolve, profile over legacy)"
         ),
     )
     parser.add_argument(
@@ -195,7 +206,11 @@ def main() -> int:
 def _main_basis_mode(args: argparse.Namespace) -> int:
     """Run temporal basis fitting mode."""
     from .basis import fit_temporal_basis, reconstruct_at_times
-    from .coefficients import _discover_npz, _load_all_data
+    from .coefficients import (
+        _discover_npz,
+        _load_all_data,
+        resolve_u_identifiable_key,
+    )
 
     logging.info("Using temporal basis fitting mode")
     logging.info("Basis specification: %s", args.temporal_basis)
@@ -208,11 +223,15 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
     try:
         files = _discover_npz(cache_dir)
         logging.info("Found %d NPZ files", len(files))
+        u_identifiable_key = resolve_u_identifiable_key(files, args.u_identifiable_key)
+        if args.require_u_identifiable:
+            logging.info("Using identifiability key '%s'", u_identifiable_key)
         utc, lat, lon, potential = _load_all_data(
             files,
             start_ts,
             end_ts_exclusive,
             require_u_identifiable=args.require_u_identifiable,
+            u_identifiable_key=u_identifiable_key,
         )
         logging.info("Loaded %d measurements", utc.size)
     except Exception as exc:
@@ -314,6 +333,7 @@ def _main_window_mode(args: argparse.Namespace) -> int:
             max_lag=args.max_lag,
             decay_factor=args.decay_factor,
             require_u_identifiable=args.require_u_identifiable,
+            u_identifiable_key=args.u_identifiable_key,
         )
     except Exception as exc:
         logging.exception("Failed to compute temporal harmonics: %s", exc)

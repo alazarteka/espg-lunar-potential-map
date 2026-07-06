@@ -86,6 +86,12 @@ class PotentialResults:
     - u_width_lhs_dchi2red_0p001: LHS-based U-width proxy [V]; NaN if disabled.
     - u_is_identifiable_lhs_dchi2red_0p001: True if width <= threshold; False if
       disabled or width is NaN.
+    - u_width_profile_dev68: profile-likelihood 68% CI width [V] from the Cash
+      (Poisson-deviance) fit, i.e. the U range with ΔD <= 1 (Wilks); NaN if
+      disabled or not a Cash fit. Unlike the LHS max-min proxy above, this is a
+      genuine confidence interval.
+    - u_is_identifiable_profile: True if the profile CI width <= threshold; False
+      if disabled or width is NaN.
 
     Kappa fit parameters (from spacecraft potential calculation):
     - electron_temperature: Electron temperature Te in eV; NaN if not fit.
@@ -124,6 +130,9 @@ class PotentialResults:
     u_is_identifiable_lhs_dchi2red_0p001: np.ndarray = field(
         default_factory=lambda: np.array([])
     )
+    # Profile-likelihood 68% CI (Cash / Poisson-deviance fit)
+    u_width_profile_dev68: np.ndarray = field(default_factory=lambda: np.array([]))
+    u_is_identifiable_profile: np.ndarray = field(default_factory=lambda: np.array([]))
 
     # Kappa fit parameters (new)
     electron_temperature: np.ndarray = field(default_factory=lambda: np.array([]))
@@ -146,6 +155,10 @@ class PotentialResults:
             self.u_width_lhs_dchi2red_0p001 = np.full(n, np.nan)
         if len(self.u_is_identifiable_lhs_dchi2red_0p001) == 0:
             self.u_is_identifiable_lhs_dchi2red_0p001 = np.zeros(n, dtype=bool)
+        if len(self.u_width_profile_dev68) == 0:
+            self.u_width_profile_dev68 = np.full(n, np.nan)
+        if len(self.u_is_identifiable_profile) == 0:
+            self.u_is_identifiable_profile = np.zeros(n, dtype=bool)
         if len(self.electron_temperature) == 0:
             self.electron_temperature = np.full(n, np.nan)
         if len(self.electron_density) == 0:
@@ -195,6 +208,8 @@ def _concat_results(results: list[PotentialResults]) -> PotentialResults:
         u_is_identifiable_lhs_dchi2red_0p001=cat(
             "u_is_identifiable_lhs_dchi2red_0p001"
         ),
+        u_width_profile_dev68=cat("u_width_profile_dev68"),
+        u_is_identifiable_profile=cat("u_is_identifiable_profile"),
         electron_temperature=cat("electron_temperature"),
         electron_density=cat("electron_density"),
         kappa_value=cat("kappa_value"),

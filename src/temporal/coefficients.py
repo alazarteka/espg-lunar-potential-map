@@ -38,7 +38,35 @@ if TYPE_CHECKING:
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 DEFAULT_SYNODIC_PERIOD_DAYS = 29.530588
 SIDEREAL_PERIOD_DAYS = 27.321661
-DEFAULT_U_IDENTIFIABLE_KEY = "rows_u_is_identifiable_lhs_dchi2red_0p001"
+# Per-row identifiability flags emitted by the batch pipeline. The Cash fit's
+# profile-likelihood 68% CI flag is preferred when present; the Lillis LHS
+# max-min proxy is the legacy fallback.
+PROFILE_U_IDENTIFIABLE_KEY = "rows_u_is_identifiable_profile"
+LEGACY_U_IDENTIFIABLE_KEY = "rows_u_is_identifiable_lhs_dchi2red_0p001"
+DEFAULT_U_IDENTIFIABLE_KEY = LEGACY_U_IDENTIFIABLE_KEY
+
+
+def resolve_u_identifiable_key(files: list[Path], override: str | None = None) -> str:
+    """Pick the per-row identifiability key to use across the cache files.
+
+    Prefers the Cash profile-CI key (``rows_u_is_identifiable_profile``) if any
+    cache file carries it, else the legacy LHS-proxy key. An explicit ``override``
+    is returned unchanged. Falls back to the legacy key when neither is present
+    (the caller warns per-file when the key is actually missing).
+    """
+    if override is not None:
+        return override
+    saw_legacy = False
+    for path in files:
+        with np.load(path) as data:
+            keys = set(data.files)
+        if PROFILE_U_IDENTIFIABLE_KEY in keys:
+            return PROFILE_U_IDENTIFIABLE_KEY
+        if LEGACY_U_IDENTIFIABLE_KEY in keys:
+            saw_legacy = True
+    if saw_legacy:
+        return LEGACY_U_IDENTIFIABLE_KEY
+    return DEFAULT_U_IDENTIFIABLE_KEY
 
 
 @dataclass(slots=True)
@@ -822,7 +850,7 @@ def compute_temporal_harmonics(
     max_lag: int = 1,
     decay_factor: float = 0.5,
     require_u_identifiable: bool = False,
-    u_identifiable_key: str = DEFAULT_U_IDENTIFIABLE_KEY,
+    u_identifiable_key: str | None = None,
 ) -> list[HarmonicCoefficients]:
     """
     Compute time-dependent spherical harmonic coefficients a_lm(t).
@@ -855,6 +883,10 @@ def compute_temporal_harmonics(
     logging.info("Discovering NPZ files in %s", cache_dir)
     files = _discover_npz(cache_dir)
     logging.info("Found %d NPZ files", len(files))
+
+    u_identifiable_key = resolve_u_identifiable_key(files, u_identifiable_key)
+    if require_u_identifiable:
+        logging.info("Using identifiability key '%s'", u_identifiable_key)
 
     start_ts = start_date.astype("datetime64[s]")
     end_ts_exclusive = (end_date + np.timedelta64(1, "D")).astype("datetime64[s]")
