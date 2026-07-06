@@ -698,18 +698,7 @@ def process_merged_data(
         FitMethod.CASH,
     )
 
-    # TODO(cash-torch): remove once torch Cash threading lands (parallel worktree).
-    # The torch fitter has no Cash-deviance path yet, so run the Cash loss-cone fit
-    # on the CPU fitter (SC-potential estimation above still uses torch when asked).
-    use_torch_fit = use_torch
-    if use_torch and fit_method == FitMethod.CASH:
-        logging.warning(
-            "Torch Cash fitting is not yet available; using the CPU fitter for the "
-            "Cash loss-cone fit."
-        )
-        use_torch_fit = False
-
-    if use_torch_fit:
+    if use_torch:
         # PyTorch-accelerated fitter (~5x faster)
         if not HAS_TORCH or LossConeFitterTorch is None:
             raise ImportError(
