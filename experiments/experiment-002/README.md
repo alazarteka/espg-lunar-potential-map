@@ -1,8 +1,8 @@
 # Experiment 002: LP ER Count Reconstruction Audit
 
-**Status:** Planned
+**Status:** Running
 
-**Planned branch:** `experiment/002-er-count-reconstruction`
+**Branch:** `experiments`
 
 **Depends on:** [Experiment 001](../experiment-001/README.md)
 

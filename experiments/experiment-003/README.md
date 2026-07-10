@@ -2,7 +2,7 @@
 
 **Status:** Blocked by Experiment 002
 
-**Planned branch:** `experiment/003-observation-model-comparison`
+**Branch:** `experiments`
 
 **Depends on:** [Experiment 001](../experiment-001/README.md) and
 [Experiment 002](../experiment-002/README.md)

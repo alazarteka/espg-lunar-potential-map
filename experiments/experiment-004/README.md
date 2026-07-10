@@ -2,7 +2,7 @@
 
 **Status:** Blocked by Experiment 003
 
-**Planned branch:** `experiment/004-instrument-response-sensitivity`
+**Branch:** `experiments`
 
 **Depends on:** [Experiment 003](../experiment-003/README.md)
 

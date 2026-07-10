@@ -2,7 +2,7 @@
 
 **Status:** Blocked by Experiments 003 and 004
 
-**Planned branch:** `experiment/005-one-day-validation-pilot`
+**Branch:** `experiments`
 
 **Depends on:** [Experiment 003](../experiment-003/README.md) and
 [Experiment 004](../experiment-004/README.md)

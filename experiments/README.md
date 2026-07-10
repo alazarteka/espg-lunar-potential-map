@@ -4,16 +4,17 @@ This directory contains version-controlled scientific experiments that inform
 production methods and manuscript claims. Experiments are numbered in execution
 order and preserve hypotheses, protocols, code, outputs, and decisions together.
 
-## Naming
+## Naming and Branching
 
 - Directory: `experiments/experiment-NNN/`
-- Branch: `experiment/NNN-short-description`
+- Branch: `experiments`
 - Commit: conventional commit describing the experiment or its result
 
-Experiment branches may build cumulatively on accepted earlier experiment
-commits. A production change should be implemented separately after the
-experiment's decision has been reviewed; experimental code should not silently
-become a production default.
+Experiments accumulate on the shared `experiments` branch while they add only
+self-contained protocols, scripts, and compact results. A production change
+should be implemented on a separate source branch after the experiment's
+decision has been reviewed; experimental code should not silently become a
+production default.
 
 ## Required Record
 
@@ -44,7 +45,7 @@ globally ignored.
 | Experiment | Question | Status | Decision |
 | --- | --- | --- | --- |
 | [001](experiment-001/README.md) | Does current Cash reproduce the Halekas benchmark, and why does it fail? | Complete | Smooth Lillis approximately reproduces the benchmark; current pure-Poisson Cash fails. |
-| [002](experiment-002/README.md) | Can the calibrated LP ER flux product support a raw-count Poisson likelihood? | Planned | Pending |
+| [002](experiment-002/README.md) | Can the calibrated LP ER flux product support a raw-count Poisson likelihood? | Running | Pending |
 | [003](experiment-003/README.md) | Which observation/uncertainty model best preserves physics and calibrates uncertainty? | Blocked by 002 | Pending |
 | [004](experiment-004/README.md) | How sensitive is retrieval to the instrument-response and fixed-shape assumptions? | Blocked by 003 | Pending |
 | [005](experiment-005/README.md) | Does the frozen method pass a complete one-day scientific validation pilot? | Blocked by 003-004 | Pending |
