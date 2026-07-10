@@ -69,7 +69,10 @@ energy/channel samples spanning:
 - Multiple latitude bands and inferred dwell times.
 
 The final sample list and selection code must be committed before evaluating
-agreement.
+agreement. This gate is now frozen in `sample_manifest.csv`: 16 bins selected
+only from calibrated spectrum 653, spanning zero flux, positive-count proxy
+quantiles, both energy extremes, and all angular exposure multiplicities. The
+selection script does not read Level-0 telemetry.
 
 ## Authoritative Sources
 
@@ -162,6 +165,40 @@ diagnostic, not a proposed correction factor.
 | `count_audit.csv` | Per-bin reconstruction and uncertainty comparison |
 | `count_audit.png` | Compact visual comparison across count regimes |
 | `sources.md` | Exact instrument-document passages, locations, and unresolved ambiguities |
+
+## Execution Record
+
+### Frozen Provenance And Sample Gate
+
+- Exact PDS products, byte sizes, hashes, and documentation locations are in
+  `sources.md`.
+- `compression.py` implements lower-endpoint decoding and represented count
+  intervals, including an open upper bound for undocumented `0xff` saturation.
+- `raw_telemetry.py` reconstructs 179 complete Format-1 blocks from the 7,285
+  records in `M9911914.B`; every accepted block contains exactly 1,320 bytes.
+- `freeze_manifest.py` produced the committed 16-bin `sample_manifest.csv`
+  without reading raw telemetry.
+
+### Exposure Finding
+
+The documented nominal exposure is `spin_period / 256` per basic accumulation,
+with multiplicity one, two, or four for the archive angular cells. At a
+five-second spin, the resulting 0.01953125, 0.0390625, and 0.078125 second
+exposures are uniformly eight times below the current production values.
+
+This invalidates the current reconstructed-count scale. It does not by itself
+explain Experiment 001: a coherent factor-of-eight reduction would lower a
+reduced deviance near 1,421 only to roughly 178.
+
+### Provisional Outcome
+
+Evidence currently favors **Outcome C: Partial Recovery**. Raw compressed
+counter intervals are recoverable from Level-0 telemetry, but a formal pairing
+to Level-1 spectrum 653 still requires the instrument timing crosswalk. Flux
+alone cannot currently recover exact independent Poisson observations because
+the archived processing includes dead-time correction, compression intervals,
+uncertain energy-dependent exposure, and incompletely documented response
+calibration.
 
 Files will be added only when they have real content; these names define the
 expected experiment record rather than empty placeholders.
