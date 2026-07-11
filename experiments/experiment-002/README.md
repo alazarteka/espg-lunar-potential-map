@@ -1,6 +1,8 @@
 # Experiment 002: LP ER Count Reconstruction Audit
 
-**Status:** Running
+**Status:** Complete
+
+**Decision:** Outcome C, partial recovery
 
 **Branch:** `experiments`
 
@@ -72,12 +74,16 @@ The final sample list and selection code must be committed before evaluating
 agreement. This gate is now frozen in `sample_manifest.csv`: 16 bins selected
 only from calibrated spectrum 653, spanning zero flux, positive-count proxy
 quantiles, both energy extremes, and all angular exposure multiplicities. The
-selection script does not read Level-0 telemetry.
+selection script does not read Level-0 telemetry. Its exposure proxy records the
+pre-comparison angular-only hypothesis; that hypothesis was subsequently
+rejected after the energy-sweep duty cycle was included.
 
 ## Authoritative Sources
 
 - LP MAG/ER telemetry format and counter compression:
   <https://pds-ppi.igpp.ucla.edu/volume/LP_1201/DOCUMENT/PROJECT/LVL0SIS.PDF>
+- Governing Format-3 frame table for the 1999 product:
+  <https://pds.nasa.gov/data/lp-l-6-position-v1.0/lp_0016/document/magerfmt.pdf>
 - Calibrated 3-D electron flux collection:
   <https://pds-ppi.igpp.ucla.edu/data/lp-er-calibrated/data-3deleflux/>
 - PDS3 source data set:
@@ -166,6 +172,11 @@ diagnostic, not a proposed correction factor.
 | `count_audit.png` | Compact visual comparison across count regimes |
 | `sources.md` | Exact instrument-document passages, locations, and unresolved ambiguities |
 
+`response_audit.csv`, `infer_response.py`, and `fragment_layout_audit.py` were
+added when the preregistered counter audit exposed a telemetry-version question.
+The planned figure was not produced because the decisive checks are scalar and
+fully represented in the tracked CSV tables.
+
 ## Execution Record
 
 ### Frozen Provenance And Sample Gate
@@ -174,62 +185,159 @@ diagnostic, not a proposed correction factor.
   `sources.md`.
 - `compression.py` implements lower-endpoint decoding and represented count
   intervals, including an open upper bound for undocumented `0xff` saturation.
-- `raw_telemetry.py` reconstructs 179 complete Format-1 blocks from the 7,285
+- `raw_telemetry.py` reconstructs 179 complete Format-3 blocks from the 7,285
   records in `M9911914.B`; every accepted block contains exactly 1,320 bytes.
 - `freeze_manifest.py` produced the committed 16-bin `sample_manifest.csv`
   without reading raw telemetry.
 
-### Exposure Finding
+### Telemetry Version And Crosswalk
 
-The documented nominal exposure is `spin_period / 256` per basic accumulation,
-with multiplicity one, two, or four for the archive angular cells. At a
-five-second spin, the resulting 0.01953125, 0.0390625, and 0.078125 second
-exposures are uniformly eight times below the current production values.
+April 1999 uses telemetry Format 3, introduced in May 1998. Format 1 and Format
+3 are identical only through 3-D byte 278. The initial Format-1 transcription
+therefore failed sharply at frame type 9. After applying the governing Format-3
+table, every documented fragment offset is the empirical optimum in a blinded
+temporal-layout check; median fragment correlations are generally 0.90-1.00.
 
-This invalidates the current reconstructed-count scale. It does not by itself
-explain Experiment 001: a coherent factor-of-eight reduction would lower a
-reduced deviance near 1,421 only to roughly 178.
+The first complete raw block aligns with Level-1 spectrum 630. The streams then
+advance at the same 80-second cadence, placing block 23 at spectrum 653. Against
+adjacent blocks 20-26, block 23 has the strongest agreement with spectrum 653:
 
-### Provisional Outcome
+| Metric | Block 23 / spectrum 653 |
+| --- | ---: |
+| Log-count/flux correlation | 0.9742 |
+| Rank correlation | 0.9997 |
+| First VCDU | 3849472 |
 
-Evidence currently favors **Outcome C: Partial Recovery**. Raw compressed
-counter intervals are recoverable from Level-0 telemetry, but a formal pairing
-to Level-1 spectrum 653 still requires the instrument timing crosswalk. Flux
-alone cannot currently recover exact independent Poisson observations because
-the archived processing includes dead-time correction, compression intervals,
-uncertain energy-dependent exposure, and incompletely documented response
-calibration.
+A 30-spectrum per-bin lag test independently peaks at zero lag. This establishes
+the benchmark crosswalk without choosing the block that gives the most favorable
+count interval matches.
 
-Files will be added only when they have real content; these names define the
-expected experiment record rather than empty placeholders.
+### Exposure And Information Scale
 
-## Decision Gate
+The angular-only hypothesis frozen before raw inspection used the basic
+`spin_period / 256` accumulation and angular multiplicity, giving
+`spin_period / (16 N_azimuth)`. It omitted that each energy receives only about
+one sixteenth of the sweep. The ideal per-energy/per-direction scale is instead
 
-Experiment 002 is complete only when all of the following are answered:
+```text
+dt_bin ~= spin_period / (256 * N_azimuth).
+```
 
-1. What physical quantity does each archived flux number represent?
-2. What accumulation/exposure produced it?
-3. Can an original counter value or interval be recovered?
-4. Which corrections make it non-Poisson or correlated?
-5. Is a count likelihood valid for all bins, a restricted subset, or none?
-6. What uncertainty information must Experiment 003 carry forward?
+The archive states that the exact integration time also depends on energy. Raw
+block 23 empirically confirms the scale: the production reconstruction is a
+median 120.9 times the decoded raw lower endpoint across positive bins, close to
+the ideal factor 128 between `2.5/N_azimuth` and the duty-cycle expression.
 
-The result must select Outcome A, B, or C with documented evidence. It must not
-tune a new loss-cone objective or acceptance threshold.
+This is a much larger error than the initial factor-of-eight diagnosis. As a
+first-order information-scale check, dividing Experiment 001's reduced deviance
+of about 1,421 by 120.9 gives about 11.8. Correct counts should therefore improve
+Cash dramatically, but count scale alone still cannot make the current forward
+model statistically adequate.
 
-## Discussion Decisions Before Execution
+### Calibration And Dead Time
 
-Before starting, decide:
+A bin-specific effective response learned on 30 neighboring spectra, excluding
+653, is highly stable and available for 99.85% of bins. Two dead-time inversions
+were compared:
 
-- Whether Level 0/1 telemetry and header metadata are locally available or must
-  be downloaded from PDS.
-- Whether exact reconstruction of spectrum 653 is feasible from available raw
-  products, or whether the primary deliverable is a defensible uncertainty
-  bound on the calibrated product.
-- How many frozen control bins are sufficient to cover telemetry modes without
-  turning this into an instrument reprocessing project.
-- Whether assistance from a Lunar Prospector ER instrument expert or PDS
-  curator should be sought for undocumented exposure/prescaling details.
+| Flux inversion | Median response relative MAD | Spectrum-653 interval recovery |
+| --- | ---: | ---: |
+| Per-bin `tau = 0.3 microsecond` | 0.3386% | 22.53% |
+| Dead time retained in effective response | 0.0396% | 67.91% |
+
+The per-bin correction is empirically rejected. Detector dead time is driven by
+the total event stream, so the abbreviated PDS formula does not justify applying
+the nonlinear inverse independently to each archived flux bin. Remaining misses
+are concentrated where integer codes, ASCII flux precision, energy-dependent
+exposure, spin timing, and compression boundaries matter most.
+
+### Uncertainty Budget
+
+- **Counting:** raw integer counts are available only as compression intervals,
+  not exact calibrated-flux inverses.
+- **Compression:** codes below `0x20` are exact; larger codes represent widening
+  truncated intervals; `0xff` has no documented finite upper bound.
+- **Prescaling:** the real-time prescale header governs pitch-angle products, not
+  the 88-by-15 3-D counters.
+- **Exposure/response:** strongly bin dependent; empirically stable over the
+  local control interval but not fully documented by the archive.
+- **Dead time:** approximately 0.3 microsecond and global-event-rate dependent;
+  a per-bin inverse is not supported.
+- **Background:** approximately 10 counts/s is retained in the archive and must
+  enter the expected count model rather than be silently removed.
+- **Model discrepancy:** remains substantial after the roughly 121-fold count
+  correction and must be estimated separately from instrumental uncertainty.
+
+### Final Decision
+
+**Outcome C: Partial Recovery.** Original compressed count intervals are
+recoverable for Format-3 telemetry when Level 0 is paired with Level 1. A local
+effective response is also recoverable and stable enough to justify testing an
+interval-censored count model in Experiment 003. The calibrated flux archive by
+itself does not define exact independent Poisson observations, and the current
+production Cash implementation is invalid because it uses the wrong exposure,
+ignores compression intervals, and applies unsupported precision.
+
+Experiment 003 must carry forward raw-code intervals, response uncertainty,
+global dead-time uncertainty, background, and an explicit model-discrepancy
+term. It must compare that candidate against conditional-shape and smooth-Lillis
+alternatives rather than assuming corrected counts alone solve the benchmark.
+
+## Reproduction
+
+```bash
+.venv/bin/python experiments/experiment-002/raw_telemetry.py \
+  artifacts/experiments/experiment-002/source/M9911914.B --format 3
+.venv/bin/python experiments/experiment-002/fragment_layout_audit.py \
+  --telemetry artifacts/experiments/experiment-002/source/M9911914.B \
+  --data data/1999/091_120APR/3D990429.TAB --format 3
+.venv/bin/python experiments/experiment-002/audit_counts.py \
+  --telemetry artifacts/experiments/experiment-002/source/M9911914.B \
+  --data data/1999/091_120APR/3D990429.TAB --theta data/theta.tab \
+  --manifest experiments/experiment-002/sample_manifest.csv \
+  --output experiments/experiment-002/count_audit.csv
+.venv/bin/python experiments/experiment-002/infer_response.py \
+  --telemetry artifacts/experiments/experiment-002/source/M9911914.B \
+  --data data/1999/091_120APR/3D990429.TAB \
+  --output experiments/experiment-002/response_audit.csv \
+  --dead-time-seconds 0
+```
+
+## Protocol Deviations
+
+1. The first parser used Format 1 from the general SIS. The empirical layout
+   discontinuity at byte 279 led to the governing 1999 Format-3 table; the
+   corrected decoder was then rerun from the frozen manifest.
+2. The initial exposure audit stopped at angular multiplicity and reported an
+   eight-fold production error. The counter comparison exposed the omitted
+   energy-sweep duty cycle, revising the empirical factor to 120.9.
+3. A response-stability holdout was added to determine whether undocumented
+   calibration prevented all count recovery. Spectrum 653 remained excluded
+   from response estimation.
+
+## Decision Gate Answers
+
+1. Each archived value is dead-time-corrected differential flux derived from a
+   compressed 3-D counter, with background retained.
+2. The measurement is a half-spin 3-D snapshot sampled every 16 spins. Per-bin
+   exposure includes angular multiplicity and energy-sweep duty cycle; the exact
+   energy-dependent table is not archived.
+3. The original counter interval is exactly recoverable from paired Format-3
+   Level-0 telemetry. Flux-only recovery is approximate, reaching 67.9% exact
+   held-out interval agreement with a locally learned response.
+4. Log compression, saturation, global dead time, response calibration, ASCII
+   quantization, retained background, and normalization all prevent treating
+   calibrated flux as an exact independent Poisson draw.
+5. A raw interval-count likelihood is scientifically testable for paired,
+   version-identified telemetry with response uncertainty. It is not justified
+   as an archive-wide calibrated-flux default.
+6. Experiment 003 must propagate count intervals, response and global-dead-time
+   uncertainty, background, and explicit forward-model discrepancy.
+
+The experiment downloaded the minimum Level-0 and sun-pulse products from PDS,
+froze 16 benchmark bins before raw comparison, and avoided mission-scale
+reprocessing. Instrument-team or PDS-curator confirmation would still be useful
+before promoting a response model beyond the local Format-3 interval.
 
 ## Non-Goals
 

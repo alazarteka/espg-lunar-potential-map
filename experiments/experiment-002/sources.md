@@ -17,12 +17,17 @@ directory; checksums make the analysis reproducible without tracking binaries.
 The merged file contains 7,285 records of 472 bytes. Each record contains one
 168-byte MAG/ER packet at one-indexed bytes 287-454. Real-time ER frame types
 0-35 collectively transmit one 1,320-byte array: 15 energies by 88 directions.
-The exact Format-1 fragments are transcribed in `raw_telemetry.py`.
+The exact Format-3 fragments are transcribed in `raw_telemetry.py`. The later
+`MAGERFMT.PDF` states that Format 3 replaced the earlier layout in May 1998 and
+is identified by software version 3. Formats 1 and 3 diverge at frame type 9;
+frame 33 also places magnetic-direction bytes after the last 3-D fragment.
 
-The matching sun-pulse ancillary is `S9911914.B`/`.LBL`. It is required for an
-independent spin-phase and look-direction reconstruction and has not yet been
-downloaded. Its absence does not prevent byte-block reconstruction, but it does
-prevent a final timing crosswalk.
+### Sun-Pulse Ancillary
+
+| Product | Role | Bytes | SHA-256 |
+| --- | --- | ---: | --- |
+| [`S9911914.B`](https://pds.nasa.gov/data/lp-l-6-position-v1.0/lp_0016/sunpulse/d11x/s9911914.b) | Matching spin/sun-pulse timing | 29,824 | `6acf3e23308aaad40565868444a330fae4e2dd5e4eb1017f41d6fc3230409b71` |
+| [`S9911914.LBL`](https://pds.nasa.gov/data/lp-l-6-position-v1.0/lp_0016/sunpulse/d11x/s9911914.lbl) | Sun-pulse record layout | 4,018 | `64b08fb83db4b626af5de3acf9a2cd8abf43eb1db76d2cc590b036926d04add0` |
 
 ## Level-1 Calibrated Product
 
@@ -52,18 +57,25 @@ t_basic = spin_period / 256.
 
 Ordinary cells receive one basic accumulation; polar map cells combine two or
 four. For the archive's latitude-band populations `N_azimuth = {16, 8, 4}`,
-the documented nominal relation is
+the angular-only relation is
 
 ```text
 multiplicity = 16 / N_azimuth
-t_bin = spin_period / (16 * N_azimuth).
+t_angular = spin_period / (16 * N_azimuth).
 ```
 
-At a five-second spin this gives 0.01953125, 0.0390625, or 0.078125 seconds.
-The current production assumption `2.5 / N_azimuth` is uniformly eight times
-larger. This invalidates the current count scale but cannot alone explain a
-benchmark reduced deviance near 1,421; a coherent factor-of-eight reduction
-would still leave it near 178.
+Each energy bin receives only about one sixteenth of the energy sweep. Including
+that duty cycle gives the idealized per-energy/per-direction relation
+
+```text
+t_bin ~= spin_period / (256 * N_azimuth).
+```
+
+At a five-second spin this is approximately 0.00122, 0.00244, or 0.00488
+seconds. The current production assumption `2.5 / N_azimuth` is 128 times
+larger in the idealized relation. The direct spectrum-653 comparison gives a
+median production-to-raw-lower ratio of 120.9 because exact exposure varies
+with energy and the calibrated rate includes other processing.
 
 The PDS data-set catalog documents the ground chain:
 
@@ -75,7 +87,8 @@ The PDS data-set catalog documents the ground chain:
 5. Leave the approximately 10 counts/s background unsubtracted.
 6. Divide by `0.02 cm^2 sr * E_center` to obtain differential flux.
 
-Consequently, a nominal flux-only inverse must first use
+The catalog's `R` is not sufficiently defined to justify applying this inverse
+to every individual bin. A trial per-bin inverse used
 
 ```text
 r_corrected = 0.02 * E * F
@@ -83,9 +96,11 @@ r = r_corrected / (1 + tau * r_corrected)
 C_proxy = r * t_bin
 ```
 
-and then test `C_proxy` against the raw byte's compression interval. The
-existing `F * 0.02 * E * dt` calculation instead produces a dead-time-corrected
-count equivalent and treats it as an exact independent Poisson observation.
+and was empirically inferior to retaining dead time in a learned effective
+response. This is physically consistent with dead time depending on the total
+detector event stream. The existing `F * 0.02 * E * dt` calculation produces a
+dead-time-corrected count equivalent and treats it as an exact independent
+Poisson observation.
 
 ## Compression And Prescaling
 
@@ -110,9 +125,10 @@ evidence.
   table/arithmetic is not supplied in the archive documentation.
 - The energy-control-table state is not completely present in the four-byte
   real-time header.
-- Pairing spectrum 653 to one raw block requires the documented `TAcc`
-  calculation, including spin phase, half-spin index, readout latency, and the
-  ground direction correction. Timestamp proximity alone is not sufficient.
+- Exact mission-wide pairing still requires robust handling of `TAcc`, data
+  gaps, telemetry-version changes, spin phase, and readout latency. For the
+  benchmark interval, cadence alignment, adjacent controls, a zero-lag temporal
+  test, and rank correlation 0.9997 independently identify raw block 23.
 
 These gaps are why a flux-only inversion is a diagnostic proxy, not yet a
 formal recovered-count likelihood.

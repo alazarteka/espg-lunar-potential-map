@@ -1,6 +1,6 @@
 # Experiment 003: Observation and Uncertainty Model Comparison
 
-**Status:** Blocked by Experiment 002
+**Status:** Ready to finalize protocol
 
 **Branch:** `experiments`
 
@@ -23,7 +23,10 @@ confirmation panel. At minimum compare:
    fractional model discrepancy.
 2. Smooth Lillis/ratio fitting with uncertainty calibrated by simulation and
    block resampling rather than nominal Wilks theory.
-3. A count-level likelihood only if Experiment 002 supports it.
+3. An interval-censored raw-count likelihood using the Format-3 telemetry codes
+   and an empirically validated response table. This candidate must retain
+   compression, response, global dead-time, and model-discrepancy uncertainty;
+   calibrated flux values must not be treated as exact Poisson counts.
 
 A constant quasi-Poisson scale alone is not an adequate candidate because it
 widens intervals without changing the biased Cash point estimate.
