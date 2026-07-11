@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -109,3 +110,23 @@ def test_provenance_name_is_repository_relative() -> None:
     assert selection.provenance_name(path) == (
         "experiments/experiment-006/support_selection.py"
     )
+
+
+def test_frozen_manifest_invariants() -> None:
+    experiment_dir = Path(__file__).resolve().parent
+    manifest = pd.read_csv(experiment_dir / "support_manifest.csv")
+    provenance = json.loads(
+        (experiment_dir / "support_provenance.json").read_text(encoding="ascii")
+    )
+
+    calibration = set(manifest.loc[manifest.split == "calibration", "spec_no"])
+    confirmation = set(manifest.loc[manifest.split == "confirmation", "spec_no"])
+    assert calibration == set(provenance["calibration_specs"])
+    assert confirmation == set(provenance["confirmation_specs"])
+    assert calibration.isdisjoint(confirmation)
+    assert len(calibration) == len(confirmation) == 12
+    assert not ({572, 652, 653, 654, 772, 969} & (calibration | confirmation))
+    assert manifest.eligible.all()
+    assert (manifest.connected_rows == 15).all()
+    assert (manifest.field_elevation_deg >= 30.0).all()
+    assert set(manifest.groupby(["temporal_stratum", "split"]).size()) == {2}

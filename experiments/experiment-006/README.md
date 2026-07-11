@@ -1,6 +1,6 @@
 # Experiment 006: Restricted-Domain Beam-Proxy Validation
 
-**Status:** Planned; design recorded before implementation or simulation
+**Status:** Running; D0 support and geometry freeze complete
 
 **Branch:** `experiments`
 
@@ -55,6 +55,9 @@ Experiment 006 starts over with:
 The full preregistration is in [protocol.md](protocol.md). The machine-readable
 design is in [configuration.json](configuration.json), and the scientific
 rationale is developed in [supplement/main.tex](supplement/main.tex).
+
+The completed D0 decision and frozen support identities are recorded in
+[support-selection-result.md](support-selection-result.md).
 
 ## Stages And Information Barriers
 
@@ -145,5 +148,5 @@ is a known positive-control observation and is not confirmatory evidence.
 | `confirm.py` | One-shot confirmatory runner and decision report |
 | `supplement/main.tex` | Mini-paper updated from expectation to result |
 
-No calibration, confirmation, or real-pilot output exists at this design
-commit.
+No calibration, confirmation, or real-pilot output exists. D0 opened only
+outcome-blind geometry and structural support information.

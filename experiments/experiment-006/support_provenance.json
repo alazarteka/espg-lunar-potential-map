@@ -1,0 +1,103 @@
+{
+  "calibration_specs": [
+    576,
+    596,
+    641,
+    684,
+    725,
+    768,
+    784,
+    799,
+    842,
+    864,
+    945,
+    964
+  ],
+  "candidate_specs": 398,
+  "confirmation_specs": [
+    619,
+    638,
+    651,
+    707,
+    716,
+    748,
+    819,
+    835,
+    856,
+    893,
+    909,
+    939
+  ],
+  "eligible_specs": 258,
+  "files": {
+    "data/1999/091_120APR/3D990429.TAB": "de8358ba1456c2777e45271a1b193f95f11e866b10ae7d09d136498efc97f702",
+    "data/attitude.tab": "26b7a635ee44926d7929658abbee916cfbfc84c755f07cc8541a481c38259f70",
+    "data/spice_kernels/kernels.lock": "bf1b760b624c42b8f4f55a9613db058e029022aff0f8f6463b65047430dc5ae8",
+    "data/spice_kernels/latest_leapseconds.tls": "678e32bdb5a744117a467cd9601cd6b373f0e9bc9bbde1371d5eee39600a039b",
+    "data/spice_kernels/lp_ask_980111-980531.bsp": "d31d099ea930fe2fe5a65252c2d306f96b989504577d0ff150bcf530079b3c42",
+    "data/spice_kernels/lp_ask_980601-981031.bsp": "aea2106fb82bbb8537fa83abad49d023ac5aaa57013f949215c1f2375dc907bd",
+    "data/spice_kernels/lp_ask_981101-990331.bsp": "a352325b0117472fa06141cd6d55392d35176dd9954190049103ec446428e8f7",
+    "data/spice_kernels/lp_ask_990401-990730.bsp": "3fb6c62f1b4248491515c8e9d55a6dd0452368080f389c51d8d01e64772246f9",
+    "data/spice_kernels/lpephemu.bsp": "4aeed7b34a8d6f10a89d7143a98dabe4806baa48f931199ba4b209c0c89bb598",
+    "data/spice_kernels/pck00011.tpc": "3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1",
+    "data/theta.tab": "395202a7237f65253072440908226467bcbae66f5e7247f5b46e39e1489cd005",
+    "experiments/experiment-006/configuration.json": "c9b62d7e171df1b467f019163313645c985ceec8bd9d6a204d74e82aed286b35",
+    "experiments/experiment-006/support_candidates.csv": "421462509b979e2d4fdfcaa4477198927f2c674fe3904f92657e2758f14d536b",
+    "experiments/experiment-006/support_manifest.csv": "1fe28bc3c12b7b91db110b6f6c58bb29e9ed422b882a02cad800e7112bd2bd7a",
+    "experiments/experiment-006/support_selection.py": "aa1334e9130809f80a92215c5f3bade0546d5d93a57ae9526598b73ee01a418a"
+  },
+  "generated_date": "2026-07-11",
+  "kernel_lock_verified": true,
+  "loaded_specs": 398,
+  "native_energy_grid_audit": {
+    "grids": [
+      {
+        "energies_ev": [
+          15927.024,
+          9191.748,
+          5304.71,
+          3061.436,
+          1766.805,
+          1019.652,
+          588.458,
+          339.609,
+          195.994,
+          113.111,
+          65.278,
+          37.673,
+          21.742,
+          12.548,
+          7.241
+        ],
+        "sha256": "a4d78885bfa04cb0bd6644d4624ed986ff9362f4bdea9fb198ee33b1ae70ec34",
+        "spec_count": 398
+      }
+    ],
+    "unique_grid_count": 1
+  },
+  "normalization_or_beam_fit_evaluated": false,
+  "repository_commit": "78f84f3c6979bdf60894245ecb23a7b878854611",
+  "selection_features": [
+    "field_elevation_deg",
+    "spacecraft_altitude_km",
+    "footprint_lat_deg",
+    "footprint_lon_sin",
+    "footprint_lon_cos",
+    "axis_support_rows",
+    "minimum_axis_sector_count",
+    "median_axis_sector_count",
+    "median_incident_sector_count",
+    "median_reflected_sector_count",
+    "median_pitch_span_deg",
+    "polarity"
+  ],
+  "selection_is_outcome_blind": true,
+  "software": {
+    "numpy": "1.26.4",
+    "pandas": "3.0.3",
+    "python": "3.12.12",
+    "spiceypy": "8.1.2"
+  },
+  "standardized_split_imbalance": 0.4943821121404222,
+  "temporal_strata": 6
+}
