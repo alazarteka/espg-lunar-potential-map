@@ -102,3 +102,10 @@ def test_selection_features_exclude_flux_morphology() -> None:
     forbidden = {"flux", "beam", "continuum", "residual", "amplitude"}
     for feature in selection.SELECTION_FEATURES:
         assert not any(word in feature for word in forbidden)
+
+
+def test_provenance_name_is_repository_relative() -> None:
+    path = Path(__file__).with_name("support_selection.py")
+    assert selection.provenance_name(path) == (
+        "experiments/experiment-006/support_selection.py"
+    )
