@@ -52,6 +52,36 @@ def _load_beam_v2_module():
 
 
 beam_v2 = _load_beam_v2_module()
+sys.modules["beam_v2"] = beam_v2
+
+
+def _load_beam_v3_module():
+    path = Path(__file__).with_name("beam_v3.py")
+    spec = importlib.util.spec_from_file_location("experiment_005_beam_v3", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+beam_v3 = _load_beam_v3_module()
+sys.modules["beam_v3"] = beam_v3
+
+
+def _load_calibrate_v3_module():
+    path = Path(__file__).with_name("calibrate_v3.py")
+    spec = importlib.util.spec_from_file_location("experiment_005_calibrate_v3", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+calibrate_v3 = _load_calibrate_v3_module()
 
 
 def synthetic_observation(
@@ -318,3 +348,86 @@ def test_flexible_assessment_rejects_null() -> None:
     )
     assert not assessment.base_valid
     assert "amplitude_not_resolved" in assessment.reason_codes
+
+
+def test_smooth_continuum_recovers_noiseless_energy_anchors() -> None:
+    configuration = fast_v2_configuration()
+    configuration["beam"]["smooth_continuum_coefficient_bounds"] = [-12.0, 12.0]
+    support = synthetic_observation(amplitude=0.0)
+    cases = (
+        (65.0, 4.0, 20.0),
+        (150.0, 8.0, 25.0),
+        (350.0, 8.0, 25.0),
+        (800.0, 12.0, 40.0),
+    )
+    for case_index, (center, amplitude, pitch_sigma) in enumerate(cases):
+        observation = calibrate.simulate_observation(
+            support,
+            center_ev=center,
+            amplitude=amplitude,
+            pitch_sigma_deg=pitch_sigma,
+            log_noise_sigma=0.0,
+            rng=np.random.default_rng(90 + case_index),
+            field_ratio=0.975,
+            cone_floor=0.2,
+            boundary_width_deg=8.0,
+        )
+        fitted = beam_v3.fit_smooth_beam(observation, configuration["beam"])
+        assert fitted.success
+        assert abs(fitted.center_ev - center) <= 0.05 * 0.48 * center
+
+
+def test_attempt_03_background_family_mixture_is_frozen() -> None:
+    families = [calibrate_v3.background_family(index) for index in range(8)]
+    assert (
+        families
+        == [
+            "single_logistic",
+            "single_logistic",
+            "double_transition",
+            "asymmetric_shoulder",
+        ]
+        * 2
+    )
+
+
+def test_empirical_correction_uses_only_calibration_split() -> None:
+    configuration = beam_v3.load_configuration()
+    rows = []
+    for center in (65.0, 150.0, 350.0, 800.0):
+        rows.extend(
+            [
+                {
+                    "kind": "beam",
+                    "split": "calibration",
+                    "base_valid": True,
+                    "true_center_ev": center,
+                    "center_error_ev": 2.0,
+                    "center_standard_error_ev": 1.0,
+                },
+                {
+                    "kind": "beam",
+                    "split": "validation",
+                    "base_valid": True,
+                    "true_center_ev": center,
+                    "center_error_ev": 200.0,
+                    "center_standard_error_ev": 1.0,
+                },
+            ]
+        )
+    correction = calibrate_v3.fit_empirical_correction(rows, configuration)
+    assert correction["median_signed_bias_ev"] == [2.0] * 4
+    assert correction["retained_calibration_counts"] == [1] * 4
+
+
+def test_empirical_correction_interpolates_in_log_energy() -> None:
+    correction = {
+        "energy_anchors_ev": [100.0, 400.0],
+        "median_signed_bias_ev": [0.0, 4.0],
+        "scale_68": [1.0, 3.0],
+        "scale_95": [2.0, 6.0],
+    }
+    bias, scale_68, scale_95 = calibrate_v3.interpolate_correction(200.0, correction)
+    assert np.isclose(bias, 2.0)
+    assert np.isclose(scale_68, 2.0)
+    assert np.isclose(scale_95, 4.0)

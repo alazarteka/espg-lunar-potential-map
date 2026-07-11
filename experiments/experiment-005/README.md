@@ -215,6 +215,8 @@ and the two-edge contained-only sensitivity. Never report only finite fits.
 | [`configuration-attempt-03.json`](configuration-attempt-03.json) | Frozen Attempt 03 smooth-continuum settings |
 | `beam.py` | Native-sector beam estimator, bootstrap, and QC funnel |
 | `calibrate.py` | Frozen injection and beam-absent calibration run |
+| `beam_v3.py` | Attempt 03 smooth-continuum beam estimator |
+| `calibrate_v3.py` | Attempt 03 split calibration and held-out validation |
 | `calibration_results.csv` | All 2,100 injection/control outcomes |
 | `calibration_summary.json` | Frozen calibration gate result |
 | `calibration_provenance.json` | Code commit and input/output checksums |
