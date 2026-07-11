@@ -113,12 +113,24 @@ sector bootstraps with a 5.625-degree angular resolution floor. Record nuisance
 edges; the strict no-nuisance-edge set is the only set eligible for a physical
 curve claim.
 
+Because the primary beam estimate is spacecraft-relative and `U_sc` is not yet
+validated, the primary boundary curve uses the documented fully adiabatic
+spacecraft-sheath limit
+
+\[
+\sin^2\alpha_c = (B_S/B_M)\left(1+U_{rel}/E\right).
+\]
+
+The paper's preferred pitch-conserving sheath equation estimates absolute
+`U_M` through `E-U_sc`; it will be retained only as a labeled sensitivity and
+cannot supply independent corroboration until `U_sc` is validated.
+
 A sweep is `beam_boundary_valid` only when it is already `beam_valid` and:
 
 - at least four strict boundary energies are resolved;
 - the boundary trend has the polarity and monotonicity expected for a negative
   potential over its supported energy range;
-- a free `(U_M, B_S/B_M)` adiabatic fit has neither parameter at a bound;
+- a free `(U_rel, B_S/B_M)` relative-limit fit has neither parameter at a bound;
 - its residual structure is compatible with one curve rather than an isolated
   low-energy point;
 - boundary and beam voltages agree within their combined empirical uncertainty.
@@ -148,6 +160,16 @@ Before opening the pilot-wide success rates:
 
 Calibration failures require a labeled protocol revision and complete rerun;
 thresholds may not be chosen to improve the observed day-wide usable fraction.
+
+## Pre-Execution Protocol Correction
+
+Before implementing the estimator or examining calibration and pilot results,
+the boundary parameter was corrected from absolute `U_M` to spacecraft-relative
+`U_rel`. The initial text inadvertently carried Experiment 004's published
+`U_sc = +11 V` convention into an experiment that explicitly withholds absolute
+potential claims. The correction selects one of the two sheath limits documented
+in the frozen reconstruction and preserves the paper's preferred equation as a
+sensitivity only. This change is committed before result generation.
 
 ## Fixed Visual Audit Set
 
