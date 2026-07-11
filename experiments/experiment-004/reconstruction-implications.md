@@ -23,6 +23,14 @@ Agreement on spectrum 653 is therefore a positive control, not evidence that
 the current production forward model is historically or physically correct.
 Compensating model choices can recover one voltage while diverging elsewhere.
 
+Conversely, disagreement with the published voltage does not establish that a
+new implementation is wrong. The publication reports a point estimate from an
+approximate physical model, incompletely documented objective, selected data,
+and manual quality control. The published value may itself be biased or wrong.
+The experiment must distinguish historical reproducibility from physical
+validation and retain that possibility whenever independent observables favor
+a different voltage.
+
 ## Scientific Meaning of the Beam
 
 The upward surface-secondary beam is not merely a nuisance component. Above

@@ -36,6 +36,18 @@ These files were frozen before Experiment 004 fitting results were inspected.
 The benchmark voltage gate remains `|U_rel + 171 V| <= 25 V`, but voltage alone
 is insufficient for acceptance.
 
+The published estimate is a historical reproducibility target, not physical
+ground truth. A stable disagreement admits at least three live explanations:
+
+1. The public reconstruction is missing a consequential implementation detail.
+2. The private processing used a different normalization, response, weighting,
+   selection, or hand-QC decision.
+3. The published point estimate is itself biased or wrong under the physical
+   and instrumental conditions of spectrum 653.
+
+Experiment 004 must not tune factors to force the first two explanations or
+exclude the third.
+
 ## Ordered Experimental Phases
 
 ### Phase A: Historical Reconstruction
@@ -172,6 +184,116 @@ diagnostics are:
 These are reconstruction diagnostics, not post hoc tuning: each corresponds to
 an ambiguity already recorded in the frozen provenance document.
 
+## Phase A2: Representation and Response Diagnostics
+
+**Status:** Protocol frozen before Phase A2 results
+
+Phase A2 changes only the operations most directly implicated by the initial
+failure. Its primary branches form a `2 x 2 x 2` design:
+
+| Factor | Levels |
+| --- | --- |
+| Observation construction | bin flux then divide; divide sector pairs then bin ratios |
+| Sharp-boundary evaluation | pitch-bin center; average the sharp sector-level model over actual bin support |
+| Beam energy response | nearest energy row; Gaussian response with `FWHM/E = 0.48` |
+
+All Phase A2 primary branches fix the cone floor at `0.10`, profile beam
+amplitude over the same `[0, 8]` grid, use conjugate normalization, and retain
+the Phase A `(U_M, B_S/B_M)` grid. These settings are controls selected from the
+initial run, not reoptimized within Phase A2. The original Phase A best branch
+is included exactly as one factorial cell.
+
+### Independent Observable Checks
+
+For each observation construction:
+
+- Fit a continuous beam centroid using a nonnegative amplitude, constant local
+  baseline, and `FWHM/E = 0.48`, without using the published voltage.
+- Fit the sharp support-integrated loss-cone model after excluding beam-affected
+  field-aligned cells identified from that response fit.
+- Report both spacecraft-relative voltages and their disagreement. Neither
+  estimate is forced to equal the published result or the joint-fit result.
+
+### Phase A2 Interpretation Gate
+
+- Agreement of beam, boundary, and joint estimates near the publication
+  supports a representation-error explanation.
+- A publication-like beam with a more-negative boundary implicates the
+  adiabatic boundary model, its weighting, or non-adiabatic broadening.
+- Agreement of independent observables away from the publication makes a
+  biased published point estimate a serious hypothesis, subject to remaining
+  provenance uncertainties.
+- Instability across the two observation constructions means the public method
+  is not reconstructed well enough to adjudicate the publication.
+
+No Phase A2 objective difference is assigned a confidence interpretation.
+
+### Phase A2 Results
+
+Phase A2 was executed on 2026-07-11. Matching the synthetic support to the
+sectors that contributed valid observed flux or ratios was fixed before the
+final run.
+
+The two support-integrated, fractional-Gaussian branches agree exactly with
+each other despite reversing normalization and aggregation order:
+
+| Observation construction | Boundary | Beam response | `U_rel` | `B_S/B_M` | Beam amp |
+| --- | --- | --- | ---: | ---: | ---: |
+| Bin flux, then divide | Sector support | Fractional Gaussian | `-161 V` | `0.880` | `8.0` |
+| Divide sector pairs, then bin | Sector support | Fractional Gaussian | `-161 V` | `0.880` | `8.0` |
+
+Both pass the 25 V historical voltage gate and differ from the published
+`-171 V` by 10 V. The first is the lowest-objective Phase A2 branch, with a
+descriptive objective per degree of freedom of `0.1938`. The exact published
+`(U_M, B_S/B_M) = (-160 V, 0.975)` pair has an objective `15.1%` above that
+branch's minimum. The voltage is reproduced; the published magnetic ratio is
+not.
+
+The factorial isolates the response effect:
+
+- Nearest-row beam branches remain at `U_rel = -251` to `-261 V`.
+- A fractional beam response moves center-evaluated fits to `-151 V` or
+  `-201 V`, depending on observation order.
+- Integrating the sharp boundary over matching sector support removes that
+  normalization-order disagreement and yields `-161 V` in both cases.
+
+Thus the initial `-261 V` result was primarily a discretized beam-response
+artifact, with angular support integration needed for representation stability.
+No sigmoid smoothing was required to recover the historical voltage scale.
+
+### Independent Observable Results
+
+The independent checks do not validate the joint solution:
+
+| Observation construction | Beam-only `U_rel` | Boundary-only `U_rel` | Difference |
+| --- | ---: | ---: | ---: |
+| Bin flux, then divide | `-145.7 V` | `-281 V` | `135.3 V` |
+| Divide sector pairs, then bin | `-145.5 V` | `-281 V` | `135.5 V` |
+
+The beam response fit requires amplitude about `10.56`, above the joint fit's
+frozen upper bound of `8.0`. Both joint historical-reproduction branches
+therefore hit the beam-amplitude rail. The beam-only fit is approximately 25.3
+V shallower than the publication, while the boundary-only fit is 110 V more
+negative. Neither difference has a formal uncertainty interpretation yet.
+
+### Phase A2 Decision
+
+Phase A2 establishes that the published **voltage scale is reproducible** from
+the archived spectrum using evidence-supported angular and energy response
+treatment. It does not establish that the published voltage is physically
+correct, nor that the two observables are mutually consistent.
+
+The joint result may be a compromise between a shallow beam estimate and a
+much more negative sharp-boundary estimate. Remaining structured residuals,
+the beam-amplitude rail, and the magnetic-ratio discrepancy prevent Phase A
+acceptance. The hypothesis that the published point estimate is biased or
+wrong therefore remains live alongside incomplete beam and boundary models.
+
+The next phase must remove the artificial beam-amplitude rail, model the
+measured beam's broader angular support, and test boundary extraction against
+beam masking, floor/refilling, and non-adiabatic broadening. Those tests must
+evaluate beam and boundary consistency, not merely preserve the joint voltage.
+
 ## Planned Artifacts
 
 | Artifact | Purpose |
@@ -183,6 +305,11 @@ an ambiguity already recorded in the frozen provenance document.
 | `phase_a_results.csv` | Per-branch fit and morphology diagnostics |
 | `phase_a_profiles.csv` | Field-ratio-profiled voltage objectives |
 | `phase_a_comparison.png` | Measured/model/residual benchmark comparison |
+| `phase_a2.py` | Frozen representation/response diagnostic |
+| `phase_a2_results.csv` | Phase A2 factorial fits |
+| `phase_a2_profiles.csv` | Phase A2 voltage profiles |
+| `beam_boundary_crosscheck.csv` | Independent beam and boundary estimates |
+| `phase_a2_comparison.png` | Best Phase A2 measured/model/residual comparison |
 | `beam_boundary_crosscheck.csv` | Independent observable estimates |
 | `supplement/main.tex` | Mathematical methods, results, and limitations |
 
