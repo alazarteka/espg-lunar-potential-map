@@ -415,6 +415,187 @@ quality gates generalize to neighboring spectra and additional hand-vetted
 cases. Further tuning on spectrum 653 would no longer distinguish reconstruction
 from overfitting.
 
+## Phase A4: Loss-Cone Boundary Forensics
+
+**Status:** Protocol frozen before Phase A4 results
+
+Phase A4 no longer fits a joint beam-plus-cone voltage. It first asks whether
+the archived measurements reproduce the published Figure 5 data panel and
+whether a coherent boundary can be measured before applying the adiabatic
+voltage equation.
+
+### Panel-Identity Gate
+
+Compare spectra `652`, `653`, and `654` with the frozen color-calibrated Figure
+5 data raster. Cross:
+
+- incident-mean versus conjugate-sector normalization; and
+- one magnetic-field vector per energy row versus one sweep-mean vector.
+
+Rebin each candidate to the same 16 pitch centers, sample the published raster
+at the candidate energy/pitch coordinates, exclude white raster gaps, and
+report log-space RMSE, median absolute log residual, correlation, and beam peak.
+No multiplicative rescaling is fitted. The closest morphology determines which
+publicly plausible representation enters the boundary interpretation; distance
+from the publication's voltage is not a selection criterion.
+
+### Boundary Extraction
+
+For each usable energy from `300-10000 eV`, fit the reflected native sectors to
+a four-parameter transition:
+
+\[
+R(\alpha)=R_{in}+\Delta R\,\sigma\!\left(\frac{\beta-\alpha}{w}\right),
+\]
+
+where `beta` is the reflected-side boundary, `R_in` is the refilled cone level,
+`Delta R` is the independently fitted contrast, and `w` is transition width.
+This locates the boundary without fixing the cone floor or forcing a joint beam
+voltage. Fits use robust log residuals.
+
+Cross the two normalizations, two magnetic-field treatments, and equal-sector
+versus angular-acceptance weighting. Estimate boundary uncertainty with 100
+deterministic sector bootstraps and impose a 5.625-degree resolution floor.
+
+### Physical-Equation Fits
+
+Fit the extracted `{E_i, beta_i, sigma_i}` points under:
+
+1. Free `(U_M, B_S/B_M)` on the existing grid.
+2. Fixed published `B_S/B_M = 0.975`.
+3. `B_S/B_M` fixed by the high-energy boundary asymptote.
+
+Record the complete free-model voltage profile and the two-dimensional
+objective surface. Objective differences remain descriptive.
+
+### Geometry Diagnostics
+
+For each spectrum report magnetic-field magnitude and direction variation
+across the 15 sequential energy rows. A strong energy-correlated field change
+can imitate an energy-dependent boundary and invalidates a single static
+distribution interpretation.
+
+### Phase A4 Decision Gate
+
+- If our data panel does not morphologically match Figure 5, resolve product,
+  timestamp, normalization, or pitch processing before judging the publication.
+- If boundary points are stable across preprocessing and reproduce the physical
+  curve, the loss cone provides independent evidence.
+- If points are measurable but imply another stable voltage, retain published
+  bias/private-processing hypotheses.
+- If boundary location or voltage changes strongly with normalization, field
+  treatment, weighting, or adjacent spectrum, the loss cone cannot justify a
+  precise voltage on this example.
+
+### Phase A4 Results
+
+Phase A4 was executed on 2026-07-11 for spectra `652-654` with 100 deterministic
+sector bootstraps per extracted energy boundary.
+
+#### Figure 5 Identity
+
+Spectrum `654`, not `653`, is the closest candidate to the frozen published
+data raster under the primary reflected-side metric:
+
+| Spectrum | Normalization | Reflected log RMSE | Correlation | Beam peak |
+| --- | --- | ---: | ---: | ---: |
+| 652 | Conjugate sector | `0.646` | `0.873` | `15.28` |
+| 653 | Incident mean | `0.434` | `0.915` | `10.39` |
+| 654 | Incident mean | **`0.399`** | `0.926` | **`4.35`** |
+| Published raster | -- | -- | -- | `4.48` |
+
+Spectrum 654 with conjugate normalization gives a slightly larger reflected
+RMSE (`0.417`) but the highest correlation (`0.932`) and beam peak `4.51`.
+Both normalizations therefore favor 654. Its sweep begins at 14:45:28 UT,
+consistent with the paper's rounded 14:45 label. Spectrum 653 remains the
+closest midpoint to 14:45 but does not reproduce the published beam amplitude
+or raster morphology as well.
+
+This supersedes the earlier assumption that spectrum 653 was uniquely the
+correct benchmark. The panel match is not exact: even spectrum 654 retains a
+reflected log RMSE near 0.4, so unrecovered normalization, binning, display, or
+processing differences remain.
+
+#### Magnetic-Field Treatment
+
+The archive repeats one magnetic vector across all 15 energy rows of each
+spectrum. Magnetic magnitude and direction variation are numerically zero, and
+row-field versus sweep-mean pitch angles differ by less than `1e-13 deg`.
+Energy-correlated magnetic rotation cannot explain the Figure 5 boundary on
+these records.
+
+#### Direct Boundary Curves
+
+The extracted boundary behavior differs sharply across adjacent spectra:
+
+- Spectrum 652 shows a coherent weak-potential trend, with preregistered free
+  fits around `U_rel = -41` to `-61 V` and `B_S/B_M = 0.975-0.990`.
+- Spectrum 653 is visibly non-monotonic around the adiabatic curve. Its
+  preregistered free fits span `-111` to `-151 V`, but require
+  `B_S/B_M = 1.005-1.050`; conjugate fits hit the upper field-ratio grid edge.
+- Spectrum 654, the closest Figure 5 panel, has a boundary trend inconsistent
+  with a large negative potential when both parameters are free. Fits span
+  `U_rel = -1` to `-41 V` with `B_S/B_M = 0.750-0.825`.
+
+Normalization and angular weighting move spectrum 653 by about 40 V and
+spectrum 654 by about 40 V. Several spectrum-653/654 per-energy transitions
+also hit cone-level, contrast, or width limits.
+
+#### Strict Nuisance-Edge Check
+
+The preregistered acceptance rule did not reject transition fits whose nuisance
+parameters hit their bounds. This was discovered during result QC. The
+original results remain preserved; a labeled `no_nuisance_edges` analysis was
+added rather than replacing them.
+
+Under strict QC:
+
+- Spectrum 652 remains near `-31` to `-61 V`.
+- Spectrum 653 loses the low-energy points that carried its negative voltage
+  and moves to approximately `-11` to `+9 V`.
+- Spectrum 654 gives free fits around `-61` to `-81 V`, with low
+  `B_S/B_M = 0.755-0.795`.
+
+If the field ratio is instead fixed to the published `0.975`, strict spectrum
+654 boundaries imply `U_rel = -181` to `-191 V`, close to the publication.
+However, those fixed-ratio objectives are substantially worse than the free
+low-ratio fits. The data do not independently select the published field ratio;
+imposing it creates the publication-like voltage through the strong
+`U_M-B_S/B_M` degeneracy.
+
+#### Protocol Corrections
+
+Two implementation corrections were made and the full analysis rerun:
+
+1. Identical row-field and sweep-field inputs initially received different
+   sequential bootstrap draws. Final results reuse identical draws so identical
+   inputs produce identical uncertainties.
+2. Nuisance-edge flags and the separate strict-QC fits were added after the
+   provisional run exposed transition-parameter rails. Preregistered fits are
+   retained as the primary results.
+
+### Phase A4 Decision
+
+Phase A4 **fails the independent loss-cone justification gate**.
+
+It strengthens the historical reconstruction in one respect: spectrum 654 is
+probably closer to the actual Figure 5 distribution than spectrum 653, and a
+published-ratio boundary fit can reproduce a publication-scale voltage. But
+the boundary does not independently determine both voltage and field ratio.
+Its free solution changes strongly across adjacent spectra, normalization,
+weighting, and nuisance QC, and the closest panel's boundary is not a coherent
+large-negative-potential curve.
+
+The scientifically supported reading is therefore:
+
+- The upward beam robustly establishes a negative voltage scale of order
+  `145-160 V` for the benchmark interval.
+- The Figure 5 loss cone provides qualitative morphological context but not a
+  stable independent two-parameter confirmation under the public method.
+- The exact published `-171 V, 0.975` pair may reflect private processing or a
+  joint beam/boundary compromise; it is not selected uniquely by the archived
+  boundary data reconstructed here.
+
 ## Planned Artifacts
 
 | Artifact | Purpose |
@@ -436,6 +617,14 @@ from overfitting.
 | `phase_a3_profiles.csv` | Phase A3 voltage profiles |
 | `phase_a3_crosscheck.csv` | Independent 2-D beam and boundary fits |
 | `phase_a3_comparison.png` | Best Phase A3 measured/model/residual comparison |
+| `phase_a4.py` | Frozen panel-identity and boundary-first analysis |
+| `phase_a4_panel_identity.csv` | Figure 5 morphology comparisons |
+| `phase_a4_boundary_points.csv` | Per-energy boundaries and bootstrap errors |
+| `phase_a4_fits.csv` | Voltage/field-ratio fits under three constraints |
+| `phase_a4_profiles.csv` | Free-model voltage profiles |
+| `phase_a4_geometry.csv` | Sweep magnetic-field variation diagnostics |
+| `phase_a4_panel_comparison.png` | Published raster and adjacent candidates |
+| `phase_a4_boundaries.png` | Extracted boundaries and physical fits |
 | `beam_boundary_crosscheck.csv` | Independent observable estimates |
 | `supplement/main.tex` | Mathematical methods, results, and limitations |
 

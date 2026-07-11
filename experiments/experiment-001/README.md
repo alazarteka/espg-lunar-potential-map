@@ -1,5 +1,12 @@
 # Step 1 Findings: Halekas Benchmark and Cash Failure
 
+> **Later provenance correction (Experiment 004 Phase A4, 2026-07-11):**
+> Figure 5 raster morphology and beam amplitude favor spectrum 654
+> (14:45:28-14:46:38 UT) over spectrum 653, despite spectrum 653 having the
+> closest midpoint to the rounded 14:45 timestamp. Treat the claim below that
+> 653 is uniquely correct as superseded; both remain timestamp controls, with
+> 654 now the stronger panel-identity candidate.
+
 **Date:** 2026-07-10
 
 **Repository state:** `d039fcc` on `losscone-weighted-width`

@@ -47,7 +47,7 @@ globally ignored.
 | [001](experiment-001/README.md) | Does current Cash reproduce the Halekas benchmark, and why does it fail? | Complete | Smooth Lillis approximately reproduces the benchmark; current pure-Poisson Cash fails. |
 | [002](experiment-002/README.md) | Can the calibrated LP ER flux product support a raw-count Poisson likelihood? | Complete | Partial recovery: raw intervals are recoverable, but calibrated flux is not an exact Poisson observation. |
 | [003](experiment-003/README.md) | Which observation/uncertainty model best preserves physics and calibrates uncertainty? | Complete | No candidate passes all gates; matched estimators work, but the shared forward model fails real-data validation. |
-| [004](experiment-004/README.md) | Can a clean-room Halekas reconstruction recover the benchmark before modern extensions? | Running | Phase A3 finds a robust beam voltage near -145 to -151 V, but no stable independent boundary voltage. |
+| [004](experiment-004/README.md) | Can a clean-room Halekas reconstruction recover the benchmark before modern extensions? | Running | Phase A4 favors spectrum 654 and rejects a stable independent loss-cone voltage/field-ratio confirmation. |
 | [005](experiment-005/README.md) | Does the frozen method pass a complete one-day scientific validation pilot? | Blocked by 003-004 | Pending |
 
 ## Status Vocabulary

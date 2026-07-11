@@ -1,0 +1,4 @@
+spec_no,magnetic_magnitude_mean_nt,magnetic_magnitude_relative_range,direction_rms_deg,direction_max_deg,direction_energy_correlation,row_sweep_pitch_max_difference_deg
+652,9.27816346944297,0.0,0.0,0.0,nan,3.197442310920451e-14
+653,9.830467261723982,0.0,0.0,0.0,nan,8.526512829121202e-14
+654,8.749532635199952,0.0,0.0,0.0,nan,7.105427357601002e-15
