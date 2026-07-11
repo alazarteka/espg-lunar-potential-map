@@ -1,0 +1,18 @@
+{
+  "generated_date": "2026-07-11",
+  "code_commit": "3112d0215132a68315a243cdcb61dc793748b289",
+  "command": "uv --no-cache run python experiments/experiment-005/calibrate.py",
+  "workers": 8,
+  "simulation_replicates_per_cell": 200,
+  "beam_absent_replicates": 500,
+  "bootstrap_replicates": 200,
+  "elapsed_seconds": null,
+  "elapsed_note": "Attempt 01 predates in-script runtime capture.",
+  "artifact_transform": "CSV line endings normalized from CRLF to LF; values unchanged.",
+  "files": {
+    "data/1999/091_120APR/3D990429.TAB": "de8358ba1456c2777e45271a1b193f95f11e866b10ae7d09d136498efc97f702",
+    "experiments/experiment-005/configuration.json": "843038b353aa940a5c0fd6927a12d5faee3272584e39886c1023988887be4aae",
+    "experiments/experiment-005/calibration_results.csv": "57b233a0e9c2cc42bab16e0136a7fa73de319c4c903bd4a24ee2410a2f111598",
+    "experiments/experiment-005/calibration_summary.json": "887210d562324abec9f442cde1eb09b0af6a2b4fa44f34c70f9e1edfc1ebd37b"
+  }
+}

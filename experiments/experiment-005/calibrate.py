@@ -15,6 +15,7 @@ import argparse
 import csv
 import json
 import os
+import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import replace
 from pathlib import Path
@@ -255,7 +256,7 @@ def summarize_calibration(
 def write_rows(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="ascii") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -296,6 +297,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    started = time.perf_counter()
     args = parse_args()
     configuration = beam.load_configuration(args.configuration)
     calibration = configuration["calibration"]
@@ -377,6 +379,7 @@ def main() -> None:
         "null_replicates": null_replicates,
         "bootstrap_replicates": bootstrap_replicates,
         "workers": args.workers,
+        "elapsed_seconds": time.perf_counter() - started,
         "frozen_scale": bool(
             replicates == calibration["simulation_replicates_per_cell"]
             and null_replicates == calibration["beam_absent_replicates"]

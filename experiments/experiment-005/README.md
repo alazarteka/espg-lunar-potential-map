@@ -1,6 +1,6 @@
 # Experiment 005: One-Day Observable Validation and Selection Pilot
 
-**Status:** Ready; protocol and numerical gates frozen before pilot-wide results
+**Status:** Complete; stopped at failed calibration gate before pilot execution
 
 **Branch:** `experiments`
 
@@ -205,7 +205,7 @@ Report counts and percentages, always relative to all 398 attempted sweeps, for:
 Also report each nonexclusive failure reason, support-conditional percentages,
 and the two-edge contained-only sensitivity. Never report only finite fits.
 
-## Planned Artifacts
+## Artifacts
 
 | Artifact | Purpose |
 | --- | --- |
@@ -213,18 +213,18 @@ and the two-edge contained-only sensitivity. Never report only finite fits.
 | [`configuration.json`](configuration.json) | Frozen model, calibration, optimizer, and QC settings |
 | `beam.py` | Native-sector beam estimator, bootstrap, and QC funnel |
 | `calibrate.py` | Frozen injection and beam-absent calibration run |
-| `run.py` | Exact experiment-local execution |
-| `selection_funnel.csv` | Attempted-to-accepted counts and reasons |
-| `sweep_diagnostics.parquet` | One row per attempted sweep with support and QC |
-| `beam_results.csv` | Beam estimates, uncertainty, sensitivities, and bounds |
-| `boundary_results.csv` | Transition points and physical-curve diagnostics |
-| `calibration_results.csv` | Injection recovery, coverage, and false detections |
-| `residual_atlas.pdf` | Fixed audit set and all major failure classes |
-| `pilot_summary.png` | Selection and observable summary |
-| `runtime.json` | Environment, backend, device, memory, and timing |
+| `calibration_results.csv` | All 2,100 injection/control outcomes |
+| `calibration_summary.json` | Frozen calibration gate result |
+| `calibration_provenance.json` | Code commit and input/output checksums |
+| `calibration_cell_summary.csv` | Compact per-cell recovery and coverage table |
+| `calibration_failure_reasons.csv` | Nonexclusive QC failure counts |
+| `calibration_summary.png` | Detection, point error, coverage, and QC anatomy |
+| `calibration-attempt-01.md` | Full interpretation and stopping decision |
+| `plot_calibration.py` | Reproduce compact tables and summary figure |
 
-Large caches remain under `artifacts/`; checksums and provenance are recorded
-here.
+The pilot artifacts (`run.py`, selection funnel, real-sweep results, boundary
+results, and residual atlas) were deliberately not generated because the
+calibration gate failed.
 
 ## Reproduction
 
@@ -237,7 +237,50 @@ uv run python experiments/experiment-005/calibrate.py
 Replicate-count overrides are development smoke tests and cannot replace the
 default frozen-scale output.
 
-## Decision Gate
+## Calibration Attempt 01 Results
+
+The frozen run completed all 1,600 beam-present simulations and 500 beam-absent
+controls with 200 residual bootstraps per case. The detailed record is
+[`calibration-attempt-01.md`](calibration-attempt-01.md); the primary visual
+summary is [`calibration_summary.png`](calibration_summary.png).
+
+| Result | Value |
+| --- | ---: |
+| Injected beams passing QC | `898 / 1600` (`56.1%`) |
+| Null controls falsely accepted | `0 / 500` (`0.0%`) |
+| Coverage-eligible cells | `5 / 8` |
+| Eligible cells passing all gates | `1 / 5` |
+
+Detection and null rejection are promising, but interval calibration fails.
+The two 150 eV cells retain `95-100%` of injections while achieving only
+`7.4-31.5%` empirical coverage for nominal 68% intervals and `22.1-53.5%` for
+nominal 95% intervals. The moderate 150 eV cell is biased low by a median
+`7.54 eV`, larger than its median nominal 68% interval width of `5.91 eV`.
+
+The constant per-energy continuum does not represent the structured loss-cone
+background. Residual resampling then removes the pitch-correlated discrepancy
+instead of propagating it, producing narrow intervals around a biased effective
+centroid. Performance also depends strongly on beam location relative to the
+coarse native energy rows and on angular support.
+
+Attempt 01 did not record elapsed runtime inside the machine-readable summary.
+That omission does not affect the scientific gate; `calibrate.py` now records it
+for any future protocol version.
+
+## Final Decision
+
+Experiment 005 **fails before the real-data pilot**. The frozen rule therefore
+prohibits generating the 398-sweep acceptance rate or voltage distribution with
+this estimator.
+
+The result does not show that upward beams are unusable. It shows that a beam
+energy fitted over a constant row-wise continuum cannot yet carry a calibrated
+voltage uncertainty in the presence of realistic loss-cone structure. A future
+attempt must model or condition out that pitch-dependent continuum and validate
+its uncertainty on an independent simulation split. It must rerun the complete
+beam-present and null matrix before opening real pilot outcomes.
+
+## Frozen Gate Applied
 
 The response-aware beam estimator advances to a second independent day only if:
 

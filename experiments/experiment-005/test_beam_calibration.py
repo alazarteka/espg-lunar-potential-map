@@ -1,8 +1,9 @@
-"""Tests for the Experiment 005 response-aware beam estimator."""
+"""Tests for the Experiment 005 beam estimator and calibration gate."""
 
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -198,3 +199,16 @@ def test_simulated_beam_is_additive_on_same_physical_background() -> None:
 
 def test_json_safe_replaces_nonfinite_values() -> None:
     assert calibrate.json_safe({"a": [1.0, float("nan")]}) == {"a": [1.0, None]}
+
+
+def test_frozen_calibration_artifacts_record_failed_gate() -> None:
+    directory = Path(__file__).parent
+    summary = json.loads(
+        (directory / "calibration_summary.json").read_text(encoding="ascii")
+    )
+    assert summary["execution"]["frozen_scale"] is True
+    assert summary["attempted_beam_simulations"] == 1600
+    assert summary["attempted_null_simulations"] == 500
+    assert summary["false_detections"] == 0
+    assert summary["eligible_cells_passed"] == 1
+    assert summary["calibration_pass"] is False

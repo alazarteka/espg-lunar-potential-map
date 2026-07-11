@@ -1,0 +1,9 @@
+reason_code,count,fraction_of_1600_attempted
+amplitude_not_resolved,498,0.31125
+centroid_uncertainty_unresolved,413,0.258125
+leave_one_energy_out_instability,316,0.1975
+insufficient_positive_excess_rows,220,0.1375
+multistart_instability,128,0.08
+pitch_sigma_bound_margin,125,0.078125
+amplitude_bound,44,0.0275
+center_bound_margin,4,0.0025
