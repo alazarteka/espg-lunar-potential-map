@@ -1,7 +1,6 @@
 """Load and interpolate LP spin-axis attitude in the ECLIPJ2000 frame."""
 
 import logging
-from bisect import bisect_right
 from pathlib import Path
 
 import numpy as np
@@ -56,20 +55,20 @@ def get_current_ra_dec(
     Returns:
         Tuple of (ra, dec) values, or (None, None) if error
     """
-    idx = bisect_right(et_spin, time)
-
-    if idx <= 0 or idx >= len(ra_vals):
+    ra, dec = get_current_ra_dec_batch(
+        np.asarray([time], dtype=np.float64), et_spin, ra_vals, dec_vals
+    )
+    if not np.isfinite(ra[0]) or not np.isfinite(dec[0]):
         logging.error("Index out of bounds for attitude data.")
         return None, None
-
-    return ra_vals[idx], dec_vals[idx]
+    return float(ra[0]), float(dec[0])
 
 
 def get_current_ra_dec_batch(
     times: np.ndarray, et_spin: np.ndarray, ra_vals: np.ndarray, dec_vals: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Batch version of get_current_ra_dec using np.searchsorted.
+    Interpolate attitude at each query time.
 
     Args:
         times: Array of ephemeris times to query
@@ -80,26 +79,42 @@ def get_current_ra_dec_batch(
     Returns:
         Tuple of (ra, dec) arrays. Values are NaN where indices are out of bounds.
     """
-    # searchsorted returns indices where elements should be inserted to maintain order.
-    # bisect_right is equivalent to searchsorted(side='right')
-    idxs = np.searchsorted(et_spin, times, side="right")
+    query = np.asarray(times, dtype=np.float64)
+    attitude_times = np.asarray(et_spin, dtype=np.float64)
+    ra = np.asarray(ra_vals, dtype=np.float64)
+    dec = np.asarray(dec_vals, dtype=np.float64)
+    if not (attitude_times.ndim == ra.ndim == dec.ndim == 1):
+        raise ValueError("Attitude arrays must be one-dimensional")
+    if not (len(attitude_times) == len(ra) == len(dec)):
+        raise ValueError("Attitude arrays must have equal lengths")
+    if len(attitude_times) == 0:
+        return np.full_like(query, np.nan), np.full_like(query, np.nan)
+    if np.any(np.diff(attitude_times) <= 0.0):
+        raise ValueError("Attitude times must be strictly increasing")
 
-    # Mask invalid indices: valid insertion points are 0 < idx < len(ra_vals).
-    # idx == 0 means the time precedes the first spin sample and idx == len means
-    # it follows the last; both are out of range and yield NaN below.
+    ra_out = np.full_like(query, np.nan)
+    dec_out = np.full_like(query, np.nan)
+    finite = np.isfinite(query)
+    covered = finite & (query >= attitude_times[0]) & (query <= attitude_times[-1])
+    if not np.any(covered):
+        return ra_out, dec_out
 
-    n = len(ra_vals)
-    valid_mask = (idxs > 0) & (idxs < n)
+    if len(attitude_times) == 1:
+        exact = covered & (query == attitude_times[0])
+        ra_out[exact] = np.mod(ra[0], 360.0)
+        dec_out[exact] = dec[0]
+        return ra_out, dec_out
 
-    ra_out = np.full_like(times, np.nan)
-    dec_out = np.full_like(times, np.nan)
+    covered_times = query[covered]
+    right = np.searchsorted(attitude_times, covered_times, side="right")
+    right = np.clip(right, 1, len(attitude_times) - 1)
+    left = right - 1
+    interval = attitude_times[right] - attitude_times[left]
+    fraction = (covered_times - attitude_times[left]) / interval
 
-    # Use valid indices to fetch values
-    # We can just use boolean indexing
-    valid_idxs = idxs[valid_mask]
-
-    if len(valid_idxs) > 0:
-        ra_out[valid_mask] = ra_vals[valid_idxs]
-        dec_out[valid_mask] = dec_vals[valid_idxs]
+    # Interpolate RA along the shortest circular arc and declination linearly.
+    ra_delta = (ra[right] - ra[left] + 180.0) % 360.0 - 180.0
+    ra_out[covered] = np.mod(ra[left] + fraction * ra_delta, 360.0)
+    dec_out[covered] = dec[left] + fraction * (dec[right] - dec[left])
 
     return ra_out, dec_out
