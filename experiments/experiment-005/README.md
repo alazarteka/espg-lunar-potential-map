@@ -1,6 +1,6 @@
 # Experiment 005: One-Day Observable Validation and Selection Pilot
 
-**Status:** Complete; stopped at failed calibration gate before pilot execution
+**Status:** Running; Attempt 02 protocol frozen before estimator outputs
 
 **Branch:** `experiments`
 
@@ -210,7 +210,8 @@ and the two-edge contained-only sensitivity. Never report only finite fits.
 | Artifact | Purpose |
 | --- | --- |
 | `README.md` | Frozen protocol, results, deviations, and decision |
-| [`configuration.json`](configuration.json) | Frozen model, calibration, optimizer, and QC settings |
+| [`configuration.json`](configuration.json) | Frozen Attempt 01 settings |
+| [`configuration-attempt-02.json`](configuration-attempt-02.json) | Frozen Attempt 02 settings and split |
 | `beam.py` | Native-sector beam estimator, bootstrap, and QC funnel |
 | `calibrate.py` | Frozen injection and beam-absent calibration run |
 | `calibration_results.csv` | All 2,100 injection/control outcomes |
@@ -267,7 +268,7 @@ Attempt 01 did not record elapsed runtime inside the machine-readable summary.
 That omission does not affect the scientific gate; `calibrate.py` now records it
 for any future protocol version.
 
-## Final Decision
+## Attempt 01 Decision
 
 Experiment 005 **fails before the real-data pilot**. The frozen rule therefore
 prohibits generating the 398-sweep acceptance rate or voltage distribution with
@@ -279,6 +280,18 @@ voltage uncertainty in the presence of realistic loss-cone structure. A future
 attempt must model or condition out that pitch-dependent continuum and validate
 its uncertainty on an independent simulation split. It must rerun the complete
 beam-present and null matrix before opening real pilot outcomes.
+
+## Calibration Attempt 02
+
+Attempt 02 is preregistered in
+[`calibration-attempt-02-protocol.md`](calibration-attempt-02-protocol.md) with
+its exact [`configuration-attempt-02.json`](configuration-attempt-02.json).
+It replaces the constant row-wise continuum with independent logistic nuisance
+transitions at each energy and calibrates Jacobian uncertainty on one simulation
+split before evaluating an untouched validation split. The validation mixture
+includes double-transition and asymmetric backgrounds outside the fitted
+continuum family. Real pilot outcomes remain closed until every held-out gate
+passes.
 
 ## Frozen Gate Applied
 
