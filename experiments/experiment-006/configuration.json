@@ -1,0 +1,178 @@
+{
+  "protocol_version": "design-1",
+  "status": "planned_before_implementation",
+  "design_date": "2026-07-11",
+  "parent_commit": "41632376f0928249800dfa157da8ed82f1cfad60",
+  "input": {
+    "data_path": "data/1999/091_120APR/3D990429.TAB",
+    "window_start_utc": "1999-04-29T12:57:00Z",
+    "window_end_utc": "1999-04-29T22:02:00Z",
+    "first_spec_no": 572,
+    "last_spec_no": 969,
+    "attempted_sweeps": 398,
+    "excluded_experiment_005_supports": [572, 654, 772, 969],
+    "known_positive_control_specs": [652, 653, 654],
+    "support_selection": {
+      "outcome_blind": true,
+      "total_supports": 24,
+      "calibration_supports": 12,
+      "confirmation_supports": 12,
+      "disjoint_splits": true,
+      "manifest": "support_manifest.csv",
+      "manifest_status": "not_yet_generated"
+    }
+  },
+  "estimand": {
+    "primary": "pre_response_beam_centroid_ev",
+    "statistical_scope": "conditional_on_frozen_final_valid_selection",
+    "retention_is_coprimary": true,
+    "physical_relation": "u_relative_v = emission_energy_ev - beam_centroid_ev + transport_discrepancy_ev",
+    "zero_emission_proxy": "u_relative_proxy_v = -beam_centroid_ev",
+    "absolute_lunar_potential_validated": false,
+    "spacecraft_potential_validated": false,
+    "losscone_boundary_validated": false
+  },
+  "domains": {
+    "observed_energy_ev": [20.0, 2000.0],
+    "optimizer_center_ev": [20.0, 2000.0],
+    "science_reporting_center_ev": [100.0, 500.0],
+    "clip_intervals_to_reporting_window": false,
+    "base_qc_independent_of_reporting_window": true
+  },
+  "geometry": {
+    "require_surface_connection": true,
+    "orient_surface_leaving_pitch_deg": 180.0,
+    "invalid_polarity_is_disconnected": true,
+    "surface_axis_support_half_width_deg": 22.5,
+    "minimum_response_contributing_rows_with_axis_support": 2
+  },
+  "estimator": {
+    "continuum_model": "log_energy_quadratic_logistic_transition",
+    "continuum_contains_voltage_equation": false,
+    "objective": "unweighted_log_residual",
+    "nominal_energy_response_fwhm_fraction": 0.48,
+    "response_evaluation": "channel_integrated",
+    "pitch_center_deg_fixed": 180.0,
+    "pitch_sigma_deg_bounds": [3.0, 50.0],
+    "amplitude_bounds": [0.0, 40.0],
+    "multistart_count": 12,
+    "optimizer_max_nfev": 2000,
+    "paired_normalizations_from_one_latent_sector_observation": true,
+    "empirical_correction_interpolation": "linear_in_log_energy",
+    "empirical_correction_extrapolation": false,
+    "outside_anchor_correction_for_qc": "constant_nearest_endpoint"
+  },
+  "generator": {
+    "independent_implementation_from_estimator": true,
+    "primary_continuum_independent_of_beam_center": true,
+    "physically_coupled_boundary_arm_role": "secondary_only",
+    "latent_observation_level": "native_sector_flux",
+    "background_families": [
+      "independent_smooth_logistic",
+      "double_transition_refilling",
+      "asymmetric_shoulder",
+      "correlated_smooth_energy_pitch_field"
+    ],
+    "noise_families": [
+      "heteroskedastic_log_noise",
+      "energy_pitch_correlated_noise",
+      "within_sweep_temporal_ramp_or_pulse"
+    ],
+    "response_challenges": [
+      "nominal_channel_integrated_linear_gaussian",
+      "stress_response_width",
+      "small_energy_scale_offset",
+      "log_energy_response",
+      "intrinsic_or_asymmetric_beam_broadening"
+    ],
+    "morphology_challenges": [
+      "pitch_axis_offset",
+      "losscone_truncated_tail",
+      "unresolved_double_peak"
+    ]
+  },
+  "calibration": {
+    "reuse_experiment_005_rows": false,
+    "reuse_experiment_005_correction": false,
+    "energy_anchors_ev": [100.0, 140.0, 220.0, 340.0, 500.0],
+    "injections_per_anchor": 600,
+    "total_beam_injections": 3000,
+    "bias_fraction_per_anchor": 0.5,
+    "interval_fraction_per_anchor": 0.5,
+    "bias_statistic": "median_signed_error",
+    "interval_quantiles": [0.68, 0.95],
+    "seed_namespace": "experiment-006-calibration",
+    "seeds_frozen": false
+  },
+  "confirmation": {
+    "one_shot": true,
+    "center_strata": [
+      {"name": "edge_100", "distribution": "point", "value_ev": 100.0},
+      {"name": "low", "distribution": "log_uniform", "bounds_ev": [100.0, 160.0], "open_low": true},
+      {"name": "middle_low", "distribution": "log_uniform", "bounds_ev": [160.0, 250.0]},
+      {"name": "middle_high", "distribution": "log_uniform", "bounds_ev": [250.0, 375.0]},
+      {"name": "high", "distribution": "log_uniform", "bounds_ev": [375.0, 500.0], "open_high": true},
+      {"name": "edge_500", "distribution": "point", "value_ev": 500.0}
+    ],
+    "primary_amplitude_strata": [
+      {"bounds": [4.0, 8.0], "closed": "left"},
+      {"bounds": [8.0, 16.0], "closed": "both"}
+    ],
+    "pitch_sigma_deg": [12.0, 42.0],
+    "log_noise_sigma_levels": [0.2, 0.25, 0.35, 0.45],
+    "cases_per_primary_cell": 400,
+    "primary_cells": 12,
+    "primary_beam_cases": 4800,
+    "weak_beam_cases": 600,
+    "weak_amplitude": [1.0, 4.0],
+    "semi_synthetic_cases": 1200,
+    "null_cases_per_family": 1000,
+    "null_families": [
+      "matched_smooth_beam_absent",
+      "misspecified_continuum_beam_absent",
+      "adversarial_nonbeam_structure"
+    ],
+    "total_null_cases": 3000,
+    "out_of_window_beam_cases": 1000,
+    "seed_namespace": "experiment-006-confirmation",
+    "seeds_frozen": false
+  },
+  "primary_gates": {
+    "all_primary_cells_must_pass": true,
+    "minimum_retained_per_400_cell": 200,
+    "insufficient_retention_is_failure": true,
+    "median_absolute_error_response_fwhm_bootstrap_upper_95_max": 0.1,
+    "q90_absolute_error_response_fwhm_bootstrap_upper_95_max": 0.25,
+    "median_signed_error_response_fwhm_bootstrap_interval_bounds": [-0.05, 0.05],
+    "coverage_68_point_bounds": [0.6, 0.76],
+    "coverage_68_exact_interval_must_contain": 0.68,
+    "coverage_95_point_bounds": [0.9, 0.99],
+    "coverage_95_exact_interval_must_contain": 0.95,
+    "maximum_95_interval_full_width_response_fwhm": 1.0,
+    "pooled_background_family_gates_required": true,
+    "null_upper_bound_method": "one_sided_clopper_pearson_bonferroni",
+    "null_familywise_confidence": 0.95,
+    "null_family_count": 3,
+    "null_false_acceptance_upper_bound_max": 0.05,
+    "maximum_false_acceptances_per_1000_null_family": 35,
+    "secondary_strong_null_upper_bound_target": 0.01,
+    "out_of_window_leakage_uses_adjusted_null_rule": true,
+    "out_of_window_sides": 2,
+    "out_of_window_cases_per_side": 500,
+    "maximum_in_window_leaks_per_500_side": 15,
+    "semi_synthetic_minimum_retained_per_100_cell": 50
+  },
+  "information_barriers": {
+    "confirmation_output_may_not_be_inspected_incrementally": true,
+    "method_change_after_confirmation_requires_new_experiment": true,
+    "real_pilot_requires_full_confirmation_pass": true,
+    "real_pilot_authorizes_production": false
+  },
+  "unresolved_before_calibration": [
+    "support_manifest_and_split",
+    "seed_derivation_and_hashes",
+    "numerical_response_stress_values",
+    "semi_synthetic_template_manifest",
+    "executable_exact_binomial_and_bootstrap_gate_code"
+  ]
+}

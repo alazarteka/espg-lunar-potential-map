@@ -1,0 +1,246 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{microtype}
+\setlength{\emergencystretch}{2em}
+
+\newcommand{\UM}{U_{\mathrm{M}}}
+\newcommand{\Usc}{U_{\mathrm{sc}}}
+\newcommand{\Urel}{U_{\mathrm{rel}}}
+\newcommand{\Ebeam}{E_{\mathrm{beam}}}
+\newcommand{\Eemit}{E_{\mathrm{emit}}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{Prospective Restricted-Domain Validation of an Upward-Beam\\
+Spacecraft-Relative Potential Proxy in Lunar Prospector ER Data}
+\author{ESPG Lunar Potential Map Project}
+\date{11 July 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+An upward field-aligned electron feature provides the most stable voltage-scale
+observable recovered in our clean-room analysis of the Lunar Prospector
+Electron Reflectometer benchmark.  A subsequent full-domain simulation study
+found calibrated held-out centroid inference at 150 and 350~eV but failed at
+65 and 800~eV and exceeded its beam-absent false-detection gate.  Because the
+candidate 100--500~eV operating window was proposed after those outcomes were
+known, it requires a new prospective experiment.  We preregister a
+polarity-aware, sector-level validation in which continuum structure is
+independent of injected beam energy, calibration and confirmation use disjoint
+instrument supports, two normalizations are derived from a common latent
+observation, and response, morphology, temporal, semi-synthetic, null, and
+out-of-window challenges are explicit.  The primary matrix contains 4800
+moderate-to-strong beams over twelve energy-amplitude cells, accompanied by 600
+weak beams, 1200 semi-synthetic injections, 3000 nulls, and 1000 out-of-window
+classification controls.  Retention is co-primary with conditional interval
+coverage, and every cell must pass.  A full pass would validate selective
+measurement of a pre-response beam centroid over the tested envelope and open
+a hand-audited one-day real-data study.  It would not validate absolute lunar
+surface potential, spacecraft potential, loss-cone corroboration, or a global
+map.  No simulation result had been generated when this design was written.
+\end{abstract}
+
+\section{Scientific Background}
+
+For a surface-emitted electron transported electrostatically to the spacecraft,
+energy conservation gives, in electron-volt/volt numerical units,
+\begin{equation}
+  \Ebeam \simeq \Eemit-\Urel+\delta_{\mathrm{transport}},
+  \qquad \Urel=\UM-\Usc.
+  \label{eq:beam}
+\end{equation}
+The commonly used proxy $\Urel\simeq-\Ebeam$ sets the initial secondary energy
+and transport discrepancy to zero.  This is often a useful leading-order
+scale, but it is not an identity.  Absolute lunar potential additionally
+requires an independent $\Usc$ estimate:
+\begin{equation}
+  \UM=\Urel+\Usc.
+\end{equation}
+
+Experiment~004 found a robust response-aware beam scale near 145--160~eV in the
+historical benchmark but did not find stable independent voltage information
+in the loss-cone boundary.  Experiment~005 therefore tested beam-centroid
+inference directly.  Its smooth-continuum estimator achieved calibrated
+held-out results in both 150 and 350~eV cells, but weak low-energy and both
+high-energy conditions failed; beam-absent acceptance was 6\% against a frozen
+5\% point-estimate gate.  The complete 20--2000~eV hypothesis failed.
+
+The observed middle-energy success motivates a restricted hypothesis.  It does
+not confirm one.  The present experiment is designed so that the new window can
+be rejected without another retrospective rescue.
+
+\section{Lessons From The Parent Experiment}
+
+Several limitations became visible only when the complete Experiment~005 record
+was reconsidered.
+
+First, the synthetic loss-cone boundary was generated using
+$\Urel=-\Ebeam$.  The nuisance continuum therefore contained indirect
+information about the injected answer even though the fitted continuum itself
+had no voltage equation.  The new primary generator samples continuum
+parameters independently of beam energy.
+
+Second, both normalization branches received the same already-normalized
+synthetic observation.  Their agreement was automatic.  The new experiment
+starts from one latent native-sector flux realization and derives incident-mean
+and conjugate-sector normalizations independently.
+
+Third, pitch was computed without establishing which magnetic-field direction
+connected to the surface.  Here surface intersection and polarity are required
+before defining 180 degrees as surface-leaving.  Disconnected geometry is
+excluded rather than assigned a directional interpretation.
+
+Fourth, four support spectra were shared by calibration and validation,
+coverage was conditional on selection without a strong retention requirement,
+and the null point estimate was underpowered as an upper-bound statement.  The
+new design uses disjoint outcome-blind support sets, makes retention co-primary,
+and uses exact binomial confidence limits.
+
+\section{Statistical Estimand}
+
+Let $S=1$ denote passage of every frozen geometry, numerical, normalization,
+stability, and interval-resolution rule.  The primary estimands are
+\begin{align}
+  r_j &= \Pr(S=1\mid j),\\
+  b_j &= \operatorname{median}
+  \left[\frac{\widehat E_b-E_b}{0.48E_b}\middle|S=1,j\right],\\
+  c_{q,j} &= \Pr(E_b\in I_q\mid S=1,j),\qquad q\in\{0.68,0.95\},
+\end{align}
+for each prespecified energy-amplitude cell $j$.  Reporting coverage only
+conditional on $S=1$ is legitimate only when $r_j$ is reported and gated.
+Every simulation, including a crash or unresolved fit, remains in the
+retention denominator.
+
+For a beam-absent family $k$, define
+\begin{equation}
+  p_{0,k}=\Pr\left(S=1,\ 100\leq\widehat E_b\leq500
+  \mid\text{no beam},k\right).
+\end{equation}
+The gate is not $\widehat p_{0,k}\leq0.05$.  It requires the
+Bonferroni-adjusted one-sided familywise-95\% Clopper--Pearson upper bound to be
+at most 0.05.  With three families of 1000 controls, no family may contain more
+than 35 false in-window acceptances.
+
+\section{Estimator And Reporting Domain}
+
+The observed support and optimizer remain broad, 20--2000~eV.  The reporting
+window, 100--500~eV, is applied after fitting.  This separation prevents a null
+or out-of-window feature from being forced against a newly narrowed optimizer
+bound.  Confidence intervals are not clipped at 100 or 500~eV, and base QC is
+computed without conditioning on whether the fitted point falls inside the
+window.
+
+The model is
+\begin{equation}
+  R(E,\alpha)=C(E,\alpha)+A
+  G_E(E;E_b)G_\alpha(\alpha;180^\circ,\sigma_\alpha).
+  \label{eq:model}
+\end{equation}
+The pitch-logistic continuum $C$ has cone level, contrast, boundary, and width
+varying quadratically in normalized log energy.  It includes no adiabatic
+boundary equation.  The nominal energy response has
+$\mathrm{FWHM}/E=0.48$ and is integrated over channel support.  The fitter uses
+the frozen unweighted log-residual objective, deterministic multistart, and
+quality checks inherited in concept from Experiment~005.
+
+\section{Support And Information Barriers}
+
+Twenty-four supports are selected from the 398-sweep parent interval using only
+time, structural validity, connection, pitch coverage, native energy alignment,
+valid-sector counts, and magnetic variation.  Known Experiment~005 supports
+and the Halekas neighborhood cannot enter confirmation.  Twelve supports are
+assigned to calibration and twelve disjoint supports to confirmation.
+
+The experiment has four barriers.  First, support selection and geometry are
+committed.  Second, implementation verification and fresh calibration are run.
+Third, code, corrections, seeds, checksums, and decision logic are frozen.
+Fourth, confirmation runs once without incremental outcome inspection.  Any
+method change after that point requires unused draws and a new experiment.
+
+\section{Calibration And Confirmation}
+
+Calibration uses 3000 beams at 100, 140, 220, 340, and 500~eV.  One
+deterministic half estimates median bias and the other estimates rank-based 68\%
+and 95\% interval multipliers.  No Experiment~005 row or correction value is
+reused.
+
+Confirmation crosses six energy strata---the exact endpoints and four
+log-uniform interior bands---with amplitudes 4--8 and 8--16.  Four hundred
+cases in each cell give 4800 primary beams.  Pitch width, noise, support,
+continuum, response, and channel phase are balanced independently within every
+cell.  Six hundred amplitude-1--4 beams characterize, but cannot expand, the
+primary claim.
+
+The primary generator includes independent smooth, double-transition,
+asymmetric, and correlated energy-pitch backgrounds.  Challenges include
+heteroskedastic and correlated noise, channel integration, response-width and
+energy-scale stress, log-energy and asymmetric response, beam-axis offsets,
+double peaks, missing channels, and temporal changes during the sequential
+energy sweep.  A further 1200 injections use held-out real residual templates.
+
+Three thousand beam-absent controls cover matched, misspecified, and adversarial
+families.  The adversarial family includes energy-only and pitch-only
+enhancements, single-row spikes, incident-side features, and temporal ramps or
+pulses.  One thousand true out-of-window beams test leakage into the reporting
+window; the 500 cases on each side may produce no more than 15 final-valid
+in-window reports under their adjusted exact-binomial gate.
+
+\section{Decision Rule}
+
+Every one of twelve primary cells must retain at least 200 of 400 attempts.
+Among retained cases, the bootstrap upper confidence bound for median absolute
+error must not exceed 0.10 response FWHM, the corresponding bound for the 90th
+percentile must not exceed 0.25 FWHM, and the signed-median interval must lie
+within $\pm0.05$ FWHM.  Empirical 68\% and 95\% coverage must lie in
+0.60--0.76 and 0.90--0.99, respectively, with each nominal level contained in
+its exact 95\% binomial interval.  Every retained 95\% interval must be no wider
+than one response FWHM.  Pooled background-family gates, semi-synthetic gates,
+null gates, and out-of-window leakage gates must also pass.
+
+These requirements form an intersection claim: the complete window passes only
+when all required components pass.  Failure at an edge rejects the full window.
+Failure of null control may leave centroid recovery interesting for an
+independently established beam, but it does not validate automated detection.
+Failure of the semi-synthetic layer limits any success to the simulation system.
+
+\section{Expected Outcomes}
+
+Three outcomes are scientifically plausible.  First, the middle-energy success
+may generalize across new supports and energy locations, including the proposed
+edges.  This would justify a one-day, hand-audited observable study.  Second,
+the central regime may remain valid while one or both edges fail.  This rejects
+the 100--500~eV claim and supplies an exploratory hypothesis for a later
+experiment; it is not a partial pass.  Third, response, polarity, normalization,
+temporal, or semi-synthetic challenges may reveal that the earlier success was
+too simulator-specific.  That negative result would prevent a misleading real
+survey and identify the missing physics or observation model.
+
+\section{Interpretation Limits}
+
+A full pass validates a selective measurement procedure for $\Ebeam$ over its
+tested amplitude, morphology, support, and discrepancy envelope.  It does not
+show that every accepted real feature is a lunar secondary, explain beam
+absence, measure real-data bias without truth, validate $\Usc$, recover $\UM$,
+provide independent loss-cone corroboration, establish mission-wide
+representativeness, or reverse the global reconstruction's identifiability
+limit.
+
+The real-data stage, if opened, is therefore a residual and prevalence audit.
+Its purpose is to learn whether the validated observable occurs in actual LP ER
+sweeps under the same quality rules, not to jump directly from a successful
+simulation to a lunar potential map.
+
+\section{Current Status}
+
+This document records the design before support selection, implementation,
+calibration, or confirmation.  Numerical response-stress values, deterministic
+seed hashes, the support manifest, and the semi-synthetic template manifest must
+be frozen in a later pre-calibration commit.  No Experiment~006 scientific
+result exists at this stage.
+
+\end{document}
