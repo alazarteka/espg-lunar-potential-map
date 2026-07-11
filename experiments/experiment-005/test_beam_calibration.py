@@ -431,3 +431,17 @@ def test_empirical_correction_interpolates_in_log_energy() -> None:
     assert np.isclose(bias, 2.0)
     assert np.isclose(scale_68, 2.0)
     assert np.isclose(scale_95, 4.0)
+
+
+def test_frozen_attempt_03_artifacts_record_failed_full_gate() -> None:
+    directory = Path(__file__).parent
+    summary = json.loads(
+        (directory / "calibration_summary_attempt_03.json").read_text(encoding="ascii")
+    )
+    assert summary["execution"]["frozen_scale"] is True
+    assert summary["attempted_validation_beams"] == 800
+    assert summary["retained_validation_beams"] == 387
+    assert summary["attempted_validation_nulls"] == 250
+    assert summary["false_detections"] == 15
+    assert summary["eligible_cells_passed"] == 4
+    assert summary["calibration_pass"] is False

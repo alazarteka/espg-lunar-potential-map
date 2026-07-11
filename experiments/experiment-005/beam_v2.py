@@ -196,9 +196,7 @@ def _start_parameters(
     observation: beam.BeamObservation, beam_config: dict[str, Any]
 ) -> list[np.ndarray]:
     aligned = observation.pitches_deg >= 157.5
-    shoulder = (observation.pitches_deg >= 112.5) & (
-        observation.pitches_deg < 146.25
-    )
+    shoulder = (observation.pitches_deg >= 112.5) & (observation.pitches_deg < 146.25)
     amplitude = float(
         np.percentile(observation.values[aligned], 90)
         - np.median(observation.values[shoulder])
@@ -234,9 +232,7 @@ def _start_parameters(
             continuum = _initial_continuum(
                 observation, beam_config, values=continuum_values_start
             )
-            starts.append(
-                np.concatenate(([amplitude, center, sigma], continuum))
-            )
+            starts.append(np.concatenate(([amplitude, center, sigma], continuum)))
     return starts[: int(beam_config["multistart_count"])]
 
 

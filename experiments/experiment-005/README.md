@@ -1,6 +1,6 @@
 # Experiment 005: One-Day Observable Validation and Selection Pilot
 
-**Status:** Running; Attempt 03 protocol frozen before noisy calibration
+**Status:** Complete; Attempt 03 partially succeeds but fails the full held-out gate
 
 **Branch:** `experiments`
 
@@ -225,6 +225,11 @@ and the two-edge contained-only sensitivity. Never report only finite fits.
 | `calibration_summary.png` | Detection, point error, coverage, and QC anatomy |
 | `calibration-attempt-01.md` | Full interpretation and stopping decision |
 | `plot_calibration.py` | Reproduce compact tables and summary figure |
+| `calibration_results_attempt_03.csv` | Attempt 03 calibration and validation rows |
+| `calibration_summary_attempt_03.json` | Frozen held-out gate result and correction map |
+| `calibration_provenance_attempt_03.json` | Attempt 03 commits, runtime, and checksums |
+| `calibration-attempt-03-result.md` | Attempt 03 interpretation and stopping decision |
+| `plot_calibration_v3.py` | Attempt 03 compact tables and summary figure |
 
 The pilot artifacts (`run.py`, selection funnel, real-sweep results, boundary
 results, and residual atlas) were deliberately not generated because the
@@ -315,6 +320,26 @@ and held-out gates are preregistered in
 [`calibration-attempt-03-protocol.md`](calibration-attempt-03-protocol.md). No
 noisy calibration or real-pilot result had been generated when that protocol was
 committed.
+
+### Attempt 03 Result
+
+Attempt 03 completed the full frozen split calibration. It retained `387/800`
+held-out beams and passed both 150 eV cells and both 350 eV cells. These cells
+show small corrected point error and calibrated coverage even under double-
+transition and asymmetric backgrounds. The complete result is recorded in
+[`calibration-attempt-03-result.md`](calibration-attempt-03-result.md).
+
+The full-domain gate nevertheless fails:
+
+- the weak 65 eV cell remains biased and undercovered;
+- the 800 eV cells are effectively unresolved;
+- `15/250` held-out nulls are accepted (`6.0%`) against the frozen `5%` limit;
+- only `4/6` coverage-eligible cells pass every gate.
+
+The real 398-sweep pilot was therefore not run. A `100-500 eV` candidate window
+is a scientifically motivated next hypothesis, but it was identified from these
+held-out failures and must be tested under a new preregistered protocol and new
+random seeds rather than applied retroactively.
 
 ## Frozen Gate Applied
 

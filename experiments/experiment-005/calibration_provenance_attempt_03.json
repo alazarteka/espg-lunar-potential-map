@@ -1,0 +1,16 @@
+{
+  "generated_date": "2026-07-11",
+  "protocol_commit": "cefe44c",
+  "code_commit": "fb044eb",
+  "command": "uv --no-cache run python experiments/experiment-005/calibrate_v3.py",
+  "workers": 8,
+  "simulation_replicates_per_cell": 200,
+  "beam_absent_replicates": 500,
+  "elapsed_seconds": 6386.620768588036,
+  "files": {
+    "data/1999/091_120APR/3D990429.TAB": "de8358ba1456c2777e45271a1b193f95f11e866b10ae7d09d136498efc97f702",
+    "experiments/experiment-005/configuration-attempt-03.json": "6a04d8403f4761f8630a10f2b8a1e4ee885be460aaed187b66e3760f50c05cb6",
+    "experiments/experiment-005/calibration_results_attempt_03.csv": "8f2c1b2eeddbe4722a91d010b3b289953d6dac43fb9e2ba40c03baee988f3bd2",
+    "experiments/experiment-005/calibration_summary_attempt_03.json": "ecc3f53a8cb147f316c9a4599a213d3dc94733b9cdd0c8a20827ea9bfbd71e00"
+  }
+}

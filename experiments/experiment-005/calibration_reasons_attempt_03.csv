@@ -1,0 +1,8 @@
+reason_code,count,fraction_of_800_validation_beams
+amplitude_not_resolved,165,0.20625
+centroid_scale_unresolved,104,0.13
+leave_one_energy_out_instability,88,0.11
+multistart_instability,77,0.09625
+pitch_sigma_bound_margin,13,0.01625
+amplitude_bound,4,0.005
+insufficient_positive_excess_rows,2,0.0025

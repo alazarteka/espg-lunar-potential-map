@@ -1,0 +1,173 @@
+{
+  "calibration_pass": false,
+  "attempted_validation_beams": 800,
+  "retained_validation_beams": 387,
+  "minimum_retained_validation_pass": true,
+  "attempted_validation_nulls": 250,
+  "false_detections": 15,
+  "false_detection_rate": 0.06,
+  "false_detection_rate_pass": false,
+  "eligible_cells": 6,
+  "eligible_cells_passed": 4,
+  "cells": [
+    {
+      "cell_id": 0,
+      "center_ev": 65.0,
+      "amplitude": 4.0,
+      "pitch_sigma_deg": 20.0,
+      "log_noise_sigma": 0.25,
+      "attempted_validation": 100,
+      "final_retained_validation": 48,
+      "retained_fraction": 0.48,
+      "median_corrected_absolute_error_response_fwhm": 0.04641592806694124,
+      "coverage_68": 0.8541666666666666,
+      "coverage_95": 0.9375,
+      "coverage_gate_eligible": true,
+      "passed": false
+    },
+    {
+      "cell_id": 1,
+      "center_ev": 65.0,
+      "amplitude": 1.0,
+      "pitch_sigma_deg": 20.0,
+      "log_noise_sigma": 0.35,
+      "attempted_validation": 100,
+      "final_retained_validation": 34,
+      "retained_fraction": 0.34,
+      "median_corrected_absolute_error_response_fwhm": 0.2023519473006855,
+      "coverage_68": 0.08823529411764706,
+      "coverage_95": 0.7058823529411765,
+      "coverage_gate_eligible": true,
+      "passed": false
+    },
+    {
+      "cell_id": 2,
+      "center_ev": 150.0,
+      "amplitude": 4.0,
+      "pitch_sigma_deg": 25.0,
+      "log_noise_sigma": 0.25,
+      "attempted_validation": 100,
+      "final_retained_validation": 90,
+      "retained_fraction": 0.9,
+      "median_corrected_absolute_error_response_fwhm": 0.022233818283410953,
+      "coverage_68": 0.6444444444444445,
+      "coverage_95": 0.9666666666666667,
+      "coverage_gate_eligible": true,
+      "passed": true
+    },
+    {
+      "cell_id": 3,
+      "center_ev": 150.0,
+      "amplitude": 12.0,
+      "pitch_sigma_deg": 25.0,
+      "log_noise_sigma": 0.35,
+      "attempted_validation": 100,
+      "final_retained_validation": 99,
+      "retained_fraction": 0.99,
+      "median_corrected_absolute_error_response_fwhm": 0.018948236067227557,
+      "coverage_68": 0.6868686868686869,
+      "coverage_95": 0.9696969696969697,
+      "coverage_gate_eligible": true,
+      "passed": true
+    },
+    {
+      "cell_id": 4,
+      "center_ev": 350.0,
+      "amplitude": 4.0,
+      "pitch_sigma_deg": 35.0,
+      "log_noise_sigma": 0.25,
+      "attempted_validation": 100,
+      "final_retained_validation": 62,
+      "retained_fraction": 0.62,
+      "median_corrected_absolute_error_response_fwhm": 0.055997094035540214,
+      "coverage_68": 0.7258064516129032,
+      "coverage_95": 0.9516129032258065,
+      "coverage_gate_eligible": true,
+      "passed": true
+    },
+    {
+      "cell_id": 5,
+      "center_ev": 350.0,
+      "amplitude": 12.0,
+      "pitch_sigma_deg": 15.0,
+      "log_noise_sigma": 0.35,
+      "attempted_validation": 100,
+      "final_retained_validation": 50,
+      "retained_fraction": 0.5,
+      "median_corrected_absolute_error_response_fwhm": 0.062064549112851156,
+      "coverage_68": 0.76,
+      "coverage_95": 0.96,
+      "coverage_gate_eligible": true,
+      "passed": true
+    },
+    {
+      "cell_id": 6,
+      "center_ev": 800.0,
+      "amplitude": 4.0,
+      "pitch_sigma_deg": 25.0,
+      "log_noise_sigma": 0.25,
+      "attempted_validation": 100,
+      "final_retained_validation": 0,
+      "retained_fraction": 0.0,
+      "median_corrected_absolute_error_response_fwhm": null,
+      "coverage_68": null,
+      "coverage_95": null,
+      "coverage_gate_eligible": false,
+      "passed": false
+    },
+    {
+      "cell_id": 7,
+      "center_ev": 800.0,
+      "amplitude": 12.0,
+      "pitch_sigma_deg": 40.0,
+      "log_noise_sigma": 0.35,
+      "attempted_validation": 100,
+      "final_retained_validation": 4,
+      "retained_fraction": 0.04,
+      "median_corrected_absolute_error_response_fwhm": 0.3545746325999752,
+      "coverage_68": 0.0,
+      "coverage_95": 0.25,
+      "coverage_gate_eligible": false,
+      "passed": false
+    }
+  ],
+  "empirical_correction": {
+    "energy_anchors_ev": [
+      65.0,
+      150.0,
+      350.0,
+      800.0
+    ],
+    "median_signed_bias_ev": [
+      -4.518514700040505,
+      -0.7064018847806324,
+      -12.884854154343657,
+      -5.097524173076749
+    ],
+    "scale_68": [
+      1.8964849275381783,
+      1.0237428634657042,
+      1.2211972372635773,
+      2.0842211436948346
+    ],
+    "scale_95": [
+      5.048714992065944,
+      2.0044819008014683,
+      3.2561136051542663,
+      134.55083936955447
+    ],
+    "retained_calibration_counts": [
+      124,
+      187,
+      151,
+      67
+    ]
+  },
+  "execution": {
+    "replicates_per_cell": 200,
+    "null_replicates": 500,
+    "workers": 8,
+    "elapsed_seconds": 6386.620768588036,
+    "frozen_scale": true
+  }
+}
