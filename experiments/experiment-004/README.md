@@ -294,6 +294,127 @@ measured beam's broader angular support, and test boundary extraction against
 beam masking, floor/refilling, and non-adiabatic broadening. Those tests must
 evaluate beam and boundary consistency, not merely preserve the joint voltage.
 
+## Phase A3: Physical-Consistency Stress Test
+
+**Status:** Protocol frozen before Phase A3 results
+
+Phase A3 asks whether the A2 beam/boundary disagreement is caused by explicit,
+evidence-supported limitations of the reconstructed synthetic distribution.
+The published voltage is not used to select a branch.
+
+The joint-fit design is `2 x 2 x 2 x 2`:
+
+| Factor | Levels |
+| --- | --- |
+| Observation construction | bin flux then divide; divide sector pairs then bin ratios |
+| Beam pitch response | narrow `155-180 deg` support; Gaussian `FWHM = 45 deg` |
+| Boundary shape | sharp and sector-integrated; sector-integrated sigmoid with `tau = 5 deg` |
+| Cone floor | `0.10`; refilled `0.25` |
+
+All branches use the Phase A2 fractional energy response with `FWHM/E = 0.48`.
+Beam amplitude is profiled on `[0, 20]` in steps of `0.5`. This extension is
+preregistered because A2 hit the bound at `8.0` while its independent beam fit
+required amplitude about `10.56`; it is not conditional on recovering the
+published voltage. The `(U_M, B_S/B_M)` grid is unchanged.
+
+### Independent Checks
+
+- Fit the beam in two-dimensional energy-pitch space with a fractional energy
+  response, a Gaussian pitch response, and one profiled baseline per energy.
+- Repeat boundary-only fitting under two beam exclusions: the fitted 2-D beam
+  support and an energy-only `E >= 340 eV` control.
+- Cross the boundary-only checks with sharp/broadened boundaries and floors
+  `0.10/0.25`.
+
+### Phase A3 Decision Gate
+
+Physical consistency improves only if:
+
+- the joint beam amplitude no longer contacts a rail;
+- independently fitted beam and boundary voltages materially converge;
+- the inferred field ratio and residual morphology improve without selecting
+  settings by proximity to the publication; and
+- the result is stable across observation construction.
+
+Reproducing the joint published voltage while beam and boundary estimates
+remain separated is a failure of this gate. In that case the historical point
+estimate remains reproducible but may be a model-dependent compromise rather
+than a uniquely supported physical voltage.
+
+### Phase A3 Results
+
+Phase A3 was executed on 2026-07-11. All 16 joint branches fall within the
+historical 25 V voltage gate: floors, boundary shapes, beam pitch responses,
+and observation order yield only `U_rel = -151 V` or `-161 V` once the beam
+amplitude rail is removed. No beam amplitude or voltage/field-ratio grid edge
+is contacted.
+
+The lowest-objective branch is:
+
+| Quantity | Result |
+| --- | ---: |
+| Observation | Bin flux, then divide |
+| Beam pitch response | Broad Gaussian |
+| Boundary | `tau = 5 deg` |
+| Cone floor | `0.25` |
+| `U_rel` | `-151 V` |
+| `B_S/B_M` | `1.000` |
+| Beam amplitude | `14.0` |
+| Descriptive objective/dof | `0.1233` |
+
+This is about 36% below the comparable A2 best objective (`0.1938`). The exact
+published `(U_M, B_S/B_M) = (-160 V, 0.975)` pair is 14.9% above the A3 minimum.
+The residual map nevertheless retains coherent high-energy and reflected-side
+structure, so the objective improvement does not establish model adequacy.
+
+The independently fitted two-dimensional beam is stable across observation
+construction:
+
+| Observation | Beam-only `U_rel` | Amplitude | Pitch FWHM |
+| --- | ---: | ---: | ---: |
+| Bin flux, then divide | `-145.42 V` | `12.24` | `57.93 deg` |
+| Divide sector pairs, then bin | `-145.43 V` | `12.16` | `58.00 deg` |
+
+The fitted angular width is broader than the 45-degree figure-forensics prior,
+but both constructions recover essentially identical centers and widths. The
+joint `-151 V` estimate is therefore beam-dominated and agrees with the
+independent beam estimate to about 6 V.
+
+Boundary-only results are not stable. Across the frozen floor, broadening, and
+mask choices they range from `U_rel = -281 V` to `+9 V`. Illustrative cases:
+
+- Sharp boundary, floor `0.10`: `-281 V` under both beam masks and both
+  observation constructions.
+- `tau = 5 deg`, floor `0.10`: `-171` to `-251 V`, depending on mask and
+  observation construction.
+- Sharp boundary, floor `0.25`, fitted 2-D beam exclusion: `-151 V` or
+  `-131 V`; the high-energy control instead gives `-101 V` or `+9 V`.
+
+The cone floor and boundary broadening therefore control the purported
+loss-cone voltage more strongly than the data constrain it. Apparent agreement
+with the beam can be created or removed by evidence-plausible boundary choices.
+
+### Phase A3 Decision
+
+Phase A3 **fails the physical-consistency gate**. It succeeds in removing the
+beam rail and identifies a robust beam-centered voltage scale near `-145` to
+`-151 V`, but it does not recover a stable independent loss-cone voltage or
+magnetic ratio.
+
+Scientifically, spectrum 653 supports the existence and approximate voltage
+scale of the upward secondary beam. It does not, under the tested public
+reconstruction, demonstrate that the energy-dependent loss-cone boundary
+independently confirms `U_rel = -171 V`. The published value remains compatible
+with the instrument-resolution scale and reproducible by the joint historical
+fit, but it is not uniquely supported and may be biased by the joint model's
+boundary/floor compromise.
+
+The next experiment stage should leave spectrum 653 as a diagnosed positive
+control and test whether the beam estimate, boundary instability, and required
+quality gates generalize to neighboring spectra and additional hand-vetted
+cases. Further tuning on spectrum 653 would no longer distinguish reconstruction
+from overfitting.
+
 ## Planned Artifacts
 
 | Artifact | Purpose |
@@ -310,6 +431,11 @@ evaluate beam and boundary consistency, not merely preserve the joint voltage.
 | `phase_a2_profiles.csv` | Phase A2 voltage profiles |
 | `beam_boundary_crosscheck.csv` | Independent beam and boundary estimates |
 | `phase_a2_comparison.png` | Best Phase A2 measured/model/residual comparison |
+| `phase_a3.py` | Frozen physical-consistency stress test |
+| `phase_a3_results.csv` | Extended-beam joint factorial fits |
+| `phase_a3_profiles.csv` | Phase A3 voltage profiles |
+| `phase_a3_crosscheck.csv` | Independent 2-D beam and boundary fits |
+| `phase_a3_comparison.png` | Best Phase A3 measured/model/residual comparison |
 | `beam_boundary_crosscheck.csv` | Independent observable estimates |
 | `supplement/main.tex` | Mathematical methods, results, and limitations |
 
