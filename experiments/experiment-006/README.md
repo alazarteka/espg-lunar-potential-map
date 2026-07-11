@@ -58,10 +58,12 @@ rationale is developed in [supplement/main.tex](supplement/main.tex).
 
 ## Stages And Information Barriers
 
-1. **D0: Support and geometry freeze.** Select 24 spectra using only time,
-   structural completeness, connection, pitch support, and magnetic variation.
-   Commit 12 calibration and 12 disjoint confirmation supports before fitting
-   any beam simulation.
+1. **D0: Support and geometry freeze.** Divide the interval into six fixed time
+   strata and select four maximin-diverse supports per stratum using only
+   structural completeness, connection, footprint geometry, pitch support, and
+   magnetic provenance. Assign two per stratum to each split, giving 12
+   calibration and 12 disjoint confirmation supports before fitting any beam
+   simulation.
 2. **D1: Implementation verification.** Verify polarity, paired normalization,
    response integration, simulator independence, deterministic seeds, and
    noiseless exact recovery. These are code gates, not scientific results.
@@ -134,6 +136,8 @@ is a known positive-control observation and is not confirmatory evidence.
 | `configuration.json` | Machine-readable design and gates |
 | `design-review.md` | Independent statistical and physical design critique |
 | `support_manifest.csv` | Frozen calibration/confirmation support assignment |
+| `support_candidates.csv` | Outcome-blind metrics and exclusions for all 398 specs |
+| `support_provenance.json` | Input, kernel, code, and output checksums |
 | `support_selection.py` | Outcome-blind support selection |
 | `beam.py` | Polarity-aware frozen estimator |
 | `simulate.py` | Independent sector-level generators and controls |

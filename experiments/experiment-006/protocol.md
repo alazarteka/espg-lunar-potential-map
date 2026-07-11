@@ -91,11 +91,28 @@ Selection uses only:
 - native energy alignment relative to the reporting window; and
 - within-sweep magnetic-vector variation.
 
-Twelve supports are assigned to calibration and twelve disjoint supports to
-confirmation by a deterministic stratified rule. The resulting manifest,
+The interval is divided into six fixed temporal strata. Four supports per
+stratum are selected by deterministic maximin sampling over standardized field-
+line elevation, spacecraft altitude, footprint location, polarity, near-axis
+pitch support, incident/reflected sector support, and pitch span. Supports with
+field-line elevation below 30 degrees are reserved as grazing challenges and
+are not primary support templates. Geometry-ranked supports 1 and 4 go to
+calibration in alternating strata, with ranks 2 and 3 used in the others; the
+complement goes to confirmation. This gives two supports per split per stratum,
+12 calibration supports, and 12 disjoint confirmation supports.
+
+The native energy grid and within-sweep magnetic variation are recorded as
+provenance checks. If they are constant across candidates, they do not enter
+the diversity score. The resulting manifest, complete candidate table,
 selection code, and checksums must be committed before simulator development
 may inspect outcome summaries. Halekas spectra may later appear only as labeled
 known positive controls.
+
+Before D0 execution, an audit found that the production attitude helper selected
+the next attitude record although the coordinate documentation specified
+per-row interpolation. Commit `ac1f03c` corrected this to shortest-arc circular
+interpolation in right ascension and linear interpolation in declination. D0
+uses the corrected, tested convention.
 
 ## 5. Frozen Estimator Family
 

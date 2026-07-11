@@ -18,8 +18,16 @@
       "calibration_supports": 12,
       "confirmation_supports": 12,
       "disjoint_splits": true,
-      "manifest": "support_manifest.csv",
-      "manifest_status": "not_yet_generated"
+      "temporal_strata": 6,
+      "supports_per_temporal_stratum": 4,
+      "supports_per_split_per_temporal_stratum": 2,
+      "required_structural_rows": 15,
+      "guard_energy_ev": [37.0, 1020.0],
+      "minimum_incident_sectors_per_row": 6,
+      "minimum_reflected_sectors_per_row": 6,
+      "minimum_usable_guard_rows": 3,
+      "minimum_field_elevation_deg": 30.0,
+      "manifest": "support_manifest.csv"
     }
   },
   "estimand": {
@@ -44,6 +52,7 @@
     "orient_surface_leaving_pitch_deg": 180.0,
     "invalid_polarity_is_disconnected": true,
     "surface_axis_support_half_width_deg": 22.5,
+    "minimum_surface_axis_sectors_per_row": 2,
     "minimum_response_contributing_rows_with_axis_support": 2
   },
   "estimator": {
