@@ -211,6 +211,8 @@ and the two-edge contained-only sensitivity. Never report only finite fits.
 | --- | --- |
 | `README.md` | Frozen protocol, results, deviations, and decision |
 | [`configuration.json`](configuration.json) | Frozen model, calibration, optimizer, and QC settings |
+| `beam.py` | Native-sector beam estimator, bootstrap, and QC funnel |
+| `calibrate.py` | Frozen injection and beam-absent calibration run |
 | `run.py` | Exact experiment-local execution |
 | `selection_funnel.csv` | Attempted-to-accepted counts and reasons |
 | `sweep_diagnostics.parquet` | One row per attempted sweep with support and QC |
@@ -223,6 +225,17 @@ and the two-edge contained-only sensitivity. Never report only finite fits.
 
 Large caches remain under `artifacts/`; checksums and provenance are recorded
 here.
+
+## Reproduction
+
+Run the frozen calibration from the repository root:
+
+```bash
+uv run python experiments/experiment-005/calibrate.py
+```
+
+Replicate-count overrides are development smoke tests and cannot replace the
+default frozen-scale output.
 
 ## Decision Gate
 

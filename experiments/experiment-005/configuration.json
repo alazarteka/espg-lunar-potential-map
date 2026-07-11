@@ -82,6 +82,8 @@
     "coverage_68_bounds": [0.6, 0.76],
     "coverage_95_bounds": [0.88, 0.99],
     "false_detection_rate_max": 0.05,
+    "minimum_qc_retained_total": 400,
+    "minimum_qc_retained_for_cell_gate": 50,
     "evaluate_only_qc_retained_support": true
   },
   "audit_specs": [
