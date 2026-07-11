@@ -1,6 +1,6 @@
 # Experiment 005: One-Day Observable Validation and Selection Pilot
 
-**Status:** Running; Attempt 02 failed exact recovery, Attempt 03 in development
+**Status:** Running; Attempt 03 protocol frozen before noisy calibration
 
 **Branch:** `experiments`
 
@@ -212,6 +212,7 @@ and the two-edge contained-only sensitivity. Never report only finite fits.
 | `README.md` | Frozen protocol, results, deviations, and decision |
 | [`configuration.json`](configuration.json) | Frozen Attempt 01 settings |
 | [`configuration-attempt-02.json`](configuration-attempt-02.json) | Frozen Attempt 02 settings and split |
+| [`configuration-attempt-03.json`](configuration-attempt-03.json) | Frozen Attempt 03 smooth-continuum settings |
 | `beam.py` | Native-sector beam estimator, bootstrap, and QC funnel |
 | `calibrate.py` | Frozen injection and beam-absent calibration run |
 | `calibration_results.csv` | All 2,100 injection/control outcomes |
@@ -303,6 +304,15 @@ operationally inaccessible competing basin rather than a missing forward-model
 solution. The full result is recorded in
 [`calibration-attempt-02-result.md`](calibration-attempt-02-result.md). No
 calibration matrix or real pilot output was generated.
+
+## Calibration Attempt 03
+
+The smooth-continuum candidate passed noiseless recovery at all four energy
+anchors before protocol freeze. Its full method, split, discrepancy families,
+and held-out gates are preregistered in
+[`calibration-attempt-03-protocol.md`](calibration-attempt-03-protocol.md). No
+noisy calibration or real-pilot result had been generated when that protocol was
+committed.
 
 ## Frozen Gate Applied
 
