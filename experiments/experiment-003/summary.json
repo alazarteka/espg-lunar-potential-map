@@ -1,0 +1,94 @@
+{
+  "count_overdispersion_alpha": 0.13168487690063668,
+  "conditional_log_scale_sigma": 0.42094407555567925,
+  "primary": {
+    "conditional_shape_t4": {
+      "u_relative_v": -225.2171374407479,
+      "target_error_v": -54.217137440747905,
+      "passes_25v_tolerance": false,
+      "bs_over_bm": 0.6821602689161932,
+      "median_abs_residual": 0.5357319133303104
+    },
+    "raw_interval_nb": {
+      "u_relative_v": -244.22390784732661,
+      "target_error_v": -73.22390784732661,
+      "passes_25v_tolerance": false,
+      "bs_over_bm": 0.7009048980368187,
+      "median_abs_residual": 0.4790616726277254
+    },
+    "smooth_lillis_pairwise": {
+      "u_relative_v": -164.41616044995806,
+      "target_error_v": 6.583839550041944,
+      "passes_25v_tolerance": true,
+      "bs_over_bm": 0.9680363045534613,
+      "median_abs_residual": 0.0014181176195840473
+    }
+  },
+  "confirmation": {
+    "raw_interval_nb": {
+      "median_abs_difference_from_lillis_v": 114.43748317489619,
+      "catastrophic_over_100v_fraction": 0.52
+    },
+    "conditional_shape_t4": {
+      "median_abs_difference_from_lillis_v": 62.33238451061935,
+      "catastrophic_over_100v_fraction": 0.48
+    }
+  },
+  "confirmation_by_method": {
+    "raw_interval_nb": {
+      "n": 50,
+      "median_u_relative_v": -1454.4712851456702,
+      "iqr_u_relative_v": 1843.5320949752086,
+      "boundary_hit_fraction": 0.82,
+      "median_abs_residual": 0.5546836040521778
+    },
+    "conditional_shape_t4": {
+      "n": 50,
+      "median_u_relative_v": -1223.9629771180953,
+      "iqr_u_relative_v": 1857.3857573351042,
+      "boundary_hit_fraction": 0.64,
+      "median_abs_residual": 0.7080569159033445
+    },
+    "smooth_lillis_pairwise": {
+      "n": 50,
+      "median_u_relative_v": -601.6544776413966,
+      "iqr_u_relative_v": 1684.6543830757917,
+      "boundary_hit_fraction": 0.56,
+      "median_abs_residual": 4.92837697438353e-06
+    }
+  },
+  "primary_seed_stability": {
+    "raw_interval_nb": {
+      "min_u_relative_v": -251.2735239757072,
+      "max_u_relative_v": -233.20877035354832,
+      "range_v": 18.06475362215889,
+      "all_beam_at_upper_bound": true
+    },
+    "conditional_shape_t4": {
+      "min_u_relative_v": -225.2171374407479,
+      "max_u_relative_v": -205.0074439138587,
+      "range_v": 20.209693526889197,
+      "all_beam_at_upper_bound": true
+    },
+    "smooth_lillis_pairwise": {
+      "min_u_relative_v": -164.41616044995806,
+      "max_u_relative_v": -159.93497693425851,
+      "range_v": 4.481183515699541,
+      "all_beam_at_upper_bound": true
+    }
+  },
+  "matched_profile_coverage": {
+    "raw_interval_nb": {
+      "0.68": 0.7666666666666667,
+      "0.95": 0.95
+    },
+    "conditional_shape_t4": {
+      "0.68": 0.5833333333333334,
+      "0.95": 0.9
+    },
+    "smooth_lillis_pairwise": {
+      "0.68": 0.7166666666666667,
+      "0.95": 0.9333333333333333
+    }
+  }
+}

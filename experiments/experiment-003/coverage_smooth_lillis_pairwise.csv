@@ -1,0 +1,3 @@
+method,threshold_source,nominal_level,threshold,evaluation_coverage,median_abs_error_v,q90_abs_error_v,profile_edge_fraction,n_calibration,n_evaluation,nuisance_parameters_fixed
+smooth_lillis_pairwise,empirical_calibration,0.68,0.18299705882564865,0.7166666666666667,9.0,20.200000000000003,0.0,30,60,True
+smooth_lillis_pairwise,empirical_calibration,0.95,0.46302948239966213,0.9333333333333333,9.0,20.200000000000003,0.0,30,60,True

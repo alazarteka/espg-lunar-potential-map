@@ -1,0 +1,5 @@
+method,threshold_source,nominal_level,threshold,evaluation_coverage,median_abs_error_v,q90_abs_error_v,profile_edge_fraction,n_calibration,n_evaluation,nuisance_parameters_fixed
+raw_interval_nb,empirical_calibration,0.68,0.8187048523786871,0.7666666666666667,4.0,10.0,0.0,30,60,True
+raw_interval_nb,empirical_calibration,0.95,1.943481986626466,0.95,4.0,10.0,0.0,30,60,True
+raw_interval_nb,nominal_likelihood,0.68,0.5,0.6333333333333333,4.0,10.0,0.0,30,60,True
+raw_interval_nb,nominal_likelihood,0.95,1.920729,0.95,4.0,10.0,0.0,30,60,True

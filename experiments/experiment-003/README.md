@@ -1,6 +1,9 @@
 # Experiment 003: Observation and Uncertainty Model Comparison
 
-**Status:** Running; protocol and panel frozen
+**Status:** Complete; no candidate advanced
+
+**Decision:** Revise the shared forward model before selecting a production
+observation/uncertainty model.
 
 **Branch:** `experiments`
 
@@ -103,6 +106,130 @@ means `|U_rel + 171 V| <= 25 V`; this tolerance was fixed before candidate fits.
 | `residual_atlas.pdf` | Successful and failed real-spectrum residuals |
 | `coverage.csv` | Simulation coverage and calibration results |
 | `comparison.png` | Primary model-comparison figure |
+| `seed_stability.csv` | Three-seed primary-benchmark check |
+| `summary.json` | Machine-readable decision metrics |
+| `supplement/main.tex` | Full mathematical analysis and mini-paper |
+
+## Discovery Calibration
+
+The seven discovery spectra fixed:
+
+- Negative-binomial quadratic overdispersion: `alpha = 0.1316848769`.
+- Conditional Student-t log-residual scale: `sigma = 0.4209440756`.
+
+No candidate form or discrepancy scale was changed after confirmation opened.
+
+## Primary Benchmark Results
+
+| Method | `U_rel` [V] | Target error [V] | `B_S/B_M` | Beam amp | Passes 25 V gate |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Raw interval negative binomial | -244.22 | -73.22 | 0.701 | 5.000 | No |
+| Conditional log shape | -225.22 | -54.22 | 0.682 | 5.000 | No |
+| Smooth pairwise Lillis | -164.42 | +6.58 | 0.968 | 5.000 | Yes |
+
+Correcting the telemetry and count scale therefore does not restore the
+published voltage under count weighting. Conditional shape moves partway toward
+the benchmark. Smooth Lillis alone preserves both the voltage and magnetic
+ratio, but every method saturates the beam-amplitude bound.
+
+Three-seed primary voltage ranges are 18.1 V (interval count), 20.2 V
+(conditional shape), and 4.5 V (Lillis). The benchmark differences are larger
+than optimizer-seed variation.
+
+## Confirmation Results
+
+| Method | Median `U_rel` [V] | IQR [V] | Bound-hit fraction |
+| --- | ---: | ---: | ---: |
+| Raw interval negative binomial | -1454 | 1844 | 0.82 |
+| Conditional log shape | -1224 | 1857 | 0.64 |
+| Smooth pairwise Lillis | -602 | 1685 | 0.56 |
+
+Relative to Lillis on the same fifty spectra, interval counts have median
+absolute disagreement 114.4 V and exceed 100 V disagreement in 52% of cases.
+Conditional shape has median absolute disagreement 62.3 V and exceeds 100 V in
+48%. These extreme estimates are diagnostics of non-identifiability and model
+mismatch, not accepted claims of kilovolt lunar potentials.
+
+## Matched-Simulation Coverage
+
+The coverage study fixes `B_S/B_M`, beam amplitude, mask, and response at a
+known common truth, then calibrates a one-dimensional voltage profile on 30
+simulations and evaluates 60 independent simulations.
+
+| Method | Median absolute error [V] | Empirical 68% coverage | Empirical 95% coverage |
+| --- | ---: | ---: | ---: |
+| Raw interval negative binomial | 4 | 0.62 | 0.83 |
+| Conditional log shape | 6 | 0.58 | 0.90 |
+| Smooth pairwise Lillis | 9 | 0.72 | 0.93 |
+
+The 30-simulation empirical upper quantiles are noisy. Nominal likelihood
+thresholds give 95% coverage of 0.95 for interval counts and 0.93 for
+conditional shape. Thus all three estimators recover voltage under their own
+matched assumptions. The real-data failures arise from shared forward-model or
+regime mismatch rather than a fundamentally broken voltage optimizer.
+
+## Final Decision
+
+No method passes every frozen gate:
+
+- **Raw interval counts:** instrument-faithful and accurate in matched
+  simulation, but fails the benchmark, saturates the beam, and catastrophically
+  disagrees across confirmation.
+- **Conditional shape:** removes row intensity and is less count-sensitive, but
+  still fails the benchmark and confirmation stability.
+- **Smooth Lillis:** preserves the benchmark and is seed-stable, but lacks a
+  generative likelihood, saturates the beam, and has a 56% confirmation
+  bound-hit rate.
+
+The appropriate next step is Experiment 004: test beam form and bounds,
+incident anisotropy, response convolution, spacecraft potential, masks, and
+plasma-regime applicability. Smooth Lillis remains a useful
+benchmark-preserving diagnostic, not a validated production estimator.
+
+The full derivation, expectations, results, and limitations are in
+[`supplement/main.tex`](supplement/main.tex).
+
+## Reproduction
+
+The long confirmation run is intentionally split into fresh five-spectrum
+processes because repeated SciPy interval CDF evaluation grows process memory.
+This execution change does not alter frozen models or tuning.
+
+```bash
+.venv/bin/python experiments/experiment-003/freeze_panel.py
+.venv/bin/python experiments/experiment-003/run.py --stage discovery \
+  --output-dir /tmp/experiment-003-discovery-final
+.venv/bin/python experiments/experiment-003/run.py --stage seeds \
+  --output-dir /tmp/experiment-003-seeds
+
+# Repeat in five-spectrum blocks over 669..718:
+.venv/bin/python experiments/experiment-003/run.py --stage confirmation \
+  --spec-first 669 --spec-last 673 \
+  --count-alpha 0.13168487690063668 \
+  --conditional-sigma 0.42094407555567925 \
+  --output-dir /tmp/experiment-003-confirm-669-673
+
+.venv/bin/python experiments/experiment-003/coverage.py \
+  --method raw_interval_nb
+.venv/bin/python experiments/experiment-003/coverage.py \
+  --method conditional_shape_t4
+.venv/bin/python experiments/experiment-003/coverage.py \
+  --method smooth_lillis_pairwise
+.venv/bin/python experiments/experiment-003/aggregate.py
+```
+
+## Protocol Deviations And Limits
+
+1. Confirmation execution was split into subprocesses after repeated
+   distribution-CDF calls caused process-memory growth. Frozen inputs and
+   parameters were unchanged.
+2. Coverage is a matched, fixed-nuisance voltage-profile test rather than full
+   three-parameter coverage. Since no real-data candidate passed the benchmark
+   and confirmation gates, more expensive misspecified coverage simulations
+   would not change the no-advance decision.
+3. Experiment-001 mask and normalization ablations were not duplicated; this
+   experiment froze the common Lillis mask and compared the three preregistered
+   observation models.
 
 ## Decision Gate
 

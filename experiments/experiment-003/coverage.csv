@@ -1,0 +1,11 @@
+method,threshold_source,nominal_level,threshold,evaluation_coverage,median_abs_error_v,q90_abs_error_v,profile_edge_fraction,n_calibration,n_evaluation,nuisance_parameters_fixed
+conditional_shape_t4,empirical_calibration,0.68,0.5207581111285435,0.5833333333333334,6.0,12.200000000000003,0.0,30,60,True
+conditional_shape_t4,empirical_calibration,0.95,1.6578104578966304,0.9,6.0,12.200000000000003,0.0,30,60,True
+conditional_shape_t4,nominal_likelihood,0.68,0.5,0.5833333333333334,6.0,12.200000000000003,0.0,30,60,True
+conditional_shape_t4,nominal_likelihood,0.95,1.920729,0.9333333333333333,6.0,12.200000000000003,0.0,30,60,True
+raw_interval_nb,empirical_calibration,0.68,0.8187048523786871,0.7666666666666667,4.0,10.0,0.0,30,60,True
+raw_interval_nb,empirical_calibration,0.95,1.943481986626466,0.95,4.0,10.0,0.0,30,60,True
+raw_interval_nb,nominal_likelihood,0.68,0.5,0.6333333333333333,4.0,10.0,0.0,30,60,True
+raw_interval_nb,nominal_likelihood,0.95,1.920729,0.95,4.0,10.0,0.0,30,60,True
+smooth_lillis_pairwise,empirical_calibration,0.68,0.18299705882564865,0.7166666666666667,9.0,20.200000000000003,0.0,30,60,True
+smooth_lillis_pairwise,empirical_calibration,0.95,0.46302948239966213,0.9333333333333333,9.0,20.200000000000003,0.0,30,60,True

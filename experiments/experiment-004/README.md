@@ -1,6 +1,6 @@
 # Experiment 004: Instrument-Response and Forward-Model Sensitivity
 
-**Status:** Blocked by Experiment 003
+**Status:** Ready to finalize protocol
 
 **Branch:** `experiments`
 
@@ -36,9 +36,12 @@ forward model?
 
 ## Experimental Design
 
-Use the observation/uncertainty model selected by Experiment 003. Freeze a
-factorial or sensitivity design before fitting. Include the Halekas benchmark,
-the Experiment 003 confirmation panel, and deliberately difficult spectra.
+Experiment 003 selected no production observation model: all three shared a
+beam-bound and confirmation-instability failure. Freeze a factorial or
+sensitivity design before fitting. Use smooth pairwise Lillis as the primary
+benchmark-preserving diagnostic, with interval-count and conditional-shape fits
+as weighting-sensitivity controls. Include the Halekas benchmark, the
+Experiment 003 confirmation panel, and deliberately difficult spectra.
 
 Report systematic voltage shifts, not only changes in fit objective. Separate
 measurement uncertainty from forward-model sensitivity.
