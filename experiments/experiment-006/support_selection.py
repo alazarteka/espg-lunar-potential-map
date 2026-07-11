@@ -103,6 +103,15 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def provenance_path(path: Path) -> str:
+    """Return a repository-relative provenance name when possible."""
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(config.PROJECT_ROOT))
+    except ValueError:
+        return str(resolved)
+
+
 def temporal_stratum(
     midpoint: pd.Timestamp, start: pd.Timestamp, end: pd.Timestamp, count: int
 ) -> int:
@@ -629,15 +638,15 @@ def main() -> None:
             "spiceypy": importlib.metadata.version("spiceypy"),
         },
         "files": {
-            str(input_path): sha256_file(input_path),
-            str(args.configuration): sha256_file(args.configuration),
+            provenance_path(input_path): sha256_file(input_path),
+            provenance_path(args.configuration): sha256_file(args.configuration),
             str(Path(__file__).resolve().relative_to(config.PROJECT_ROOT)): sha256_file(
                 Path(__file__)
             ),
-            str(config.DATA_DIR / config.ATTITUDE_FILE): sha256_file(
+            provenance_path(config.DATA_DIR / config.ATTITUDE_FILE): sha256_file(
                 config.DATA_DIR / config.ATTITUDE_FILE
             ),
-            str(config.DATA_DIR / config.THETA_FILE): sha256_file(
+            provenance_path(config.DATA_DIR / config.THETA_FILE): sha256_file(
                 config.DATA_DIR / config.THETA_FILE
             ),
             str(lock_path.relative_to(config.PROJECT_ROOT)): sha256_file(lock_path),
