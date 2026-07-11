@@ -1,6 +1,6 @@
 # Experiment 004: Clean-Room Halekas Reconstruction and Forward-Model Validation
 
-**Status:** Running; Phase A protocol frozen
+**Status:** Complete; no production joint estimator advanced
 
 **Branch:** `experiments`
 
@@ -9,7 +9,7 @@
 ## Scientific Question
 
 Can a best-supported clean-room reconstruction of the Halekas et al. (2008)
-lunar-potential estimator reproduce the published spectrum-653 distribution,
+lunar-potential estimator reproduce the published Figure 5 distribution,
 voltage, and magnetic ratio, and which historical ambiguities or modern
 response corrections materially control that result?
 
@@ -627,6 +627,21 @@ The scientifically supported reading is therefore:
 | `phase_a4_boundaries.png` | Extracted boundaries and physical fits |
 | `beam_boundary_crosscheck.csv` | Independent observable estimates |
 | `supplement/main.tex` | Mathematical methods, results, and limitations |
+| `supplement/main.pdf` | Compiled experiment mini-paper |
+| `author_questions.md` | Targeted provenance questions for the original method |
+
+## Closure
+
+Experiment 004 is complete. The full A1--A4 mathematical analysis and final
+decision are preserved in [`supplement/main.tex`](supplement/main.tex) and its
+compiled PDF. Questions whose answers could distinguish private-processing
+differences from a biased historical point estimate are frozen in
+[`author_questions.md`](author_questions.md).
+
+No joint beam/loss-cone estimator advances to production. Experiment 005 will
+test a response-aware beam centroid as the primary candidate observable, direct
+boundary extraction as conditional corroboration, and the historical joint fit
+as a provenance comparison only.
 
 ## Non-Goals
 
