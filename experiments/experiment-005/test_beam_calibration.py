@@ -40,6 +40,20 @@ def _load_calibrate_module():
 calibrate = _load_calibrate_module()
 
 
+def _load_beam_v2_module():
+    path = Path(__file__).with_name("beam_v2.py")
+    spec = importlib.util.spec_from_file_location("experiment_005_beam_v2", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+beam_v2 = _load_beam_v2_module()
+
+
 def synthetic_observation(
     *,
     center_ev: float = 150.0,
@@ -81,6 +95,13 @@ def fast_configuration():
     configuration = deepcopy(beam.load_configuration())
     configuration["beam"]["multistart_count"] = 12
     configuration["beam"]["bootstrap_replicates"] = 30
+    return configuration
+
+
+def fast_v2_configuration():
+    configuration = deepcopy(beam_v2.load_configuration())
+    configuration["beam"]["multistart_count"] = 6
+    configuration["beam"]["optimizer_max_nfev"] = 1000
     return configuration
 
 
@@ -212,3 +233,88 @@ def test_frozen_calibration_artifacts_record_failed_gate() -> None:
     assert summary["false_detections"] == 0
     assert summary["eligible_cells_passed"] == 1
     assert summary["calibration_pass"] is False
+
+
+def test_flexible_continuum_fails_practical_exact_recovery() -> None:
+    configuration = fast_v2_configuration()
+    support = synthetic_observation(amplitude=0.0)
+    observation = calibrate.simulate_observation(
+        support,
+        center_ev=150.0,
+        amplitude=8.0,
+        pitch_sigma_deg=25.0,
+        log_noise_sigma=0.0,
+        rng=np.random.default_rng(81),
+        field_ratio=0.975,
+        cone_floor=0.2,
+        boundary_width_deg=8.0,
+    )
+    fitted = beam_v2.fit_flexible_beam(observation, configuration["beam"])
+    assert fitted.success
+    assert abs(fitted.center_ev - 150.0) > 5.0
+    assert fitted.rms_log_residual < 0.01
+
+    boundaries = calibrate.relative_boundary_pitch(
+        observation.energies_ev, -150.0, 0.975
+    )
+    continuum = np.column_stack(
+        (
+            np.full(len(boundaries), 0.2),
+            np.full(len(boundaries), 0.8),
+            boundaries,
+            np.full(len(boundaries), 8.0),
+        )
+    ).ravel()
+    truth_start = np.concatenate(([8.0, 150.0, 25.0], continuum))
+    truth_fit = beam_v2.fit_flexible_beam(
+        observation, configuration["beam"], starts=[truth_start]
+    )
+    assert abs(truth_fit.center_ev - 150.0) < 1e-6
+    assert truth_fit.objective < 1e-12
+
+
+def test_flexible_assessment_accepts_resolved_beam() -> None:
+    configuration = fast_v2_configuration()
+    support = synthetic_observation(amplitude=0.0)
+    observation = calibrate.simulate_observation(
+        support,
+        center_ev=150.0,
+        amplitude=12.0,
+        pitch_sigma_deg=25.0,
+        log_noise_sigma=0.05,
+        rng=np.random.default_rng(82),
+        field_ratio=0.96,
+        cone_floor=0.2,
+        boundary_width_deg=9.0,
+    )
+    assessment = beam_v2.assess_flexible_beam(
+        observation,
+        observation,
+        configuration["beam"],
+        configuration["beam_qc"],
+    )
+    assert assessment.base_valid, assessment.reason_codes
+
+
+def test_flexible_assessment_rejects_null() -> None:
+    configuration = fast_v2_configuration()
+    support = synthetic_observation(amplitude=0.0)
+    observation = calibrate.simulate_observation(
+        support,
+        center_ev=150.0,
+        amplitude=0.0,
+        pitch_sigma_deg=25.0,
+        log_noise_sigma=0.1,
+        rng=np.random.default_rng(83),
+        field_ratio=0.96,
+        cone_floor=0.2,
+        boundary_width_deg=9.0,
+    )
+    assessment = beam_v2.assess_flexible_beam(
+        observation,
+        observation,
+        configuration["beam"],
+        configuration["beam_qc"],
+    )
+    assert not assessment.base_valid
+    assert "amplitude_not_resolved" in assessment.reason_codes

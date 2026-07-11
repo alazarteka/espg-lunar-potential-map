@@ -1,6 +1,6 @@
 # Experiment 005: One-Day Observable Validation and Selection Pilot
 
-**Status:** Running; Attempt 02 protocol frozen before estimator outputs
+**Status:** Running; Attempt 02 failed exact recovery, Attempt 03 in development
 
 **Branch:** `experiments`
 
@@ -292,6 +292,17 @@ split before evaluating an untouched validation split. The validation mixture
 includes double-transition and asymmetric backgrounds outside the fitted
 continuum family. Real pilot outcomes remain closed until every held-out gate
 passes.
+
+### Attempt 02 Result
+
+Attempt 02 stopped at its noiseless exact-recovery test. The practical
+multistart fit moved a matched `150 eV` beam to `139.269 eV` while retaining a
+log-residual RMS of only `0.00862`. A truth-initialized diagnostic recovered the
+exact global solution, demonstrating that independent row continua create an
+operationally inaccessible competing basin rather than a missing forward-model
+solution. The full result is recorded in
+[`calibration-attempt-02-result.md`](calibration-attempt-02-result.md). No
+calibration matrix or real pilot output was generated.
 
 ## Frozen Gate Applied
 
