@@ -1,0 +1,22 @@
+{
+  "background_counts": {
+    "asymmetric_shoulder": 750,
+    "correlated_smooth_energy_pitch_field": 750,
+    "double_transition_refilling": 750,
+    "independent_smooth_logistic": 750
+  },
+  "branch_log_rms_median": 0.2980474580180846,
+  "branch_log_rms_minimum": 0.1809113309487391,
+  "cases": 3000,
+  "configuration_sha256": "e843439026173dc135ca69ee3a391a46d7d67a0941927411f74091e4588c89ed",
+  "confirmation_flux_opened": false,
+  "determinism_pass": true,
+  "failures": {},
+  "full_gate_pass": true,
+  "manifest_sha256": "474cc5af8c01f8ee21fd34c3631ee8adff9144fc721002f6942347dda51f615b",
+  "minimum_common_normalized_rows": 11,
+  "nontrivial_branch_pass": true,
+  "normalization_support_pass": true,
+  "positivity_pass": true,
+  "simulator_sha256": "ec4ce73dffb66863341963c17fdf2dd8902165ca4cc46f0849acddeeee5b7725"
+}
