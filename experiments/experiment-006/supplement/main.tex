@@ -235,12 +235,43 @@ Its purpose is to learn whether the validated observable occurs in actual LP ER
 sweeps under the same quality rules, not to jump directly from a successful
 simulation to a lunar potential map.
 
+\section{Implementation Certification Result}
+
+Before calibration, we froze a 512-case implementation corpus containing 96
+matched analytic cases, 160 generic discrepancy cases, 64 null or adversarial
+cases, and 192 cases on the twelve calibration supports.  Each case used the
+same twelve truth-blind starts.  Complete SciPy multistart fitting defined the
+reference; float64 projected Levenberg--Marquardt GPU candidates were ranked by
+the canonical NumPy objective and polished on the CPU.  Certification required
+100\% reference-basin recall for some $K\leq6$ and final objective, modeled
+signal, and identifiable-center parity.
+
+The GPU-candidate procedure failed this gate.  Rank-1 recall was 82.3\% in the
+matched analytic arm, 92.5\% under generic discrepancy, 88.0\% on calibration
+supports, and 62.5\% in the null/adversarial arm.  Overall recall increased
+only from 85.2\% at $K=1$ to 86.1\% at $K=12$.  Thus the failure was not chiefly
+an ordering problem among multiple useful GPU basins: in many cases the
+candidate set contained no eligible trajectory in the CPU-reference basin.
+Only 337 of 512 cases supplied at least six converged GPU candidates, and the
+fail-closed hybrid invoked complete CPU fitting in 226 cases.
+
+Seven deliberately non-identifiable controls---one flat-pitch, one
+single-energy, and five zero-dynamic-range cases---had no successful finite CPU
+reference trajectory.  They remain failures in the denominator.  The result
+does not challenge the already verified float64 CPU/CUDA forward equivalence,
+and it does not test the beam-proxy hypothesis.  It rejects only replacement or
+pruning of complete CPU multistart by the current projected-LM candidates.
+
+Consequently, fresh calibration will use the complete deterministic twelve-start
+SciPy fitter.  Retaining this slower path prevents an implementation shortcut
+from creating energy- or support-dependent selection before scientific
+calibration.  Redesigning the GPU optimizer would require a new, independently
+frozen certification corpus and is not part of the present experiment.
+
 \section{Current Status}
 
-This document records the design before support selection, implementation,
-calibration, or confirmation.  Numerical response-stress values, deterministic
-seed hashes, the support manifest, and the semi-synthetic template manifest must
-be frozen in a later pre-calibration commit.  No Experiment~006 scientific
-result exists at this stage.
+Support selection and implementation certification are complete.  No
+confirmation flux has been opened.  Fresh calibration, correction freeze, and
+one-shot confirmation remain to be run under the preregistered barriers.
 
 \end{document}

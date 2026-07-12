@@ -1,6 +1,6 @@
 # Experiment 006: Restricted-Domain Beam-Proxy Validation
 
-**Status:** Running; D0 support and geometry freeze complete
+**Status:** D1 complete; CPU reference path selected for C1
 
 **Branch:** `experiments`
 
@@ -58,6 +58,14 @@ rationale is developed in [supplement/main.tex](supplement/main.tex).
 
 The completed D0 decision and frozen support identities are recorded in
 [support-selection-result.md](support-selection-result.md).
+
+The completed D1 basin audit is recorded in
+[d1-certification-result.md](d1-certification-result.md).  The float64 CUDA
+forward model passed parity and throughput checks, but the projected-LM GPU
+candidate optimizer did not pass the frozen all-case basin-recall gate.  C1
+must therefore use complete CPU multistart fitting.  This is an implementation
+decision, not a failure of the scientific beam hypothesis; no calibration or
+confirmation flux has been opened.
 
 ## Stages And Information Barriers
 
@@ -156,6 +164,9 @@ is a known positive-control observation and is not confirmatory evidence.
 | `configuration-d1-starts.json` | Frozen practical-start construction settings |
 | `d1-optimizer-benchmark-result.md` | Complete-LM recovery and speed decision |
 | `d1-optimizer-benchmark.json` | Frozen GPU 0 LM batch matrix |
+| `d1-certification-result.md` | Frozen 512-case basin-recall decision |
+| `d1-certification-summary.json` | Machine-readable merged D1 gate summary |
+| `d1-certification-provenance.json` | Commit, configuration, and result hashes |
 | `d1-forward-benchmark-result.md` | Precision and GPU-batch decision |
 | `d1-forward-benchmark.json` | Frozen single-GPU throughput matrix |
 | `simulate.py` | Independent sector-level generators and controls |

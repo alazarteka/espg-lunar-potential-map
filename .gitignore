@@ -83,6 +83,8 @@ figures/
 results/
 gitingest/
 potential_timeseries*.html
+experiments/experiment-006/d1-shards*/
+experiments/experiment-006/d1-certification-results.csv
 
 # =============================================================================
 # Artifacts (gitinclude pattern - ignore all, whitelist what to track)
