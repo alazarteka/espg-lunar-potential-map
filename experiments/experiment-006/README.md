@@ -138,6 +138,7 @@ is a known positive-control observation and is not confirmatory evidence.
 | `protocol.md` | Full preregistration and claim matrix |
 | `configuration.json` | Machine-readable design and gates |
 | `configuration-d1.json` | Frozen CPU/GPU forward-model and parity settings |
+| `configuration-d1-optimizer.json` | Float64 batched-LM candidate settings |
 | `design-review.md` | Independent statistical and physical design critique |
 | `support_manifest.csv` | Frozen calibration/confirmation support assignment |
 | `support_candidates.csv` | Outcome-blind metrics and exclusions for all 398 specs |
@@ -149,6 +150,8 @@ is a known positive-control observation and is not confirmatory evidence.
 | `d1-backend-protocol.md` | CPU-reference/GPU-candidate information barrier |
 | `d1-forward-parity-result.md` | CPU/CUDA forward-equivalence decision |
 | `benchmark_forward.py` | Deterministic implementation-only throughput benchmark |
+| `d1-forward-benchmark-result.md` | Precision and GPU-batch decision |
+| `d1-forward-benchmark.json` | Frozen single-GPU throughput matrix |
 | `simulate.py` | Independent sector-level generators and controls |
 | `calibrate.py` | Fresh calibration only |
 | `confirm.py` | One-shot confirmatory runner and decision report |

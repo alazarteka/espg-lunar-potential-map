@@ -1,0 +1,120 @@
+{
+  "protocol": "experiment-006-d1-forward-benchmark-1",
+  "implementation_only": true,
+  "confirmation_data_opened": false,
+  "seed": 6006,
+  "iterations": 100,
+  "software": {
+    "python": "3.12.12",
+    "numpy": "1.26.4",
+    "torch": "2.6.0+cu118",
+    "cuda_build": "11.8"
+  },
+  "hardware": {
+    "requested_device": "cuda:0",
+    "cuda_device_count": 4,
+    "cuda_device_name": "NVIDIA TITAN Xp"
+  },
+  "results": [
+    {
+      "device": "cuda:0",
+      "dtype": "float32",
+      "batch_size": 16,
+      "maximum_relative_forward_error": 4.4910511655971066e-05,
+      "elapsed_seconds": 0.07348187640309334,
+      "case_evaluations": 1600,
+      "case_evaluations_per_second": 21774.07652497896,
+      "peak_allocated_mib": 8.94677734375
+    },
+    {
+      "device": "cuda:0",
+      "dtype": "float32",
+      "batch_size": 32,
+      "maximum_relative_forward_error": 8.279434409907978e-06,
+      "elapsed_seconds": 0.07333613559603691,
+      "case_evaluations": 3200,
+      "case_evaluations_per_second": 43634.69623797478,
+      "peak_allocated_mib": 9.76171875
+    },
+    {
+      "device": "cuda:0",
+      "dtype": "float32",
+      "batch_size": 64,
+      "maximum_relative_forward_error": 1.5986481049009507e-05,
+      "elapsed_seconds": 0.07394902408123016,
+      "case_evaluations": 6400,
+      "case_evaluations_per_second": 86546.10496238389,
+      "peak_allocated_mib": 11.39599609375
+    },
+    {
+      "device": "cuda:0",
+      "dtype": "float32",
+      "batch_size": 128,
+      "maximum_relative_forward_error": 9.339226261109884e-06,
+      "elapsed_seconds": 0.0739038996398449,
+      "case_evaluations": 12800,
+      "case_evaluations_per_second": 173197.89703084825,
+      "peak_allocated_mib": 14.66064453125
+    },
+    {
+      "device": "cuda:0",
+      "dtype": "float32",
+      "batch_size": 256,
+      "maximum_relative_forward_error": 2.1083475515175096e-06,
+      "elapsed_seconds": 0.07448440790176392,
+      "case_evaluations": 25600,
+      "case_evaluations_per_second": 343696.09319796646,
+      "peak_allocated_mib": 21.19580078125
+    },
+    {
+      "device": "cuda:0",
+      "dtype": "float64",
+      "batch_size": 16,
+      "maximum_relative_forward_error": 6.22258249163145e-16,
+      "elapsed_seconds": 0.07375334203243256,
+      "case_evaluations": 1600,
+      "case_evaluations_per_second": 21693.93217864501,
+      "peak_allocated_mib": 9.5595703125
+    },
+    {
+      "device": "cuda:0",
+      "dtype": "float64",
+      "batch_size": 32,
+      "maximum_relative_forward_error": 9.76214491797852e-14,
+      "elapsed_seconds": 0.07436640560626984,
+      "case_evaluations": 3200,
+      "case_evaluations_per_second": 43030.18243132902,
+      "peak_allocated_mib": 10.9931640625
+    },
+    {
+      "device": "cuda:0",
+      "dtype": "float64",
+      "batch_size": 64,
+      "maximum_relative_forward_error": 9.171641611137932e-13,
+      "elapsed_seconds": 0.07638740539550781,
+      "case_evaluations": 6400,
+      "case_evaluations_per_second": 83783.44527953258,
+      "peak_allocated_mib": 13.85498046875
+    },
+    {
+      "device": "cuda:0",
+      "dtype": "float64",
+      "batch_size": 128,
+      "maximum_relative_forward_error": 2.5666337357582106e-14,
+      "elapsed_seconds": 0.07563357427716255,
+      "case_evaluations": 12800,
+      "case_evaluations_per_second": 169237.01044583504,
+      "peak_allocated_mib": 19.58251953125
+    },
+    {
+      "device": "cuda:0",
+      "dtype": "float64",
+      "batch_size": 256,
+      "maximum_relative_forward_error": 7.157165339608771e-15,
+      "elapsed_seconds": 0.08447108417749405,
+      "case_evaluations": 25600,
+      "case_evaluations_per_second": 303062.2875185104,
+      "peak_allocated_mib": 31.31298828125
+    }
+  ]
+}

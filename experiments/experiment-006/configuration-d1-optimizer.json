@@ -1,0 +1,76 @@
+{
+  "protocol_version": "d1-optimizer-1",
+  "status": "frozen_before_optimizer_outputs",
+  "frozen_date": "2026-07-12",
+  "parent_forward_commit": "6482735",
+  "parent_configuration": "configuration-d1.json",
+  "precision_decision": {
+    "gpu_candidate_dtype": "float64",
+    "float32_scientific_search_enabled": false,
+    "reason": "float32 exceeded frozen forward rtol in benchmark while float64 retained approximately 88 percent of batch-256 throughput"
+  },
+  "parameters": {
+    "lower": [
+      0.0,
+      20.0,
+      3.0,
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0,
+      -12.0
+    ],
+    "upper": [
+      40.0,
+      2000.0,
+      50.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0
+    ],
+    "scaled_optimizer_domain": [0.0, 1.0]
+  },
+  "levenberg_marquardt": {
+    "maximum_iterations": 100,
+    "initial_damping": 0.01,
+    "minimum_damping": 1e-10,
+    "maximum_damping": 1e10,
+    "accepted_step_damping_divisor": 3.0,
+    "rejected_step_damping_multiplier": 10.0,
+    "gradient_infinity_tolerance": 1e-8,
+    "scaled_step_tolerance": 1e-8,
+    "relative_objective_tolerance": 1e-10,
+    "singular_solve_role": "increase_damping_and_retry",
+    "independent_trajectory_stopping": true
+  },
+  "batching": {
+    "trajectories_per_gpu_batch": 256,
+    "static_shard_rule": "case_id_mod_device_count",
+    "gpu_processes": 4,
+    "canonical_merge_order": "case_id_then_start_id"
+  },
+  "certification": {
+    "initial_cpu_polish_top_k": 3,
+    "top_k_is_provisional_until_basin_recall_gate": true,
+    "complete_cpu_fallback": true,
+    "final_jacobian_backend": "scipy_float64",
+    "final_covariance_backend": "numpy_float64",
+    "final_qc_backend": "cpu_reference"
+  }
+}
