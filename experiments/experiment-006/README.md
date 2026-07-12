@@ -151,6 +151,8 @@ is a known positive-control observation and is not confirmatory evidence.
 | `d1-forward-parity-result.md` | CPU/CUDA forward-equivalence decision |
 | `benchmark_forward.py` | Deterministic implementation-only throughput benchmark |
 | `benchmark_optimizer.py` | Complete batched-LM throughput and recovery benchmark |
+| `d1-optimizer-benchmark-result.md` | Complete-LM recovery and speed decision |
+| `d1-optimizer-benchmark.json` | Frozen GPU 0 LM batch matrix |
 | `d1-forward-benchmark-result.md` | Precision and GPU-batch decision |
 | `d1-forward-benchmark.json` | Frozen single-GPU throughput matrix |
 | `simulate.py` | Independent sector-level generators and controls |

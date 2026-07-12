@@ -1,0 +1,100 @@
+{
+  "protocol": "experiment-006-d1-optimizer-benchmark-1",
+  "implementation_only": true,
+  "confirmation_data_opened": false,
+  "seed": 6106,
+  "maximum_iterations": 100,
+  "software": {
+    "python": "3.12.12",
+    "numpy": "1.26.4",
+    "torch": "2.6.0+cu118",
+    "cuda_build": "11.8"
+  },
+  "hardware": {
+    "requested_device": "cuda:0",
+    "cuda_device_count": 4,
+    "cuda_device_name": "NVIDIA TITAN Xp"
+  },
+  "results": [
+    {
+      "device": "cuda:0",
+      "cases": 1,
+      "starts_per_case": 12,
+      "trajectories": 12,
+      "elapsed_seconds": 0.9168003872036934,
+      "trajectories_per_second": 13.088999707559958,
+      "converged_fraction": 1.0,
+      "median_iterations": 6.0,
+      "maximum_iterations_used": 7,
+      "median_center_error_response_fwhm": 3.737935033125109e-10,
+      "maximum_center_error_response_fwhm": 4.077987657438102e-09,
+      "median_objective": 2.4362290076966866e-15,
+      "maximum_objective": 8.71023898420606e-14,
+      "peak_allocated_mib": 53.23291015625
+    },
+    {
+      "device": "cuda:0",
+      "cases": 4,
+      "starts_per_case": 12,
+      "trajectories": 48,
+      "elapsed_seconds": 0.13264259696006775,
+      "trajectories_per_second": 361.8747001346066,
+      "converged_fraction": 1.0,
+      "median_iterations": 7.0,
+      "maximum_iterations_used": 8,
+      "median_center_error_response_fwhm": 2.9760723560043387e-10,
+      "maximum_center_error_response_fwhm": 1.4397186851807139e-08,
+      "median_objective": 7.821726319810782e-16,
+      "maximum_objective": 2.176413604030929e-13,
+      "peak_allocated_mib": 166.267578125
+    },
+    {
+      "device": "cuda:0",
+      "cases": 8,
+      "starts_per_case": 12,
+      "trajectories": 96,
+      "elapsed_seconds": 0.14819153398275375,
+      "trajectories_per_second": 647.8102859180356,
+      "converged_fraction": 1.0,
+      "median_iterations": 7.0,
+      "maximum_iterations_used": 8,
+      "median_center_error_response_fwhm": 5.549967969628368e-10,
+      "maximum_center_error_response_fwhm": 6.412238144254963e-09,
+      "median_objective": 2.492791510849879e-15,
+      "maximum_objective": 8.556261694572947e-14,
+      "peak_allocated_mib": 313.71875
+    },
+    {
+      "device": "cuda:0",
+      "cases": 16,
+      "starts_per_case": 12,
+      "trajectories": 192,
+      "elapsed_seconds": 0.17648322880268097,
+      "trajectories_per_second": 1087.9220722704918,
+      "converged_fraction": 1.0,
+      "median_iterations": 7.0,
+      "maximum_iterations_used": 8,
+      "median_center_error_response_fwhm": 5.38691402306559e-10,
+      "maximum_center_error_response_fwhm": 2.153197015798148e-08,
+      "median_objective": 1.4422019289729726e-15,
+      "maximum_objective": 9.08063986311384e-13,
+      "peak_allocated_mib": 612.48388671875
+    },
+    {
+      "device": "cuda:0",
+      "cases": 21,
+      "starts_per_case": 12,
+      "trajectories": 252,
+      "elapsed_seconds": 0.23722027242183685,
+      "trajectories_per_second": 1062.3038133599355,
+      "converged_fraction": 1.0,
+      "median_iterations": 7.0,
+      "maximum_iterations_used": 9,
+      "median_center_error_response_fwhm": 2.7889040629815265e-10,
+      "maximum_center_error_response_fwhm": 1.8850171710325623e-08,
+      "median_objective": 1.1128940344562795e-15,
+      "maximum_objective": 3.677946013214798e-13,
+      "peak_allocated_mib": 796.2548828125
+    }
+  ]
+}
