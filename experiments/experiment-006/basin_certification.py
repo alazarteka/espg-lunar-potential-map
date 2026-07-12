@@ -9,6 +9,7 @@ import hashlib
 import json
 import subprocess
 import time
+import traceback
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -467,10 +468,53 @@ def run_case(
         "final_center_difference_response_fwhm": final_center,
         "final_rank": certified.result.jacobian_rank,
         "final_contacts_bound": _contacts_bound(certified.result.parameters),
+        "error": "",
         **timers,
     }
     for k in range(1, N_STARTS + 1):
         row[f"recall_k{k}"] = bool(first_rank and first_rank <= k)
+    return row
+
+
+def failed_case_row(case: CertificationCase, error: BaseException) -> dict[str, Any]:
+    """Represent an unconstructable CPU reference as a fail-closed result row."""
+    row = {
+        "case_id": case.case_id,
+        "arm": case.arm,
+        "challenge": case.challenge,
+        "support_spec_no": case.support_spec_no,
+        "true_center_ev": case.true_center_ev,
+        "true_amplitude": case.true_amplitude,
+        "true_pitch_sigma_deg": case.true_pitch_sigma_deg,
+        "reference_winner_start": -1,
+        "reference_objective": float("inf"),
+        "reference_rank": 0,
+        "reference_success": False,
+        "reference_fits": "[]",
+        "gpu_candidates": "[]",
+        "gpu_objectives": "[]",
+        "gpu_converged": "[]",
+        "canonical_objectives": "[]",
+        "canonical_ranking": "[]",
+        "cpu_polished_gpu_fits": "[]",
+        "basin_matches": "[]",
+        "minimum_matching_gpu_rank": 0,
+        "gpu_finite_candidates": 0,
+        "gpu_converged_candidates": 0,
+        "used_fallback": True,
+        "fallback_reason": "CPU reference unavailable",
+        "final_objective_relative_difference": float("inf"),
+        "final_log_model_rms": float("inf"),
+        "final_center_difference_response_fwhm": float("nan"),
+        "final_rank": 0,
+        "final_contacts_bound": False,
+        "error": "".join(traceback.format_exception_only(error)).strip(),
+        "starts_seconds": 0.0,
+        "reference_seconds": 0.0,
+        "gpu_seconds": 0.0,
+        "all_gpu_polish_seconds": 0.0,
+    }
+    row.update({f"recall_k{k}": False for k in range(1, N_STARTS + 1)})
     return row
 
 
@@ -584,6 +628,42 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
+def load_checkpoint(path: Path) -> list[dict[str, Any]]:
+    """Load raw checkpoint rows for restart bookkeeping."""
+    if not path.exists():
+        return []
+    with path.open(encoding="ascii", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    boolean_fields = {
+        "reference_success",
+        "used_fallback",
+        "final_contacts_bound",
+        *(f"recall_k{k}" for k in range(1, N_STARTS + 1)),
+    }
+    integer_fields = {
+        "gpu_finite_candidates",
+        "gpu_converged_candidates",
+        "final_rank",
+    }
+    float_fields = {
+        "final_objective_relative_difference",
+        "final_log_model_rms",
+        "final_center_difference_response_fwhm",
+        "starts_seconds",
+        "reference_seconds",
+        "gpu_seconds",
+        "all_gpu_polish_seconds",
+    }
+    for row in rows:
+        for field in boolean_fields:
+            row[field] = row[field] == "True"
+        for field in integer_fields:
+            row[field] = int(row[field])
+        for field in float_fields:
+            row[field] = float(row[field])
+    return rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     experiment_dir = Path(__file__).resolve().parent
@@ -634,9 +714,20 @@ def main() -> None:
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but unavailable")
     started = time.perf_counter()
-    rows = []
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = args.output_dir / "d1-certification-partial.csv"
+    prior_rows = load_checkpoint(checkpoint_path)
+    completed_ids = {int(row["case_id"]) for row in prior_rows}
+    rows: list[dict[str, Any]] = prior_rows
     for index, case in enumerate(cases, start=1):
-        rows.append(run_case(case, configuration, device))
+        if case.case_id in completed_ids:
+            continue
+        try:
+            row = run_case(case, configuration, device)
+        except (RuntimeError, ValueError, FloatingPointError) as error:
+            row = failed_case_row(case, error)
+        rows.append(row)
+        write_csv(checkpoint_path, rows)
         print(
             f"[{index}/{len(cases)}] case {case.case_id} {case.arm}/{case.challenge}",
             flush=True,
@@ -646,7 +737,6 @@ def main() -> None:
     summary["repository_commit"] = subprocess.run(
         ["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True
     ).stdout.strip()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
     results_path = args.output_dir / "d1-certification-results.csv"
     summary_path = args.output_dir / "d1-certification-summary.json"
     write_csv(results_path, rows)

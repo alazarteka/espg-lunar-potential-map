@@ -153,3 +153,13 @@ def test_summary_evaluates_all_k_and_final_gates() -> None:
     assert not certification.summarize([failed], configuration())["full_gate_pass"]
     failed = dict(row, reference_success=False)
     assert not certification.summarize([failed], configuration())["full_gate_pass"]
+
+
+def test_failed_reference_row_is_complete_and_fails_closed() -> None:
+    case = certification.make_cases(supports(), configuration())[0]
+    row = certification.failed_case_row(case, RuntimeError("no reference"))
+    assert not row["reference_success"]
+    assert row["gpu_finite_candidates"] == 0
+    assert not any(row[f"recall_k{k}"] for k in range(1, 13))
+    assert "no reference" in row["error"]
+    assert not certification.summarize([row], configuration())["full_gate_pass"]
