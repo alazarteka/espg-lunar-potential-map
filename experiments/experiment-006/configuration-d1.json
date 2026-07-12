@@ -1,0 +1,63 @@
+{
+  "protocol_version": "d1-forward-parity-1",
+  "status": "frozen_before_gpu_parity_outputs",
+  "frozen_date": "2026-07-11",
+  "parent_d0_configuration": "configuration.json",
+  "model": {
+    "parameter_order": [
+      "amplitude",
+      "center_ev",
+      "pitch_sigma_deg",
+      "continuum_coefficients_12"
+    ],
+    "parameter_count": 15,
+    "observed_energy_domain_ev": [20.0, 2000.0],
+    "optimizer_center_ev": [20.0, 2000.0],
+    "amplitude_bounds": [0.0, 40.0],
+    "pitch_sigma_deg_bounds": [3.0, 50.0],
+    "continuum_coefficient_bounds": [-12.0, 12.0],
+    "continuum_cone_level_bounds": [0.01, 2.0],
+    "continuum_contrast_bounds": [0.01, 3.0],
+    "continuum_boundary_deg_bounds": [90.0, 180.0],
+    "continuum_width_deg_bounds": [0.5, 45.0],
+    "pitch_center_deg_fixed": 180.0,
+    "energy_response": "linear_gaussian_channel_average",
+    "energy_response_fwhm_fraction": 0.48,
+    "channel_edges": "geometric_midpoints_with_ratio_endpoint_extrapolation",
+    "objective": "unweighted_log_residual",
+    "multistart_count": 12
+  },
+  "backend": {
+    "cpu_reference_dtype": "float64",
+    "gpu_search_dtype": "float32",
+    "final_certification": "scipy_float64",
+    "planned_optimizer": "batched_projected_levenberg_marquardt",
+    "initial_cpu_polish_top_k": 3,
+    "top_k_frozen": false,
+    "complete_cpu_fallback": true,
+    "static_gpu_shard_rule": "case_id_mod_device_count"
+  },
+  "parity_gates": {
+    "float64_forward_rtol_max": 1e-9,
+    "float32_forward_rtol_max": 2e-5,
+    "float32_objective_relative_error_max": 1e-4,
+    "cpu_polished_center_difference_response_fwhm_max": 1e-4,
+    "cpu_polished_objective_relative_error_max": 1e-8,
+    "gpu_top_k_reference_basin_recall_required": 1.0,
+    "final_qc_agreement_required": 1.0
+  },
+  "benchmark": {
+    "batch_sizes": [16, 32, 64, 128, 256],
+    "dtypes": ["float32", "float64"],
+    "compile_mode_role": "sensitivity_only",
+    "dry_run_cases": 512,
+    "compare_one_and_four_gpus": true
+  },
+  "information_barrier": {
+    "calibration_supports_allowed": true,
+    "confirmation_support_flux_allowed": false,
+    "confirmation_residual_templates_allowed": false,
+    "confirmation_seeds_allowed": false,
+    "partial_confirmation_outputs_allowed": false
+  }
+}

@@ -137,12 +137,18 @@ is a known positive-control observation and is not confirmatory evidence.
 | `README.md` | Experiment status, rationale, and decision summary |
 | `protocol.md` | Full preregistration and claim matrix |
 | `configuration.json` | Machine-readable design and gates |
+| `configuration-d1.json` | Frozen CPU/GPU forward-model and parity settings |
 | `design-review.md` | Independent statistical and physical design critique |
 | `support_manifest.csv` | Frozen calibration/confirmation support assignment |
 | `support_candidates.csv` | Outcome-blind metrics and exclusions for all 398 specs |
 | `support_provenance.json` | Input, kernel, code, and output checksums |
 | `support_selection.py` | Outcome-blind support selection |
 | `beam.py` | Polarity-aware frozen estimator |
+| `beam_model.py` | Canonical float64 channel-integrated forward model |
+| `beam_torch.py` | Batched PyTorch forward model after D1 parity |
+| `d1-backend-protocol.md` | CPU-reference/GPU-candidate information barrier |
+| `d1-forward-parity-result.md` | CPU/CUDA forward-equivalence decision |
+| `benchmark_forward.py` | Deterministic implementation-only throughput benchmark |
 | `simulate.py` | Independent sector-level generators and controls |
 | `calibrate.py` | Fresh calibration only |
 | `confirm.py` | One-shot confirmatory runner and decision report |
