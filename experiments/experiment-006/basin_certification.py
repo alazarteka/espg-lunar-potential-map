@@ -594,6 +594,8 @@ def main() -> None:
     )
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--shard-index", type=int)
+    parser.add_argument("--shard-count", type=int)
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -604,6 +606,12 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+    if (args.shard_index is None) != (args.shard_count is None):
+        parser.error("--shard-index and --shard-count must be supplied together")
+    if args.shard_count is not None and (
+        args.shard_count < 1 or not 0 <= args.shard_index < args.shard_count
+    ):
+        parser.error("shard index must satisfy 0 <= index < count")
     if args.limit is not None and args.output_dir.resolve() == experiment_dir:
         parser.error(
             "partial runs require --output-dir outside the experiment directory"
@@ -614,6 +622,12 @@ def main() -> None:
         experiment_dir / "support_manifest.csv",
     )
     cases = make_cases(supports, configuration)
+    if args.shard_count is not None:
+        cases = [
+            case
+            for case in cases
+            if case.case_id % args.shard_count == args.shard_index
+        ]
     if args.limit is not None:
         cases = cases[: args.limit]
     device = torch.device(args.device)
@@ -646,6 +660,8 @@ def main() -> None:
         "summary_sha256": sha256_file(summary_path),
         "confirmation_flux_opened": False,
         "device": str(device),
+        "shard_index": args.shard_index,
+        "shard_count": args.shard_count,
     }
     (args.output_dir / "d1-certification-provenance.json").write_text(
         json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="ascii"
