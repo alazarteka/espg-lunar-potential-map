@@ -56,6 +56,7 @@
     "gradient_infinity_tolerance": 1e-8,
     "scaled_step_tolerance": 1e-8,
     "relative_objective_tolerance": 1e-10,
+    "exact_objective_tolerance": 1e-24,
     "singular_solve_role": "increase_damping_and_retry",
     "independent_trajectory_stopping": true
   },
