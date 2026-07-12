@@ -240,8 +240,8 @@ def certify_candidates(
         )
     )
     reason: str | None = None
-    if not finite.all():
-        reason = "invalid, unconverged, or objective-disagreeing candidate"
+    if np.count_nonzero(finite) < top_k:
+        reason = "fewer eligible candidates than top_k"
         selected = ranked[:top_k]
     else:
         cutoff = objectives[ranked[top_k - 1]]

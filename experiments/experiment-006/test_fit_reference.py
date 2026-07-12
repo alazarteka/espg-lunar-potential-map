@@ -79,6 +79,20 @@ def _near(offset: float) -> np.ndarray:
     return start
 
 
+def _objectives(observation: object, candidates: np.ndarray) -> np.ndarray:
+    return np.array(
+        [
+            np.dot(
+                reference._residual(observation, candidate),
+                reference._residual(observation, candidate),
+            )
+            if np.isfinite(candidate).all()
+            else np.nan
+            for candidate in candidates
+        ]
+    )
+
+
 def test_exact_and_noisy_fits() -> None:
     exact = reference.fit_reference(_observation(), TRUE[None, :])
     assert exact.objective < 1e-25
@@ -121,50 +135,62 @@ def test_top_k_candidates_are_ranked_and_cpu_polished() -> None:
     assert not certified.used_fallback
 
 
-def test_nonfinite_candidate_forces_complete_reference_fallback() -> None:
+def test_nonfinite_candidate_is_rejected_individually() -> None:
     starts = np.stack((_near(0.5), TRUE, _near(-0.2)))
     candidates = starts.copy()
     candidates[0, 0] = np.nan
+    observation = _observation()
     certified = reference.certify_candidates(
-        _observation(), candidates, np.array([0.0, 1.0, 2.0]), starts, top_k=1
+        observation, candidates, _objectives(observation, candidates), starts, top_k=1
     )
-    assert certified.used_fallback
-    assert certified.fallback_reason == (
-        "invalid, unconverged, or objective-disagreeing candidate"
-    )
-    assert len(certified.result.fits) == len(starts)
+    assert not certified.used_fallback
+    assert 0 not in certified.polished_candidate_indices
     np.testing.assert_allclose(certified.result.parameters, TRUE, atol=1e-12)
 
 
-def test_out_of_bounds_candidate_forces_complete_reference_fallback() -> None:
+def test_out_of_bounds_candidate_is_rejected_individually() -> None:
     starts = np.stack((_near(0.5), TRUE, _near(-0.2)))
     candidates = starts.copy()
     candidates[0, 1] = 2001.0
+    observation = _observation()
     certified = reference.certify_candidates(
-        _observation(), candidates, np.array([0.0, 1.0, 2.0]), starts, top_k=1
+        observation, candidates, _objectives(observation, candidates), starts, top_k=1
     )
-    assert certified.used_fallback
-    assert certified.fallback_reason == (
-        "invalid, unconverged, or objective-disagreeing candidate"
-    )
-    assert len(certified.result.fits) == len(starts)
+    assert not certified.used_fallback
+    assert 0 not in certified.polished_candidate_indices
 
 
-def test_unconverged_or_objective_disagreement_forces_fallback() -> None:
+def test_unconverged_or_objective_disagreement_is_rejected() -> None:
     starts = np.stack((_near(0.5), TRUE, _near(-0.2)))
     converged = np.array([True, False, True])
+    observation = _observation()
+    objectives = _objectives(observation, starts)
+    objectives[0] = 1e9
     certified = reference.certify_candidates(
-        _observation(),
+        observation,
         starts,
-        np.array([1e9, 1.0, 2.0]),
+        objectives,
         starts,
         candidate_converged=converged,
         top_k=1,
     )
-    assert certified.used_fallback
-    assert certified.fallback_reason == (
-        "invalid, unconverged, or objective-disagreeing candidate"
+    assert not certified.used_fallback
+    np.testing.assert_array_equal(certified.polished_candidate_indices, [2])
+
+
+def test_too_few_eligible_candidates_force_reference_fallback() -> None:
+    starts = np.stack((_near(0.5), TRUE, _near(-0.2)))
+    observation = _observation()
+    certified = reference.certify_candidates(
+        observation,
+        starts,
+        _objectives(observation, starts),
+        starts,
+        candidate_converged=np.array([False, True, True]),
+        top_k=3,
     )
+    assert certified.used_fallback
+    assert certified.fallback_reason == "fewer eligible candidates than top_k"
 
 
 def test_covariance_rank_and_standard_errors_are_cpu_products() -> None:

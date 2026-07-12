@@ -1,0 +1,72 @@
+{
+  "protocol_version": "d1-basin-certification-2-independent-review",
+  "status": "frozen_before_basin_recall_outputs",
+  "frozen_date": "2026-07-12",
+  "parent_start_commit": "7351864",
+  "support_split": "calibration",
+  "confirmation_flux_opened": false,
+  "corpus": {
+    "seed": 6206,
+    "total_cases": 512,
+    "support_count": 12,
+    "arms": {
+      "analytic_matched": 96,
+      "generic_discrepancy": 160,
+      "null_adversarial": 64,
+      "calibration_support": 192
+    },
+    "analytic_cases_per_support": 8,
+    "calibration_cases_per_support": 16,
+    "generic_challenges": [
+      "correlated_log_residual",
+      "asymmetric_energy_tail",
+      "broad_secondary",
+      "narrow_secondary",
+      "energy_tilt"
+    ],
+    "generic_cases_per_challenge": 32,
+    "null_adversarial_challenges": [
+      "null",
+      "near_null",
+      "flat_pitch",
+      "single_energy",
+      "duplicate_samples",
+      "sparse_pitch",
+      "bound_center",
+      "zero_dynamic_range"
+    ],
+    "null_adversarial_cases_per_challenge": 8,
+    "beam_energy_anchors_ev": [80.0, 110.0, 150.0, 220.0, 340.0, 500.0, 760.0, 1100.0],
+    "amplitudes": [2.0, 4.0, 10.0, 18.0],
+    "pitch_sigma_deg": [8.0, 15.0, 27.0, 40.0],
+    "continuum_coefficient_distribution": "deterministic_uniform_minus_0.8_to_0.8",
+    "correlated_log_residual_amplitude": 0.02,
+    "asymmetric_tail_fraction": 0.2,
+    "asymmetric_tail_center_factor": 1.18
+  },
+  "basin_match": {
+    "cpu_polished_objective_relative_difference_max": 1e-8,
+    "log_model_rms_max": 1e-8,
+    "cpu_polished_center_difference_response_fwhm_max": 1e-4,
+    "identifiable_rank": 15,
+    "identifiable_amplitude_min": 1e-6,
+    "null_center_parity_required": false
+  },
+  "gates": {
+    "reference_success_required": 1.0,
+    "gpu_finite_candidate_fraction_required": 1.0,
+    "gpu_eligible_candidates_min": 6,
+    "top_k_reference_basin_recall_required": 1.0,
+    "top_k_ceiling": 6,
+    "certified_final_objective_parity_required": 1.0,
+    "certified_final_model_parity_required": 1.0,
+    "certified_final_center_parity_required": 1.0,
+    "fallback_is_permitted_and_reported": true
+  },
+  "top_k_policy": {
+    "candidate": 6,
+    "evaluate": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "freeze_only_after_full_gate_pass": true,
+    "failure_action": "increase_k_or_complete_cpu_fallback_before_C1"
+  }
+}
