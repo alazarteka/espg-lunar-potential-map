@@ -187,8 +187,10 @@ def certify_candidates(
     candidate_objectives: Sequence[float] | np.ndarray,
     reference_starts: np.ndarray,
     *,
+    candidate_converged: np.ndarray | None = None,
     top_k: int = 3,
     ambiguity_rtol: float = 1e-8,
+    candidate_objective_rtol: float = 1e-8,
     bound_tolerance: float = 1e-8,
 ) -> CertificationResult:
     """Rank GPU candidates, CPU-polish them, and fall back when uncertifiable.
@@ -206,6 +208,12 @@ def certify_candidates(
         raise ValueError("Candidate objectives must match the candidate count")
     if not 1 <= top_k <= candidates.shape[0]:
         raise ValueError("top_k must be between one and the candidate count")
+    if candidate_converged is None:
+        converged = np.ones(candidates.shape[0], dtype=bool)
+    else:
+        converged = np.asarray(candidate_converged, dtype=bool)
+        if converged.shape != (candidates.shape[0],):
+            raise ValueError("Candidate convergence flags must match candidates")
 
     lower, upper = parameter_bounds()
     finite = (
@@ -213,7 +221,18 @@ def certify_candidates(
         & np.isfinite(candidates).all(axis=1)
         & np.all(candidates >= lower, axis=1)
         & np.all(candidates <= upper, axis=1)
+        & converged
     )
+    canonical_objectives = np.full_like(objectives, np.nan)
+    for index in np.flatnonzero(finite):
+        residual = _residual(observation, candidates[index])
+        canonical_objectives[index] = float(np.dot(residual, residual))
+    objective_scale = np.maximum(np.abs(canonical_objectives), 1e-12)
+    objective_agreement = (
+        np.abs(objectives - canonical_objectives) / objective_scale
+        <= candidate_objective_rtol
+    )
+    finite &= objective_agreement
     ranked = np.concatenate(
         (
             np.flatnonzero(finite)[np.argsort(objectives[finite], kind="stable")],
@@ -222,7 +241,7 @@ def certify_candidates(
     )
     reason: str | None = None
     if not finite.all():
-        reason = "nonfinite or out-of-bounds candidate"
+        reason = "invalid, unconverged, or objective-disagreeing candidate"
         selected = ranked[:top_k]
     else:
         cutoff = objectives[ranked[top_k - 1]]
@@ -248,6 +267,8 @@ def certify_candidates(
             reason = reason or "bound contact"
         if not np.isfinite(polished.jacobian).all():
             reason = reason or "nonfinite CPU Jacobian"
+        if polished.jacobian_rank < N_PARAMETERS:
+            reason = reason or "rank-deficient CPU Jacobian"
     else:
         reason = reason or "no finite candidate"
 

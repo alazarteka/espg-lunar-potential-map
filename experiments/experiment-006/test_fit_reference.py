@@ -101,12 +101,22 @@ def test_all_start_winner_and_trajectory_retention() -> None:
 
 def test_top_k_candidates_are_ranked_and_cpu_polished() -> None:
     candidates = np.stack((_near(0.5), _near(0.1), _near(-0.2), _near(0.3)))
-    gpu_objectives = np.array([4.0, 1.0, 3.0, 2.0])
-    certified = reference.certify_candidates(
-        _observation(0.001), candidates, gpu_objectives, candidates, top_k=2
+    observation = _observation(0.001)
+    gpu_objectives = np.array(
+        [
+            np.dot(
+                reference._residual(observation, candidate),
+                reference._residual(observation, candidate),
+            )
+            for candidate in candidates
+        ]
     )
-    np.testing.assert_array_equal(certified.ranked_candidate_indices, [1, 3, 2, 0])
-    np.testing.assert_array_equal(certified.polished_candidate_indices, [1, 3])
+    certified = reference.certify_candidates(
+        observation, candidates, gpu_objectives, candidates, top_k=2
+    )
+    expected = np.argsort(gpu_objectives, kind="stable")
+    np.testing.assert_array_equal(certified.ranked_candidate_indices, expected)
+    np.testing.assert_array_equal(certified.polished_candidate_indices, expected[:2])
     assert len(certified.result.fits) == 2
     assert not certified.used_fallback
 
@@ -119,7 +129,9 @@ def test_nonfinite_candidate_forces_complete_reference_fallback() -> None:
         _observation(), candidates, np.array([0.0, 1.0, 2.0]), starts, top_k=1
     )
     assert certified.used_fallback
-    assert certified.fallback_reason == "nonfinite or out-of-bounds candidate"
+    assert certified.fallback_reason == (
+        "invalid, unconverged, or objective-disagreeing candidate"
+    )
     assert len(certified.result.fits) == len(starts)
     np.testing.assert_allclose(certified.result.parameters, TRUE, atol=1e-12)
 
@@ -132,8 +144,27 @@ def test_out_of_bounds_candidate_forces_complete_reference_fallback() -> None:
         _observation(), candidates, np.array([0.0, 1.0, 2.0]), starts, top_k=1
     )
     assert certified.used_fallback
-    assert certified.fallback_reason == "nonfinite or out-of-bounds candidate"
+    assert certified.fallback_reason == (
+        "invalid, unconverged, or objective-disagreeing candidate"
+    )
     assert len(certified.result.fits) == len(starts)
+
+
+def test_unconverged_or_objective_disagreement_forces_fallback() -> None:
+    starts = np.stack((_near(0.5), TRUE, _near(-0.2)))
+    converged = np.array([True, False, True])
+    certified = reference.certify_candidates(
+        _observation(),
+        starts,
+        np.array([1e9, 1.0, 2.0]),
+        starts,
+        candidate_converged=converged,
+        top_k=1,
+    )
+    assert certified.used_fallback
+    assert certified.fallback_reason == (
+        "invalid, unconverged, or objective-disagreeing candidate"
+    )
 
 
 def test_covariance_rank_and_standard_errors_are_cpu_products() -> None:
