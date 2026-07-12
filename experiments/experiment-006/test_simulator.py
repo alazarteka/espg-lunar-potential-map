@@ -84,3 +84,49 @@ def test_simulator_does_not_import_estimator_model() -> None:
     source = Path(simulator.__file__).read_text(encoding="ascii")
     assert "beam_model" not in source
     assert "model_values" not in source
+
+
+def test_continuum_channel_quadrature_refines() -> None:
+    config = json.loads(Path(__file__).with_name("configuration-c1.json").read_text())
+    support = _support()
+    args = (
+        support.channel_low_ev,
+        support.channel_high_ev,
+        support.pitches_deg,
+        "asymmetric_shoulder",
+    )
+    coarse, _ = simulator._channel_continuum(
+        *args, np.random.default_rng(71), config, nodes_count=6
+    )
+    fine, _ = simulator._channel_continuum(
+        *args, np.random.default_rng(71), config, nodes_count=24
+    )
+    reference, _ = simulator._channel_continuum(
+        *args, np.random.default_rng(71), config, nodes_count=48
+    )
+    assert np.max(np.abs(fine - reference)) < np.max(np.abs(coarse - reference))
+
+
+def test_noise_is_heteroskedastic_correlated_and_reproducible() -> None:
+    config = json.loads(Path(__file__).with_name("configuration-c1.json").read_text())
+    config["noise"]["heteroskedastic_energy_exponent_bounds"] = [0.3, 0.3]
+    config["noise"]["correlated_fraction_bounds"] = [0.5, 0.5]
+    energies = np.geomspace(30.0, 1500.0, 80)
+    shape = (energies.size, 256)
+    first, latents = simulator._log_noise(
+        energies, shape, 0.2, np.random.default_rng(19), config
+    )
+    second, _ = simulator._log_noise(
+        energies, shape, 0.2, np.random.default_rng(19), config
+    )
+    np.testing.assert_array_equal(first, second)
+    assert latents == {
+        "noise_energy_exponent": 0.3,
+        "noise_correlated_fraction": 0.5,
+    }
+    assert np.std(first[-10:]) > np.std(first[:10])
+    standardized = first / (0.2 * (energies / 220.0) ** 0.3)[:, None]
+    adjacent = np.corrcoef(standardized[:, :-1].ravel(), standardized[:, 1:].ravel())[
+        0, 1
+    ]
+    assert adjacent > 0.1

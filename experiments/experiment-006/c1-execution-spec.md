@@ -47,10 +47,10 @@ before, and independently of, every continuum draw.
 
 Amplitude is log-uniform on `[4,16]`; pitch sigma is uniform on `[12,42] deg`.
 Quartiles stratify those continuous draws without replacing them by point
-values. Native-channel phase is uniform over one local logarithmic channel
-spacing and shifts the latent beam center relative to fixed native channels.
-It does not alter channel calibration and is independent of the response
-energy-scale challenge.
+values. At fixed anchors and fixed native support grids, native-channel phase
+is derived rather than randomized: shifting it independently would also shift
+the declared true center. C1 samples the five anchor-implied alignments;
+continuous phase coverage is reserved for V1's continuously sampled centers.
 
 ## Independent Sector-Level Generator
 
@@ -192,9 +192,10 @@ Before C1 execution:
 4. Channel integration converges under quadrature refinement.
 5. Both normalizations reproduce hand-computed examples and differ on a
    nonuniform incident hemisphere.
-6. Nominal matched noiseless cases spanning anchors, supports, phase and
-   morphology quartiles, and both branches recover injected centers within
-   `1e-4` nominal response FWHM using complete CPU multistart.
+6. Nominal matched noiseless cases spanning anchors, supports, the five
+   anchor-implied alignments, morphology quartiles, and both branches recover
+   injected centers within `1e-4` nominal response FWHM using complete CPU
+   multistart.
 7. Sector permutation, common flux scaling, and deterministic replay
    invariances pass.
 8. Configuration, source, support, and manifest hashes are recorded.

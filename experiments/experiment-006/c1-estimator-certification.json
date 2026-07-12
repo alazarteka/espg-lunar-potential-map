@@ -1,0 +1,41 @@
+{
+  "anchors_ev": [
+    100.0,
+    140.0,
+    220.0,
+    340.0,
+    500.0
+  ],
+  "cases": 120,
+  "common_native_flux_scale_factor": 2.0,
+  "common_native_flux_scale_pass": true,
+  "confirmation_flux_opened": false,
+  "deterministic_replay_pass": true,
+  "fits_per_case": 12,
+  "full_gate_pass": true,
+  "hashes": {
+    "beam_model.py": "8f76e1c4230c7e51f072b0c7c377691a4750e4644d515720f47edbe5beb94daf",
+    "c1-case-manifest.csv": "680b430dff4ae6157dc6b56f6bf7ea1bcce8edd055f9e133fb0175ebf31ca30f",
+    "c1_estimator.py": "4b1c1819346f0565a9002101eab6e9fd79b96a362c075d07e363bc053998f3ee",
+    "certify_c1_estimator.py": "a6612d1dc0001067484b83504f0c9f2468ee705733ad2062823cb579d40d38d0",
+    "configuration-c1.json": "30740f0ce580c00133cd319b00d36f78e8b48f1fabf66ead8a7c108a0e2d2c11",
+    "fit_reference.py": "de2bf9b1337699b36ceca48899cec9cb6a5c4a06e5b791b42c68617091fbd6af",
+    "simulator.py": "60a64f388220cf9cb96f4e184cd1b0e907997a0895f73bf5142777706a3972de",
+    "start_parameters.py": "d8e29265999a0e52f5bba79613259cdee67f8bf26fb37161b1318911bbbabcc5",
+    "support_manifest.csv": "1fe28bc3c12b7b91db110b6f6c58bb29e9ed422b882a02cad800e7112bd2bd7a"
+  },
+  "maximum_permutation_shift_nominal_fwhm": 0.0,
+  "maximum_recovery_error_nominal_fwhm": 2.3684757858670006e-16,
+  "normalization_labels": [
+    "incident_mean",
+    "conjugate"
+  ],
+  "parallel_jobs": 16,
+  "quadrature_refinement_pass": true,
+  "quadrature_refinement_relative_error": 8.36195019482515e-16,
+  "recovery_limit_nominal_fwhm": 0.0001,
+  "recovery_pass": true,
+  "sector_permutation_pass": true,
+  "simulator_source_independence_pass": true,
+  "support_count": 12
+}

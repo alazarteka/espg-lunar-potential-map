@@ -233,9 +233,6 @@ def generate_manifest(config_path: Path, support_path: Path) -> list[dict[str, A
                     "pitch_sigma_deg": _stratified_value(
                         seeds["seed_continuum"], pitch_q, 12.0, 42.0, False
                     ),
-                    "native_log_channel_phase": random.Random(
-                        seeds["seed_response"]
-                    ).uniform(-0.5, 0.5),
                     "beam_axis_deg": 180.0,
                     "response_direction": response_occurrences[
                         columns["response_family"][local]
@@ -309,8 +306,6 @@ def validate_manifest(
                     raise ValueError("amplitude lies outside its quartile")
                 if not q_pitch / 4 <= pitch_fraction < (q_pitch + 1) / 4:
                     raise ValueError("pitch sigma lies outside its quartile")
-                if not -0.5 <= row["native_log_channel_phase"] <= 0.5:
-                    raise ValueError("native channel phase is out of bounds")
 
 
 def write_manifest(
@@ -319,7 +314,7 @@ def write_manifest(
     """Write CSV plus a checksum-bearing provenance sidecar."""
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="", encoding="ascii") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     digest = hashlib.sha256(output.read_bytes()).hexdigest()

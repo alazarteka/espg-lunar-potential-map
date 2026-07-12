@@ -47,7 +47,7 @@ def test_each_block_has_exact_marginals_and_pairwise_balance(manifest) -> None:
 
 
 def test_continuous_values_are_stratified_not_point_masses(manifest) -> None:
-    for field in ("beam_amplitude", "pitch_sigma_deg", "native_log_channel_phase"):
+    for field in ("beam_amplitude", "pitch_sigma_deg"):
         assert len({row[field] for row in manifest}) > 2900
 
 

@@ -1,6 +1,6 @@
 {
-  "protocol_version": "c1-execution-1",
-  "status": "pre_outcome_draft_pending_simulator_source_and_manifest",
+  "protocol_version": "c1-execution-2",
+  "status": "pre_outcome_amended_channel_phase_and_noise_model",
   "frozen_date": "2026-07-12",
   "d1_decision_commit": "67c4f95",
   "confirmation_flux_opened": false,
@@ -25,7 +25,7 @@
     "pitch_sigma_distribution": "quartile_stratified_uniform",
     "pitch_sigma_deg_bounds": [12.0, 42.0],
     "pitch_center_deg": 180.0,
-    "native_log_channel_phase_bounds": [-0.5, 0.5]
+    "native_channel_phase_role": "derived_from_fixed_anchor_and_support_grid_not_randomized"
   },
   "backgrounds": {
     "families": [

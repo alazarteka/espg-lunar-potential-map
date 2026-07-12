@@ -217,3 +217,64 @@ def test_repeated_reference_fit_is_deterministic() -> None:
         [fit.objective for fit in first.fits],
         [fit.objective for fit in second.fits],
     )
+
+
+def test_reference_max_nfev_is_configurable_and_defaults_to_5000() -> None:
+    observed_max_nfev: list[int] = []
+    original = reference.least_squares
+
+    def recording_least_squares(*args: object, **kwargs: object) -> object:
+        observed_max_nfev.append(kwargs["max_nfev"])
+        return original(*args, **kwargs)
+
+    reference.least_squares = recording_least_squares
+    try:
+        reference.fit_reference(_observation(), TRUE[None, :])
+        reference.fit_reference(_observation(), TRUE[None, :], max_nfev=37)
+    finally:
+        reference.least_squares = original
+
+    assert observed_max_nfev == [5000, 37]
+
+
+def test_certification_threads_max_nfev_through_polish_and_fallback() -> None:
+    observed_max_nfev: list[int] = []
+    original = reference._fit_starts
+
+    def recording_fit_starts(
+        observation: object,
+        starts: np.ndarray,
+        *,
+        max_nfev: int = 5000,
+    ) -> tuple[object, ...]:
+        observed_max_nfev.append(max_nfev)
+        return original(observation, starts, max_nfev=max_nfev)
+
+    reference._fit_starts = recording_fit_starts
+    observation = _observation()
+    candidates = np.stack((TRUE, _near(0.2)))
+    objectives = _objectives(observation, candidates)
+    try:
+        certified = reference.certify_candidates(
+            observation,
+            candidates,
+            objectives,
+            candidates,
+            top_k=1,
+            max_nfev=41,
+        )
+        fallback = reference.certify_candidates(
+            observation,
+            candidates,
+            objectives,
+            candidates,
+            candidate_converged=np.array([True, False]),
+            top_k=2,
+            max_nfev=43,
+        )
+    finally:
+        reference._fit_starts = original
+
+    assert not certified.used_fallback
+    assert fallback.used_fallback
+    assert observed_max_nfev == [41, 43, 43]

@@ -89,6 +89,27 @@ def _continuum(
     return np.maximum(values, np.finfo(float).tiny), latents
 
 
+def _channel_continuum(
+    low_ev: np.ndarray,
+    high_ev: np.ndarray,
+    pitches_deg: np.ndarray,
+    family: str,
+    rng: np.random.Generator,
+    config: dict[str, Any],
+    nodes_count: int | None = None,
+) -> tuple[np.ndarray, dict[str, float]]:
+    """Average the continuum over each native energy-channel width."""
+    count = int(nodes_count or config["response"]["channel_quadrature_nodes"])
+    nodes, weights = leggauss(count)
+    energy = (
+        0.5 * (high_ev - low_ev)[:, None] * nodes + 0.5 * (high_ev + low_ev)[:, None]
+    )
+    values, latents = _continuum(
+        energy[:, :, None], pitches_deg[:, None, :], family, rng, config
+    )
+    return 0.5 * np.sum(values * weights[None, :, None], axis=1), latents
+
+
 def _beam_response(
     low_ev: np.ndarray,
     high_ev: np.ndarray,
@@ -177,6 +198,38 @@ def normalize_native(
     return mean_product, conjugate_product
 
 
+def _log_noise(
+    energies_ev: np.ndarray,
+    shape: tuple[int, int],
+    base_sigma: float,
+    rng: np.random.Generator,
+    config: dict[str, Any],
+) -> tuple[np.ndarray, dict[str, float]]:
+    """Draw deterministic heteroskedastic, energy/pitch-correlated log noise."""
+    cfg = config["noise"]
+    exponent = _uniform(rng, cfg["heteroskedastic_energy_exponent_bounds"])
+    correlated_fraction = _uniform(rng, cfg["correlated_fraction_bounds"])
+    sigma = base_sigma * np.power(energies_ev / 220.0, exponent)
+
+    independent = rng.standard_normal(shape)
+    energy_indices = np.arange(shape[0])
+    energy_distance = np.abs(np.subtract.outer(energy_indices, energy_indices))
+    pitch_distance = np.abs(np.subtract.outer(np.arange(shape[1]), np.arange(shape[1])))
+    energy_covariance = np.exp(-energy_distance / 2.0) + 1e-12 * np.eye(shape[0])
+    pitch_covariance = np.exp(-pitch_distance / 2.0) + 1e-12 * np.eye(shape[1])
+    energy_cholesky = np.linalg.cholesky(energy_covariance)
+    pitch_cholesky = np.linalg.cholesky(pitch_covariance)
+    correlated = energy_cholesky @ rng.standard_normal(shape) @ pitch_cholesky.T
+    standardized = (
+        np.sqrt(1.0 - correlated_fraction) * independent
+        + np.sqrt(correlated_fraction) * correlated
+    )
+    return sigma[:, None] * standardized, {
+        "noise_energy_exponent": exponent,
+        "noise_correlated_fraction": correlated_fraction,
+    }
+
+
 def simulate_case(
     support: GeometrySupport, row: dict[str, Any], config: dict[str, Any]
 ) -> SimulatedCase:
@@ -184,10 +237,14 @@ def simulate_case(
     seeds = {name: int(row[f"seed_{name}"]) for name in config["seeds"]["namespaces"]}
     continuum_rng = np.random.default_rng(seeds["continuum"])
     response_rng = np.random.default_rng(seeds["response"])
-    energies = support.energies_ev[:, None]
     pitches = support.pitches_deg
-    continuum, continuum_latents = _continuum(
-        energies, pitches, str(row["background_family"]), continuum_rng, config
+    continuum, continuum_latents = _channel_continuum(
+        support.channel_low_ev,
+        support.channel_high_ev,
+        pitches,
+        str(row["background_family"]),
+        continuum_rng,
+        config,
     )
     beam, response_latents = _beam_response(
         support.channel_low_ev,
@@ -214,8 +271,14 @@ def simulate_case(
         )
         native *= np.exp(amplitude * effect)
     noise_rng = np.random.default_rng(seeds["noise"])
-    sigma = float(row["log_noise_sigma"])
-    native *= np.exp(noise_rng.normal(0.0, sigma, size=native.shape))
+    log_noise, noise_latents = _log_noise(
+        support.energies_ev,
+        native.shape,
+        float(row["log_noise_sigma"]),
+        noise_rng,
+        config,
+    )
+    native *= np.exp(log_noise)
     mask_rng = np.random.default_rng(seeds["mask"])
     valid = np.isfinite(pitches)
     row_missing = mask_rng.random(native.shape[0]) < float(
@@ -232,5 +295,5 @@ def simulate_case(
         valid,
         incident_mean,
         conjugate,
-        {**continuum_latents, **response_latents},
+        {**continuum_latents, **response_latents, **noise_latents},
     )

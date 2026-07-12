@@ -210,10 +210,11 @@ Cross six true-center strata with two amplitude strata:
 | `[375,500)` log-uniform | `[4,8)`, `[8,16]` | 400 |
 | exactly 500 eV | `[4,8)`, `[8,16]` | 400 |
 
-This produces 4,800 primary cases. Pitch sigma, noise, support, continuum,
-response, and native-channel phase are independently balanced within every
-cell. The exact endpoint cells test the proposed boundaries; they are not
-allowed to become descriptive-only after inspection.
+This produces 4,800 primary cases. Pitch sigma, noise, support, continuum, and
+response are independently balanced within every cell. Native-channel phase is
+derived from the continuously sampled center and fixed support grid, not
+assigned independently. The exact endpoint cells test the proposed boundaries;
+they are not allowed to become descriptive-only after inspection.
 
 ### 8.2 Secondary and control matrices
 

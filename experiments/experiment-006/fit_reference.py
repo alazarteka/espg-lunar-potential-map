@@ -110,7 +110,12 @@ def _validate_starts(starts: np.ndarray) -> np.ndarray:
     return values
 
 
-def _fit_starts(observation: Observation, starts: np.ndarray) -> tuple[StartFit, ...]:
+def _fit_starts(
+    observation: Observation,
+    starts: np.ndarray,
+    *,
+    max_nfev: int = 5000,
+) -> tuple[StartFit, ...]:
     lower, upper = parameter_bounds()
     fits: list[StartFit] = []
     for index, start in enumerate(starts):
@@ -123,7 +128,7 @@ def _fit_starts(observation: Observation, starts: np.ndarray) -> tuple[StartFit,
             ftol=1e-13,
             xtol=1e-13,
             gtol=1e-13,
-            max_nfev=5000,
+            max_nfev=max_nfev,
         )
         objective = float(np.dot(fitted.fun, fitted.fun))
         fits.append(
@@ -170,9 +175,20 @@ def _summarize(fits: tuple[StartFit, ...]) -> FitResult:
     )
 
 
-def fit_reference(observation: Observation, starts: np.ndarray) -> FitResult:
+def fit_reference(
+    observation: Observation,
+    starts: np.ndarray,
+    *,
+    max_nfev: int = 5000,
+) -> FitResult:
     """Fit every explicit start in float64 and select the first best objective."""
-    return _summarize(_fit_starts(observation, _validate_starts(starts)))
+    return _summarize(
+        _fit_starts(
+            observation,
+            _validate_starts(starts),
+            max_nfev=max_nfev,
+        )
+    )
 
 
 def _contacts_bounds(parameters: np.ndarray, tolerance: float) -> bool:
@@ -192,6 +208,7 @@ def certify_candidates(
     ambiguity_rtol: float = 1e-8,
     candidate_objective_rtol: float = 1e-8,
     bound_tolerance: float = 1e-8,
+    max_nfev: int = 5000,
 ) -> CertificationResult:
     """Rank GPU candidates, CPU-polish them, and fall back when uncertifiable.
 
@@ -250,7 +267,13 @@ def certify_candidates(
 
     selected_finite = selected[finite[selected]]
     if selected_finite.size:
-        polished = _summarize(_fit_starts(observation, candidates[selected_finite]))
+        polished = _summarize(
+            _fit_starts(
+                observation,
+                candidates[selected_finite],
+                max_nfev=max_nfev,
+            )
+        )
         polished_objectives = np.array([fit.objective for fit in polished.fits])
         best = polished.objective
         close = np.isclose(polished_objectives, best, rtol=ambiguity_rtol, atol=0.0)
@@ -273,7 +296,11 @@ def certify_candidates(
         reason = reason or "no finite candidate"
 
     used_fallback = reason is not None
-    result = fit_reference(observation, starts) if used_fallback else polished
+    result = (
+        fit_reference(observation, starts, max_nfev=max_nfev)
+        if used_fallback
+        else polished
+    )
     return CertificationResult(
         result=result,
         ranked_candidate_indices=ranked,
