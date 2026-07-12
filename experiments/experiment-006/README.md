@@ -152,6 +152,8 @@ is a known positive-control observation and is not confirmatory evidence.
 | `benchmark_forward.py` | Deterministic implementation-only throughput benchmark |
 | `benchmark_optimizer.py` | Complete batched-LM throughput and recovery benchmark |
 | `fit_reference.py` | Complete SciPy multistart and hybrid CPU certification |
+| `start_parameters.py` | Truth-blind deterministic practical 12-start constructor |
+| `configuration-d1-starts.json` | Frozen practical-start construction settings |
 | `d1-optimizer-benchmark-result.md` | Complete-LM recovery and speed decision |
 | `d1-optimizer-benchmark.json` | Frozen GPU 0 LM batch matrix |
 | `d1-forward-benchmark-result.md` | Precision and GPU-batch decision |

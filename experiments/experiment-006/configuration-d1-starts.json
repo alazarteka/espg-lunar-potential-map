@@ -1,0 +1,39 @@
+{
+  "protocol_version": "d1-practical-starts-1",
+  "status": "frozen_before_basin_recall_outputs",
+  "frozen_date": "2026-07-12",
+  "parent_cpu_certification_commit": "84fb8d9",
+  "start_count": 12,
+  "beam_detection": {
+    "aligned_pitch_min_deg": 157.5,
+    "shoulder_pitch_bounds_deg": [112.5, 146.25],
+    "row_score": "median_aligned_minus_median_shoulder",
+    "detected_center": "native_energy_row_with_largest_positive_score",
+    "null_center": "geometric_mean_optimizer_center_bounds",
+    "amplitude": "largest_positive_row_score_clipped_to_bounds"
+  },
+  "grid": {
+    "center_factors": [0.75, 1.0, 1.25, 1.75],
+    "pitch_sigma_count": 3,
+    "pitch_sigma_margin_deg_max": 5.0,
+    "pitch_sigma_margin_bound_fraction": 0.25
+  },
+  "row_continuum": {
+    "prefer_pitch_max_deg": 150.0,
+    "minimum_preferred_samples": 4,
+    "starts": [
+      [1.005, 1.505, 135.0, 22.75],
+      [0.15, 0.85, 105.0, 5.0],
+      [0.15, 0.85, 135.0, 15.0],
+      [0.15, 0.85, 165.0, 15.0]
+    ],
+    "maximum_function_evaluations": 300,
+    "beam_subtraction": "channel_integrated_response_per_center_and_pitch_sigma"
+  },
+  "smooth_projection": {
+    "basis": "quadratic_normalized_log_energy",
+    "latent_fraction_clip": [1e-5, 0.99999],
+    "coefficient_bounds": [-12.0, 12.0],
+    "missing_all_rows_fallback": "zero_coefficients"
+  }
+}
