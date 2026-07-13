@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "amends": "configuration.json",
+  "status": "frozen_after_geometry_before_scientific_outcomes",
+  "windows": {
+    "anchor_utc_ns": 0,
+    "interval": "half_open_non_overlapping",
+    "empty_windows_attempted": false,
+    "nonempty_underdetermined_windows_attempted_failure": true
+  },
+  "harmonics": {
+    "column_order": "degree_major_order_minus_l_through_plus_l",
+    "complex_source": "scipy_sph_harm_y_condon_shortley",
+    "negative_real_order": "sqrt2_times_minus1_abs_m_times_imag_Y_l_abs_m",
+    "positive_real_order": "sqrt2_times_minus1_m_times_real_Y_l_m"
+  },
+  "global_metric": {
+    "primary": "unweighted_equal_angle_grid_rms",
+    "longitude_endpoint": "minus_180_inclusive_plus_180_exclusive",
+    "latitude_poles_included": true,
+    "area_weighted_sensitivity": true
+  },
+  "injections": {
+    "degree_total_expected_power": "proportional_to_l_plus_1_power_minus_2",
+    "coefficient_scale": "inverse_sqrt_of_l_plus_1_squared_times_2l_plus_1",
+    "seed_derivation": "sha256_namespace_model_window_noise_replicate_class",
+    "window_model_recovery_pass_fraction_min": 0.9
+  },
+  "blocked_validation": {
+    "lmax": 5,
+    "noise_sigma_v": 25.0,
+    "replicates": 32,
+    "models": ["constant", "constant_synodic"],
+    "longitude_assignment": "circular_mean_corrected_sweep_longitude"
+  },
+  "solar_corotating": {
+    "epoch_utc_ns": 0,
+    "longitude_sign": -1
+  },
+  "numerics": {
+    "window_decomposition": "direct_float64_svd",
+    "large_control_decomposition": "chunked_float64_gram_eigh",
+    "gram_controls_cannot_override_primary": true
+  }
+}

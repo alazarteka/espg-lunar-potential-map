@@ -2,7 +2,8 @@
 
 ## Status
 
-**Protocol freeze in progress. No scientific outcomes have been computed.**
+**Protocol and numerical conventions frozen. Geometry cache certified;
+operator analysis in progress.**
 
 ## Question
 
@@ -33,10 +34,24 @@ The full decision rules are frozen in [protocol.md](protocol.md) and
 attitude-only sensitivity from a newly discovered production coordinate-frame
 mismatch. It was frozen before any operator or recovery outcome.
 
+[Protocol Amendment 02](protocol-amendment-02.md) freezes window anchoring,
+real-basis conventions, injection normalization, recovery aggregation, blocked
+validation scope, and numerical decomposition choices. It was also frozen
+before any operator or recovery outcome.
+
+[Protocol Amendment 03](protocol-amendment-03.md) records the corrections from
+two independent pre-outcome audits. It makes a physical area-RMS metric primary,
+states the spacecraft-potential gauge limitation, stabilizes the recovery gate,
+and makes the decision tree executable. It supersedes conflicting numerical
+details in the earlier protocol while all scientific spectra remained unopened.
+
 The [one-day geometry implementation check](geometry-implementation-check.md)
 then reproduced the production frame-mixed path to machine precision and found
 that frame-consistent footprints shifted by a median 48 km on that fixture.
-Mission-wide identifiability outcomes remain unopened.
+Mission-wide identifiability outcomes remain unopened. The tracked
+[geometry census](geometry-census.csv) records zero failures across all 560 raw
+files. The ignored merged cache contains 559,321 exact 15-row sweeps, including
+399,643 with at least one canonical connection and 376,920 with all 15.
 
 ## Information Barrier
 
@@ -67,7 +82,7 @@ footprints is retained only as a sensitivity diagnostic.
 - `configuration.json`: machine-readable frozen choices.
 - `input-manifest.csv`: raw and auxiliary input provenance.
 - `geometry.py`: raw-data geometry extraction.
-- `operator.py`: real harmonic and temporal observation operators.
+- `observation_operator.py`: real harmonic and temporal observation operators.
 - `run.py`: phased analysis runner.
 - `test_*.py`: focused correctness and information-barrier tests.
 - `results/`: compact machine-readable outcomes and figures.

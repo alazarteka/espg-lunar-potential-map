@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "amends": [
+    "configuration.json",
+    "configuration-amendment-02.json"
+  ],
+  "status": "frozen_after_independent_audits_before_scientific_outcomes",
+  "estimands": {
+    "canonical": "oracle_spacecraft_relative_including_monopole",
+    "contrast_sensitivity": "remove_all_l0_columns",
+    "absolute_surface_potential_recoverable": false,
+    "unknown_offset_confounds_monopole": true
+  },
+  "primary_metric": {
+    "spatial": "analytic_uniform_surface_area_rms",
+    "static_gram": "identity_over_4pi",
+    "temporal": "analytic_uniform_continuous_mission_time_rms",
+    "operator": "A_times_G_inverse_half_over_sqrt_n",
+    "empirical_unit_column_normalization": "secondary_only",
+    "unweighted_equal_angle_grid": "legacy_replay_only"
+  },
+  "decomposition": {
+    "windowed": "direct_float64_svd",
+    "whole_mission": "chunked_tsqr_then_direct_svd",
+    "gram_rank_decisions_forbidden": true,
+    "underdetermined_zero_padding": true,
+    "explicit_representative_null_vector": true
+  },
+  "outcome_tree": {
+    "material_witness_window_fraction_min": 0.5,
+    "recovery_pass_window_fraction_min": 0.9,
+    "precedence": ["D_stop_rule", "C", "B", "A", "D_other"]
+  },
+  "recovery": {
+    "explicit_injection_rng": "numpy_PCG64",
+    "explicit_replicates": 32,
+    "quantile_method": "linear",
+    "gate_method": "svd_covariance_deterministic_draws",
+    "gate_rng": "numpy_PCG64DXSM",
+    "gate_draws": 16384,
+    "gate_noise_sigma_v": 25.0,
+    "challenge_truths": ["broadband_degree_power", "equal_power_degree_shells", "weakest_metric_subspace"],
+    "caps": {
+      "profile": "great_circle_gaussian",
+      "centers_lat_lon_degrees": [[0.0, 0.0], [60.0, 0.0], [-60.0, 180.0]],
+      "fwhm_degrees": [15.0, 30.0],
+      "outcome_deciding": false
+    }
+  },
+  "blocked_recovery": {
+    "outcome_deciding": false,
+    "mission_tail_and_seven_day_models": ["constant", "constant_synodic"],
+    "independent_window_tests": ["contiguous_time", "longitude_sector"],
+    "longitude_sector_origin_degrees": -180.0,
+    "seven_day_anchor_utc_ns": 0
+  },
+  "sensitivities": {
+    "native_and_common_cohorts": true,
+    "legacy_duplicate_noise": "shared_within_sweep",
+    "invalid_false_precision_noise": "independent_within_sweep",
+    "canonical_longitude_name": "IAU_MOON_body_fixed"
+  },
+  "structural_validity": {
+    "mag_norm_min_exclusive": 1e-09,
+    "mag_norm_max_exclusive": 1000.0
+  }
+}
