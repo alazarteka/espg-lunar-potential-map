@@ -7,9 +7,10 @@ where T_k are temporal basis functions (constant, linear, sinusoidal, etc.)
 and b_lmk are the parameters fitted to all data jointly.
 
 Like the per-window fit in `coefficients.py`, this is a joint space-time fit
-used to probe identifiability of the surface potential from LP ER data, not
-a global-map reconstruction pipeline; see `src/temporal/coefficients.py` for
-the underlying negative result.
+used to probe model-specific identifiability of the surface potential from LP
+ER data, not a validated global-map reconstruction pipeline. Compact shared
+bases can be geometrically identifiable even when independent daily fields are
+not; see `src/temporal/coefficients.py`.
 """
 
 from __future__ import annotations

@@ -1,60 +1,645 @@
 \documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,booktabs,graphicx,hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
 
-\title{Geometry-Only Identifiability of a Spatiotemporal Lunar Surface
-Potential Field from Lunar Prospector Sampling}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\rms}{\operatorname{RMS}}
+
+\title{Geometry-Only Identifiability of Lunar Prospector\newline
+Spatiotemporal Surface-Potential Reconstructions}
 \author{Experiment 008}
-\date{}
+\date{13 July 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-This prospective experiment tests which spatial and spatiotemporal potential
-fields are identifiable from the corrected Lunar Prospector sampling operator
-without using fitted potential values. The analysis treats each energy sweep as
-one integrated observation, measures rank, conditioning, resolution, and
-near-null structure, and performs frozen synthetic recovery tests. Scientific
-results will be inserted only after the protocol and implementation are frozen.
+We prospectively audited whether the Lunar Prospector electron-reflectometer
+sampling geometry can identify a global, time-dependent lunar potential field.
+No fitted potential, fit-quality flag, beam estimate, or spacecraft-potential
+estimate entered the analysis.  Each structurally valid, surface-connected
+15-row energy sweep was granted an oracle-known scalar spacecraft-relative
+potential, making the experiment an optimistic upper bound on information in
+any later selected measurement set.  The primary model comprised independent
+24-hour real spherical-harmonic fields through degree $\ell=5$ (36 parameters
+per day).  All 560 daily operators were algebraically full rank, but none was
+physically stable: the median sampled-RMS/global-RMS visibility of the weakest
+mode was $4.5191538242914006\times10^{-5}$, and all 560 windows failed the
+frozen 25-V recovery gate.  In contrast, prospectively declared 72-hour
+$\ell=1$, 168-hour $\ell\leq3$, one-synodic-period $\ell\leq10$, whole-mission
+static $\ell\leq20$, and whole-mission constant-plus-synodic $\ell\leq10$
+classes passed their applicable stability and recovery gates.  The frozen
+decision tree therefore yields \textbf{Outcome C}: the submitted daily
+$\ell=5$ class fails, while specified coarse, static, and shared-synodic
+classes are conditionally identifiable from the design.  This is not recovery
+of absolute lunar surface potential.  Measurement validation remains open,
+and an unknown additive spacecraft potential is exactly confounded with the
+spatial monopole and its temporal counterparts.
 \end{abstract}
 
-\section{Background}
-The manuscript poses global reconstruction as a spherical-harmonic inverse
-problem. Sparse instantaneous longitude coverage and time-dependent plasma
-conditions can confound spatial and temporal coefficients. Coverage plots and
-regularized fits alone do not establish non-identifiability; the observation
-operator itself must be audited.
+\section{Background and scope}
 
-\section{Observation Operator}
-For sweep $i$, temporal basis $T_q$, and real spherical harmonic $Y_k$, the
-canonical row is
+Lunar Prospector sampled along a moving orbital track rather than observing the
+whole lunar surface simultaneously.  A regularized spherical-harmonic fit can
+always return a smooth map, but smoothness does not establish that the data
+constrain that map.  Experiment 008 therefore asks a narrower question: given
+the actual sampling times and corrected magnetic-field surface intersections,
+which declared spatial and spatiotemporal field classes are identifiable?
+
+The protocol, configurations, seeds, model grid, thresholds, and outcome tree
+were frozen before any scientific singular spectrum or recovery result was
+opened.  Two independent pre-outcome audits found that empirical column
+normalization, an unweighted latitude--longitude grid norm, midpoint temporal
+evaluation, Gram-matrix rank decisions, and 32-draw tail estimates could give
+misleading answers.  Prospective Amendment 03 replaced them with a physical
+field metric, exact row-level temporal products, direct null-space checks,
+tall-skinny QR (TSQR), and a 16,384-draw covariance gate.  It also made the
+spacecraft-potential gauge and the outcome precedence explicit.  The original
+32-replicate injections and empirical column-normalization diagnostics were
+retained as labeled checks rather than discarded.
+
+The information barrier allowed the 560 raw Level-1 ER/MAG files, attitude
+history, SPICE kernels, and geometry/harmonic code.  It prohibited fitted
+potentials and all selections derived from them.  Thus, a failure here is an
+upper-bound sampling result: removing sweeps after fit-quality selection cannot
+add geometric information.  A success here is only a design result and does
+not validate a measurement.
+
+\section{Estimand, observation unit, and gauge}
+
+The canonical estimand grants sweep $i$ one noisily observed scalar relative
+potential and represents a declared field by coefficients $c$:
 \begin{equation}
-A_{i,qk}=\frac{1}{n_i}\sum_{j\in i}T_q(t_{ij})Y_k(x_{ij}).
+  y_i = A_i c + \epsilon_i, \qquad
+  \epsilon_i\sim\mathcal{N}(0,\sigma^2).
+  \label{eq:model}
 \end{equation}
-This represents one sweep-level estimate assembled from fifteen energy rows.
-Repeating the estimate at fifteen footprints would change its statistical
-weight without adding independent information.
+This is an oracle measurement model, not a claim that the loss-cone analysis
+has already delivered such a scalar.  One sweep contains 15 energy rows, but
+those rows share one fitted potential.  The observation operator consequently
+has one row per sweep,
+\begin{equation}
+ A_{i,qk}=\frac{1}{n_i}\sum_{j\in i}
+ T_q(t_{ij})R_k(x_{ij}),
+ \label{eq:operator}
+\end{equation}
+where the sum includes only surface-connected row footprints.  The midpoint
+UTC used to assign a sweep to a window is computed from all 15 structurally
+valid UTC rows.  Equation~\eqref{eq:operator} evaluates the temporal--spatial
+product at every connected row; it is not
+$T_q(t_{i,\mathrm{mid}})\,\overline{R_k(x_i)}$.
 
-\section{Identifiability Diagnostics}
-Let $A=U\Sigma V^T$. We report exact and effective rank, condition number,
-truncated-SVD resolution, leverage, and the global visibility of the smallest
-right-singular mode. A near-null witness is scaled to 100~V global RMS and
-evaluated both globally and at the sampled footprints.
+The scalar available to a surface-connected electron measurement is
+spacecraft-relative.  If an additive spacecraft potential $u(t)$ is unknown,
+then adding offset columns to Equation~\eqref{eq:model} duplicates the spatial
+$\ell=0$ column and, for a temporal model, its matching temporal columns.  The
+augmented absolute-potential problem is therefore exactly rank deficient in
+those directions.  We report both the optimistic oracle estimand retaining
+$\ell=0$ and a gauge-safe contrast estimand with every $\ell=0$ column removed.
+Neither can justify the phrase ``recovered absolute surface potential.''
 
-\section{Prospective Tests}
-The primary model uses independent 24-hour windows and degree five. Frozen
-coarser, static, and synodic-basis controls distinguish complete failure from
-conditional coarse recovery. Within-basis and localized smooth injections test
-recovery under fixed noise levels and blocked time/longitude validation.
+\section{Geometry and the production-frame defect}
+
+\subsection{Canonical extraction}
+
+A sweep was retained only if it was an exact contiguous 15-row group, every UTC
+was finite, and every MAG vector was finite with
+$10^{-9}<\lVert B\rVert<10^3$.  Canonical geometry uses circular right-ascension
+and linear declination interpolation, constructs the spacecraft-despun to
+J2000 rotation from a J2000 spin axis and J2000 spacecraft-to-Sun vector,
+rotates MAG into \texttt{IAU\_MOON}, and applies the frozen ray--sphere
+intersection.  At least one finite intersection admits a sweep to the
+optimistic population.  Table~\ref{tab:census} gives the exact mission census.
+
+\begin{table}[ht]
+\centering
+\caption{Geometry-only input census.  All 560 files processed without error.}
+\label{tab:census}
+\begin{tabular}{lr}
+\toprule
+Quantity & Count \\
+\midrule
+Raw rows & 8,389,815 \\
+Contiguous groups / exact 15-row sweeps & 559,321 \\
+Malformed sweep groups & 0 \\
+Structurally valid sweeps & 551,637 \\
+Canonical connected sweeps & 399,643 \\
+Canonical complete-geometry sweeps & 376,920 \\
+Legacy-attitude connected / complete & 399,647 / 376,962 \\
+Frame-mixed connected / complete & 421,502 / 399,680 \\
+Submitted-legacy connected / complete & 421,545 / 399,663 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Frame mismatch discovered before outcomes}
+
+Static code inspection found a production coordinate-frame defect distinct
+from the earlier next-sample attitude lookup.  The production path rotated the
+spacecraft-to-Sun vector from J2000 to \texttt{IAU\_MOON}, then passed it with a
+J2000 attitude-derived spin axis to a rotation builder whose two inputs are
+defined to be J2000 vectors.  Projecting one vector against another expressed
+in a different frame is not a valid coordinate operation.  Amendment 01 froze
+four variants before operator outcomes: canonical frame-consistent geometry;
+frame-consistent geometry with legacy next-sample attitude; corrected attitude
+with the frame-mixed production path; and the submitted combination of legacy
+attitude plus frame mixing.
+
+On the pre-outcome one-day fixture, the frame-mixed implementation reproduced
+production with 9,180 valid projected rows, zero validity or polarity
+disagreements, and maximum latitude and longitude discrepancies of
+$2.2737367544323206\times10^{-13}$ and
+$5.115907697472721\times10^{-13}$ degrees.  Relative to canonical geometry,
+the production frame mix moved common footprints by 47.8247 km median,
+194.768 km at the 95th percentile, and 419.166 km maximum.  The attitude-only
+contrast was 1.06186, 9.75790, and 85.2621 km; the submitted combined legacy
+contrast was 47.9543, 194.283, and 417.739 km.  The defect is therefore material
+to production footprints and connectivity, although, as shown below, it does
+not change the primary identifiability verdict.
+
+\section{Real harmonics and the physical field metric}
+
+Columns are degree-major and order-minor, $m=-\ell,\ldots,+\ell$.  From
+SciPy's orthonormal complex harmonics $Y_{\ell m}$ with the Condon--Shortley
+phase, the real basis is
+\begin{equation}
+R_{\ell m}=\begin{cases}
+ \sqrt{2}(-1)^{|m|}\operatorname{Im}Y_{\ell,|m|}, &m<0,\\
+ Y_{\ell0}, &m=0,\\
+ \sqrt{2}(-1)^m\operatorname{Re}Y_{\ell m}, &m>0.
+\end{cases}
+\label{eq:realbasis}
+\end{equation}
+The implementation was tested for numerical orthonormality and for field and
+coefficient-norm parity with the repository's complex representation.  A
+degree limit $L$ has $p=(L+1)^2$ spatial coefficients.
+
+For $f(x)=\sum_k c_kR_k(x)$, the analytic surface-area mean-square metric is
+\begin{equation}
+ \lVert f\rVert_{\mathrm{global}}^2
+ =\frac{1}{4\pi}\int_{S^2}f(x)^2\,d\Omega
+ =c^T G_xc,\qquad G_x=\frac{I}{4\pi}.
+ \label{eq:spatialmetric}
+\end{equation}
+This supersedes the original unweighted equal-angle grid, which overweights
+polar samples.  An area-weighted 2-degree grid was used as a discretization
+check; the unweighted grid remains only a legacy replay.
+
+The shared synodic model uses
+$T(t)=(1,\cos\omega t,\sin\omega t)$ with period 29.530588 days.  Its metric is
+$G=G_t\otimes G_x$, where $G_t$ is the analytic continuous-time average of
+$T(t)T(t)^T$ over the half-open interval from the earliest complete-sweep UTC
+through one nanosecond beyond the latest.  Static and independent-window
+models use $G_x$.
+
+Let $d=G^{1/2}c$ be metric coordinates, so $\lVert d\rVert_2$ is global RMS.
+The primary decomposition is
+\begin{equation}
+ \widetilde A=\frac{A G^{-1/2}}{\sqrt n}=U\Sigma V^T.
+ \label{eq:metricoperator}
+\end{equation}
+Each singular value is consequently a sampled-RMS/global-RMS visibility
+ratio.  A right singular vector maps to physical coefficients through
+$G^{-1/2}$.  This makes a weak column or weak combination physically visible
+in the spectrum instead of scaling it away by empirical unit-column
+normalization.
+
+\section{Numerical audit and decision rules}
+
+Independent-window operators were decomposed by direct float64 SVD.  Large
+whole-mission operators were streamed in chunks: each chunk received a reduced
+QR factorization; stacked $R$ factors were repeatedly reduced; and the final
+small $R/\sqrt n$ received a direct SVD.  This TSQR construction preserves the
+tall matrix's singular spectrum without squaring its condition number.  Gram
+matrices were not used for rank or effective-rank decisions.
+
+Exact numerical rank used
+$\max(n,p)\epsilon_{64}\sigma_{\max}$.  Effective ranks used relative
+thresholds $10^{-3}$, $10^{-6}$, and $10^{-9}$.  A window was unstable if any
+of the following held: exact rank below $p$; condition number at least $10^6$;
+effective rank at $10^{-6}$ below $p$; or minimum physical visibility at most
+0.1.  A 100-V global-RMS weakest mode is a material near-null witness when at
+least 50\% of eligible windows have visibility at most 0.1.  Nonempty epoch-
+anchored half-open windows were eligible; empty scheduled windows were reported
+separately, and a nonempty underdetermined window was an attempted failure.
+
+The primary class passes only if at least 90\% of windows are stable, at least
+90\% pass recovery, and no material witness exists.  Outcome B requires at
+least 50\% primary instability, at least 50\% recovery failure, and a material
+witness.  Outcome C takes precedence over B when all B criteria hold and at
+least one prospectively declared coarse or static class passes the analogous
+90\% gates without a material witness.  Provenance, geometry, or numerical
+stop-rule failure would instead force Outcome D.
+
+\section{Recovery, challenge injections, and blocked tests}
+
+\subsection{Frozen recovery gate}
+
+For a full-rank unregularized estimator with independent sweep noise, the
+metric-coordinate estimation error is independent of injected truth.  If
+$s_j$ are the singular values in Equation~\eqref{eq:metricoperator}, its
+covariance eigenvalues are $\sigma^2/(n s_j^2)$.  The outcome gate evaluated
+this exact covariance with 16,384 deterministic PCG64DXSM standard-normal
+draws per parameter count at $\sigma=25$ V.  Relative global error was divided
+by a 100-V truth RMS.  A window passed only when its median error was below
+0.25 and its 90th percentile was below 0.5; rank-deficient windows failed
+automatically.
+
+The original explicit trials remained an implementation check: 32 PCG64
+realizations in every window at 10, 25, 50, and 100 V, with degree power
+proportional to $(\ell+1)^{-2}$ and every truth scaled to 100 V global RMS.
+Equal-total-power degree shells and the weakest metric mode challenged spectral
+dependence.  Recoveries included unregularized SVD, relative truncated SVD at
+$10^{-3}$, $10^{-6}$, and $10^{-9}$, and ridge penalties $10^{-6}$,
+$10^{-3}$, 1, and $10^3$ after empirical column normalization.  Regularized
+answers are bias--variance diagnostics and cannot establish unregularized
+identifiability.
+
+Six out-of-basis great-circle Gaussian caps used centers $(0,0)$, $(60,0)$,
+and $(-60,180)$ degrees and angular FWHM 15 and 30 degrees.  Their errors were
+decomposed into best-$L=5$ approximation bias and estimation error.  These cap
+tests were prospectively descriptive and do not enter Outcomes A--D.
+
+\subsection{Blocked synthetic recovery}
+
+Blocked tests generated observations before splitting and kept complete
+sweeps together.  Whole-mission static and constant-plus-synodic $L=5$ models
+used a final-25\%-of-time holdout, twelve 30-degree longitude holdouts, and four
+interleaved seven-day-block folds.  Daily independent fields instead used a
+contiguous final-quarter holdout within each day and every available
+30-degree longitude sector.  All blocked tests are descriptive: the mission-
+tail test is not meaningful for unrelated daily coefficient vectors, and
+success on matched synthetic truths does not show that the real field belongs
+to the shared temporal class.
 
 \section{Results}
-No scientific outcomes had been computed when this document was frozen.
+
+No provenance, geometry, replay, or numerical stop rule was triggered.  The
+canonical geometry cache contained 399,643 connected sweeps, and the primary
+calendar-day partition had 560 nonempty windows and zero scheduled empty
+windows.
+
+\subsection{Primary daily degree-5 model}
+
+Table~\ref{tab:primary} is the central result.  Every daily matrix has
+numerical rank 36/36.  Thus there is no exact algebraic null space under the
+rank tolerance.  Nevertheless, all 560 matrices have a physically weak mode
+far below the 0.1 visibility threshold.  Algebraic full rank is not physical
+identifiability at the declared field amplitude and noise scale.
+
+\begin{table}[ht]
+\centering
+\caption{Primary independent 24-hour, $L=5$ audit.  Recovery values are
+relative global-RMS errors at 25-V sweep noise.}
+\label{tab:primary}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lr}
+\toprule
+Diagnostic & Result \\
+\midrule
+Eligible / empty windows & 560 / 0 \\
+Rows per window & 205--967 \\
+Exact rank 36/36 & 560/560 \\
+Minimum visibility, min / median / max &
+$1.085048307712986\times10^{-6}$ /
+$4.5191538242914006\times10^{-5}$ /
+$4.0496025853511009\times10^{-4}$ \\
+Condition number, min / median / max &
+5,008.16191 / 47,125.23367 / 1,934,950.62826 \\
+Condition $\geq10^6$ / effective-rank-$10^{-6}$ failure & 11 / 11 \\
+Effective-rank-$10^{-3}$ failure & 560 \\
+Stable / material-witness windows & 0 / 560 \\
+Covariance median-error range & 16.9976255298--6,373.24934397 \\
+Covariance 90th-percentile range & 38.8118610674--15,401.4657774 \\
+Recovery-passing windows & 0/560 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Scaling the weakest metric mode in each window to exactly 100 V analytic
+surface-area RMS gave the following minimum, median, and maximum sampled RMS:
+\begin{equation*}
+\left(1.08504830771\times10^{-4},\;
+4.51915382429\times10^{-3},\;
+4.04960258535\times10^{-2}\right)\ \mathrm{V}.
+\end{equation*}
+Direct replay agreed with
+$100\sigma_{\min}$ to numerical precision.  The old unweighted equal-angle
+grid assigned these same witnesses only about 81 V RMS, demonstrating why it
+was not retained as the physical metric.  The daily operators are therefore
+algebraically full rank but not physically identifiable under the frozen
+visibility and recovery definitions.
+
+\subsection{Temporal-resolution boundary}
+
+Failure was not universal across all parameterizations.  No tested class at
+one or six hours passed.  At 24 hours, $L=1$ recovered noisy injections in all
+560 windows but only 435/560 (77.6786\%) were stable, below the 90\% class gate.
+The first passing class was the 72-hour $L=1$ model.  Table~\ref{tab:coarse}
+reports the decision boundary and all passing independent-window classes.
+
+\begin{table}[ht]
+\centering
+\caption{Independent-window boundary.  Fractions are stable, recovery-passing,
+and weakest-visibility $\leq0.1$ witness fractions.}
+\label{tab:coarse}
+\begin{tabular}{rrrrrcl}
+\toprule
+Hours & $L$ & Windows & Stable & Recovery & Witness & Class \\
+\midrule
+24 & 1 & 560 & 0.776786 & 1.000000 & 0.223214 & fail \\
+24 & 5 & 560 & 0.000000 & 0.000000 & 1.000000 & fail \\
+72 & 1 & 187 & 1.000000 & 1.000000 & 0.000000 & pass \\
+168 & 1 & 81 & 1.000000 & 1.000000 & 0.000000 & pass \\
+168 & 2 & 81 & 0.987654 & 0.987654 & 0.012346 & pass \\
+168 & 3 & 81 & 0.975309 & 0.987654 & 0.024691 & pass \\
+708.734112 & 1 & 20 & 1.000000 & 1.000000 & 0.000000 & pass \\
+708.734112 & 2 & 20 & 1.000000 & 1.000000 & 0.000000 & pass \\
+708.734112 & 3 & 20 & 0.950000 & 1.000000 & 0.050000 & pass \\
+708.734112 & 5 & 20 & 0.950000 & 0.950000 & 0.050000 & pass \\
+708.734112 & 10 & 20 & 0.950000 & 0.950000 & 0.050000 & pass \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 708.734112-hour duration is one 29.530588-day synodic period.  For $L=5$
+and 10, 19 of 20 windows passed and the single short edge window failed.  These
+are independent piecewise-constant fields over long windows, not a continuous
+global history.
+
+\subsection{Static and shared-synodic controls}
+
+All prospectively specified whole-mission static controls passed through
+$L=20$ (Table~\ref{tab:static}).  Their strong visibility shows that the
+mission contains abundant integrated spatial coverage; this does not repair
+the lack of simultaneous daily coverage.
+
+\begin{table}[ht]
+\centering
+\caption{Whole-mission static controls; all are full rank, stable, and pass
+25-V covariance recovery.}
+\label{tab:static}
+\begin{tabular}{rrrrrr}
+\toprule
+$L$ & Parameters & Condition & Min. visibility & Median rel. error & P90 rel. error \\
+\midrule
+1  & 4   & 1.38615 & 0.871539 & 0.000744337 & 0.00114765 \\
+2  & 9   & 1.65853 & 0.837292 & 0.00120426  & 0.00161642 \\
+3  & 16  & 1.88882 & 0.818785 & 0.00164752  & 0.00205996 \\
+5  & 36  & 2.26619 & 0.799284 & 0.00254016  & 0.00295569 \\
+10 & 121 & 2.96840 & 0.769662 & 0.00475333  & 0.00516575 \\
+20 & 441 & 3.88098 & 0.726022 & 0.00932556  & 0.00975176 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The mission-shared constant-plus-synodic class also passed at every specified
+degree (Table~\ref{tab:synodic}).  At $L=5$, removing the three monopole
+temporal columns left 105 contrast parameters and changed the condition,
+minimum visibility, median error, and 90th-percentile error only to 2.40114,
+0.766700, 0.00436844, and 0.00477675; that contrast model also passed.  All
+constant and constant-plus-synodic contrast controls through $L=10$ passed.
+
+\begin{table}[ht]
+\centering
+\caption{Whole-mission shared constant-plus-synodic oracle controls.  Each has
+three temporal coefficients per spatial harmonic and passes all gates.}
+\label{tab:synodic}
+\begin{tabular}{rrrrrr}
+\toprule
+$L$ & Parameters & Condition & Min. visibility & Median rel. error & P90 rel. error \\
+\midrule
+1  & 12  & 1.43712 & 0.853315 & 0.00137446 & 0.00177743 \\
+2  & 27  & 1.72202 & 0.818734 & 0.00214701 & 0.00255761 \\
+3  & 48  & 1.97788 & 0.794083 & 0.00290868 & 0.00331821 \\
+5  & 108 & 2.40469 & 0.765616 & 0.00443060 & 0.00484974 \\
+10 & 363 & 3.20476 & 0.726145 & 0.00826680 & 0.00868253 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The shared-synodic result is conditional on one coefficient set multiplying a
+constant, a synodic cosine, and a synodic sine over the entire mission.  It is
+not evidence for freely varying daily coefficients and is not evidence that
+the real potential follows this temporal law.
+
+\subsection{Explicit injections and regularization}
+
+The explicit 32-replicate broadband injections agreed with the covariance
+gate in the outcome-determinative sense: all 560 daily windows failed both.
+Explicit 25-V window medians ranged from 16.5753468783 to 6,637.68690849 and
+90th percentiles from 37.6841391646 to 16,766.9073404.  Aggregated
+unregularized errors increased approximately linearly with noise
+(Table~\ref{tab:unreg}).
+
+\begin{table}[ht]
+\centering
+\caption{Explicit daily $L=5$ broadband injections, unregularized SVD.  Each
+row pools $560\times32=17,920$ relative global errors.}
+\label{tab:unreg}
+\begin{tabular}{rrr}
+\toprule
+Noise (V) & Median relative error & P90 relative error \\
+\midrule
+10  & 58.9882  & 438.982 \\
+25  & 148.408  & 1,087.708 \\
+50  & 291.847  & 2,182.739 \\
+100 & 595.786  & 4,321.062 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At 25 V, truncation at $10^{-3}$ reduced the pooled median and 90th percentile
+to 3.43809 and 6.66880, while ridge penalties $10^{-3}$ and 1 produced
+0.846384/1.14231 and 0.864440/0.940035.  These remain outside the
+0.25/0.5 gate and are biased regularized estimates.  The $10^{-9}$ truncated
+solution equaled the unregularized 148.408/1,087.708 result.  Degree-shell
+challenges had unregularized medians from 146.842 to 148.708; the weakest-mode
+challenge gave 146.898 median and 1,061.56 at the 90th percentile.  The failure
+is therefore not an accident of the broadband truth spectrum.
+
+The localized caps additionally show that small sampled residuals can coexist
+with large global errors (Table~\ref{tab:caps}).  For the 15-degree equatorial
+cap, the median sampled residual was only
+\begin{equation*}
+4.769007918593412\times10^{-6}\ \mathrm{V},
+\end{equation*}
+while the median global error was 100 V.  Because caps lie outside the fitted
+basis, these values are descriptive only.
+
+\begin{table}[ht]
+\centering
+\caption{Out-of-basis cap diagnostics over 560 daily windows.  Errors are V.}
+\label{tab:caps}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{rrrrrrrr}
+\toprule
+Center $(\phi,\lambda)$ & FWHM & Amplitude & Approx. bias & Est. median & Est. P90 & Total median & Total P90 \\
+\midrule
+$(0,0)$       & 15 & 1800.804 & 80.0530 & 59.9292  & 85124.9  & 100.000  & 85125.0 \\
+$(0,0)$       & 30 & 903.185  & 41.0706 & 802.183  & 53429.1  & 803.234  & 53429.1 \\
+$(60,0)$      & 15 & 1800.804 & 80.0530 & 8596.52  & 172007   & 8596.89  & 172007 \\
+$(60,0)$      & 30 & 903.185  & 41.0706 & 14795.1  & 110723   & 14795.1  & 110723 \\
+$(-60,180)$   & 15 & 1800.804 & 80.0530 & 7775.67  & 152644   & 7776.09  & 152644 \\
+$(-60,180)$   & 30 & 903.185  & 41.0706 & 14675.4  & 107732   & 14675.5  & 107732 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{Blocked recovery}
+
+Every shared-parameter training operator remained full rank: 36/36 for the
+static $L=5$ class and 108/108 for the constant-plus-synodic $L=5$ class.
+Table~\ref{tab:blocked} summarizes the exact ranges of the 32-draw, 25-V
+matched-truth tests.  Errors are small because hundreds of thousands of sweeps
+constrain a genuinely shared synthetic coefficient vector.  Longitude
+holdouts are the hardest, particularly for the synodic class, but remain below
+1 V sampled RMS.
+
+\begin{table}[ht]
+\centering
+\caption{Shared-parameter blocked recovery.  Ranges span all splits of the
+named type; global and test quantities are median/P90 error in V.}
+\label{tab:blocked}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrr}
+\toprule
+Model & Split & Condition & Global median & Global P90 & Test median / P90 \\
+\midrule
+Static & mission tail & 2.28099 & 0.297567 & 0.354559 & 0.279850 / 0.319962 \\
+Static & 12 longitude sectors & 4.12540--4.17478 & 0.260792--0.281630 & 0.309194--0.341257 & 0.300132--0.368343 / 0.453577--0.542919 \\
+Static & four seven-day folds & 2.23083--2.30305 & 0.286837--0.312589 & 0.331306--0.347164 & 0.264512--0.289454 / 0.315540--0.319660 \\
+Synodic & mission tail & 2.57313 & 0.516044 & 0.566709 & 0.483320 / 0.528202 \\
+Synodic & 12 longitude sectors & 4.28472--4.39554 & 0.478147--0.499358 & 0.521463--0.544529 & 0.587156--0.680886 / 0.732551--0.823409 \\
+Synodic & four seven-day folds & 2.53311--2.64617 & 0.507485--0.530116 & 0.541629--0.560522 & 0.476686--0.495051 / 0.510225--0.527096 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Daily blocked fits remained algebraically rank 36, yet global recovery was
+catastrophic.  The finite median-global-error ranges were
+\begin{align*}
+\text{560 contiguous-time tests:}\quad
+ &[2.78127999422\times10^3,\;3.68024426671\times10^6]\ \mathrm{V},\\
+\text{6,524 longitude-sector tests:}\quad
+ &[1.23274522598\times10^3,\;2.03174795607\times10^6]\ \mathrm{V}.
+\end{align*}
+One contiguous-time covariance result was infinite.  Low in-sample or held-
+footprint errors therefore do not imply recovery away from the thin daily
+tracks.
+
+\subsection{Sensitivity analyses}
+
+All 16 frozen daily $L=5$ sensitivity records had zero stable windows, zero
+recovery-passing windows, and witness fraction one.  Table~\ref{tab:sensitivity}
+shows the principal native contrasts.  The six paired common-sweep cohorts
+gave the same verdict, with median visibility between
+$1.9548336121415843\times10^{-5}$ and
+$4.2555408221077033\times10^{-5}$.
+
+\begin{table}[ht]
+\centering
+\caption{Primary sensitivity summaries.  Each contains 560 daily windows and
+fails the class gate.}
+\label{tab:sensitivity}
+\begin{tabular}{lrr}
+\toprule
+Variant & Median condition & Median minimum visibility \\
+\midrule
+Canonical mean & 47,125.2 & $4.51915\times10^{-5}$ \\
+Canonical midpoint row & 41,887.6 & $5.15730\times10^{-5}$ \\
+Complete 15-row geometry & 99,715.2 & $2.18497\times10^{-5}$ \\
+Legacy next-sample attitude & 49,285.0 & $4.25414\times10^{-5}$ \\
+Production frame-mixed & 68,788.8 & $3.00415\times10^{-5}$ \\
+Submitted combined legacy & 67,656.1 & $3.07093\times10^{-5}$ \\
+Solar co-rotating longitude & 14,364.2 & $1.42608\times10^{-4}$ \\
+Contrast only (35 parameters) & 43,906.3 & $4.79262\times10^{-5}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Representing all row footprints with total sweep weight one also failed, with
+median visibility $5.290155297417636\times10^{-5}$.  The invalid false-
+precision analysis that treated row footprints as independent failed as well,
+with $4.632934509032125\times10^{-5}$.  Thus the conclusion is insensitive to
+the reducer, complete-sweep selection, attitude lookup, production frame mix,
+common-cohort pairing, body-fixed versus solar co-rotating longitude, monopole
+removal, and row-representation convention.  The coordinate-frame bug remains
+important for physical footprint provenance even though it does not rescue the
+daily inverse problem.
+
+The retained empirical unit-column-normalized spectrum reduced the median
+daily condition number from 47,125.2 to 29,842.8 (maximum 1,010,653), but the
+physical visibility of its selected weakest mode remained
+$4.64097\times10^{-5}$ median and $5.65089\times10^{-4}$ maximum.  It therefore
+changes the apparent coefficient collinearity without rescuing the physical
+field.
+
+\section{Outcome and interpretation}
+
+For the primary daily $L=5$ model, the unstable fraction, failed-recovery
+fraction, and material-witness fraction are all exactly 1.0.  It therefore
+satisfies every frozen Outcome B criterion.  However, multiple prospectively
+specified classes meet the at-least-90\% stability and recovery requirements
+without a material witness: 72-hour $L=1$; 168-hour $L\leq3$; one-synodic-
+period $L\leq10$; whole-mission static $L\leq20$; and whole-mission shared
+constant-plus-synodic $L\leq10$.  Under the frozen precedence rule, the final
+classification is therefore \textbf{Outcome C}, not B.
+
+Outcome C is a boundary statement.  The daily $L=5$ model is algebraically
+full rank but physically non-identifiable at the frozen 100-V field and 25-V
+sweep-noise scales.  Longer independent windows and tightly shared temporal
+bases can become conditionally identifiable because they pool orbital coverage
+over time.  Such pooling changes the estimand: it does not reconstruct an
+instantaneous global map.
 
 \section{Limitations}
-Geometry-only failure is an optimistic upper-bound result because later
-measurement selection can only remove rows. Geometry-only success does not
-validate the potential estimator, spacecraft-potential correction, or physical
-interpretation.
+
+First, the experiment never reads a measured potential.  Its iid Gaussian
+noise levels are controlled reference scales, not an empirical error model for
+loss-cone fits.  Real errors may be heteroscedastic, correlated, biased, and
+selected by environment or fit quality.  The oracle inclusion of every
+connected sweep makes failures strong but successes conditional.
+
+Second, the spacecraft-potential gauge is unresolved.  Absolute $\ell=0$
+surface potential and corresponding temporal terms cannot be separated from
+an unknown additive spacecraft potential using this operator alone.  The
+contrast checks remove the exact gauge direction but do not supply a physical
+spacecraft-potential calibration.
+
+Third, all passing models assume their declared band limit and temporal class.
+The localized-cap tests show severe aliasing when truth lies outside the daily
+$L=5$ basis.  Passing matched-truth blocked tests for a static or shared
+synodic model do not establish that the Moon obeys either model.
+
+Fourth, canonical results correct a material production frame mismatch.  Any
+previous product using the mixed-frame path requires separate reassessment of
+footprints, connectivity, polarity, and illumination.  The robustness of the
+identifiability verdict across frame variants does not validate those physical
+locations.
+
+Finally, the pass/fail thresholds are prospective engineering definitions of
+usable visibility and noisy recovery.  The phrase ``physical non-
+identifiability'' here means failure under those declared metrics; it does not
+erase the mathematical fact that every primary matrix has nonzero singular
+values in finite precision.
+
+\section{Conclusions}
+
+Actual Lunar Prospector geometry does not support the submitted independent
+daily degree-5 global field.  Full numerical rank alone is misleading: a
+100-V global weakest mode produces only $1.085\times10^{-4}$ to 0.0405 V RMS
+on a day's sampled footprints, and 25-V noise drives global recovery errors
+many times the truth amplitude.  This failure survives every frozen geometry,
+gauge, reducer, longitude, and row-weighting sensitivity.
+
+The same geometry does support prospectively defined coarse independent
+windows, mission-integrated static fields, and a mission-shared
+constant-plus-synodic basis.  Those successes establish conditional design
+identifiability and motivate sharply constrained summaries, not an
+instantaneous global potential map.  Until the scalar measurement itself and
+the spacecraft-potential contribution are independently validated, Experiment
+008 supports no claim of recovered physical lunar surface potential.
 
 \end{document}

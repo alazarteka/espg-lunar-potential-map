@@ -2,8 +2,8 @@
 
 ## Status
 
-**Protocol and numerical conventions frozen. Geometry cache certified;
-operator analysis in progress.**
+**Complete. Outcome C: the submitted daily degree-5 model fails, while frozen
+coarse, static, and shared-synodic field classes are conditionally recoverable.**
 
 ## Question
 
@@ -48,7 +48,7 @@ details in the earlier protocol while all scientific spectra remained unopened.
 The [one-day geometry implementation check](geometry-implementation-check.md)
 then reproduced the production frame-mixed path to machine precision and found
 that frame-consistent footprints shifted by a median 48 km on that fixture.
-Mission-wide identifiability outcomes remain unopened. The tracked
+The tracked
 [geometry census](geometry-census.csv) records zero failures across all 560 raw
 files. The ignored merged cache contains 559,321 exact 15-row sweeps, including
 399,643 with at least one canonical connection and 376,920 with all 15.
@@ -76,17 +76,54 @@ T_q(t_{ij})Y_{\ell m}(\theta_{ij},\phi_{ij}).
 The legacy representation that repeats one fitted potential over 15 row
 footprints is retained only as a sensitivity diagnostic.
 
-## Planned Record
+## Result
+
+All 560 primary daily operators are algebraically full rank, but all have
+physical weakest-mode visibility below `4.1e-4` and all fail the 25 V recovery
+gate. Recoverability begins at 72 hours for degree 1, at seven days for degrees
+1-3, and is strong for whole-mission static and compact shared-synodic models.
+
+See [RESULTS.md](RESULTS.md), [phase-1-results.md](phase-1-results.md), the
+[machine-readable results](results/final-summary.json), and the
+[LaTeX supplement](supplement/main.tex).
+
+## Record
 
 - `protocol.md`: frozen scientific protocol and decision rules.
 - `configuration.json`: machine-readable frozen choices.
 - `input-manifest.csv`: raw and auxiliary input provenance.
 - `geometry.py`: raw-data geometry extraction.
 - `observation_operator.py`: real harmonic and temporal observation operators.
-- `run.py`: phased analysis runner.
+- `run_analysis.py`: primary, grid, and static runner.
+- `extended_analysis.py`: temporal, sensitivity, injection, cap, and blocked
+  runner.
 - `test_*.py`: focused correctness and information-barrier tests.
 - `results/`: compact machine-readable outcomes and figures.
 - `supplement/main.tex`: full mathematical and scientific analysis.
 
 Large geometry caches remain under `artifacts/experiment-008/` and are not
 tracked.
+
+## Reproduction
+
+From the repository root, with BLAS held to the four-thread experiment budget:
+
+```bash
+export OPENBLAS_NUM_THREADS=4 OMP_NUM_THREADS=4 MKL_NUM_THREADS=4
+export NUMEXPR_NUM_THREADS=4
+.venv/bin/python experiments/experiment-008/geometry.py extract --workers 4
+.venv/bin/python experiments/experiment-008/geometry.py merge
+.venv/bin/python experiments/experiment-008/run_analysis.py prepare
+.venv/bin/python experiments/experiment-008/run_analysis.py primary
+.venv/bin/python experiments/experiment-008/run_analysis.py grid
+.venv/bin/python experiments/experiment-008/run_analysis.py static
+.venv/bin/python experiments/experiment-008/extended_analysis.py prepare-temporal
+.venv/bin/python experiments/experiment-008/extended_analysis.py temporal
+.venv/bin/python experiments/experiment-008/extended_analysis.py sensitivities
+.venv/bin/python experiments/experiment-008/extended_analysis.py column-normalization
+.venv/bin/python experiments/experiment-008/extended_analysis.py injections
+.venv/bin/python experiments/experiment-008/extended_analysis.py caps
+.venv/bin/python experiments/experiment-008/extended_analysis.py blocked
+MPLBACKEND=Agg MPLCONFIGDIR=/tmp/matplotlib \
+  .venv/bin/python experiments/experiment-008/plot_results.py
+```

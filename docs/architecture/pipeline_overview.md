@@ -17,13 +17,13 @@ ER flux (.TAB)
 ```
 
 The temporal harmonics step fits spherical-harmonic coefficients jointly in
-space and time, but that joint fit is the paper's identifiability test, not a
-mapping deliverable: Lunar Prospector's instantaneous spatial coverage is too
-sparse to constrain the joint space-time reconstruction, so a global
-spatiotemporal surface-potential map is not recoverable from LP ER data (this
-is further entangled with the spacecraft's own floating potential). The
-per-measurement loss-cone potential estimate and the aggregate/per-site
-measurement statistics remain valid outputs.
+space and time, but it is an identifiability test, not a mapping deliverable.
+Experiment 008 shows that instantaneous coverage cannot constrain the default
+independent daily degree-5 field. Geometry can constrain static, compact
+shared-synodic, and some coarser/longer-window classes, but those successes are
+conditional on the temporal model and do not resolve the spacecraft floating-
+potential gauge or validate the input potential measurements. Per-measurement
+and aggregate outputs therefore require separate measurement-model validation.
 
 ## Forward vs Inverse Steps
 

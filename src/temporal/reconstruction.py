@@ -1,12 +1,11 @@
 """Reconstruction helpers for temporal spherical harmonic datasets.
 
 These helpers evaluate the fitted a_lm(t) coefficients on a lat/lon grid.
-That joint space-time fit is the identifiability / sampling-limits analysis
-behind the paper's negative result — Lunar Prospector's instantaneous
-spatial coverage is too sparse to jointly identify the surface potential in
-space and time, so the evaluated field is not a recoverable global potential
-map. These functions exist to probe and visualize that non-identifiability,
-not to deliver a validated map product.
+That joint space-time fit is a model-specific identifiability / sampling-limits
+analysis. Instantaneous coverage does not identify the default independent
+daily degree-5 field; lower-dimensional shared or longer-window models can be
+geometrically identifiable but remain conditional. These functions probe and
+visualize those model classes, not a validated global map product.
 """
 
 from __future__ import annotations

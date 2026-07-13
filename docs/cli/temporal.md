@@ -2,14 +2,15 @@
 
 Fits time-dependent spherical harmonic coefficients a_lm(t) to Lunar Prospector
 ER surface-potential measurements. Lunar Prospector's instantaneous spatial
-coverage is small relative to the surface, so recovering a_lm(t) requires
-resolving joint space-time variation from data that cannot identify it: this
-tool is the identifiability / sampling-limits analysis behind the paper's
-negative result that **a global spatiotemporal lunar surface-potential map
-cannot be recovered from LP ER data** — it is not a working map-reconstruction
-deliverable. Per-measurement loss-cone inversion and the aggregate/per-site
-statistics in `src.engineering` (see [engineering.md](engineering.md)) remain
-valid and are unaffected by this limitation.
+coverage is small relative to the surface, so recoverability depends on both
+spatial degree and temporal parameterization. Experiment 008 shows that the
+default independent 24-hour, degree-5 field is not recoverable, while static,
+compact shared-synodic, and selected coarser/longer-window classes are
+geometrically identifiable. This CLI is therefore a model-specific
+identifiability / sampling-limits tool, not a validated map deliverable.
+Per-measurement loss-cone validity and the aggregate/per-site statistics in
+`src.engineering` (see [engineering.md](engineering.md)) require their own
+measurement-model validation and are not decided by the geometry result.
 
 ## Usage
 
@@ -58,12 +59,11 @@ uv run python -m src.temporal --start YYYY-MM-DD --end YYYY-MM-DD --output FILE 
 7. Saves coefficients to compressed NPZ file
 
 The fitted coefficients are the artifact this identifiability analysis
-operates on — the `--min-coverage`, `--min-samples`, `--l2-penalty`, and
-`--temporal-lambda` knobs exist to probe how much regularization is needed
-to make the joint space-time fit tractable, which is itself evidence of the
-underdetermination the paper reports. Use `--require-u-identifiable` to
-additionally exclude measurements where the fit is entangled with an
-unidentifiable spacecraft potential.
+operates on. The `--min-coverage`, `--min-samples`, `--l2-penalty`, and
+`--temporal-lambda` knobs probe a declared model's dependence on selection and
+regularization. A bounded regularized map is not by itself evidence of
+recovery. Use `--require-u-identifiable` to additionally exclude measurements
+where the fit is entangled with an unidentifiable spacecraft potential.
 
 ## Fit Modes
 

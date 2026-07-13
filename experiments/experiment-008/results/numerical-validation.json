@@ -1,0 +1,16 @@
+{
+  "explicit_covariance_median_ratio_median": 1.0030485811817242,
+  "explicit_covariance_p90_ratio_median": 0.954814699650615,
+  "explicit_injection_passing_windows": 0,
+  "physical_area_grid_rms_representative_v": [
+    100.0050774467822,
+    100.00507744678204,
+    100.00507744675689
+  ],
+  "primary_grid_recovery_fraction_difference": 0.0,
+  "primary_grid_stable_fraction_difference": 0.0,
+  "primary_grid_visibility_median_difference": 0.0,
+  "schema_version": 1,
+  "temporal_cache_constant_block_max_abs_difference": 7.771561172376096e-16,
+  "temporal_cache_sampled_direct_max_abs_difference": 0.0
+}

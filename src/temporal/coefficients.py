@@ -7,13 +7,12 @@ Implements the expansion:
 
 where a_lm(t) are fitted in temporal windows with spatial coverage validation.
 
-This joint space-time fit is the identifiability / sampling-limits analysis
-underlying the paper's negative result: Lunar Prospector's instantaneous
-spatial coverage is too sparse to jointly identify a_lm(t) in space and time
-from ER data, so the fitted coefficients demonstrate that a global
-spatiotemporal potential map cannot be recovered rather than deliver one.
-Per-measurement loss-cone inversion and the measurement statistics in
-`src.engineering` are unaffected and remain valid.
+This joint space-time fit is an identifiability / sampling-limits analysis.
+Lunar Prospector's instantaneous coverage cannot identify the default
+independent daily degree-5 field, although static, compact shared-synodic, and
+some coarser/longer-window classes can be geometrically identifiable. Fitted
+coefficients are diagnostic artifacts, not validated map products; measurement
+validity and spacecraft-potential gauge questions remain separate.
 """
 
 from __future__ import annotations

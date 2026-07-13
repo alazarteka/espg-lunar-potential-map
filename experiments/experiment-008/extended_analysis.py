@@ -601,6 +601,55 @@ def run_sensitivities() -> int:
     return 0
 
 
+def run_column_normalization() -> int:
+    """Record the original empirical column-normalized secondary spectrum."""
+    basis, geometry = run_analysis.load_basis_and_geometry()
+    windows, _ = run_analysis.iter_windows(geometry.midpoint_utc_ns, 24.0)
+    field_gram = operator.static_field_gram(36)
+    rows: list[dict[str, object]] = []
+    for window_id, indices in windows:
+        matrix = np.asarray(basis[indices, :36])
+        diagnostics = operator.direct_spectrum(
+            matrix,
+            include_explicit_null=False,
+        )
+        sampled_rms, visibility = operator.mode_visibility(
+            matrix,
+            diagnostics.smallest_physical_mode,
+            field_gram,
+        )
+        rows.append(
+            {
+                "condition_number": diagnostics.condition_number,
+                "effective_rank_1e3": diagnostics.effective_ranks[1e-3],
+                "effective_rank_1e6": diagnostics.effective_ranks[1e-6],
+                "effective_rank_1e9": diagnostics.effective_ranks[1e-9],
+                "exact_rank": diagnostics.exact_rank,
+                "physical_visibility_of_selected_weakest_mode": visibility,
+                "rows": len(indices),
+                "sampled_rms_for_100v_selected_mode": sampled_rms,
+                "window_id": window_id,
+            }
+        )
+    run_analysis.write_csv(RESULTS_DIR / "column-normalization-sensitivity.csv", rows)
+    condition = np.asarray([float(row["condition_number"]) for row in rows])
+    visibility = np.asarray(
+        [float(row["physical_visibility_of_selected_weakest_mode"]) for row in rows]
+    )
+    summary = {
+        "condition_maximum": float(np.max(condition)),
+        "condition_median": float(np.median(condition)),
+        "metric": "empirical_unit_l2_column_secondary",
+        "physical_visibility_maximum": float(np.max(visibility)),
+        "physical_visibility_median": float(np.median(visibility)),
+        "physical_visibility_minimum": float(np.min(visibility)),
+        "windows": len(rows),
+    }
+    run_analysis.write_json(RESULTS_DIR / "column-normalization-summary.json", summary)
+    print(json.dumps(summary, indent=2))
+    return 0
+
+
 def broadband_truths(
     lmax: int,
     replicates: int,
@@ -1147,6 +1196,7 @@ def parse_args() -> argparse.Namespace:
             "injections",
             "blocked",
             "caps",
+            "column-normalization",
         ),
     )
     return parser.parse_args()
@@ -1158,6 +1208,7 @@ def main() -> int:
     handlers = {
         "blocked": run_blocked,
         "caps": run_caps,
+        "column-normalization": run_column_normalization,
         "injections": run_injections,
         "prepare-temporal": prepare_temporal,
         "sensitivities": run_sensitivities,
