@@ -40,7 +40,8 @@ class PackedObservations:
 class G2BatchResult:
     """GPU island endpoints and final CPU-polished results."""
 
-    results: tuple[fit_reference.FitResult, ...]
+    results: tuple[fit_reference.FitResult | None, ...]
+    polish_trajectories: tuple[tuple[fit_reference.StartFit, ...], ...]
     island_parameters: np.ndarray
     island_objectives: np.ndarray
     gpu_seconds: float
@@ -193,16 +194,23 @@ def fit_observations(
     island_parameters = de_result.parameters.detach().cpu().numpy()
     island_objectives = de_result.objectives.detach().cpu().numpy()
     polish_started = time.perf_counter()
-    results = tuple(
-        fit_reference.fit_reference(
+    polished = tuple(
+        fit_reference._fit_starts(
             observation,
-            island_parameters[index],
+            fit_reference._validate_starts(island_parameters[index]),
             max_nfev=cpu_max_nfev,
         )
         for index, observation in enumerate(observations)
     )
+    results = tuple(
+        fit_reference._summarize(fits)
+        if any(fit.success and np.isfinite(fit.objective) for fit in fits)
+        else None
+        for fits in polished
+    )
     return G2BatchResult(
         results,
+        polished,
         island_parameters,
         island_objectives,
         gpu_seconds,

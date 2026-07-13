@@ -101,11 +101,26 @@ def make_observation(
     return branches[row["normalization"]].observation
 
 
-def cpu_reference(observation: fit_reference.Observation) -> fit_reference.FitResult:
-    """Run the old complete twelve-start CPU estimator for comparison."""
+def cpu_reference(
+    observation: fit_reference.Observation,
+) -> tuple[fit_reference.FitResult | None, tuple[fit_reference.StartFit, ...]]:
+    """Run and retain all old complete twelve-start CPU trajectories."""
     lower, upper = fit_reference.parameter_bounds()
     starts = start_parameters.construct_starts(observation, lower, upper)
-    return fit_reference.fit_reference(observation, starts, max_nfev=2000)
+    fits = fit_reference._fit_starts(observation, starts, max_nfev=2000)
+    result = (
+        fit_reference._summarize(fits)
+        if any(fit.success and np.isfinite(fit.objective) for fit in fits)
+        else None
+    )
+    return result, fits
+
+
+def _status_summary(fits: tuple[fit_reference.StartFit, ...]) -> str:
+    """Encode SciPy status counts without discarding failed trajectories."""
+    statuses, counts = np.unique([fit.status for fit in fits], return_counts=True)
+    pairs = zip(statuses, counts, strict=True)
+    return ";".join(f"{int(status)}:{int(count)}" for status, count in pairs)
 
 
 def run_case(
@@ -117,7 +132,7 @@ def run_case(
 ) -> dict[str, Any]:
     """Evaluate all frozen G2 gates for one certification case."""
     observation = make_observation(support, row, c1_config)
-    old = cpu_reference(observation)
+    old, old_fits = cpu_reference(observation)
     case_id = int(row["case_id"])
     new = g2_beam_fit.fit_observations(
         [observation], [case_id], device=device, configuration=g2_config
@@ -128,27 +143,54 @@ def run_case(
     result = new.results[0]
     replay_result = replay.results[0]
     fwhm = 0.48 * float(row["true_center_ev"])
-    island_centers = np.array([fit.parameters[1] for fit in result.fits])
-    matched_error = abs(result.parameters[1] - float(row["true_center_ev"])) / fwhm
-    objective_scale = max(abs(old.objective), 1e-12)
-    objective_delta = (result.objective - old.objective) / objective_scale
+    new_fits = new.polish_trajectories[0]
+    successful_centers = np.array(
+        [
+            fit.parameters[1]
+            for fit in new_fits
+            if fit.success and np.isfinite(fit.objective)
+        ]
+    )
+    matched_error = (
+        np.nan
+        if result is None
+        else abs(result.parameters[1] - float(row["true_center_ev"])) / fwhm
+    )
+    if old is None or result is None:
+        objective_delta = np.nan
+    else:
+        objective_scale = max(abs(old.objective), 1e-12)
+        objective_delta = (result.objective - old.objective) / objective_scale
+    replay_equal = (result is None) == (replay_result is None)
+    if result is not None and replay_result is not None:
+        replay_equal &= np.array_equal(result.parameters, replay_result.parameters)
     return {
         "case_id": case_id,
         "arm": row["arm"],
         "support_id": int(row["support_id"]),
         "normalization": row["normalization"],
         "true_center_ev": float(row["true_center_ev"]),
-        "old_center_ev": float(old.parameters[1]),
-        "new_center_ev": float(result.parameters[1]),
-        "old_objective": float(old.objective),
-        "new_objective": float(result.objective),
+        "old_available": old is not None,
+        "new_available": result is not None,
+        "old_status_counts": _status_summary(old_fits),
+        "new_status_counts": _status_summary(new_fits),
+        "old_center_ev": np.nan if old is None else float(old.parameters[1]),
+        "new_center_ev": np.nan if result is None else float(result.parameters[1]),
+        "old_objective": np.nan if old is None else float(old.objective),
+        "new_objective": np.nan if result is None else float(result.objective),
         "objective_relative_delta": float(objective_delta),
         "matched_error_fwhm": float(matched_error),
-        "island_center_spread_fwhm": float(np.ptp(island_centers) / fwhm),
-        "jacobian_rank": int(result.jacobian_rank),
-        "covariance_finite": bool(np.isfinite(result.covariance).all()),
+        "island_center_spread_fwhm": (
+            np.nan
+            if successful_centers.size == 0
+            else float(np.ptp(successful_centers) / fwhm)
+        ),
+        "jacobian_rank": -1 if result is None else int(result.jacobian_rank),
+        "covariance_finite": (
+            False if result is None else bool(np.isfinite(result.covariance).all())
+        ),
         "deterministic_replay": bool(
-            np.array_equal(result.parameters, replay_result.parameters)
+            replay_equal
             and np.array_equal(new.island_parameters, replay.island_parameters)
             and np.array_equal(new.island_objectives, replay.island_objectives)
         ),
@@ -184,17 +226,19 @@ def main() -> None:
         Path("data/1999/091_120APR/3D990429.TAB"), ROOT / "support_manifest.csv"
     )
     geometry = {support.spec_no: support for support in supports}
-    output = [
-        run_case(
-            row,
-            geometry[int(row["support_id"])],
-            c1_config,
-            g2_config,
-            args.device,
+    output: list[dict[str, Any]] = []
+    for row in rows[args.start : args.stop]:
+        print(f"case_id={row['case_id']}", flush=True)
+        output.append(
+            run_case(
+                row,
+                geometry[int(row["support_id"])],
+                c1_config,
+                g2_config,
+                args.device,
+            )
         )
-        for row in rows[args.start : args.stop]
-    ]
-    write_rows(args.output, output)
+        write_rows(args.output, output)
 
 
 if __name__ == "__main__":

@@ -79,4 +79,5 @@ def test_small_de_run_recovers_matched_center_after_cpu_polish() -> None:
         cpu_max_nfev=500,
     )
     assert result.island_parameters.shape == (1, 2, 15)
+    assert result.results[0] is not None
     assert abs(result.results[0].parameters[1] - TRUE[1]) < 1e-5

@@ -53,7 +53,9 @@ def main() -> None:
         device=args.device,
         configuration=config,
     )
-    centers = np.array([fit.parameters[1] for fit in result.results])
+    if any(fit is None for fit in result.results):
+        raise RuntimeError("Matched benchmark produced an unavailable CPU polish")
+    centers = np.array([fit.parameters[1] for fit in result.results if fit is not None])
     print(
         json.dumps(
             {
