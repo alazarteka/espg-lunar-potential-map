@@ -1,0 +1,32 @@
+{
+  "analysis_git_head": "e386086cb96dbaef3499f8a74e0324c1ddc1f49f",
+  "phase_one_results_open": true,
+  "records": [
+    {
+      "path": "experiments/experiment-008/extended_analysis.py",
+      "sha256": "bb51ddf838a51a874f0935a0a68e0af54c3e64b95cd02d9e94bcc25e4b786f62"
+    },
+    {
+      "path": "experiments/experiment-008/test_extended_analysis.py",
+      "sha256": "0cf118221716f3efb18352bbc07ed9fee95df7cf1270a41496b772ed7090eaaa"
+    },
+    {
+      "path": "experiments/experiment-008/analysis-freeze.json",
+      "sha256": "da0b910d4e787da0b7328aa36c18b2599bd0141f43bc0ec91543464b9d152ce4"
+    },
+    {
+      "path": "experiments/experiment-008/results/primary-summary.json",
+      "sha256": "6b5ceb6639608763740703afee99e78a05ac9f5bcb6d3b7cbb5aaf98efb5b50e"
+    },
+    {
+      "path": "experiments/experiment-008/results/window-grid-summary.csv",
+      "sha256": "54eb6d1fb78ed7033b2d1a327e61b081916ec00e50e7b8cda22f1f0565cfedb3"
+    },
+    {
+      "path": "experiments/experiment-008/results/static-controls.csv",
+      "sha256": "890f6bb9cc72f2bb3ec7b7f64f8de150e4cc6fa5427642568e83d207b7fc1f0f"
+    }
+  ],
+  "schema_version": 1,
+  "status": "secondary_code_frozen_before_temporal_sensitivity_injection_and_blocked_outcomes"
+}
