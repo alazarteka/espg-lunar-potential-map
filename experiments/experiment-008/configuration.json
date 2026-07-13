@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "experiment": "008",
+  "status": "frozen_before_geometry_and_scientific_outcomes",
+  "inputs": {
+    "raw_globs": [
+      "data/1998/**/3D*.TAB",
+      "data/1999/**/3D*.TAB"
+    ],
+    "attitude": "data/attitude.tab",
+    "spice_directory": "data/spice_kernels",
+    "potential_cache_forbidden": true,
+    "expected_rows_per_sweep": 15,
+    "minimum_valid_projection_rows_primary": 1,
+    "complete_geometry_rows": 15
+  },
+  "geometry": {
+    "canonical_attitude": "circular_ra_linear_dec_interpolation",
+    "legacy_sensitivity_attitude": "next_sample_lookup",
+    "observation_unit": "one_contiguous_spec_no_sweep",
+    "canonical_reducer": "mean_valid_row_basis",
+    "midpoint_sensitivity": true,
+    "legacy_row_duplication_sensitivity": true
+  },
+  "basis": {
+    "spatial": "real_orthonormal_spherical_harmonics",
+    "synodic_period_days": 29.530588,
+    "primary_lmax": 5,
+    "primary_window_hours": 24.0,
+    "window_lmax": [1, 2, 3, 5, 10],
+    "window_hours": [1.0, 6.0, 24.0, 72.0, 168.0, 708.734112],
+    "static_lmax": [1, 2, 3, 5, 10, 20],
+    "temporal_lmax": [1, 2, 3, 5, 10],
+    "temporal_models": ["constant", "constant_synodic"],
+    "solar_corotating_sensitivity": true
+  },
+  "diagnostics": {
+    "exact_rank_tolerance": "max_n_p_times_eps_times_smax",
+    "relative_effective_rank_thresholds": [0.001, 1e-06, 1e-09],
+    "unstable_condition_number_min": 1000000.0,
+    "unstable_visibility_max": 0.1,
+    "witness_global_rms_v": 100.0,
+    "global_grid_step_degrees": 2.0
+  },
+  "injections": {
+    "seed_namespace": "experiment-008-geometry-only-v1",
+    "replicates": 32,
+    "truth_global_rms_v": 100.0,
+    "degree_power_exponent": -2.0,
+    "noise_sigma_v": [10.0, 25.0, 50.0, 100.0],
+    "tsvd_relative_thresholds": [0.001, 1e-06, 1e-09],
+    "ridge_penalties": [1e-06, 0.001, 1.0, 1000.0],
+    "recovery_gate_noise_sigma_v": 25.0,
+    "median_relative_global_rms_error_max": 0.25,
+    "p90_relative_global_rms_error_max": 0.5
+  },
+  "blocked_validation": {
+    "temporal_train_fraction": 0.75,
+    "longitude_sector_width_degrees": 30.0,
+    "interleaved_block_days": 7,
+    "interleaved_folds": 4
+  },
+  "outcomes": {
+    "a_stable_window_fraction_min": 0.9,
+    "b_unstable_window_fraction_min": 0.5,
+    "b_failed_recovery_window_fraction_min": 0.5,
+    "minimum_raw_file_success_fraction": 0.9
+  },
+  "resources": {
+    "maximum_cpu_workers": 4,
+    "blas_threads_per_worker": 1,
+    "gpu": false,
+    "geometry_cache": "artifacts/experiment-008/geometry.npz"
+  }
+}
+

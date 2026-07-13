@@ -1,0 +1,16 @@
+{
+  "experiment": "008",
+  "freeze_date_utc": "2026-07-13",
+  "branch": "experiments",
+  "source_commit_before_experiment": "7a1fc4f66c870e8db0ef5dfb70a098db92168278",
+  "scientific_outcomes_opened": false,
+  "input_count": 568,
+  "raw_er_mag_file_count": 560,
+  "attitude_file_count": 1,
+  "spice_file_count": 7,
+  "sha256": {
+    "input_manifest_csv": "6127ce9e1aa020e1b57ba3e03cd0fd295a775cbf70942b36d6b7cc711c220158",
+    "configuration_json": "cd2b6e383a3e44a6dbd385e42815d84b864ec48f021502506caf1e00affa0b0c",
+    "protocol_md": "e3425b01fa917b57d9a5d12da5fbd58fd36d91602cd0c3b554f13c23f2c48c9c"
+  }
+}

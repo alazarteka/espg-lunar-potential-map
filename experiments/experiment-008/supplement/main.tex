@@ -1,0 +1,60 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,graphicx,hyperref}
+
+\title{Geometry-Only Identifiability of a Spatiotemporal Lunar Surface
+Potential Field from Lunar Prospector Sampling}
+\author{Experiment 008}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This prospective experiment tests which spatial and spatiotemporal potential
+fields are identifiable from the corrected Lunar Prospector sampling operator
+without using fitted potential values. The analysis treats each energy sweep as
+one integrated observation, measures rank, conditioning, resolution, and
+near-null structure, and performs frozen synthetic recovery tests. Scientific
+results will be inserted only after the protocol and implementation are frozen.
+\end{abstract}
+
+\section{Background}
+The manuscript poses global reconstruction as a spherical-harmonic inverse
+problem. Sparse instantaneous longitude coverage and time-dependent plasma
+conditions can confound spatial and temporal coefficients. Coverage plots and
+regularized fits alone do not establish non-identifiability; the observation
+operator itself must be audited.
+
+\section{Observation Operator}
+For sweep $i$, temporal basis $T_q$, and real spherical harmonic $Y_k$, the
+canonical row is
+\begin{equation}
+A_{i,qk}=\frac{1}{n_i}\sum_{j\in i}T_q(t_{ij})Y_k(x_{ij}).
+\end{equation}
+This represents one sweep-level estimate assembled from fifteen energy rows.
+Repeating the estimate at fifteen footprints would change its statistical
+weight without adding independent information.
+
+\section{Identifiability Diagnostics}
+Let $A=U\Sigma V^T$. We report exact and effective rank, condition number,
+truncated-SVD resolution, leverage, and the global visibility of the smallest
+right-singular mode. A near-null witness is scaled to 100~V global RMS and
+evaluated both globally and at the sampled footprints.
+
+\section{Prospective Tests}
+The primary model uses independent 24-hour windows and degree five. Frozen
+coarser, static, and synodic-basis controls distinguish complete failure from
+conditional coarse recovery. Within-basis and localized smooth injections test
+recovery under fixed noise levels and blocked time/longitude validation.
+
+\section{Results}
+No scientific outcomes had been computed when this document was frozen.
+
+\section{Limitations}
+Geometry-only failure is an optimistic upper-bound result because later
+measurement selection can only remove rows. Geometry-only success does not
+validate the potential estimator, spacecraft-potential correction, or physical
+interpretation.
+
+\end{document}
