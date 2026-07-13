@@ -1,6 +1,10 @@
 # Experiment 006: Restricted-Domain Beam-Proxy Validation
 
-**Status:** D1 complete; CPU reference path selected for C1
+**Status:** C1 paused after 339 cases; G2 complete-GPU-equivalence development
+
+G2 is governed by `g2-gpu-equivalence-protocol.md` and
+`configuration-g2.json`. It preserves complete 12-start CPU-polished inference;
+the failed D1 projected-LM candidate shortcut remains rejected.
 
 **Branch:** `experiments`
 

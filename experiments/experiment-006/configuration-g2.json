@@ -1,0 +1,48 @@
+{
+  "protocol_version": "g2-complete-gpu-equivalence-1",
+  "status": "frozen_before_g2_solver_or_corpus_outcomes",
+  "frozen_date": "2026-07-13",
+  "parent_c1_commit": "677cc05",
+  "information_barrier": {
+    "partial_c1_cases_computed": 339,
+    "partial_c1_scientific_outcomes_opened": false,
+    "confirmation_flux_opened": false,
+    "d1_failure_summary_may_set_algorithm_class_not_tuning_thresholds": true
+  },
+  "estimator": {
+    "starts": 12,
+    "gpu_pruning": false,
+    "gpu_dtype": "float64",
+    "gpu_algorithm": "bounded_trust_region_reflective",
+    "cpu_polish_all_gpu_endpoints": true,
+    "canonical_winner_backend": "numpy_float64",
+    "final_inference_backend": "scipy_numpy_float64",
+    "complete_cpu_fallback": true
+  },
+  "corpus": {
+    "seed_root": "experiment-006-g2-v1",
+    "matched_cases": 48,
+    "discrepancy_cases": 72,
+    "calibration_geometry_cases": 48,
+    "control_cases": 24,
+    "total_cases": 192
+  },
+  "correctness_gates": {
+    "winner_basin_recall": 1.0,
+    "qc_and_reason_code_agreement": 1.0,
+    "objective_relative_tolerance": 1e-10,
+    "identifiable_center_fwhm_tolerance": 1e-6,
+    "model_log_rms_tolerance": 1e-10,
+    "bound_contact_agreement": true,
+    "jacobian_rank_agreement": true,
+    "deterministic_replay": true,
+    "batch_order_invariance": true,
+    "required_trajectories_per_fit": 12
+  },
+  "performance_gate": {
+    "devices": 4,
+    "device_model": "NVIDIA TITAN Xp",
+    "maximum_projected_c1_wall_hours": 24.0,
+    "includes_cpu_polish_and_qc": true
+  }
+}
