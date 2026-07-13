@@ -1,6 +1,6 @@
 # Experiment 006: Restricted-Domain Beam-Proxy Validation
 
-**Status:** C1 paused after 339 cases; G2 complete-GPU-equivalence development
+**Status:** C1 paused after 339 cases; frozen G2 DE estimator rejected
 
 G2 is governed by `g2-gpu-equivalence-protocol.md` and
 `configuration-g2.json`. It defines a new four-island differential-evolution
@@ -10,7 +10,8 @@ the failed D1 projected-LM candidate shortcut remains rejected.
 The frozen 17-fit matched benchmark took 5.29 seconds of GPU search and 15.10
 seconds of CPU polishing on one TITAN Xp, projecting to approximately 4.3 hours
 for 3,000 cases across four GPUs. This is an implementation benchmark, not a
-scientific validation result; G2 certification remains required before C1.
+scientific validation result. G2 subsequently failed the prospective
+discrepancy-case gate; see `g2-certification-failure.md`.
 
 **Branch:** `experiments`
 
