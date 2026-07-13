@@ -155,6 +155,39 @@ def _load_raw_geometry_columns(path: Path) -> pd.DataFrame:
     )
 
 
+def robust_spkpos(
+    target: str,
+    et: np.ndarray,
+    reference_frame: str,
+    observer: str,
+) -> np.ndarray:
+    """Vectorize SPK lookup while isolating uncovered epochs as NaN rows."""
+    epochs = np.asarray(et, dtype=np.float64)
+    output = np.full((len(epochs), 3), np.nan, dtype=np.float64)
+
+    def fill(start: int, stop: int) -> None:
+        if start >= stop:
+            return
+        try:
+            positions, _ = spice.spkpos(
+                target,
+                epochs[start:stop],
+                reference_frame,
+                "NONE",
+                observer,
+            )
+            output[start:stop] = np.asarray(positions).reshape(stop - start, 3)
+        except Exception:
+            if stop - start == 1:
+                return
+            midpoint = start + (stop - start) // 2
+            fill(start, midpoint)
+            fill(midpoint, stop)
+
+    fill(0, len(epochs))
+    return output
+
+
 def _worker_initialize() -> None:
     """Load kernels and attitude once in each extraction process."""
     global _ATTITUDE_ET, _ATTITUDE_RA, _ATTITUDE_DEC
@@ -186,8 +219,8 @@ def _project_rows(
             et, _ATTITUDE_ET, _ATTITUDE_RA, _ATTITUDE_DEC
         )
 
-    lp_positions, _ = spice.spkpos("-25", et, "IAU_MOON", "NONE", "301")
-    sun_j2000, _ = spice.spkpos("10", et, "J2000", "NONE", "-25")
+    lp_positions = robust_spkpos("-25", et, "IAU_MOON", "301")
+    sun_j2000 = robust_spkpos("10", et, "J2000", "-25")
     sun_norms = np.linalg.norm(sun_j2000, axis=1)
     sun_unit = np.divide(
         sun_j2000,
@@ -427,7 +460,8 @@ def run_extract(args: argparse.Namespace) -> int:
     rows_per_sweep = int(configuration["inputs"]["expected_rows_per_sweep"])
     maximum_workers = int(configuration["resources"]["maximum_cpu_workers"])
     workers = min(args.workers, maximum_workers)
-    paths = raw_paths_from_manifest(args.manifest)
+    paths = list(enumerate(raw_paths_from_manifest(args.manifest)))
+    paths = paths[args.start_index :]
     if args.limit is not None:
         paths = paths[: args.limit]
     args.shard_dir.mkdir(parents=True, exist_ok=True)
@@ -435,12 +469,12 @@ def run_extract(args: argparse.Namespace) -> int:
     rows: list[FileCensus] = []
     if workers == 1:
         _worker_initialize()
-        for file_index, path in enumerate(paths):
+        for completed, (file_index, path) in enumerate(paths, start=1):
             row = extract_file(file_index, path, args.shard_dir, rows_per_sweep)
             rows.append(row)
             error_suffix = f" ERROR {row.error}" if row.error else ""
             print(
-                f"[{file_index + 1}/{len(paths)}] {path.name}: "
+                f"[{completed}/{len(paths)}] {path.name}: "
                 f"{row.corrected_connected_sweeps} connected, "
                 f"{row.elapsed_seconds:.2f}s{error_suffix}"
             )
@@ -452,7 +486,7 @@ def run_extract(args: argparse.Namespace) -> int:
                 executor.submit(
                     extract_file, file_index, path, args.shard_dir, rows_per_sweep
                 ): file_index
-                for file_index, path in enumerate(paths)
+                for file_index, path in paths
             }
             for completed, future in enumerate(as_completed(futures), start=1):
                 row = future.result()
@@ -531,6 +565,7 @@ def parse_args() -> argparse.Namespace:
         "--census", type=Path, default=EXPERIMENT_DIR / "geometry-census.csv"
     )
     extract.add_argument("--workers", type=int, default=4)
+    extract.add_argument("--start-index", type=int, default=0)
     extract.add_argument("--limit", type=int)
     extract.set_defaults(handler=run_extract)
 

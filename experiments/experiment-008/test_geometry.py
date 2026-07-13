@@ -68,3 +68,21 @@ def test_display_path_handles_external_output(tmp_path: Path) -> None:
     internal = project_root / "artifacts" / "result.npz"
     assert geometry.display_path(internal, project_root) == "artifacts/result.npz"
     assert geometry.display_path(external, project_root) == external.as_posix()
+
+
+def test_robust_spkpos_isolates_uncovered_epoch(monkeypatch) -> None:
+    def fake_spkpos(target, et, reference_frame, correction, observer):
+        del target, reference_frame, correction, observer
+        epochs = np.atleast_1d(et)
+        if np.any(epochs == 2.0):
+            raise RuntimeError("uncovered")
+        return np.column_stack([epochs, epochs + 1.0, epochs + 2.0]), np.zeros(
+            len(epochs)
+        )
+
+    monkeypatch.setattr(geometry.spice, "spkpos", fake_spkpos)
+    actual = geometry.robust_spkpos(
+        "target", np.array([1.0, 2.0, 3.0]), "frame", "observer"
+    )
+    np.testing.assert_allclose(actual[[0, 2]], [[1.0, 2.0, 3.0], [3.0, 4.0, 5.0]])
+    assert np.isnan(actual[1]).all()
