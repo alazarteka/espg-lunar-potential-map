@@ -3,7 +3,8 @@
 **Status:** C1 paused after 339 cases; G2 complete-GPU-equivalence development
 
 G2 is governed by `g2-gpu-equivalence-protocol.md` and
-`configuration-g2.json`. It preserves complete 12-start CPU-polished inference;
+`configuration-g2.json`. It defines a new four-island differential-evolution
+estimator with CPU-polished island winners and therefore requires fresh C1;
 the failed D1 projected-LM candidate shortcut remains rejected.
 
 **Branch:** `experiments`

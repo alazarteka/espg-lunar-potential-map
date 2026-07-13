@@ -1,20 +1,29 @@
 {
-  "protocol_version": "g2-complete-gpu-equivalence-1",
-  "status": "frozen_before_g2_solver_or_corpus_outcomes",
+  "protocol_version": "g2-global-de-estimator-2",
+  "status": "amended_before_g2_solver_or_corpus_outcomes",
   "frozen_date": "2026-07-13",
   "parent_c1_commit": "677cc05",
   "information_barrier": {
     "partial_c1_cases_computed": 339,
     "partial_c1_scientific_outcomes_opened": false,
+    "partial_c1_cases_excluded_from_recalibration": true,
     "confirmation_flux_opened": false,
     "d1_failure_summary_may_set_algorithm_class_not_tuning_thresholds": true
   },
   "estimator": {
-    "starts": 12,
-    "gpu_pruning": false,
+    "estimator_change_requires_fresh_c1": true,
+    "observation_derived_seeds": 12,
     "gpu_dtype": "float64",
-    "gpu_algorithm": "bounded_trust_region_reflective",
-    "cpu_polish_all_gpu_endpoints": true,
+    "gpu_algorithm": "deterministic_four_island_differential_evolution",
+    "islands": 4,
+    "population_per_island": 128,
+    "maximum_generations": 400,
+    "mutation_range": [0.5, 1.0],
+    "crossover_probability": 0.9,
+    "initialization": "twelve_observation_starts_plus_scrambled_sobol",
+    "migration_interval_generations": 40,
+    "migration_elites_per_island": 2,
+    "cpu_polish_all_island_winners": true,
     "canonical_winner_backend": "numpy_float64",
     "final_inference_backend": "scipy_numpy_float64",
     "complete_cpu_fallback": true
@@ -28,16 +37,13 @@
     "total_cases": 192
   },
   "correctness_gates": {
-    "winner_basin_recall": 1.0,
-    "qc_and_reason_code_agreement": 1.0,
-    "objective_relative_tolerance": 1e-10,
-    "identifiable_center_fwhm_tolerance": 1e-6,
-    "model_log_rms_tolerance": 1e-10,
-    "bound_contact_agreement": true,
-    "jacobian_rank_agreement": true,
+    "matched_recovery_fwhm_tolerance": 1e-4,
+    "objective_not_worse_than_old_cpu_reference_tolerance": 1e-10,
+    "identifiable_island_center_spread_fwhm_max": 1e-4,
+    "identifiable_cases_require_finite_full_rank_covariance": true,
     "deterministic_replay": true,
     "batch_order_invariance": true,
-    "required_trajectories_per_fit": 12
+    "required_island_winners_per_fit": 4
   },
   "performance_gate": {
     "devices": 4,
