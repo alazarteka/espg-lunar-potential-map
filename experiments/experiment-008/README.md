@@ -33,6 +33,11 @@ The full decision rules are frozen in [protocol.md](protocol.md) and
 attitude-only sensitivity from a newly discovered production coordinate-frame
 mismatch. It was frozen before any operator or recovery outcome.
 
+The [one-day geometry implementation check](geometry-implementation-check.md)
+then reproduced the production frame-mixed path to machine precision and found
+that frame-consistent footprints shifted by a median 48 km on that fixture.
+Mission-wide identifiability outcomes remain unopened.
+
 ## Information Barrier
 
 The experiment may read raw Level-1 ER/MAG files, attitude, SPICE kernels, and
