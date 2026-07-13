@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "experiment": "008",
+  "amendment": "coordinate_frame_sensitivity",
+  "frozen_before_scientific_operator_outcomes": true,
+  "canonical": {
+    "attitude": "circular_ra_linear_dec_interpolation",
+    "spin_frame": "J2000",
+    "sun_frame": "J2000",
+    "output_frame": "IAU_MOON"
+  },
+  "sensitivities": [
+    {
+      "name": "legacy_attitude",
+      "attitude": "next_sample_lookup",
+      "spin_frame": "J2000",
+      "sun_frame": "J2000"
+    },
+    {
+      "name": "frame_mixed",
+      "attitude": "circular_ra_linear_dec_interpolation",
+      "spin_frame": "J2000",
+      "sun_frame": "IAU_MOON_passed_to_J2000_builder"
+    },
+    {
+      "name": "submitted_legacy",
+      "attitude": "next_sample_lookup",
+      "spin_frame": "J2000",
+      "sun_frame": "IAU_MOON_passed_to_J2000_builder"
+    }
+  ]
+}

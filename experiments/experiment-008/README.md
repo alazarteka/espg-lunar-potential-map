@@ -29,6 +29,10 @@ or use the precomputed potential archive.
 The full decision rules are frozen in [protocol.md](protocol.md) and
 [configuration.json](configuration.json).
 
+[Protocol Amendment 01](protocol-amendment-01.md) prospectively separates an
+attitude-only sensitivity from a newly discovered production coordinate-frame
+mismatch. It was frozen before any operator or recovery outcome.
+
 ## Information Barrier
 
 The experiment may read raw Level-1 ER/MAG files, attitude, SPICE kernels, and
@@ -66,4 +70,3 @@ footprints is retained only as a sensitivity diagnostic.
 
 Large geometry caches remain under `artifacts/experiment-008/` and are not
 tracked.
-
