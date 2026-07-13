@@ -7,6 +7,11 @@ G2 is governed by `g2-gpu-equivalence-protocol.md` and
 estimator with CPU-polished island winners and therefore requires fresh C1;
 the failed D1 projected-LM candidate shortcut remains rejected.
 
+The frozen 17-fit matched benchmark took 5.29 seconds of GPU search and 15.10
+seconds of CPU polishing on one TITAN Xp, projecting to approximately 4.3 hours
+for 3,000 cases across four GPUs. This is an implementation benchmark, not a
+scientific validation result; G2 certification remains required before C1.
+
 **Branch:** `experiments`
 
 **Parent commit:** `41632376f0928249800dfa157da8ed82f1cfad60`

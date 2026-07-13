@@ -1,0 +1,17 @@
+{
+  "c1_outcomes_opened": false,
+  "confirmation_flux_opened": false,
+  "cpu_polish_seconds": 15.103423804044724,
+  "device": "cuda:0",
+  "device_model": "NVIDIA TITAN Xp",
+  "evaluations_per_problem": 205312,
+  "gpu_seconds": 5.293405469506979,
+  "maximum_center_error_fwhm": 2.691449756667046e-16,
+  "problems": 17,
+  "projected_four_gpu_c1_hours": 4.249339064583182,
+  "settings": {
+    "generations": 400,
+    "islands": 4,
+    "population_per_island": 128
+  }
+}
