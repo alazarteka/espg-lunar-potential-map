@@ -1,0 +1,108 @@
+{
+  "analysis_git_head": "072dcc9257fc831630393c999a18da7e5691f9fe",
+  "injection_cell_count": 81290,
+  "records": [
+    {
+      "path": "experiments/experiment-008/protocol.md",
+      "sha256": "e3425b01fa917b57d9a5d12da5fbd58fd36d91602cd0c3b554f13c23f2c48c9c",
+      "size_bytes": 8607
+    },
+    {
+      "path": "experiments/experiment-008/configuration.json",
+      "sha256": "cd2b6e383a3e44a6dbd385e42815d84b864ec48f021502506caf1e00affa0b0c",
+      "size_bytes": 2532
+    },
+    {
+      "path": "experiments/experiment-008/protocol-amendment-01.md",
+      "sha256": "8ec5de8f3262ab8ecff2261daa797bd46506699d28c206f3ffcaf5b4954fe9ae",
+      "size_bytes": 2192
+    },
+    {
+      "path": "experiments/experiment-008/configuration-amendment-01.json",
+      "sha256": "2e3980baf1fc49364abc62666ce7f8b6cfe09a5db660f7ee971ca727273c1dfc",
+      "size_bytes": 832
+    },
+    {
+      "path": "experiments/experiment-008/protocol-amendment-02.md",
+      "sha256": "365251c0f8782cd2057e375e90bfc8b4a1c92e90f23ff65fc4235b16a41ea4a9",
+      "size_bytes": 4170
+    },
+    {
+      "path": "experiments/experiment-008/configuration-amendment-02.json",
+      "sha256": "e899010df5cd68ca074ff1836719f40b07e9124288ff977ec9ea83e695535a88",
+      "size_bytes": 1602
+    },
+    {
+      "path": "experiments/experiment-008/protocol-amendment-03.md",
+      "sha256": "3f10fdcf515e7fbdc3f3dcb355815bbd5e0fc18ee517a435608fe31a70a4e2c9",
+      "size_bytes": 8371
+    },
+    {
+      "path": "experiments/experiment-008/configuration-amendment-03.json",
+      "sha256": "42c45fcef5f117f3d8e33b4c52167ce2149b05d17abe6d54a4b6f5f10a5ce00f",
+      "size_bytes": 2431
+    },
+    {
+      "path": "experiments/experiment-008/input-manifest.csv",
+      "sha256": "6127ce9e1aa020e1b57ba3e03cd0fd295a775cbf70942b36d6b7cc711c220158",
+      "size_bytes": 78971
+    },
+    {
+      "path": "experiments/experiment-008/geometry-census.csv",
+      "sha256": "2dac793fce6407e24e94b1fbbe755a23bf9abba38b4fc7e71148c559251a7c95",
+      "size_bytes": 95884
+    },
+    {
+      "path": "experiments/experiment-008/geometry.py",
+      "sha256": "0c04aaeefa421ca3eca31db2e3769666202e34b01d8525b113fa867bdd9c9efd",
+      "size_bytes": 22692
+    },
+    {
+      "path": "experiments/experiment-008/observation_operator.py",
+      "sha256": "7accfbfb88b6cbfd9f22b049cc7882ed1c049c0098caca4246626ebdee174e5c",
+      "size_bytes": 21299
+    },
+    {
+      "path": "experiments/experiment-008/run_analysis.py",
+      "sha256": "69a91ee5b9950162ea76b5bde8b5b88a0fb86844448686939aeb11f79662d072",
+      "size_bytes": 23119
+    },
+    {
+      "path": "experiments/experiment-008/test_geometry.py",
+      "sha256": "311b1d80d794243733ca1c4fc3d6ea60a69ce4034b591ed843ed745b7234b0bb",
+      "size_bytes": 3290
+    },
+    {
+      "path": "experiments/experiment-008/test_operator.py",
+      "sha256": "b10a18c17cbfdb9ec2bcd00c19641d5ac7f5514d385ca89a2b5589c8e9540cd0",
+      "size_bytes": 7293
+    },
+    {
+      "path": "experiments/experiment-008/test_run_analysis.py",
+      "sha256": "fd07e7a6d363a3198e8e6fddc6a423c78ae3192a64b2ba653a7782571fbb1fbf",
+      "size_bytes": 2391
+    },
+    {
+      "path": "artifacts/experiment-008/geometry.npz",
+      "sha256": "57ecd66ec5c6f02a945411584287bf995baf3dd53ee2e4b3a2980a2c17595a9f",
+      "size_bytes": 398360062
+    },
+    {
+      "path": "artifacts/experiment-008/canonical-sweep-basis-l10.npy",
+      "sha256": "4f2d62ace2fb67b445982b87319db68feefbe868febcbe3e3b77519a15ed50fc",
+      "size_bytes": 386854552
+    },
+    {
+      "path": "artifacts/experiment-008/canonical-sweep-basis-l10.json",
+      "sha256": "98848199f00ef21e8d6aeba2a83f562b1c917255535414f723148d70df76285b",
+      "size_bytes": 446
+    },
+    {
+      "path": "artifacts/experiment-008/injection-cells.csv",
+      "sha256": "651ca6999bc0a14ffcfe57635712e68d449f19c9090918c13686b0a9e1e54a3a",
+      "size_bytes": 5288641
+    }
+  ],
+  "schema_version": 1,
+  "status": "frozen_before_scientific_operator_outcomes"
+}
