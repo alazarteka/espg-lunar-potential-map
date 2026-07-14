@@ -1,0 +1,19 @@
+{
+  "basis_cache_sha256": "19100c26e64890e9020044bee46ab7e572a6d31af53dcd9c3b606b83c066953e",
+  "class_pass": false,
+  "eligible_nonempty_windows": 560,
+  "empty_scheduled_windows": 0,
+  "failed_recovery_fraction": 1.0,
+  "geometry_cache_sha256": "cb47bc11c3bae8fd89eacf1d946db06310f18692c0ff2b5863fcb4dc14eefa62",
+  "lmax": 5,
+  "material_witness": true,
+  "parameters": 36,
+  "recovery_pass_fraction": 0.0,
+  "stable_fraction": 0.0,
+  "unstable_fraction": 1.0,
+  "visibility_median": 4.448770831397241e-05,
+  "visibility_minimum": 1.1484689946596484e-06,
+  "visibility_p90": 0.00018723035031672998,
+  "window_hours": 24.0,
+  "witness_window_fraction": 1.0
+}
