@@ -1,0 +1,9 @@
+{
+  "condition_maximum": 1171794.6121597218,
+  "condition_median": 28172.74006824349,
+  "metric": "empirical_unit_l2_column_secondary",
+  "physical_visibility_maximum": 0.0004752368532680426,
+  "physical_visibility_median": 4.574261423433257e-05,
+  "physical_visibility_minimum": 1.153870282135215e-06,
+  "windows": 560
+}

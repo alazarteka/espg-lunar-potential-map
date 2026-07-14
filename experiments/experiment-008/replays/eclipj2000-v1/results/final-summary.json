@@ -1,0 +1,39 @@
+{
+  "blocked_shared_full_rank_records": 34,
+  "canonical_complete_sweeps": 366715,
+  "canonical_connected_sweeps": 389317,
+  "decision": "C_conditional_coarse_recovery",
+  "geometry_file_failures": 0,
+  "primary": {
+    "eligible_windows": 560,
+    "formal_full_rank_windows": 560,
+    "lmax": 5,
+    "recovery_pass_windows": 0,
+    "stable_windows": 0,
+    "visibility_max": 0.0003739434279653,
+    "visibility_median": 4.448770831397241e-05,
+    "visibility_min": 1.1484689946596484e-06,
+    "window_hours": 24.0
+  },
+  "recoverable_classes": {
+    "independent_windows": [
+      "72h_lmax1",
+      "168h_lmax1",
+      "168h_lmax2",
+      "168h_lmax3",
+      "708.734112h_lmax1",
+      "708.734112h_lmax2",
+      "708.734112h_lmax3",
+      "708.734112h_lmax5",
+      "708.734112h_lmax10"
+    ],
+    "shared_temporal": "constant_and_constant_synodic_through_lmax10",
+    "static": "through_lmax20"
+  },
+  "run_id": "eclipj2000-v1",
+  "schema_version": 2,
+  "spacecraft_potential_gauge_resolved": false,
+  "structurally_valid_sweeps": 551637,
+  "total_exact_15_row_sweeps": 559321,
+  "total_raw_files": 560
+}

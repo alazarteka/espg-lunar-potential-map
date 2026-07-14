@@ -9,10 +9,12 @@ from typing import TYPE_CHECKING
 
 from replay_context import (
     ARTIFACT_DIR,
+    EXPERIMENT_DIR,
     OUTPUT_DIR,
     PROJECT_ROOT,
     RESULT_MANIFEST_PATH,
     RESULTS_DIR,
+    RUN_ID,
 )
 
 if TYPE_CHECKING:
@@ -37,15 +39,40 @@ def result_paths() -> list[tuple[str, Path]]:
         for path in sorted(RESULTS_DIR.rglob("*"))
         if path.is_file()
     ]
-    paths.extend(
-        ("tracked_result", OUTPUT_DIR / relative)
-        for relative in (
-            "RESULTS.md",
-            "supplement/README.md",
-            "supplement/main.tex",
-            "supplement/main.pdf",
+    tracked_documents = [
+        "RESULTS.md",
+        "supplement/README.md",
+        "supplement/main.tex",
+        "supplement/main.pdf",
+    ]
+    if RUN_ID:
+        tracked_documents.extend(
+            (
+                "README.md",
+                "replay-freeze.json",
+                "analysis-freeze.json",
+                "analysis-freeze-extension-01.json",
+                "geometry-census.csv",
+                "implementation-check-one-day.json",
+                "input-manifest-current.csv",
+                "one-day-census.csv",
+            )
         )
+    else:
+        tracked_documents.append("phase-1-results.md")
+    paths.extend(
+        ("tracked_result", OUTPUT_DIR / relative) for relative in tracked_documents
     )
+    if RUN_ID:
+        paths.extend(
+            (
+                ("tracked_synthesis_code", EXPERIMENT_DIR / "summarize_replay.py"),
+                (
+                    "tracked_synthesis_test",
+                    EXPERIMENT_DIR / "test_summarize_replay.py",
+                ),
+            )
+        )
     artifact_names = (
         "geometry.npz",
         "canonical-sweep-basis-l10.npy",

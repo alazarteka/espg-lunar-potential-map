@@ -1,0 +1,16 @@
+{
+  "canonical_connected_sweep_change": -10326,
+  "canonical_connected_sweep_fractional_change": -0.025838060468968527,
+  "corrected_decision": "C_conditional_coarse_recovery",
+  "decision_changed": false,
+  "original_decision": "C_conditional_coarse_recovery",
+  "primary_visibility_median_corrected": 4.448770831397241e-05,
+  "primary_visibility_median_fractional_change": -0.015574374237016686,
+  "primary_visibility_median_original": 4.5191538242914006e-05,
+  "recoverable_independent_classes_changed": false,
+  "schema_version": 1,
+  "static_l20_condition_corrected": 3.752797195326085,
+  "static_l20_condition_original": 3.880976082127243,
+  "synodic_l10_condition_corrected": 3.1308381024564267,
+  "synodic_l10_condition_original": 3.204761871827128
+}

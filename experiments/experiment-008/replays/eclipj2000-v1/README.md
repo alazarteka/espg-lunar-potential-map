@@ -2,8 +2,14 @@
 
 ## Status
 
-Replay prepared on 2026-07-14. Scientific outcomes are not yet recorded in
-this directory.
+**Complete. Outcome C remains certified: conditional/coarse recovery.**
+
+The corrected coordinate frame changes footprints and reduces the canonical
+connected cohort by 2.58%, but the primary daily degree-5 failure, the passing
+coarse-class boundary, and the whole-mission static/shared-temporal controls
+are unchanged. See [RESULTS.md](RESULTS.md), the
+[machine-readable summary](results/final-summary.json), and the
+[standalone supplement](supplement/main.tex).
 
 ## Reason
 
@@ -37,9 +43,10 @@ All commands set:
 
 ```bash
 export EXPERIMENT_008_RUN_ID=eclipj2000-v1
-export OPENBLAS_NUM_THREADS=4 OMP_NUM_THREADS=4 MKL_NUM_THREADS=4
-export NUMEXPR_NUM_THREADS=4
 ```
+
+Geometry extraction uses four workers with all BLAS thread variables set to
+`1`. Single-process SVD/TSQR phases set those variables to `4`.
 
 The dependency order remains geometry extraction and merge, spatial basis,
 primary/grid/static analyses, temporal preparation and controls, sensitivities,
@@ -52,3 +59,6 @@ The original outcome is superseded only if the unchanged frozen decision tree
 classifies the corrected replay differently. Similarity to the prior numerical
 result is evidence of robustness, not a success criterion.
 
+The unchanged decision tree returns the same outcome and exactly the same set
+of passing independent-window classes. The original frozen outputs remain
+available as the audit baseline rather than being overwritten.

@@ -57,6 +57,17 @@ again be called certified.
 The sparse-orbit argument suggests the qualitative daily degree-5 result will
 survive, but that is a hypothesis, not a substitute for replay.
 
+## Resolution
+
+The isolated [ECLIPJ2000 replay](replays/eclipj2000-v1/README.md) subsequently
+regenerated all geometry-dependent caches, primary and extended analyses,
+figures, synthesis products, and the LaTeX supplement without altering the
+original outputs. The replay processed all 560 files without failure and
+retained 389,317 corrected connected sweeps. The unchanged decision tree again
+returned Outcome C, with exactly the same passing independent-window classes.
+The corrected replay therefore supersedes the provisional geometry result for
+scientific interpretation while preserving the original run as provenance.
+
 ## Sources
 
 - PDS attitude product:
