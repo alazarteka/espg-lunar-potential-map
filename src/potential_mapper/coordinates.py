@@ -1,5 +1,4 @@
-"""Per-row geometry for ER data: SCD/J2000/IAU_MOON transforms, magnetic field
-projection, and field-line surface intersections with polarity."""
+"""Per-row SCD/ECLIPJ2000/IAU_MOON geometry and field-line projection."""
 
 import logging
 from dataclasses import dataclass
@@ -10,13 +9,14 @@ import spiceypy as spice
 import src.config as config
 from src.flux import FluxData
 from src.utils.attitude import get_current_ra_dec_batch
-from src.utils.coordinates import build_scd_to_j2000, ra_dec_to_unit
+from src.utils.coordinates import build_scd_to_reference, ra_dec_to_unit
 from src.utils.geometry import (
     get_connections_and_polarity_batch,
 )
 from src.utils.spice_ops import (
-    get_j2000_iau_moon_transform_matrix_batch,
+    get_eclipj2000_iau_moon_transform_matrix_batch,
     get_lp_position_wrt_moon_batch,
+    get_lp_vector_to_sun_in_eclipj2000_batch,
     get_lp_vector_to_sun_in_lunar_frame_batch,
     get_sun_vector_wrt_moon_batch,
 )
@@ -25,28 +25,28 @@ from src.utils.spice_ops import (
 @dataclass
 class CoordinateArrays:
     """
-    Container for per-row geometry and transform arrays in IAU_MOON/J2000 frames.
+    Container for per-row geometry in ECLIPJ2000 and IAU_MOON frames.
 
     Shapes:
     - lp_positions: (N, 3) LP position in IAU_MOON (km)
     - lp_vectors_to_sun: (N, 3) LP→Sun vector in IAU_MOON (km)
-    - ra_dec_cartesian: (N, 3) spin axis unit vectors in J2000
+    - spin_vectors_eclipj2000: (N, 3) spin-axis unit vectors in ECLIPJ2000
     - moon_vectors_to_sun: (N, 3) Moon→Sun vector in IAU_MOON (km)
-    - j2000_to_iau_moon_mats: (N, 3, 3) rotation matrices
+    - eclipj2000_to_iau_moon_mats: (N, 3, 3) rotation matrices
     - scd_to_iau_moon_mats: (N, 3, 3) rotation matrices (SCD→IAU_MOON)
     """
 
     lp_positions: np.ndarray
     lp_vectors_to_sun: np.ndarray
-    ra_dec_cartesian: np.ndarray
+    spin_vectors_eclipj2000: np.ndarray
     moon_vectors_to_sun: np.ndarray
-    j2000_to_iau_moon_mats: np.ndarray
+    eclipj2000_to_iau_moon_mats: np.ndarray
     scd_to_iau_moon_mats: np.ndarray
 
 
 class CoordinateCalculator:
     """
-    Compute coordinate transformations between spacecraft (SCD), J2000, and IAU_MOON.
+    Compute transformations between SCD, ECLIPJ2000, and IAU_MOON.
     """
 
     def __init__(
@@ -57,8 +57,8 @@ class CoordinateCalculator:
 
         Args:
             et_spin: Ephemeris times for attitude data (shape: (N,))
-            right_ascension: Right ascension in degrees (shape: (N,))
-            declination: Declination in degrees (shape: (N,))
+            right_ascension: ECLIPJ2000 right ascension in degrees (shape: (N,))
+            declination: ECLIPJ2000 declination in degrees (shape: (N,))
         """
         self.et_spin = et_spin
         self.right_ascension = right_ascension
@@ -95,8 +95,13 @@ class CoordinateCalculator:
         # These functions handle NaNs in et_times gracefully (returning NaNs)
         lp_positions = get_lp_position_wrt_moon_batch(et_times)
         lp_vectors_to_sun = get_lp_vector_to_sun_in_lunar_frame_batch(et_times)
+        lp_vectors_to_sun_eclipj2000 = get_lp_vector_to_sun_in_eclipj2000_batch(
+            et_times
+        )
         moon_vectors_to_sun = get_sun_vector_wrt_moon_batch(et_times)
-        j2000_to_iau_moon_mats = get_j2000_iau_moon_transform_matrix_batch(et_times)
+        eclipj2000_to_iau_moon_mats = get_eclipj2000_iau_moon_transform_matrix_batch(
+            et_times
+        )
 
         # 3. Attitude lookup
         ra_vals, dec_vals = get_current_ra_dec_batch(
@@ -110,15 +115,19 @@ class CoordinateCalculator:
             np.isfinite(et_times)
             & np.all(np.isfinite(lp_positions), axis=1)
             & np.all(np.isfinite(lp_vectors_to_sun), axis=1)
+            & np.all(np.isfinite(lp_vectors_to_sun_eclipj2000), axis=1)
             & np.all(np.isfinite(moon_vectors_to_sun), axis=1)
-            & np.all(np.isfinite(j2000_to_iau_moon_mats.reshape(n_points, -1)), axis=1)
+            & np.all(
+                np.isfinite(eclipj2000_to_iau_moon_mats.reshape(n_points, -1)),
+                axis=1,
+            )
             & np.isfinite(ra_vals)
             & np.isfinite(dec_vals)
         )
 
         # Also check vector norms > 0
-        lp_sun_norms = np.linalg.norm(lp_vectors_to_sun, axis=1)
-        valid_mask &= lp_sun_norms > 0
+        lp_sun_eclipj2000_norms = np.linalg.norm(lp_vectors_to_sun_eclipj2000, axis=1)
+        valid_mask &= lp_sun_eclipj2000_norms > 0
 
         # Apply mask to invalidate bad rows (set to NaN)
         # Note: The original code skipped rows, effectively leaving them as NaNs
@@ -131,52 +140,54 @@ class CoordinateCalculator:
         if not np.all(valid_mask):
             lp_positions[~valid_mask] = np.nan
             lp_vectors_to_sun[~valid_mask] = np.nan
+            lp_vectors_to_sun_eclipj2000[~valid_mask] = np.nan
             moon_vectors_to_sun[~valid_mask] = np.nan
-            j2000_to_iau_moon_mats[~valid_mask] = np.nan
+            eclipj2000_to_iau_moon_mats[~valid_mask] = np.nan
             ra_vals[~valid_mask] = np.nan
             dec_vals[~valid_mask] = np.nan
 
         # 5. Derived quantities
-        ra_dec_cartesian = np.full((n_points, 3), np.nan)
+        spin_vectors_eclipj2000 = np.full((n_points, 3), np.nan)
         # Only compute for valid rows to avoid warnings/errors
         if np.any(valid_mask):
-            ra_dec_cartesian[valid_mask] = ra_dec_to_unit(
+            spin_vectors_eclipj2000[valid_mask] = ra_dec_to_unit(
                 ra_vals[valid_mask], dec_vals[valid_mask]
             )
 
         # Unit vectors to sun
-        unit_lp_vectors_to_sun = np.full_like(lp_vectors_to_sun, np.nan)
+        unit_lp_vectors_to_sun_eclipj2000 = np.full_like(
+            lp_vectors_to_sun_eclipj2000, np.nan
+        )
         # Safe division
-        safe_norms = np.where(lp_sun_norms > 0, lp_sun_norms, 1.0)
+        safe_norms = np.where(lp_sun_eclipj2000_norms > 0, lp_sun_eclipj2000_norms, 1.0)
         np.divide(
-            lp_vectors_to_sun,
+            lp_vectors_to_sun_eclipj2000,
             safe_norms[:, None],
-            out=unit_lp_vectors_to_sun,
+            out=unit_lp_vectors_to_sun_eclipj2000,
             where=valid_mask[:, None],
         )
 
-        # SCD to J2000
-        scd_to_j2000_transformation_mats = np.full((n_points, 3, 3), np.nan)
+        # SCD to ECLIPJ2000. Both defining vectors are in the same frame.
+        scd_to_eclipj2000_mats = np.full((n_points, 3, 3), np.nan)
         if np.any(valid_mask):
-            scd_to_j2000_transformation_mats[valid_mask] = build_scd_to_j2000(
-                ra_dec_cartesian[valid_mask], unit_lp_vectors_to_sun[valid_mask]
+            scd_to_eclipj2000_mats[valid_mask] = build_scd_to_reference(
+                spin_vectors_eclipj2000[valid_mask],
+                unit_lp_vectors_to_sun_eclipj2000[valid_mask],
             )
 
         # SCD to IAU_MOON
-        # Matrix multiplication: M_iau_j2000 @ M_j2000_scd
-        # j2000_to_iau_moon_mats is (N, 3, 3)
-        # scd_to_j2000_transformation_mats is (N, 3, 3)
-        # Result (N, 3, 3)
         scd_to_iau_moon_transformation_mats = np.einsum(
-            "nij,njk->nik", j2000_to_iau_moon_mats, scd_to_j2000_transformation_mats
+            "nij,njk->nik",
+            eclipj2000_to_iau_moon_mats,
+            scd_to_eclipj2000_mats,
         )
 
         return CoordinateArrays(
             lp_positions=lp_positions,
             lp_vectors_to_sun=lp_vectors_to_sun,
-            ra_dec_cartesian=ra_dec_cartesian,
+            spin_vectors_eclipj2000=spin_vectors_eclipj2000,
             moon_vectors_to_sun=moon_vectors_to_sun,
-            j2000_to_iau_moon_mats=j2000_to_iau_moon_mats,
+            eclipj2000_to_iau_moon_mats=eclipj2000_to_iau_moon_mats,
             scd_to_iau_moon_mats=scd_to_iau_moon_transformation_mats,
         )
 

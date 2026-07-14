@@ -1,4 +1,4 @@
-"""RA/DEC and Cartesian conversions plus spacecraft (SCD) to J2000 rotations."""
+"""RA/DEC, Cartesian, and despun-spacecraft frame conversions."""
 
 import numpy as np
 
@@ -40,9 +40,9 @@ def cartesian_to_lat_lon(coordinate: np.ndarray) -> tuple[float, float]:
     return lat, lon
 
 
-def build_scd_to_j2000(spin_vecs: np.ndarray, sun_vecs: np.ndarray) -> np.ndarray:
+def build_scd_to_reference(spin_vecs: np.ndarray, sun_vecs: np.ndarray) -> np.ndarray:
     """
-    Build rotation matrices from spacecraft (SCD) frame to J2000 frame.
+    Build rotation matrices from spacecraft (SCD) to a common reference frame.
 
     The SCD frame is defined as:
     - X-axis: projection of sun vector onto plane perpendicular to spin axis
@@ -50,15 +50,19 @@ def build_scd_to_j2000(spin_vecs: np.ndarray, sun_vecs: np.ndarray) -> np.ndarra
     - Z-axis: spin axis
 
     Args:
-        spin_vecs: Array of shape (N, 3) with spin vectors (unit, in J2000)
-        sun_vecs: Array of shape (N, 3) with sun direction vectors (unit, in J2000)
+        spin_vecs: Array of shape (N, 3) with spin vectors in one frame
+        sun_vecs: Array of shape (N, 3) with Sun direction vectors in that frame
 
     Returns:
-        Array of shape (N, 3, 3) with rotation matrices (SCD → J2000)
+        Array of shape (N, 3, 3) with rotation matrices from SCD to the
+        shared input frame
     """
-    # Ensure inputs are arrays
-    spin_vecs = np.asarray(spin_vecs)
-    sun_vecs = np.asarray(sun_vecs)
+    spin_vecs = np.asarray(spin_vecs, dtype=np.float64)
+    sun_vecs = np.asarray(sun_vecs, dtype=np.float64)
+    if spin_vecs.ndim != 2 or spin_vecs.shape[1] != 3:
+        raise ValueError("spin_vecs must have shape (N, 3)")
+    if sun_vecs.shape != spin_vecs.shape:
+        raise ValueError("sun_vecs must have the same (N, 3) shape as spin_vecs")
 
     # Normalize spin vectors
     z_norms = np.linalg.norm(spin_vecs, axis=1, keepdims=True)
@@ -75,7 +79,7 @@ def build_scd_to_j2000(spin_vecs: np.ndarray, sun_vecs: np.ndarray) -> np.ndarra
     proj_norms = np.linalg.norm(sun_proj, axis=1, keepdims=True)
 
     # Mask for valid projection
-    valid_mask = proj_norms.flatten() >= 1e-8
+    valid_mask = (z_norms.flatten() >= 1e-8) & (proj_norms.flatten() >= 1e-8)
 
     x_hat = np.zeros_like(sun_proj)
     np.divide(sun_proj, proj_norms, out=x_hat, where=valid_mask[:, None])
@@ -91,3 +95,12 @@ def build_scd_to_j2000(spin_vecs: np.ndarray, sun_vecs: np.ndarray) -> np.ndarra
         mats[~valid_mask] = np.nan
 
     return mats
+
+
+def build_scd_to_j2000(spin_vecs: np.ndarray, sun_vecs: np.ndarray) -> np.ndarray:
+    """Build SCD-to-J2000 matrices from two J2000 vectors.
+
+    This compatibility wrapper keeps the historical public API. New code should
+    use :func:`build_scd_to_reference` and make the shared input frame explicit.
+    """
+    return build_scd_to_reference(spin_vecs, sun_vecs)

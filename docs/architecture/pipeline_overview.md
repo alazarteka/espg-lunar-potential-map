@@ -7,7 +7,7 @@ High-level map of the ESPG lunar potential pipeline.
 ```
 ER flux (.TAB)
   -> load + validate (ERData)
-  -> coordinate transforms (SCD -> J2000 -> IAU_MOON)
+  -> coordinate transforms (SCD -> ECLIPJ2000 -> IAU_MOON)
   -> B-field line intersection (surface footpoint)
   -> spacecraft potential U_sc (day/night branches)
   -> surface potential U_surface (loss-cone fitting, per measurement)

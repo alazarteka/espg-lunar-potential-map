@@ -14,27 +14,22 @@ def test_get_lp_position_wrt_moon_batch_with_mock(monkeypatch):
     call_log = []
 
     def mock_spkpos(target, time, frame, abcorr, observer):
-        call_log.append(("spkpos", target, time, observer))
+        call_log.append((target, time, frame, abcorr, observer))
         # Return position that depends on time
         return np.array([time * 100, time * 10, time]), None
 
-    def mock_pxform(from_frame, to_frame, time):
-        call_log.append(("pxform", time))
-        # Return identity + time offset
-        mat = np.eye(3)
-        mat[0, 0] = 1.0 + time * 0.01
-        return mat
-
-    def mock_mxv(mat, vec):
-        return mat @ vec
-
     monkeypatch.setattr("spiceypy.spkpos", mock_spkpos)
-    monkeypatch.setattr("spiceypy.pxform", mock_pxform)
-    monkeypatch.setattr("spiceypy.mxv", mock_mxv)
 
     # Test batch function
     times = np.array([0.0, 1.0, 2.0, 5.0])
     batch_result = spice_ops.get_lp_position_wrt_moon_batch(times)
+    assert all(
+        target == spice_ops.LP
+        and frame == spice_ops.IAU_MOON
+        and abcorr == "NONE"
+        and observer == spice_ops.MOON
+        for target, _time, frame, abcorr, observer in call_log
+    )
 
     # Compare with individual scalar calls
     call_log.clear()
@@ -52,24 +47,24 @@ def test_get_lp_position_wrt_moon_batch_with_mock(monkeypatch):
 def test_get_lp_vector_to_sun_batch_with_mock(monkeypatch):
     """Test batch LP->Sun vector function matches scalar."""
 
+    call_log = []
+
     def mock_spkpos(target, time, frame, abcorr, observer):
+        call_log.append((target, frame, abcorr, observer))
         # Sun vector depends on time
         return np.array([time * 50, time * 5, -time]), None
 
-    def mock_pxform(from_frame, to_frame, time):
-        mat = np.eye(3)
-        mat[1, 1] = 1.0 + time * 0.02
-        return mat
-
-    def mock_mxv(mat, vec):
-        return mat @ vec
-
     monkeypatch.setattr("spiceypy.spkpos", mock_spkpos)
-    monkeypatch.setattr("spiceypy.pxform", mock_pxform)
-    monkeypatch.setattr("spiceypy.mxv", mock_mxv)
 
     times = np.array([0.5, 1.5, 3.0])
     batch_result = spice_ops.get_lp_vector_to_sun_in_lunar_frame_batch(times)
+    assert all(
+        target == spice_ops.SUN
+        and frame == spice_ops.IAU_MOON
+        and abcorr == "NONE"
+        and observer == spice_ops.LP
+        for target, frame, abcorr, observer in call_log
+    )
 
     scalar_results = []
     for t in times:
@@ -83,21 +78,23 @@ def test_get_lp_vector_to_sun_batch_with_mock(monkeypatch):
 def test_get_sun_vector_wrt_moon_batch_with_mock(monkeypatch):
     """Test batch Moon->Sun vector function matches scalar."""
 
+    call_log = []
+
     def mock_spkpos(target, time, frame, abcorr, observer):
+        call_log.append((target, frame, abcorr, observer))
         return np.array([time * 1000, time * 100, time * 10]), None
 
-    def mock_pxform(from_frame, to_frame, time):
-        return np.eye(3) * (1.0 + time * 0.001)
-
-    def mock_mxv(mat, vec):
-        return mat @ vec
-
     monkeypatch.setattr("spiceypy.spkpos", mock_spkpos)
-    monkeypatch.setattr("spiceypy.pxform", mock_pxform)
-    monkeypatch.setattr("spiceypy.mxv", mock_mxv)
 
     times = np.array([1.0, 2.0, 4.0, 8.0])
     batch_result = spice_ops.get_sun_vector_wrt_moon_batch(times)
+    assert all(
+        target == spice_ops.SUN
+        and frame == spice_ops.IAU_MOON
+        and abcorr == "NONE"
+        and observer == spice_ops.MOON
+        for target, frame, abcorr, observer in call_log
+    )
 
     scalar_results = []
     for t in times:
@@ -106,6 +103,27 @@ def test_get_sun_vector_wrt_moon_batch_with_mock(monkeypatch):
     scalar_results = np.array(scalar_results)
 
     np.testing.assert_allclose(batch_result, scalar_results, rtol=1e-10)
+
+
+def test_get_lp_vector_to_sun_in_eclipj2000_requests_attitude_frame(
+    monkeypatch,
+):
+    """The SCD-defining Sun vector must share the PDS attitude frame."""
+    calls = []
+
+    def mock_spkpos(target, time, frame, abcorr, observer):
+        calls.append((target, time, frame, abcorr, observer))
+        return np.array([1.0, 2.0, 3.0]), None
+
+    monkeypatch.setattr("spiceypy.spkpos", mock_spkpos)
+
+    result = spice_ops.get_lp_vector_to_sun_in_eclipj2000_batch(np.array([1.0, 2.0]))
+
+    np.testing.assert_allclose(result, [[1.0, 2.0, 3.0]] * 2)
+    assert calls == [
+        (spice_ops.SUN, 1.0, spice_ops.ECLIPJ2000, "NONE", spice_ops.LP),
+        (spice_ops.SUN, 2.0, spice_ops.ECLIPJ2000, "NONE", spice_ops.LP),
+    ]
 
 
 def test_get_j2000_iau_moon_transform_matrix_batch_with_mock(monkeypatch):
@@ -132,6 +150,26 @@ def test_get_j2000_iau_moon_transform_matrix_batch_with_mock(monkeypatch):
     assert batch_result.shape == (3, 3, 3)
 
 
+def test_get_eclipj2000_iau_moon_transform_requests_named_frames(monkeypatch):
+    calls = []
+
+    def mock_pxform(from_frame, to_frame, time):
+        calls.append((from_frame, to_frame, time))
+        return np.eye(3)
+
+    monkeypatch.setattr("spiceypy.pxform", mock_pxform)
+
+    result = spice_ops.get_eclipj2000_iau_moon_transform_matrix_batch(
+        np.array([1.0, 2.0])
+    )
+
+    np.testing.assert_allclose(result, np.tile(np.eye(3), (2, 1, 1)))
+    assert calls == [
+        (spice_ops.ECLIPJ2000, spice_ops.IAU_MOON, 1.0),
+        (spice_ops.ECLIPJ2000, spice_ops.IAU_MOON, 2.0),
+    ]
+
+
 def test_batch_functions_handle_errors(monkeypatch):
     """Test that batch functions return NaN for failed calls."""
 
@@ -140,15 +178,7 @@ def test_batch_functions_handle_errors(monkeypatch):
             raise RuntimeError("SPICE error")
         return np.array([time, time, time]), None
 
-    def mock_pxform(from_frame, to_frame, time):
-        return np.eye(3)
-
-    def mock_mxv(mat, vec):
-        return mat @ vec
-
     monkeypatch.setattr("spiceypy.spkpos", mock_spkpos_with_errors)
-    monkeypatch.setattr("spiceypy.pxform", mock_pxform)
-    monkeypatch.setattr("spiceypy.mxv", mock_mxv)
 
     times = np.array([1.0, 2.0, 3.0])
     result = spice_ops.get_lp_position_wrt_moon_batch(times)
@@ -195,17 +225,35 @@ def test_batch_spice_ops_with_real_kernels():
     # Test all batch functions against scalar
     batch_pos = spice_ops.get_lp_position_wrt_moon_batch(times)
     batch_lp_sun = spice_ops.get_lp_vector_to_sun_in_lunar_frame_batch(times)
+    batch_lp_sun_eclip = spice_ops.get_lp_vector_to_sun_in_eclipj2000_batch(times)
     batch_moon_sun = spice_ops.get_sun_vector_wrt_moon_batch(times)
     batch_mats = spice_ops.get_j2000_iau_moon_transform_matrix_batch(times)
+    batch_eclip_mats = spice_ops.get_eclipj2000_iau_moon_transform_matrix_batch(times)
 
     for i, t in enumerate(times):
         scalar_pos = spice_ops.get_lp_position_wrt_moon(t)
         scalar_lp_sun = spice_ops.get_lp_vector_to_sun_in_lunar_frame(t)
         scalar_moon_sun = spice_ops.get_sun_vector_wrt_moon(t)
         scalar_mat = spice_ops.get_j2000_iau_moon_transform_matrix(t)
+        lp_j2000, _ = spice_ops.spice.spkpos(
+            spice_ops.LP, t, spice_ops.J2000, "NONE", spice_ops.MOON
+        )
+        lp_expected = spice_ops.spice.pxform(
+            spice_ops.J2000, spice_ops.IAU_MOON, t
+        ) @ np.asarray(lp_j2000)
+        lp_sun_eclip, _ = spice_ops.spice.spkpos(
+            spice_ops.SUN, t, spice_ops.ECLIPJ2000, "NONE", spice_ops.LP
+        )
 
         # All should match
         np.testing.assert_allclose(batch_pos[i], scalar_pos, rtol=1e-10)
+        np.testing.assert_allclose(batch_pos[i], lp_expected, rtol=1e-10)
         np.testing.assert_allclose(batch_lp_sun[i], scalar_lp_sun, rtol=1e-10)
+        np.testing.assert_allclose(batch_lp_sun_eclip[i], lp_sun_eclip, rtol=1e-10)
         np.testing.assert_allclose(batch_moon_sun[i], scalar_moon_sun, rtol=1e-10)
         np.testing.assert_allclose(batch_mats[i], scalar_mat, rtol=1e-10)
+        np.testing.assert_allclose(
+            batch_eclip_mats[i],
+            spice_ops.spice.pxform(spice_ops.ECLIPJ2000, spice_ops.IAU_MOON, t),
+            rtol=1e-10,
+        )
