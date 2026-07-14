@@ -1,5 +1,4 @@
-"""SPICE lookups of LP/Moon/Sun geometry: positions, Sun vectors, and
-J2000-to-IAU_MOON transforms, in scalar and NaN-tolerant batch forms."""
+"""SPICE lookups of LP/Moon/Sun geometry in explicitly named frames."""
 
 import logging
 from collections.abc import Callable
@@ -11,6 +10,9 @@ import spiceypy as spice
 LP = "-25"
 MOON = "301"
 SUN = "10"
+ECLIPJ2000 = "ECLIPJ2000"
+IAU_MOON = "IAU_MOON"
+J2000 = "J2000"
 
 
 def get_lp_position_wrt_moon(time: float) -> np.ndarray | None:
@@ -103,21 +105,48 @@ def _batch_spice_vector(
     return values
 
 
+def _get_position_batch(
+    times: np.ndarray,
+    *,
+    target: str,
+    observer: str,
+    reference_frame: str,
+) -> np.ndarray:
+    """Return the target position relative to the observer in the named frame."""
+
+    def compute(t: float) -> np.ndarray | None:
+        try:
+            position, _ = spice.spkpos(target, t, reference_frame, "NONE", observer)
+            return position
+        except Exception:
+            return None
+
+    return _batch_spice_vector(times, compute)
+
+
+def _get_frame_transform_batch(
+    times: np.ndarray, *, from_frame: str, to_frame: str
+) -> np.ndarray:
+    """Return position transforms between two SPICE frames."""
+
+    def compute(t: float) -> np.ndarray | None:
+        try:
+            return spice.pxform(from_frame, to_frame, t)
+        except Exception:
+            return None
+
+    return _batch_spice_vector(times, compute, output_shape=(3, 3))
+
+
 def get_lp_position_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
     """
     Batch version of get_lp_position_wrt_moon.
     Returns (N, 3) array. Rows with errors are NaN.
     """
 
-    def compute(t: float) -> np.ndarray | None:
-        try:
-            pos, _ = spice.spkpos(LP, t, "J2000", "NONE", MOON)
-            mat = spice.pxform("J2000", "IAU_MOON", t)
-            return spice.mxv(mat, pos)
-        except Exception:
-            return None
-
-    return _batch_spice_vector(times, compute)
+    return _get_position_batch(
+        times, target=LP, observer=MOON, reference_frame=IAU_MOON
+    )
 
 
 def get_lp_vector_to_sun_in_lunar_frame_batch(times: np.ndarray) -> np.ndarray:
@@ -126,15 +155,14 @@ def get_lp_vector_to_sun_in_lunar_frame_batch(times: np.ndarray) -> np.ndarray:
     Returns (N, 3) array. Rows with errors are NaN.
     """
 
-    def compute(t: float) -> np.ndarray | None:
-        try:
-            pos, _ = spice.spkpos(SUN, t, "J2000", "NONE", LP)
-            mat = spice.pxform("J2000", "IAU_MOON", t)
-            return spice.mxv(mat, pos)
-        except Exception:
-            return None
+    return _get_position_batch(times, target=SUN, observer=LP, reference_frame=IAU_MOON)
 
-    return _batch_spice_vector(times, compute)
+
+def get_lp_vector_to_sun_in_eclipj2000_batch(times: np.ndarray) -> np.ndarray:
+    """Return LP-to-Sun vectors in the attitude product's ECLIPJ2000 frame."""
+    return _get_position_batch(
+        times, target=SUN, observer=LP, reference_frame=ECLIPJ2000
+    )
 
 
 def get_sun_vector_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
@@ -143,15 +171,9 @@ def get_sun_vector_wrt_moon_batch(times: np.ndarray) -> np.ndarray:
     Returns (N, 3) array. Rows with errors are NaN.
     """
 
-    def compute(t: float) -> np.ndarray | None:
-        try:
-            pos, _ = spice.spkpos(SUN, t, "J2000", "NONE", MOON)
-            mat = spice.pxform("J2000", "IAU_MOON", t)
-            return spice.mxv(mat, pos)
-        except Exception:
-            return None
-
-    return _batch_spice_vector(times, compute)
+    return _get_position_batch(
+        times, target=SUN, observer=MOON, reference_frame=IAU_MOON
+    )
 
 
 def get_j2000_iau_moon_transform_matrix_batch(times: np.ndarray) -> np.ndarray:
@@ -160,10 +182,11 @@ def get_j2000_iau_moon_transform_matrix_batch(times: np.ndarray) -> np.ndarray:
     Returns (N, 3, 3) array. Rows with errors are NaN.
     """
 
-    def compute(t: float) -> np.ndarray | None:
-        try:
-            return spice.pxform("J2000", "IAU_MOON", t)
-        except Exception:
-            return None
+    return _get_frame_transform_batch(times, from_frame=J2000, to_frame=IAU_MOON)
 
-    return _batch_spice_vector(times, compute, output_shape=(3, 3))
+
+def get_eclipj2000_iau_moon_transform_matrix_batch(
+    times: np.ndarray,
+) -> np.ndarray:
+    """Return ECLIPJ2000-to-IAU_MOON position transforms."""
+    return _get_frame_transform_batch(times, from_frame=ECLIPJ2000, to_frame=IAU_MOON)

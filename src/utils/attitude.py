@@ -1,5 +1,4 @@
-"""Load LP attitude tables (UTC, RPM, RA, DEC) and look up spin-axis
-right ascension/declination at query ephemeris times."""
+"""Load and interpolate LP spin-axis attitude in the ECLIPJ2000 frame."""
 
 import logging
 from bisect import bisect_right
@@ -20,8 +19,9 @@ def load_attitude_data(
         path: Path to the attitude data file
 
     Returns:
-        Tuple of (et_spin, ra_vals, dec_vals) arrays, or (None, None, None) on
-        error. Callers must check for the None case (they already do).
+        Tuple of ephemeris time, ECLIPJ2000 right ascension, and ECLIPJ2000
+        declination arrays, or (None, None, None) on error. Callers must check
+        for the None case (they already do).
     """
     try:
         attitude_data = pd.read_csv(
@@ -50,8 +50,8 @@ def get_current_ra_dec(
     Args:
         time: Ephemeris time to query
         et_spin: Array of ephemeris times for attitude data
-        ra_vals: Array of right ascension values
-        dec_vals: Array of declination values
+        ra_vals: Array of ECLIPJ2000 right ascension values
+        dec_vals: Array of ECLIPJ2000 declination values
 
     Returns:
         Tuple of (ra, dec) values, or (None, None) if error
@@ -74,8 +74,8 @@ def get_current_ra_dec_batch(
     Args:
         times: Array of ephemeris times to query
         et_spin: Array of ephemeris times for attitude data (must be sorted)
-        ra_vals: Array of right ascension values
-        dec_vals: Array of declination values
+        ra_vals: Array of ECLIPJ2000 right ascension values
+        dec_vals: Array of ECLIPJ2000 declination values
 
     Returns:
         Tuple of (ra, dec) arrays. Values are NaN where indices are out of bounds.

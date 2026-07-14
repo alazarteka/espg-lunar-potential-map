@@ -15,6 +15,7 @@ For backward compatibility, commonly used functions are imported at package leve
 from .attitude import get_current_ra_dec, load_attitude_data
 from .coordinates import (
     build_scd_to_j2000,
+    build_scd_to_reference,
     cartesian_to_lat_lon,
     ra_dec_to_unit,
 )
@@ -41,6 +42,7 @@ from .thetas import clear_theta_cache, get_thetas
 # Re-export for backward compatibility
 __all__ = [
     "build_scd_to_j2000",
+    "build_scd_to_reference",
     "cartesian_to_lat_lon",
     # Theta cache
     "clear_theta_cache",
