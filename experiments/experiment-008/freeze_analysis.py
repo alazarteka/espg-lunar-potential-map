@@ -11,13 +11,19 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from replay_context import (
+    ARTIFACT_DIR,
+    CENSUS_PATH,
+    OUTPUT_DIR,
+    PROJECT_ROOT,
+    RUN_ID,
+)
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EXPERIMENT_DIR = Path(__file__).resolve().parent
-ARTIFACT_DIR = PROJECT_ROOT / "artifacts" / "experiment-008"
-OUTPUT_PATH = EXPERIMENT_DIR / "analysis-freeze.json"
+OUTPUT_PATH = OUTPUT_DIR / "analysis-freeze.json"
 CELL_PATH = ARTIFACT_DIR / "injection-cells.csv"
 CONFIGURATION_PATH = EXPERIMENT_DIR / "configuration.json"
 
@@ -127,31 +133,45 @@ def git_head() -> str:
 def main() -> int:
     """Write the final pre-outcome analysis freeze."""
     cell_count = write_cells()
-    relative_paths = (
-        "experiments/experiment-008/protocol.md",
-        "experiments/experiment-008/configuration.json",
-        "experiments/experiment-008/protocol-amendment-01.md",
-        "experiments/experiment-008/configuration-amendment-01.json",
-        "experiments/experiment-008/protocol-amendment-02.md",
-        "experiments/experiment-008/configuration-amendment-02.json",
-        "experiments/experiment-008/protocol-amendment-03.md",
-        "experiments/experiment-008/configuration-amendment-03.json",
-        "experiments/experiment-008/input-manifest.csv",
-        "experiments/experiment-008/geometry-census.csv",
-        "experiments/experiment-008/geometry.py",
-        "experiments/experiment-008/observation_operator.py",
-        "experiments/experiment-008/run_analysis.py",
-        "experiments/experiment-008/test_geometry.py",
-        "experiments/experiment-008/test_operator.py",
-        "experiments/experiment-008/test_run_analysis.py",
-        "artifacts/experiment-008/geometry.npz",
-        "artifacts/experiment-008/canonical-sweep-basis-l10.npy",
-        "artifacts/experiment-008/canonical-sweep-basis-l10.json",
-        "artifacts/experiment-008/injection-cells.csv",
-    )
+    paths = [
+        EXPERIMENT_DIR / "protocol.md",
+        EXPERIMENT_DIR / "configuration.json",
+        EXPERIMENT_DIR / "protocol-amendment-01.md",
+        EXPERIMENT_DIR / "configuration-amendment-01.json",
+        EXPERIMENT_DIR / "protocol-amendment-02.md",
+        EXPERIMENT_DIR / "configuration-amendment-02.json",
+        EXPERIMENT_DIR / "protocol-amendment-03.md",
+        EXPERIMENT_DIR / "configuration-amendment-03.json",
+        EXPERIMENT_DIR / "input-manifest.csv",
+        CENSUS_PATH,
+        EXPERIMENT_DIR / "geometry.py",
+        EXPERIMENT_DIR / "replay_context.py",
+        EXPERIMENT_DIR / "observation_operator.py",
+        EXPERIMENT_DIR / "run_analysis.py",
+        EXPERIMENT_DIR / "extended_analysis.py",
+        EXPERIMENT_DIR / "validate_geometry.py",
+        EXPERIMENT_DIR / "test_geometry.py",
+        EXPERIMENT_DIR / "test_operator.py",
+        EXPERIMENT_DIR / "test_run_analysis.py",
+        EXPERIMENT_DIR / "test_extended_analysis.py",
+        ARTIFACT_DIR / "geometry.npz",
+        ARTIFACT_DIR / "canonical-sweep-basis-l10.npy",
+        ARTIFACT_DIR / "canonical-sweep-basis-l10.json",
+        CELL_PATH,
+    ]
+    if RUN_ID:
+        paths.extend(
+            (
+                OUTPUT_DIR / "README.md",
+                OUTPUT_DIR / "replay-freeze.json",
+                OUTPUT_DIR / "input-manifest-current.csv",
+                OUTPUT_DIR / "one-day-census.csv",
+                OUTPUT_DIR / "implementation-check-one-day.json",
+            )
+        )
     records = []
-    for relative in relative_paths:
-        path = PROJECT_ROOT / relative
+    for path in paths:
+        relative = path.relative_to(PROJECT_ROOT).as_posix()
         records.append(
             {
                 "path": relative,

@@ -1,0 +1,50 @@
+{
+  "status": "implementation_check_not_identifiability_outcome",
+  "source_raw_file": "data/1998/001_031JAN/3D980116.TAB",
+  "sweeps": 1032,
+  "production_corrected_parity": {
+    "reference_valid_rows": 10056,
+    "candidate_valid_rows": 10056,
+    "valid_mask_mismatch_rows": 0,
+    "polarity_mismatch_rows": 0,
+    "max_abs_latitude_difference_deg": 1.0516032489249483e-12,
+    "max_abs_longitude_difference_deg": 4.263256414560601e-13,
+    "pass": true
+  },
+  "canonical_vs_equatorial_interpretation": {
+    "common_rows": 8638,
+    "median_angular_shift_deg": 2.2108061006012916,
+    "p95_angular_shift_deg": 6.423973804834448,
+    "max_angular_shift_deg": 14.265600259850707,
+    "median_surface_shift_km": 67.03904810838043,
+    "p95_surface_shift_km": 194.79640879955184,
+    "max_surface_shift_km": 432.5807956902909
+  },
+  "canonical_vs_frame_mixed": {
+    "common_rows": 7890,
+    "median_angular_shift_deg": 2.7347439001548794,
+    "p95_angular_shift_deg": 8.229665249466862,
+    "max_angular_shift_deg": 15.326107753147395,
+    "median_surface_shift_km": 82.92659760470167,
+    "p95_surface_shift_km": 249.5510232330292,
+    "max_surface_shift_km": 464.73893603696274
+  },
+  "canonical_vs_legacy_attitude": {
+    "common_rows": 10038,
+    "median_angular_shift_deg": 0.031494697656069784,
+    "p95_angular_shift_deg": 0.25048341108536737,
+    "max_angular_shift_deg": 2.5527101072441774,
+    "median_surface_shift_km": 0.9550247535276434,
+    "p95_surface_shift_km": 7.595496249777884,
+    "max_surface_shift_km": 77.4067231132334
+  },
+  "canonical_vs_submitted_legacy": {
+    "common_rows": 7873,
+    "median_angular_shift_deg": 2.7496266655996315,
+    "p95_angular_shift_deg": 8.248960256365569,
+    "max_angular_shift_deg": 15.285437994492973,
+    "median_surface_shift_km": 83.37789291656331,
+    "p95_surface_shift_km": 250.1361124886551,
+    "max_surface_shift_km": 463.5056926936191
+  }
+}
