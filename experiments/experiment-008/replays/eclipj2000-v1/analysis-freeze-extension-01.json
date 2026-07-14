@@ -1,0 +1,41 @@
+{
+  "analysis_git_head": "030fc9d",
+  "phase_one_results_open": true,
+  "records": [
+    {
+      "path": "experiments/experiment-008/extended_analysis.py",
+      "sha256": "e5720fa1365602848ee782a11b589edab289a860699e61751b81f112e8c1a38f"
+    },
+    {
+      "path": "experiments/experiment-008/test_extended_analysis.py",
+      "sha256": "0cf118221716f3efb18352bbc07ed9fee95df7cf1270a41496b772ed7090eaaa"
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/analysis-freeze.json",
+      "sha256": "69ea55179b9c8e7e91beaf1e37693a80eea91bad607813d9802acc88bad70972"
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/results/primary-summary.json",
+      "sha256": "13f6d887d784a4652791275a68a12111c0c71f5b66c4cc4be815cb52dc264f3d"
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/results/window-grid-summary.csv",
+      "sha256": "af7d99161d8047e5a406811631b8e5776a24198f46471a9f7e47e21d037f7ab8"
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/results/static-controls.csv",
+      "sha256": "6732365fc656c980cf76390741d1ebce3a37b85acc021a2abf09a5133da6cb46"
+    },
+    {
+      "path": "artifacts/experiment-008/eclipj2000-v1/canonical-sweep-temporal-synodic-l10.json",
+      "sha256": "7e1e6186c5f18bd4c4c3c0355b23edb9a8d846e347cff13acdb120674807f26b"
+    },
+    {
+      "path": "artifacts/experiment-008/eclipj2000-v1/canonical-sweep-temporal-synodic-l10.npy",
+      "sha256": "e5f7a7345db7e4f53565e5d1037c20e52eaf96f18f32b811c3ccae3b32cf3fdb",
+      "size_bytes": 1130576696
+    }
+  ],
+  "schema_version": 1,
+  "status": "secondary_code_and_cache_frozen_before_temporal_sensitivity_injection_and_blocked_outcomes"
+}
