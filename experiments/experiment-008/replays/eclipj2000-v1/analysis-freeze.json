@@ -1,0 +1,153 @@
+{
+  "analysis_git_head": "de25c84f08e606f5e85e6580ef3a0bd9640756e5",
+  "injection_cell_count": 81085,
+  "records": [
+    {
+      "path": "experiments/experiment-008/protocol.md",
+      "sha256": "e3425b01fa917b57d9a5d12da5fbd58fd36d91602cd0c3b554f13c23f2c48c9c",
+      "size_bytes": 8607
+    },
+    {
+      "path": "experiments/experiment-008/configuration.json",
+      "sha256": "cd2b6e383a3e44a6dbd385e42815d84b864ec48f021502506caf1e00affa0b0c",
+      "size_bytes": 2532
+    },
+    {
+      "path": "experiments/experiment-008/protocol-amendment-01.md",
+      "sha256": "8ec5de8f3262ab8ecff2261daa797bd46506699d28c206f3ffcaf5b4954fe9ae",
+      "size_bytes": 2192
+    },
+    {
+      "path": "experiments/experiment-008/configuration-amendment-01.json",
+      "sha256": "2e3980baf1fc49364abc62666ce7f8b6cfe09a5db660f7ee971ca727273c1dfc",
+      "size_bytes": 832
+    },
+    {
+      "path": "experiments/experiment-008/protocol-amendment-02.md",
+      "sha256": "365251c0f8782cd2057e375e90bfc8b4a1c92e90f23ff65fc4235b16a41ea4a9",
+      "size_bytes": 4170
+    },
+    {
+      "path": "experiments/experiment-008/configuration-amendment-02.json",
+      "sha256": "e899010df5cd68ca074ff1836719f40b07e9124288ff977ec9ea83e695535a88",
+      "size_bytes": 1602
+    },
+    {
+      "path": "experiments/experiment-008/protocol-amendment-03.md",
+      "sha256": "3f10fdcf515e7fbdc3f3dcb355815bbd5e0fc18ee517a435608fe31a70a4e2c9",
+      "size_bytes": 8371
+    },
+    {
+      "path": "experiments/experiment-008/configuration-amendment-03.json",
+      "sha256": "42c45fcef5f117f3d8e33b4c52167ce2149b05d17abe6d54a4b6f5f10a5ce00f",
+      "size_bytes": 2431
+    },
+    {
+      "path": "experiments/experiment-008/input-manifest.csv",
+      "sha256": "6127ce9e1aa020e1b57ba3e03cd0fd295a775cbf70942b36d6b7cc711c220158",
+      "size_bytes": 78971
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/geometry-census.csv",
+      "sha256": "0aa06c3724e13ecb884b6e2ebf3acb90aa700ba0287f9d4169b5d9b36cd7319f",
+      "size_bytes": 108156
+    },
+    {
+      "path": "experiments/experiment-008/geometry.py",
+      "sha256": "b77363446e9fdcbba00a3f0faca2c656306c83ea0dfddd4c14b6d81aa98952c4",
+      "size_bytes": 24217
+    },
+    {
+      "path": "experiments/experiment-008/replay_context.py",
+      "sha256": "fe3ea461cb15dd03a6c5dab7d6485d0e6478eb65a65ba157b38e332817eaac98",
+      "size_bytes": 850
+    },
+    {
+      "path": "experiments/experiment-008/observation_operator.py",
+      "sha256": "7accfbfb88b6cbfd9f22b049cc7882ed1c049c0098caca4246626ebdee174e5c",
+      "size_bytes": 21299
+    },
+    {
+      "path": "experiments/experiment-008/run_analysis.py",
+      "sha256": "a43a46b6de7387b718cf810307587a56c2fb26627b2fa0158f9e31dc22efe5cf",
+      "size_bytes": 23070
+    },
+    {
+      "path": "experiments/experiment-008/extended_analysis.py",
+      "sha256": "e5720fa1365602848ee782a11b589edab289a860699e61751b81f112e8c1a38f",
+      "size_bytes": 46828
+    },
+    {
+      "path": "experiments/experiment-008/validate_geometry.py",
+      "sha256": "eaab4cc710add2ea26b1c13465bb1dc553eb85b0a4c05e1a2e904a5f98779081",
+      "size_bytes": 8600
+    },
+    {
+      "path": "experiments/experiment-008/test_geometry.py",
+      "sha256": "c38899da6e207894cbfcd8f8630178ef13b1234f01ca21a0096f540f876e9e48",
+      "size_bytes": 5003
+    },
+    {
+      "path": "experiments/experiment-008/test_operator.py",
+      "sha256": "b10a18c17cbfdb9ec2bcd00c19641d5ac7f5514d385ca89a2b5589c8e9540cd0",
+      "size_bytes": 7293
+    },
+    {
+      "path": "experiments/experiment-008/test_run_analysis.py",
+      "sha256": "fd07e7a6d363a3198e8e6fddc6a423c78ae3192a64b2ba653a7782571fbb1fbf",
+      "size_bytes": 2391
+    },
+    {
+      "path": "experiments/experiment-008/test_extended_analysis.py",
+      "sha256": "0cf118221716f3efb18352bbc07ed9fee95df7cf1270a41496b772ed7090eaaa",
+      "size_bytes": 3576
+    },
+    {
+      "path": "artifacts/experiment-008/eclipj2000-v1/geometry.npz",
+      "sha256": "cb47bc11c3bae8fd89eacf1d946db06310f18692c0ff2b5863fcb4dc14eefa62",
+      "size_bytes": 480991357
+    },
+    {
+      "path": "artifacts/experiment-008/eclipj2000-v1/canonical-sweep-basis-l10.npy",
+      "sha256": "19100c26e64890e9020044bee46ab7e572a6d31af53dcd9c3b606b83c066953e",
+      "size_bytes": 376858984
+    },
+    {
+      "path": "artifacts/experiment-008/eclipj2000-v1/canonical-sweep-basis-l10.json",
+      "sha256": "f6218b6eb0ba3f02b3f57f34d2dced75410e634b3cc713ac4da58289171ae8a9",
+      "size_bytes": 474
+    },
+    {
+      "path": "artifacts/experiment-008/eclipj2000-v1/injection-cells.csv",
+      "sha256": "11706153358ea397cf9de5f4cf230dec6f32384436e04bd9af7a1ef48c4889a8",
+      "size_bytes": 5275270
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/README.md",
+      "sha256": "e27d9ffb5a441bc00ad69f56c760653187039879d2f9caa9791c48bd3fbf7442",
+      "size_bytes": 2135
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/replay-freeze.json",
+      "sha256": "54ddbb7465ef3d45a10cc45eb7d017fe057448b2e33de5cd3682fa2b56bf96cc",
+      "size_bytes": 797
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/input-manifest-current.csv",
+      "sha256": "6127ce9e1aa020e1b57ba3e03cd0fd295a775cbf70942b36d6b7cc711c220158",
+      "size_bytes": 78971
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/one-day-census.csv",
+      "sha256": "c2c5c139cec1611333df3affdac383b6c86b7387015d80214a8b159b42131265",
+      "size_bytes": 649
+    },
+    {
+      "path": "experiments/experiment-008/replays/eclipj2000-v1/implementation-check-one-day.json",
+      "sha256": "cfb93759ec1b4bf77bf816881a814d85b1c415530545db2290e8c508ae0d8683",
+      "size_bytes": 1910
+    }
+  ],
+  "schema_version": 1,
+  "status": "frozen_before_scientific_operator_outcomes"
+}
