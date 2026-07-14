@@ -22,14 +22,13 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import observation_operator as operator
+from replay_context import ARTIFACT_DIR, RESULTS_DIR
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EXPERIMENT_DIR = Path(__file__).resolve().parent
-ARTIFACT_DIR = PROJECT_ROOT / "artifacts" / "experiment-008"
-RESULTS_DIR = EXPERIMENT_DIR / "results"
 GEOMETRY_PATH = ARTIFACT_DIR / "geometry.npz"
 BASIS_PATH = ARTIFACT_DIR / "canonical-sweep-basis-l10.npy"
 BASIS_METADATA_PATH = ARTIFACT_DIR / "canonical-sweep-basis-l10.json"

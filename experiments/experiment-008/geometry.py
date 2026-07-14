@@ -29,11 +29,12 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pandas as pd
 import spiceypy as spice
+from replay_context import ARTIFACT_DIR, CENSUS_PATH
 
 from src import config
 from src.potential_mapper.spice import load_spice_files
 from src.utils.attitude import get_current_ra_dec_batch, load_attitude_data
-from src.utils.coordinates import build_scd_to_j2000, ra_dec_to_unit
+from src.utils.coordinates import build_scd_to_reference, ra_dec_to_unit
 from src.utils.geometry import get_connections_and_polarity_batch
 
 if TYPE_CHECKING:
@@ -43,7 +44,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EXPERIMENT_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIGURATION = EXPERIMENT_DIR / "configuration.json"
 DEFAULT_MANIFEST = EXPERIMENT_DIR / "input-manifest.csv"
-DEFAULT_ARTIFACT_DIR = PROJECT_ROOT / "artifacts" / "experiment-008"
+DEFAULT_ARTIFACT_DIR = ARTIFACT_DIR
 RAW_COLUMNS = ("utc", "time", "energy", "spec_no", "mag_x", "mag_y", "mag_z")
 NAT_INT64 = np.datetime64("NaT", "ns").astype(np.int64)
 
@@ -67,6 +68,8 @@ class FileCensus:
     corrected_complete_sweeps: int
     legacy_connected_sweeps: int
     legacy_complete_sweeps: int
+    equatorial_connected_sweeps: int
+    equatorial_complete_sweeps: int
     frame_mixed_connected_sweeps: int
     frame_mixed_complete_sweeps: int
     submitted_legacy_connected_sweeps: int
@@ -207,9 +210,10 @@ def _project_rows(
     magnetic_field: np.ndarray,
     *,
     legacy_attitude: bool,
+    attitude_frame: str,
     frame_mixed_sun: bool,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Project valid raw rows to lunar surface latitude/longitude."""
+    """Project rows, explicitly naming the frame of the attitude components."""
     if _ATTITUDE_ET is None or _ATTITUDE_RA is None or _ATTITUDE_DEC is None:
         raise RuntimeError("Geometry worker was not initialized")
     if legacy_attitude:
@@ -220,29 +224,29 @@ def _project_rows(
         )
 
     lp_positions = robust_spkpos("-25", et, "IAU_MOON", "301")
-    sun_j2000 = robust_spkpos("10", et, "J2000", "-25")
-    sun_norms = np.linalg.norm(sun_j2000, axis=1)
+    sun_reference = robust_spkpos("10", et, attitude_frame, "-25")
+    sun_norms = np.linalg.norm(sun_reference, axis=1)
     sun_unit = np.divide(
-        sun_j2000,
+        sun_reference,
         sun_norms[:, None],
-        out=np.full_like(sun_j2000, np.nan),
+        out=np.full_like(sun_reference, np.nan),
         where=sun_norms[:, None] > 0.0,
     )
     spin_unit = ra_dec_to_unit(ra, dec)
-    j2000_to_moon = np.stack(
-        [spice.pxform("J2000", "IAU_MOON", float(value)) for value in et]
+    reference_to_moon = np.stack(
+        [spice.pxform(attitude_frame, "IAU_MOON", float(value)) for value in et]
     )
     sun_for_builder = sun_unit
     if frame_mixed_sun:
-        # Reproduce the submitted/current production frame mismatch: the Sun
-        # vector is rotated to IAU_MOON while the spin vector remains J2000.
-        sun_for_builder = np.einsum("nij,nj->ni", j2000_to_moon, sun_unit)
-    scd_to_j2000 = build_scd_to_j2000(spin_unit, sun_for_builder)
+        # Reproduce the submitted production mismatch: the Sun vector is in
+        # IAU_MOON while attitude components are interpreted as J2000.
+        sun_for_builder = np.einsum("nij,nj->ni", reference_to_moon, sun_unit)
+    scd_to_reference = build_scd_to_reference(spin_unit, sun_for_builder)
     mag_norms = np.linalg.norm(magnetic_field, axis=1)
     mag_unit = magnetic_field / mag_norms[:, None]
-    mag_j2000 = np.einsum("nij,nj->ni", scd_to_j2000, mag_unit)
+    mag_reference = np.einsum("nij,nj->ni", scd_to_reference, mag_unit)
 
-    mag_moon = np.einsum("nij,nj->ni", j2000_to_moon, mag_j2000)
+    mag_moon = np.einsum("nij,nj->ni", reference_to_moon, mag_reference)
     points, connected, polarity = get_connections_and_polarity_batch(
         np.asarray(lp_positions), mag_moon, config.LUNAR_RADIUS
     )
@@ -260,6 +264,9 @@ def _empty_shard_arrays(sweep_count: int, rows_per_sweep: int) -> dict[str, np.n
         "legacy_latitude": np.full(shape, np.nan, dtype=np.float64),
         "legacy_longitude": np.full(shape, np.nan, dtype=np.float64),
         "legacy_polarity": np.zeros(shape, dtype=np.int8),
+        "equatorial_latitude": np.full(shape, np.nan, dtype=np.float64),
+        "equatorial_longitude": np.full(shape, np.nan, dtype=np.float64),
+        "equatorial_polarity": np.zeros(shape, dtype=np.int8),
         "frame_mixed_latitude": np.full(shape, np.nan, dtype=np.float64),
         "frame_mixed_longitude": np.full(shape, np.nan, dtype=np.float64),
         "frame_mixed_polarity": np.zeros(shape, dtype=np.int8),
@@ -325,24 +332,35 @@ def extract_file(
                 et,
                 mag[source],
                 legacy_attitude=False,
+                attitude_frame="ECLIPJ2000",
                 frame_mixed_sun=False,
             )
             legacy = _project_rows(
                 et,
                 mag[source],
                 legacy_attitude=True,
+                attitude_frame="ECLIPJ2000",
+                frame_mixed_sun=False,
+            )
+            equatorial = _project_rows(
+                et,
+                mag[source],
+                legacy_attitude=False,
+                attitude_frame="J2000",
                 frame_mixed_sun=False,
             )
             frame_mixed = _project_rows(
                 et,
                 mag[source],
                 legacy_attitude=False,
+                attitude_frame="J2000",
                 frame_mixed_sun=True,
             )
             submitted_legacy = _project_rows(
                 et,
                 mag[source],
                 legacy_attitude=True,
+                attitude_frame="J2000",
                 frame_mixed_sun=True,
             )
             for key, values in zip(
@@ -358,6 +376,16 @@ def extract_file(
             for key, values in zip(
                 ("legacy_latitude", "legacy_longitude", "legacy_polarity"),
                 legacy,
+                strict=True,
+            ):
+                arrays[key].reshape(-1)[destination] = values
+            for key, values in zip(
+                (
+                    "equatorial_latitude",
+                    "equatorial_longitude",
+                    "equatorial_polarity",
+                ),
+                equatorial,
                 strict=True,
             ):
                 arrays[key].reshape(-1)[destination] = values
@@ -384,6 +412,7 @@ def extract_file(
 
         corrected_count = np.sum(np.isfinite(arrays["corrected_latitude"]), axis=1)
         legacy_count = np.sum(np.isfinite(arrays["legacy_latitude"]), axis=1)
+        equatorial_count = np.sum(np.isfinite(arrays["equatorial_latitude"]), axis=1)
         frame_mixed_count = np.sum(np.isfinite(arrays["frame_mixed_latitude"]), axis=1)
         submitted_legacy_count = np.sum(
             np.isfinite(arrays["submitted_legacy_latitude"]), axis=1
@@ -409,6 +438,8 @@ def extract_file(
             corrected_complete_sweeps=int(np.sum(corrected_count == rows_per_sweep)),
             legacy_connected_sweeps=int(np.sum(legacy_count >= 1)),
             legacy_complete_sweeps=int(np.sum(legacy_count == rows_per_sweep)),
+            equatorial_connected_sweeps=int(np.sum(equatorial_count >= 1)),
+            equatorial_complete_sweeps=int(np.sum(equatorial_count == rows_per_sweep)),
             frame_mixed_connected_sweeps=int(np.sum(frame_mixed_count >= 1)),
             frame_mixed_complete_sweeps=int(
                 np.sum(frame_mixed_count == rows_per_sweep)
@@ -433,6 +464,8 @@ def extract_file(
             corrected_complete_sweeps=0,
             legacy_connected_sweeps=0,
             legacy_complete_sweeps=0,
+            equatorial_connected_sweeps=0,
+            equatorial_complete_sweeps=0,
             frame_mixed_connected_sweeps=0,
             frame_mixed_complete_sweeps=0,
             submitted_legacy_connected_sweeps=0,
@@ -520,6 +553,9 @@ def run_merge(args: argparse.Namespace) -> int:
         "legacy_latitude": [],
         "legacy_longitude": [],
         "legacy_polarity": [],
+        "equatorial_latitude": [],
+        "equatorial_longitude": [],
+        "equatorial_polarity": [],
         "frame_mixed_latitude": [],
         "frame_mixed_longitude": [],
         "frame_mixed_polarity": [],
@@ -561,9 +597,7 @@ def parse_args() -> argparse.Namespace:
     extract.add_argument(
         "--shard-dir", type=Path, default=DEFAULT_ARTIFACT_DIR / "geometry-shards"
     )
-    extract.add_argument(
-        "--census", type=Path, default=EXPERIMENT_DIR / "geometry-census.csv"
-    )
+    extract.add_argument("--census", type=Path, default=CENSUS_PATH)
     extract.add_argument("--workers", type=int, default=4)
     extract.add_argument("--start-index", type=int, default=0)
     extract.add_argument("--limit", type=int)

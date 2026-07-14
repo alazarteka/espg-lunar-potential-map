@@ -86,3 +86,54 @@ def test_robust_spkpos_isolates_uncovered_epoch(monkeypatch) -> None:
     )
     np.testing.assert_allclose(actual[[0, 2]], [[1.0, 2.0, 3.0], [3.0, 4.0, 5.0]])
     assert np.isnan(actual[1]).all()
+
+
+def test_corrected_projection_uses_eclipj2000_for_both_defining_vectors(
+    monkeypatch,
+) -> None:
+    frames: list[tuple[str, str]] = []
+    monkeypatch.setattr(geometry, "_ATTITUDE_ET", np.array([0.0]))
+    monkeypatch.setattr(geometry, "_ATTITUDE_RA", np.array([0.0]))
+    monkeypatch.setattr(geometry, "_ATTITUDE_DEC", np.array([90.0]))
+    monkeypatch.setattr(
+        geometry,
+        "get_current_ra_dec_batch",
+        lambda *_args: (np.array([0.0]), np.array([90.0])),
+    )
+
+    def fake_spkpos(target, et, reference_frame, observer):
+        frames.append((target, reference_frame))
+        if target == "-25":
+            return np.array([[2_000.0, 0.0, 0.0]])
+        return np.array([[1.0, 0.0, 0.0]])
+
+    def fake_pxform(from_frame, to_frame, et):
+        del et
+        frames.append((from_frame, to_frame))
+        return np.eye(3)
+
+    monkeypatch.setattr(geometry, "robust_spkpos", fake_spkpos)
+    monkeypatch.setattr(geometry.spice, "pxform", fake_pxform)
+    monkeypatch.setattr(
+        geometry,
+        "get_connections_and_polarity_batch",
+        lambda positions, field, radius: (
+            field,
+            np.array([True]),
+            np.array([1], dtype=np.int8),
+        ),
+    )
+
+    latitude, longitude, polarity = geometry._project_rows(
+        np.array([1.0]),
+        np.array([[1.0, 0.0, 0.0]]),
+        legacy_attitude=False,
+        attitude_frame="ECLIPJ2000",
+        frame_mixed_sun=False,
+    )
+
+    assert ("10", "ECLIPJ2000") in frames
+    assert ("ECLIPJ2000", "IAU_MOON") in frames
+    np.testing.assert_allclose(latitude, [0.0], atol=1e-12)
+    np.testing.assert_allclose(longitude, [0.0], atol=1e-12)
+    np.testing.assert_array_equal(polarity, [1])

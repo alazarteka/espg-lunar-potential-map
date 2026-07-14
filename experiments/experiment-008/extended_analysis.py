@@ -12,14 +12,13 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import observation_operator as operator
 import run_analysis
+from replay_context import ARTIFACT_DIR, RESULTS_DIR
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 EXPERIMENT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = EXPERIMENT_DIR.parents[1]
-ARTIFACT_DIR = PROJECT_ROOT / "artifacts" / "experiment-008"
-RESULTS_DIR = EXPERIMENT_DIR / "results"
 TEMPORAL_PATH = ARTIFACT_DIR / "canonical-sweep-temporal-synodic-l10.npy"
 TEMPORAL_METADATA_PATH = ARTIFACT_DIR / "canonical-sweep-temporal-synodic-l10.json"
 CONFIGURATION_PATH = EXPERIMENT_DIR / "configuration.json"
@@ -523,7 +522,7 @@ def run_sensitivities() -> int:
         )
     )
 
-    for variant in ("legacy", "frame_mixed", "submitted_legacy"):
+    for variant in ("legacy", "equatorial", "frame_mixed", "submitted_legacy"):
         geometry = operator.load_sweep_geometry(
             run_analysis.GEOMETRY_PATH, variant=variant
         )

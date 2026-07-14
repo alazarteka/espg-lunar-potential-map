@@ -5,13 +5,20 @@ from __future__ import annotations
 
 import csv
 import hashlib
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-EXPERIMENT_DIR = Path(__file__).resolve().parent
-RESULTS_DIR = EXPERIMENT_DIR / "results"
-ARTIFACT_DIR = PROJECT_ROOT / "artifacts" / "experiment-008"
-OUTPUT_PATH = EXPERIMENT_DIR / "result-manifest.csv"
+from replay_context import (
+    ARTIFACT_DIR,
+    OUTPUT_DIR,
+    PROJECT_ROOT,
+    RESULT_MANIFEST_PATH,
+    RESULTS_DIR,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+OUTPUT_PATH = RESULT_MANIFEST_PATH
 
 
 def sha256_file(path: Path) -> str:
@@ -31,10 +38,9 @@ def result_paths() -> list[tuple[str, Path]]:
         if path.is_file()
     ]
     paths.extend(
-        ("tracked_result", EXPERIMENT_DIR / relative)
+        ("tracked_result", OUTPUT_DIR / relative)
         for relative in (
             "RESULTS.md",
-            "phase-1-results.md",
             "supplement/README.md",
             "supplement/main.tex",
             "supplement/main.pdf",

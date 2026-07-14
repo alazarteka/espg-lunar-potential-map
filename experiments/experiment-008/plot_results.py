@@ -3,14 +3,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from replay_context import RESULTS_DIR
 
-EXPERIMENT_DIR = Path(__file__).resolve().parent
-RESULTS_DIR = EXPERIMENT_DIR / "results"
 FIGURE_DIR = RESULTS_DIR / "figures"
 
 COLORS = {

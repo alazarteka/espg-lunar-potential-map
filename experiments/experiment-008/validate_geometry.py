@@ -156,22 +156,24 @@ def validate(shard_path: Path) -> dict[str, Any]:
         rows_per_sweep,
     )
     aligned_lat, aligned_lon, aligned_polarity = aligned
-    mixed_lat = shard["frame_mixed_latitude"]
-    mixed_lon = shard["frame_mixed_longitude"]
-    mixed_polarity = shard["frame_mixed_polarity"]
+    canonical_lat = shard["corrected_latitude"]
+    canonical_lon = shard["corrected_longitude"]
+    canonical_polarity = shard["corrected_polarity"]
     reference_valid = np.isfinite(aligned_lat) & np.isfinite(aligned_lon)
-    candidate_valid = np.isfinite(mixed_lat) & np.isfinite(mixed_lon)
+    candidate_valid = np.isfinite(canonical_lat) & np.isfinite(canonical_lon)
     common = reference_valid & candidate_valid
-    lon_difference = (mixed_lon[common] - aligned_lon[common] + 180.0) % 360.0 - 180.0
+    lon_difference = (
+        canonical_lon[common] - aligned_lon[common] + 180.0
+    ) % 360.0 - 180.0
     parity = {
         "reference_valid_rows": int(np.sum(reference_valid)),
         "candidate_valid_rows": int(np.sum(candidate_valid)),
         "valid_mask_mismatch_rows": int(np.sum(reference_valid != candidate_valid)),
         "polarity_mismatch_rows": int(
-            np.sum(mixed_polarity[common] != aligned_polarity[common])
+            np.sum(canonical_polarity[common] != aligned_polarity[common])
         ),
         "max_abs_latitude_difference_deg": float(
-            np.max(np.abs(mixed_lat[common] - aligned_lat[common]))
+            np.max(np.abs(canonical_lat[common] - aligned_lat[common]))
         ),
         "max_abs_longitude_difference_deg": float(np.max(np.abs(lon_difference))),
     }
@@ -182,15 +184,22 @@ def validate(shard_path: Path) -> dict[str, Any]:
         and parity["max_abs_longitude_difference_deg"] <= 1e-9
     )
 
-    canonical_lat = shard["corrected_latitude"]
-    canonical_lon = shard["corrected_longitude"]
     report = {
         "status": "implementation_check_not_identifiability_outcome",
         "source_raw_file": str(shard["source_path"]),
         "sweeps": len(shard["sweep_spec_no"]),
-        "production_frame_mixed_parity": parity,
+        "production_corrected_parity": parity,
+        "canonical_vs_equatorial_interpretation": shift_summary(
+            canonical_lat,
+            canonical_lon,
+            shard["equatorial_latitude"],
+            shard["equatorial_longitude"],
+        ),
         "canonical_vs_frame_mixed": shift_summary(
-            canonical_lat, canonical_lon, mixed_lat, mixed_lon
+            canonical_lat,
+            canonical_lon,
+            shard["frame_mixed_latitude"],
+            shard["frame_mixed_longitude"],
         ),
         "canonical_vs_legacy_attitude": shift_summary(
             canonical_lat,
@@ -218,7 +227,7 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="ascii")
     print(json.dumps(report, indent=2))
-    return 0 if report["production_frame_mixed_parity"]["pass"] else 1
+    return 0 if report["production_corrected_parity"]["pass"] else 1
 
 
 if __name__ == "__main__":

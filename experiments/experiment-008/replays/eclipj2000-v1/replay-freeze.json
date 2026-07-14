@@ -1,0 +1,16 @@
+{
+  "canonical_geometry": "SCD_to_ECLIPJ2000_to_IAU_MOON",
+  "configuration_amendment_03_sha256": "42c45fcef5f117f3d8e33b4c52167ce2149b05d17abe6d54a4b6f5f10a5ce00f",
+  "configuration_sha256": "cd2b6e383a3e44a6dbd385e42815d84b864ec48f021502506caf1e00affa0b0c",
+  "coordinate_fix_commit_on_experiments": "8a3da10",
+  "coordinate_fix_commit_on_main": "f81eb19",
+  "fitted_potential_archive_forbidden": true,
+  "frozen_on": "2026-07-14",
+  "input_manifest_sha256": "6127ce9e1aa020e1b57ba3e03cd0fd295a775cbf70942b36d6b7cc711c220158",
+  "new_sensitivity_variant": "equatorial_original_experiment_008_canonical",
+  "original_outputs_mutable": false,
+  "run_id": "eclipj2000-v1",
+  "schema_version": 1,
+  "scientific_decision_rules_changed": false,
+  "status": "frozen_before_corrected_replay_outcomes"
+}
