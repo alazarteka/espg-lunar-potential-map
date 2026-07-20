@@ -4,24 +4,24 @@ from __future__ import annotations
 
 import argparse
 import logging
-from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
 import plotly.graph_objects as go
-import spiceypy as spice
 from plotly.subplots import make_subplots
 
-from src.potential_mapper.spice import load_spice_files
-from src.utils.spice_ops import get_sun_vector_wrt_moon
+from src.potential_mapper.cache_io import (
+    datetime64_midpoint,
+    discover_npz,
+    load_rows_in_window,
+    sample_indices,
+    sun_geometry_at,
+)
 
 # Default cache directory mirrors the batch runner output
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
-
-# Global guard so we only load kernels once
-_SPICE_LOADED = False
 
 
 @dataclass(slots=True)
@@ -44,96 +44,28 @@ def _parse_iso_date(value: str) -> np.datetime64:
     return np.datetime64(dt.date())
 
 
-def _discover_npz(cache_dir: Path) -> list[Path]:
-    """Return all NPZ cache files under cache_dir."""
-    if not cache_dir.exists():
-        raise FileNotFoundError(f"Cache directory {cache_dir} does not exist")
-    return sorted(p for p in cache_dir.rglob("*.npz") if p.is_file())
-
-
 def _load_rows(
-    files: Iterable[Path],
+    files: list[Path],
     start_ts: np.datetime64,
     end_ts_exclusive: np.datetime64,
 ) -> TimeSeriesRows:
-    """Load rows inside the requested UTC window."""
-    utc_parts: list[np.ndarray] = []
-    sc_pot_parts: list[np.ndarray] = []
-    surf_pot_parts: list[np.ndarray] = []
-    lat_parts: list[np.ndarray] = []
-    lon_parts: list[np.ndarray] = []
-    proj_sun_parts: list[np.ndarray] = []
-
-    start_str = str(start_ts.astype("datetime64[s]"))
-    end_str = str(end_ts_exclusive.astype("datetime64[s]"))
-
-    for path in files:
-        with np.load(path) as data:
-            utc = data["rows_utc"]
-            sc_pot = data["rows_spacecraft_potential"].astype(np.float64)
-            surf_pot = data["rows_projected_potential"].astype(np.float64)
-            lat = data["rows_projection_latitude"].astype(np.float64)
-            lon = data["rows_projection_longitude"].astype(np.float64)
-            proj_in_sun = data.get("rows_projection_in_sun")
-
-        if utc.size == 0:
-            continue
-
-        valid_time = utc != ""
-        if not np.any(valid_time):
-            continue
-
-        mask = valid_time & (utc >= start_str) & (utc < end_str)
-        if not np.any(mask):
-            continue
-
-        try:
-            utc_vals = np.array(utc[mask], dtype="datetime64[ns]")
-        except ValueError:
-            logging.debug("Failed to parse UTC strings in %s; skipping", path)
-            continue
-
-        utc_parts.append(utc_vals)
-        sc_pot_parts.append(sc_pot[mask])
-        surf_pot_parts.append(surf_pot[mask])
-        lat_parts.append(lat[mask])
-        lon_parts.append(lon[mask])
-        if proj_in_sun is not None:
-            proj_sun_parts.append(proj_in_sun[mask].astype(bool))
-        else:
-            proj_sun_parts.append(np.zeros(mask.sum(), dtype=bool))
-
-    if not utc_parts:
-        empty_time = np.array([], dtype="datetime64[ns]")
-        empty_float = np.array([])
-        return TimeSeriesRows(
-            utc=empty_time,
-            spacecraft_potential=empty_float,
-            surface_potential=empty_float,
-            projection_lat=empty_float,
-            projection_lon=empty_float,
-            projection_in_sun=np.array([], dtype=bool),
-        )
-
+    data = load_rows_in_window(files, start_ts, end_ts_exclusive)
     return TimeSeriesRows(
-        utc=np.concatenate(utc_parts),
-        spacecraft_potential=np.concatenate(sc_pot_parts),
-        surface_potential=np.concatenate(surf_pot_parts),
-        projection_lat=np.concatenate(lat_parts),
-        projection_lon=np.concatenate(lon_parts),
-        projection_in_sun=np.concatenate(proj_sun_parts),
+        utc=data["utc"],
+        spacecraft_potential=data["spacecraft_potential"],
+        surface_potential=data["potential"],
+        projection_lat=data["lat"],
+        projection_lon=data["lon"],
+        projection_in_sun=data["projection_in_sun"],
     )
 
 
 def _sample_rows(
     rows: TimeSeriesRows, sample: int | None, seed: int | None
 ) -> TimeSeriesRows:
-    """Uniformly down-sample the row bundle if needed."""
-    size = rows.utc.size
-    if sample is None or sample <= 0 or size <= sample:
+    idx = sample_indices(rows.utc.size, sample, seed)
+    if idx is None:
         return rows
-    rng = np.random.default_rng(seed)
-    idx = rng.choice(size, size=sample, replace=False)
     return TimeSeriesRows(
         utc=rows.utc[idx],
         spacecraft_potential=rows.spacecraft_potential[idx],
@@ -142,61 +74,6 @@ def _sample_rows(
         projection_lon=rows.projection_lon[idx],
         projection_in_sun=rows.projection_in_sun[idx],
     )
-
-
-def _ensure_spice_loaded() -> None:
-    """Load SPICE kernels once per process."""
-    global _SPICE_LOADED
-    if not _SPICE_LOADED:
-        load_spice_files()
-        _SPICE_LOADED = True
-
-
-def _datetime64_midpoint(times: np.ndarray) -> np.datetime64:
-    """Return midpoint between earliest and latest timestamps."""
-    t_min = times.min()
-    t_max = times.max()
-    delta = t_max - t_min
-    return t_min + delta // 2
-
-
-def _utc_string(dt64: np.datetime64) -> str:
-    """Render datetime64 with millisecond precision for SPICE."""
-    dt_ms = dt64.astype("datetime64[ms]")
-    return np.datetime_as_string(dt_ms, unit="ms")
-
-
-def _compute_sun_geometry(
-    mid_time: np.datetime64,
-) -> dict[str, float | np.ndarray | str]:
-    """Compute midpoint Sun direction in IAU_MOON."""
-    _ensure_spice_loaded()
-    utc_str = _utc_string(mid_time)
-    try:
-        et = spice.utc2et(utc_str)
-    except Exception as exc:
-        raise RuntimeError(f"Failed to convert UTC {utc_str} to ET") from exc
-
-    sun_vec = get_sun_vector_wrt_moon(et)
-    if sun_vec is None:
-        raise RuntimeError("SPICE returned no Moon→Sun vector.")
-
-    sun_vec = np.asarray(sun_vec, dtype=np.float64)
-    norm = np.linalg.norm(sun_vec)
-    if norm == 0.0:
-        raise RuntimeError("Sun vector magnitude is zero; cannot derive geometry.")
-    sun_unit = sun_vec / norm
-
-    subsolar_lat = np.degrees(np.arcsin(sun_unit[2]))
-    subsolar_lon = np.degrees(np.arctan2(sun_unit[1], sun_unit[0]))
-
-    return {
-        "utc": utc_str,
-        "et": et,
-        "sun_unit": sun_unit,
-        "subsolar_lat": subsolar_lat,
-        "subsolar_lon": subsolar_lon,
-    }
 
 
 def _angular_distance_deg(
@@ -406,7 +283,7 @@ def main() -> int:
     start_ts = args.start.astype("datetime64[s]")
     end_ts_exclusive = (end_date + np.timedelta64(1, "D")).astype("datetime64[s]")
 
-    files = _discover_npz(args.cache_dir)
+    files = discover_npz(args.cache_dir)
     rows = _load_rows(files, start_ts, end_ts_exclusive)
     if rows.utc.size == 0:
         print("No cached rows found in the requested date range.")
@@ -423,9 +300,9 @@ def main() -> int:
         projection_in_sun=rows.projection_in_sun[order],
     )
 
-    midpoint = _datetime64_midpoint(rows.utc)
-    geometry = _compute_sun_geometry(midpoint)
-    sun_unit = geometry["sun_unit"]  # type: ignore[assignment]
+    midpoint = datetime64_midpoint(rows.utc)
+    geometry = sun_geometry_at(midpoint)
+    sun_unit = geometry["sun_unit"]
 
     angles_deg = _angular_distance_deg(
         rows.projection_lat, rows.projection_lon, sun_unit

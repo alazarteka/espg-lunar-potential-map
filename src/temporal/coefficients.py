@@ -26,6 +26,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.linalg import LinAlgError, lstsq
 
+from src.potential_mapper.cache_io import (
+    DEFAULT_U_IDENTIFIABLE_KEY,
+    discover_npz,
+    load_projection_rows,
+)
+
 from ._harmonics import _sph_harm
 
 if TYPE_CHECKING:
@@ -38,7 +44,10 @@ if TYPE_CHECKING:
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 DEFAULT_SYNODIC_PERIOD_DAYS = 29.530588
 SIDEREAL_PERIOD_DAYS = 27.321661
-DEFAULT_U_IDENTIFIABLE_KEY = "rows_u_is_identifiable_lhs_dchi2red_0p001"
+
+# Backward-compatible private aliases (prefer cache_io public names)
+_discover_npz = discover_npz
+_load_all_data = load_projection_rows
 
 
 @dataclass(slots=True)
@@ -67,13 +76,6 @@ class HarmonicCoefficients:
     rms_residual: float  # RMS fit residual
 
 
-def _discover_npz(cache_dir: Path) -> list[Path]:
-    """Find all NPZ cache files."""
-    if not cache_dir.exists():
-        raise FileNotFoundError(f"Cache directory {cache_dir} does not exist")
-    return sorted(p for p in cache_dir.rglob("*.npz") if p.is_file())
-
-
 def _validate_window_parameters(
     window_hours: float,
     stride_hours: float | None,
@@ -90,86 +92,6 @@ def _validate_window_parameters(
     validate_duration("window_hours", window_hours)
     if stride_hours is not None:
         validate_duration("stride_hours", stride_hours, optional=True)
-
-
-def _load_all_data(
-    files: list[Path],
-    start_ts: np.datetime64,
-    end_ts_exclusive: np.datetime64,
-    *,
-    require_u_identifiable: bool = False,
-    u_identifiable_key: str = DEFAULT_U_IDENTIFIABLE_KEY,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Load all measurements in the time range."""
-    utc_parts: list[np.ndarray] = []
-    lat_parts: list[np.ndarray] = []
-    lon_parts: list[np.ndarray] = []
-    pot_parts: list[np.ndarray] = []
-
-    start_str = str(start_ts.astype("datetime64[s]"))
-    end_str = str(end_ts_exclusive.astype("datetime64[s]"))
-
-    for path in files:
-        with np.load(path) as data:
-            utc = data["rows_utc"]
-            if utc.size == 0:
-                continue
-
-            valid_time = utc != ""
-            if not np.any(valid_time):
-                continue
-
-            mask = valid_time & (utc >= start_str) & (utc < end_str)
-            if not np.any(mask):
-                continue
-
-            try:
-                utc_vals = np.array(utc[mask], dtype="datetime64[ns]")
-            except ValueError:
-                logging.debug("Failed to parse UTC in %s", path)
-                continue
-
-            lat = data["rows_projection_latitude"].astype(np.float64)
-            lon = data["rows_projection_longitude"].astype(np.float64)
-            pot = data["rows_projected_potential"].astype(np.float64)
-
-            if require_u_identifiable:
-                try:
-                    u_identifiable = data[u_identifiable_key].astype(bool)
-                except KeyError:
-                    logging.warning(
-                        "Missing %s in %s; skipping (require_u_identifiable=True)",
-                        u_identifiable_key,
-                        path,
-                    )
-                    continue
-            else:
-                u_identifiable = np.ones_like(pot, dtype=bool)
-
-            finite_mask = np.isfinite(lat) & np.isfinite(lon) & np.isfinite(pot)
-            mask_refined = mask & finite_mask & u_identifiable
-            if not np.any(mask_refined):
-                continue
-
-            utc_parts.append(utc_vals[(finite_mask & u_identifiable)[mask]])
-            lat_parts.append(lat[mask_refined])
-            lon_parts.append(lon[mask_refined])
-            pot_parts.append(pot[mask_refined])
-
-    if not utc_parts:
-        return (
-            np.array([], dtype="datetime64[ns]"),
-            np.array([]),
-            np.array([]),
-            np.array([]),
-        )
-
-    return (
-        np.concatenate(utc_parts),
-        np.concatenate(lat_parts),
-        np.concatenate(lon_parts),
-        np.concatenate(pot_parts),
-    )
 
 
 def _partition_into_windows(
