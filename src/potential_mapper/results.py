@@ -45,11 +45,11 @@ class PlasmaEnvironment(IntEnum):
         1. Shadow (projection_in_sun=False) → WAKE
         2. Temperature-based classification for sunlit regions
         """
-        if not np.isfinite(te_ev) or te_ev <= 0:
-            return cls.UNKNOWN
         # Shadow regions are classified as WAKE regardless of temperature
         if not projection_in_sun:
             return cls.WAKE
+        if not np.isfinite(te_ev) or te_ev <= 0:
+            return cls.UNKNOWN
         # Sunlit regions: temperature-based classification
         if te_ev < 30:
             return cls.SOLAR_WIND

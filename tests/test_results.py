@@ -9,6 +9,8 @@ def test_shadow_is_wake_regardless_of_temperature() -> None:
     f = PE.from_temperature_and_illumination
     assert f(200.0, projection_in_sun=False) == PE.WAKE
     assert f(10.0, projection_in_sun=False) == PE.WAKE
+    assert f(0.0, projection_in_sun=False) == PE.WAKE
+    assert f(np.nan, projection_in_sun=False) == PE.WAKE
 
 
 def test_invalid_temperature_is_unknown() -> None:
