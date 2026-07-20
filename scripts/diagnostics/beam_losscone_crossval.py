@@ -24,108 +24,17 @@ from __future__ import annotations
 
 import argparse
 import logging
-import warnings
 from pathlib import Path
 
 import numpy as np
 
 from src import config
-from src.diagnostics import LossConeSession
-from src.model import synth_losscone_batch
-
-from scipy.stats.qmc import LatinHypercube, scale
-
-
-def _build_energy_profile(
-    energies: np.ndarray,
-    pitches: np.ndarray,
-    norm2d: np.ndarray,
-    pitch_min: float,
-    pitch_max: float,
-    min_band_points: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Build 1D energy profile by averaging over high-pitch band."""
-    band_mask = (pitches >= pitch_min) & (pitches <= pitch_max)
-    values = np.full(energies.shape, np.nan, dtype=float)
-
-    for idx in range(len(energies)):
-        row_mask = band_mask[idx] & np.isfinite(norm2d[idx])
-        if min_band_points > 0 and np.count_nonzero(row_mask) < min_band_points:
-            continue
-        if np.any(row_mask):
-            values[idx] = float(np.nanmean(norm2d[idx][row_mask]))
-
-    order = np.argsort(energies)
-    return energies[order], values[order]
-
-
-def _detect_beam(
-    profile: np.ndarray,
-    energies: np.ndarray,
-    *,
-    min_peak: float = 2.0,
-    min_neighbor: float = 1.5,
-    contrast: float = 1.2,
-    neighbor_window: int = 1,
-    edge_skip: int = 1,
-    energy_min: float = 20.0,
-    energy_max: float = 500.0,
-) -> tuple[bool, float | None, float | None]:
-    """
-    Detect beam peak in energy profile.
-
-    Returns:
-        Tuple of (has_beam, beam_energy, peak_amplitude)
-    """
-    if profile.size == 0:
-        return False, None, None
-
-    window = max(1, neighbor_window)
-    start = max(edge_skip, window)
-    end = profile.size - max(edge_skip, window)
-    if end <= start:
-        return False, None, None
-
-    best_idx: int | None = None
-    best_value: float = -np.inf
-
-    for idx in range(start, end):
-        value = profile[idx]
-        energy = energies[idx]
-
-        # Skip if outside energy window
-        if energy < energy_min or energy > energy_max:
-            continue
-
-        if not np.isfinite(value) or value < min_peak:
-            continue
-
-        left = profile[idx - window : idx]
-        right = profile[idx + 1 : idx + 1 + window]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            left_max = np.nanmax(left) if left.size else np.nan
-            right_max = np.nanmax(right) if right.size else np.nan
-
-        if not np.isfinite(left_max) or not np.isfinite(right_max):
-            continue
-
-        # Check contrast requirement
-        if not (value >= left_max * contrast and value >= right_max * contrast):
-            continue
-
-        # Check neighbor threshold requirement
-        if left_max < min_neighbor and right_max < min_neighbor:
-            continue
-
-        # This is a valid peak; track the best one
-        if value > best_value:
-            best_value = value
-            best_idx = idx
-
-    if best_idx is not None:
-        return True, float(energies[best_idx]), float(best_value)
-    return False, None, None
+from src.diagnostics import (
+    LossConeSession,
+    PeakCriteria,
+    _build_energy_profile,
+    detect_peak,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -182,7 +91,8 @@ def parse_args() -> argparse.Namespace:
         help="Limit number of sweeps to process (for quick tests)",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Print per-sweep comparison details",
     )
@@ -234,7 +144,6 @@ def main() -> int:
         chunk = session.get_chunk_data(chunk_idx)
         norm2d = session.get_norm2d(chunk_idx)
 
-        # Beam detection
         energies_sorted, profile = _build_energy_profile(
             energies=chunk.energies,
             pitches=chunk.pitches,
@@ -242,18 +151,20 @@ def main() -> int:
             pitch_min=150.0,
             pitch_max=180.0,
             min_band_points=5,
-        )
-
-        has_beam, beam_energy, beam_amplitude = _detect_beam(
-            profile,
-            energies_sorted,
-            min_peak=args.min_peak,
             energy_min=args.energy_min,
             energy_max=args.energy_max,
         )
 
-        if not has_beam:
+        criteria = PeakCriteria(
+            min_peak=args.min_peak,
+            check_high_energy=False,
+            check_peak_width=False,
+        )
+        detection = detect_peak(profile, energies=energies_sorted, criteria=criteria)
+        if not detection.has_peak or detection.beam_energy is None:
             continue
+        beam_energy = detection.beam_energy
+        beam_amplitude = detection.peak_value
 
         # Loss cone fitting
         u_surface, bs_over_bm, beam_amp, chi2 = session.fit_chunk_lhs(
@@ -274,19 +185,23 @@ def main() -> int:
         # ΔU = U_spacecraft - U_surface (U_surface is negative)
         expected_beam_energy = args.u_spacecraft - u_surface  # This is positive
 
-        results.append({
-            "spec_no": chunk.spec_no,
-            "beam_energy": beam_energy,
-            "beam_amplitude": beam_amplitude,
-            "u_surface_fit": u_surface,
-            "bs_over_bm": bs_over_bm,
-            "expected_beam_energy": expected_beam_energy,
-            "chi2": chi2,
-        })
+        results.append(
+            {
+                "spec_no": chunk.spec_no,
+                "beam_energy": beam_energy,
+                "beam_amplitude": beam_amplitude,
+                "u_surface_fit": u_surface,
+                "bs_over_bm": bs_over_bm,
+                "expected_beam_energy": expected_beam_energy,
+                "chi2": chi2,
+            }
+        )
 
         if args.verbose:
             diff = beam_energy - expected_beam_energy
-            pct_diff = 100.0 * diff / expected_beam_energy if expected_beam_energy > 0 else 0
+            pct_diff = (
+                100.0 * diff / expected_beam_energy if expected_beam_energy > 0 else 0
+            )
             print(
                 f"spec_no {chunk.spec_no:5d}: "
                 f"beam={beam_energy:6.1f} eV, "
@@ -313,7 +228,9 @@ def main() -> int:
     # Correlation
     valid_mask = np.isfinite(beam_energies) & np.isfinite(expected_energies)
     if np.sum(valid_mask) > 2:
-        corr = np.corrcoef(beam_energies[valid_mask], expected_energies[valid_mask])[0, 1]
+        corr = np.corrcoef(beam_energies[valid_mask], expected_energies[valid_mask])[
+            0, 1
+        ]
     else:
         corr = np.nan
 
@@ -342,7 +259,9 @@ def main() -> int:
     print("Expected Beam Energy (U_spacecraft - U_surface):")
     print(f"  Mean:   {np.mean(expected_energies):.1f} eV")
     print(f"  Median: {np.median(expected_energies):.1f} eV")
-    print(f"  Range:  {np.min(expected_energies):.1f} – {np.max(expected_energies):.1f} eV")
+    print(
+        f"  Range:  {np.min(expected_energies):.1f} – {np.max(expected_energies):.1f} eV"
+    )
     print()
     print("Difference (Detected - Expected):")
     print(f"  Mean:   {np.mean(diff):+.1f} eV ({np.mean(pct_diff):+.1f}%)")
@@ -359,9 +278,15 @@ def main() -> int:
 
     print()
     print("Agreement:")
-    print(f"  Within 50 eV:  {within_50_eV}/{len(results)} ({100*within_50_eV/len(results):.1f}%)")
-    print(f"  Within 100 eV: {within_100_eV}/{len(results)} ({100*within_100_eV/len(results):.1f}%)")
-    print(f"  Within 30%:    {within_30_pct}/{len(results)} ({100*within_30_pct/len(results):.1f}%)")
+    print(
+        f"  Within 50 eV:  {within_50_eV}/{len(results)} ({100 * within_50_eV / len(results):.1f}%)"
+    )
+    print(
+        f"  Within 100 eV: {within_100_eV}/{len(results)} ({100 * within_100_eV / len(results):.1f}%)"
+    )
+    print(
+        f"  Within 30%:    {within_30_pct}/{len(results)} ({100 * within_30_pct / len(results):.1f}%)"
+    )
 
     return 0
 

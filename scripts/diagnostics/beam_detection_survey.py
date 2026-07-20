@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import logging
 import re
-import warnings
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -24,68 +23,13 @@ from pathlib import Path
 import numpy as np
 
 from src import config
-from src.diagnostics import LossConeSession
+from src.diagnostics import (
+    LossConeSession,
+    PeakCriteria,
+    _build_energy_profile,
+    detect_peak,
+)
 from src.flux import ERData
-
-
-def _build_energy_profile(
-    energies: np.ndarray,
-    pitches: np.ndarray,
-    norm2d: np.ndarray,
-    pitch_min: float,
-    pitch_max: float,
-    min_band_points: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    band_mask = (pitches >= pitch_min) & (pitches <= pitch_max)
-    values = np.full(energies.shape, np.nan, dtype=float)
-
-    for idx in range(len(energies)):
-        row_mask = band_mask[idx] & np.isfinite(norm2d[idx])
-        if min_band_points > 0 and np.count_nonzero(row_mask) < min_band_points:
-            continue
-        if np.any(row_mask):
-            values[idx] = float(np.nanmean(norm2d[idx][row_mask]))
-
-    order = np.argsort(energies)
-    return energies[order], values[order]
-
-
-def _has_peak(
-    profile: np.ndarray,
-    *,
-    contrast: float = 1.2,
-    min_peak: float = 2.0,
-    neighbor_window: int = 1,
-    edge_skip: int = 1,
-    min_neighbor: float = 1.5,
-) -> bool:
-    if profile.size == 0:
-        return False
-
-    window = max(1, neighbor_window)
-    start = max(edge_skip, window)
-    end = profile.size - max(edge_skip, window)
-    if end <= start:
-        return False
-
-    for idx in range(start, end):
-        value = profile[idx]
-        if not np.isfinite(value) or value < min_peak:
-            continue
-        left = profile[idx - window : idx]
-        right = profile[idx + 1 : idx + 1 + window]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            left_max = np.nanmax(left) if left.size else np.nan
-            right_max = np.nanmax(right) if right.size else np.nan
-        if not np.isfinite(left_max) or not np.isfinite(right_max):
-            continue
-        if not (value >= left_max * contrast and value >= right_max * contrast):
-            continue
-        if left_max < min_neighbor and right_max < min_neighbor:
-            continue
-        return True
-    return False
 
 
 def scan_file(er_file: Path) -> dict:
@@ -121,7 +65,7 @@ def scan_file(er_file: Path) -> dict:
         for chunk_idx in range(session.chunk_count()):
             chunk = session.get_chunk_data(chunk_idx)
             norm2d = session.get_norm2d(chunk_idx)
-            _, profile = _build_energy_profile(
+            energies_sorted, profile = _build_energy_profile(
                 energies=chunk.energies,
                 pitches=chunk.pitches,
                 norm2d=norm2d,
@@ -129,7 +73,14 @@ def scan_file(er_file: Path) -> dict:
                 pitch_max=180.0,
                 min_band_points=5,
             )
-            if _has_peak(profile):
+            # Match prior survey criteria (no high-energy / width gates)
+            criteria = PeakCriteria(
+                check_high_energy=False,
+                check_peak_width=False,
+            )
+            if detect_peak(
+                profile, energies=energies_sorted, criteria=criteria
+            ).has_peak:
                 peak_count += 1
 
         return {

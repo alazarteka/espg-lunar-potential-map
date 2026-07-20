@@ -29,6 +29,7 @@ from src.diagnostics import (
     _build_energy_profile,
     compute_loss_cone_boundary,
     detect_peak,
+    finite_range,
     interpolate_to_regular_grid,
 )
 from src.diagnostics.beam_detection import (
@@ -41,19 +42,6 @@ from src.diagnostics.beam_detection import (
     DEFAULT_PITCH_MAX,
     DEFAULT_PITCH_MIN,
 )
-
-
-def _finite_range(
-    data: np.ndarray, fallback: tuple[float, float], pct: tuple[float, float]
-) -> tuple[float, float]:
-    finite = data[np.isfinite(data)]
-    if finite.size == 0:
-        return fallback
-    vmin = float(np.nanpercentile(finite, pct[0]))
-    vmax = float(np.nanpercentile(finite, pct[1]))
-    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
-        return fallback
-    return vmin, vmax
 
 
 def _find_beam_chunks(
@@ -243,12 +231,8 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
     u_surface = pn.widgets.FloatInput(
         name="U_surface [V]", value=args.u_surface, step=10.0
     )
-    bs_over_bm = pn.widgets.FloatInput(
-        name="Bs/Bm", value=args.bs_over_bm, step=0.01
-    )
-    beam_amp = pn.widgets.FloatInput(
-        name="Beam Amp", value=args.beam_amp, step=0.1
-    )
+    bs_over_bm = pn.widgets.FloatInput(name="Bs/Bm", value=args.bs_over_bm, step=0.01)
+    beam_amp = pn.widgets.FloatInput(name="Beam Amp", value=args.beam_amp, step=0.1)
     beam_width = pn.widgets.FloatInput(
         name="Beam Width [eV]", value=args.beam_width, step=1.0
     )
@@ -268,9 +252,15 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
 
     status = pn.pane.Alert("", alert_type="info", sizing_mode="stretch_width")
 
-    raw_source = ColumnDataSource(data=dict(image=[np.zeros((2, 2))], x=[0], y=[0], dw=[1], dh=[1]))
-    norm_source = ColumnDataSource(data=dict(image=[np.zeros((2, 2))], x=[0], y=[0], dw=[1], dh=[1]))
-    model_source = ColumnDataSource(data=dict(image=[np.zeros((2, 2))], x=[0], y=[0], dw=[1], dh=[1]))
+    raw_source = ColumnDataSource(
+        data=dict(image=[np.zeros((2, 2))], x=[0], y=[0], dw=[1], dh=[1])
+    )
+    norm_source = ColumnDataSource(
+        data=dict(image=[np.zeros((2, 2))], x=[0], y=[0], dw=[1], dh=[1])
+    )
+    model_source = ColumnDataSource(
+        data=dict(image=[np.zeros((2, 2))], x=[0], y=[0], dw=[1], dh=[1])
+    )
     residual_source = ColumnDataSource(
         data=dict(image=[np.zeros((2, 2))], x=[0], y=[0], dw=[1], dh=[1])
     )
@@ -288,16 +278,40 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
     )
 
     raw_fig = _build_image_figure(
-        "Raw log10 flux", raw_source, raw_mapper, x_range, y_range, x_formatter, "Pitch [deg]"
+        "Raw log10 flux",
+        raw_source,
+        raw_mapper,
+        x_range,
+        y_range,
+        x_formatter,
+        "Pitch [deg]",
     )
     norm_fig = _build_image_figure(
-        "Normalized", norm_source, norm_mapper, x_range, y_range, x_formatter, "Pitch [deg]"
+        "Normalized",
+        norm_source,
+        norm_mapper,
+        x_range,
+        y_range,
+        x_formatter,
+        "Pitch [deg]",
     )
     model_fig = _build_image_figure(
-        "Model", model_source, model_mapper, x_range, y_range, x_formatter, "Pitch [deg]"
+        "Model",
+        model_source,
+        model_mapper,
+        x_range,
+        y_range,
+        x_formatter,
+        "Pitch [deg]",
     )
     residual_fig = _build_image_figure(
-        "Residual (obs - model)", residual_source, residual_mapper, x_range, y_range, x_formatter, "Pitch [deg]"
+        "Residual (obs - model)",
+        residual_source,
+        residual_mapper,
+        x_range,
+        y_range,
+        x_formatter,
+        "Pitch [deg]",
     )
 
     for fig in (raw_fig, norm_fig, model_fig, residual_fig):
@@ -318,7 +332,9 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         chunk_input.value = chunk_slider.value
 
     def sync_chunk_slider() -> None:
-        max_idx = len(beam_chunks) - 1 if (beam_only.value and beam_chunks) else max_chunk
+        max_idx = (
+            len(beam_chunks) - 1 if (beam_only.value and beam_chunks) else max_chunk
+        )
         value = int(chunk_input.value)
         if 0 <= value <= max_idx:
             chunk_slider.value = value
@@ -349,7 +365,9 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         nonlocal beam_chunks
         session.set_normalization(normalization.value, incident_stat.value)
         beam_chunks = _find_beam_chunks(session)
-        beam_chunk_count.object = f"Beam-detected chunks: {len(beam_chunks)} / {max_chunk + 1}"
+        beam_chunk_count.object = (
+            f"Beam-detected chunks: {len(beam_chunks)} / {max_chunk + 1}"
+        )
         if beam_only.value and not beam_chunks:
             status.object = "No beam detections found with current settings."
             status.alert_type = "warning"
@@ -359,7 +377,9 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         else:
             status.object = ""
 
-        max_idx = len(beam_chunks) - 1 if (beam_only.value and beam_chunks) else max_chunk
+        max_idx = (
+            len(beam_chunks) - 1 if (beam_only.value and beam_chunks) else max_chunk
+        )
         chunk_slider.end = max_idx
         if chunk_slider.value > max_idx:
             chunk_slider.value = max(0, max_idx)
@@ -414,16 +434,16 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
                 y=frame["loss_cone"],
             )
 
-            raw_mapper.low, raw_mapper.high = _finite_range(
+            raw_mapper.low, raw_mapper.high = finite_range(
                 frame["raw_log_reg"], fallback=(0.0, 1.0), pct=(5, 95)
             )
-            norm_mapper.low, norm_mapper.high = _finite_range(
+            norm_mapper.low, norm_mapper.high = finite_range(
                 frame["norm_reg"], fallback=(0.0, 1.0), pct=(1, 99)
             )
-            model_mapper.low, model_mapper.high = _finite_range(
+            model_mapper.low, model_mapper.high = finite_range(
                 frame["model_reg"], fallback=(0.0, 1.0), pct=(0, 100)
             )
-            resid_low, resid_high = _finite_range(
+            resid_low, resid_high = finite_range(
                 frame["residual"], fallback=(-0.5, 0.5), pct=(5, 95)
             )
             max_abs = max(abs(resid_low), abs(resid_high))
@@ -432,7 +452,11 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
 
             spec_input.value = int(frame["spec_no"])
             actual_idx = get_current_chunk_idx()
-            filter_indicator = f" [filtered {chunk_slider.value}/{len(beam_chunks)-1}]" if (beam_only.value and beam_chunks) else ""
+            filter_indicator = (
+                f" [filtered {chunk_slider.value}/{len(beam_chunks) - 1}]"
+                if (beam_only.value and beam_chunks)
+                else ""
+            )
             metrics.object = (
                 f"Chunk: {actual_idx}{filter_indicator}  |  Spec: {frame['spec_no']}  |  "
                 f"UTC: {frame['timestamp']}  |  chi2: {frame['chi2']:.3g}"
