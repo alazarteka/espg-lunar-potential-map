@@ -1,5 +1,10 @@
-"""U-surface identifiability QC: LHS-based chi²(U) width metrics and spec/row
-alignment helpers for augmenting batch NPZ output."""
+"""U-surface identifiability QC and D2 confidence-set NPZ helpers.
+
+Legacy LHS ``u_width_*`` / ``u_is_identifiable_*`` fields measure optimizer
+geometry only — they are **not** confidence intervals. Prefer the D2
+profile-likelihood confidence-set arrays from
+:func:`augment_batch_arrays_with_confidence_sets`.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,7 @@ from typing import Any
 
 import numpy as np
 
+from src.losscone.confidence_set import ConfidenceSetBatch, SweepConfidenceSet
 from src.potential_mapper.npz_io import write_npz_atomic
 
 
@@ -209,3 +215,65 @@ def augment_batch_npz_with_u_width(
         include_rows=bool(include_rows),
     )
     write_npz_atomic(out_npz_path, payload)
+
+
+def augment_batch_arrays_with_confidence_sets(
+    *,
+    batch_arrays: dict[str, np.ndarray],
+    spec_nos: np.ndarray,
+    confidence_sets: list[SweepConfidenceSet],
+    include_rows: bool = True,
+    prefix: str = "spec_ci_",
+) -> dict[str, np.ndarray]:
+    """Attach D2 profile-likelihood confidence-set fields to a batch payload.
+
+    Unlike :func:`augment_batch_arrays_with_u_width`, this stores endpoints,
+    component counts, bound-touch flags, and gate reasons — never a lone
+    scalar width presented as a CI.
+    """
+    if "spec_spec_no" not in batch_arrays or "rows_spec_no" not in batch_arrays:
+        raise KeyError("batch_arrays must contain 'spec_spec_no' and 'rows_spec_no'")
+
+    ci_batch = ConfidenceSetBatch.from_sets(np.asarray(spec_nos), confidence_sets)
+    ci_arrays = ci_batch.to_npz_arrays(prefix=prefix)
+
+    # Align CI arrays onto the batch's spec_spec_no order.
+    batch_spec = np.asarray(batch_arrays["spec_spec_no"], dtype=np.int64)
+    src_spec = np.asarray(ci_arrays[f"{prefix}spec_no"], dtype=np.int64)
+    out = dict(batch_arrays)
+    for key, values in ci_arrays.items():
+        if key == f"{prefix}observation_level":
+            out[key] = values
+            continue
+        if key == f"{prefix}spec_no":
+            out[key] = batch_spec
+            continue
+        out[key] = align_by_spec_no(
+            target_spec_no=batch_spec,
+            source_spec_no=src_spec,
+            source_values=values,
+            fill_value=np.nan if np.asarray(values).dtype.kind == "f" else 0,
+        )
+
+    if include_rows:
+        rows_spec = batch_arrays["rows_spec_no"]
+        for field in (
+            "u_hat",
+            "r_hat",
+            "c_alpha",
+            "n_components",
+            "is_full_domain",
+            "is_one_sided",
+            "touches_bound_lo",
+            "touches_bound_hi",
+        ):
+            spec_key = f"{prefix}{field}"
+            if spec_key not in out:
+                continue
+            out[f"rows_ci_{field}"] = broadcast_spec_to_rows(
+                rows_spec_no=rows_spec,
+                spec_spec_no=batch_spec,
+                spec_values=out[spec_key],
+                fill_value=np.nan if out[spec_key].dtype.kind == "f" else 0,
+            )
+    return out

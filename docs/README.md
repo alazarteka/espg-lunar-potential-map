@@ -34,6 +34,8 @@ uv run python -m src.potential_mapper.batch --year 1998 --month 1
 - [Pipeline Overview](architecture/pipeline_overview.md)
 - [Coordinate Frames & SPICE](architecture/coordinate_frames.md)
 - [GPU Acceleration](architecture/gpu_acceleration.md)
+- [ER Measurement Contract](architecture/er_measurement_contract.md) — calibrated-flux quasi-likelihood decision
+- [Profile-likelihood CI](physics/profile_likelihood_ci.md) — D2 ΔU confidence sets
 - [Spacecraft Potential](physics/spacecraft_potential.md)
 
 ## Archived Documentation

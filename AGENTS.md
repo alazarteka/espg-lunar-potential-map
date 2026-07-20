@@ -37,10 +37,17 @@ uv run python -m src.potential_mapper.batch --fast --year 1999 --month 4 --day 2
   --losscone-fit-method lillis --u-spacecraft 0 --emit-u-width-qc  # Lillis + U identifiability QC
 uv run python scripts/diagnostics/losscone_u_profile.py --year 1999 --month 4 --day 29 \
   --batch-npz artifacts/potential_cache/1999_04_29_u0_lillis/potential_batch_1999_04_29.npz \
-  --fit-method lillis --u-spacecraft 0  # Profile chi2(U) + plot
+  --fit-method lillis --u-spacecraft 0  # Profile chi2(U) + plot (legacy; not a CI)
+uv run python scripts/diagnostics/losscone_profile_ci.py --demo --skip-bootstrap --c-alpha 1.0
+uv run python scripts/diagnostics/r_bound_artifact_check.py --n-per-cell 4
 ```
 
-Loss-cone fitting supports both Halekas (log-chi2) and Lillis (masked linear chi2).
+Loss-cone fitting supports Halekas (log-chi2), Lillis (masked linear chi2), and
+the D2 calibrated-flux **quasi-likelihood** path (`FitMethod.QUASI_LIKELIHOOD`).
+The honest per-sweep uncertainty product is a profile-likelihood confidence
+*set* ([docs/physics/profile_likelihood_ci.md](docs/physics/profile_likelihood_ci.md));
+LHS `u_width` fields are optimizer-geometry diagnostics only.
+
 Set `LOSS_CONE_FIT_METHOD` in `src/config.py` or use `--losscone-fit-method` on
 the batch CLI / `--fit-method` in diagnostics tools.
 
@@ -54,7 +61,8 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
   - `potential_mapper/` - Mapping pipeline
   - `temporal/` - Spherical-harmonic reconstruction; used as the identifiability / sampling-limits analysis (tests whether a global spatiotemporal potential map is recoverable from LP ER data)
   - `engineering/` - GlobalStats, SiteStats, site analysis
-  - `losscone/` - Loss-cone core (cpu, model, masks, chi2, types, params, torch/)
+  - `losscone/` - Loss-cone core (cpu, model, masks, chi2, types, params, torch/,
+    confidence_set, response_folded, quasi_likelihood, profile_ci, regime_gate)
   - `diagnostics/` - Loss cone session management
   - `physics/`, `utils/`, `visualization/` - Supporting modules
   - `utils/losscone_lhs.py` - Shared loss-cone LHS sampling helper
@@ -85,6 +93,8 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
 | Analysis Scripts | [analysis.md](docs/cli/analysis.md) | Analysis & publication plotting scripts |
 | Visualization | [visualization.md](docs/visualization/visualization.md) | Plot styling |
 | Spacecraft Potential | [spacecraft_potential.md](docs/physics/spacecraft_potential.md) | U_sc estimation details |
+| ER Measurement Contract | [er_measurement_contract.md](docs/architecture/er_measurement_contract.md) | Calibrated-flux quasi-likelihood decision |
+| Profile-likelihood CI | [profile_likelihood_ci.md](docs/physics/profile_likelihood_ci.md) | D2 ΔU confidence sets |
 
 ## Coding Standards
 

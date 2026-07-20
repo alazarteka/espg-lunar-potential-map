@@ -18,9 +18,8 @@ uv run python -m src.potential_mapper.batch [OPTIONS]
 | `--day` | int | None | Filter to specific day (1-31) |
 | `--parallel` | flag | False | Legacy CPU parallel fitting (deprecated; falls back to sequential) |
 | `--fast` | flag | False | Use PyTorch-accelerated fitter (GPU/CPU) |
-| `--losscone-fit-method` | str | None | Loss-cone fitter (`halekas` or `lillis`, defaults to config) |
-| `--u-spacecraft` | float | None | Override spacecraft potential [V] (constant for all rows; skips estimation) |
-| `--emit-u-width-qc` | flag | False | Emit an LHS-based U identifiability proxy (adds `u_width` + `identifiable` fields) |
+| `--losscone-fit-method` | str | None | Loss-cone fitter (`halekas`, `lillis`, or `quasi_likelihood`; defaults to config) |
+| `--emit-u-width-qc` | flag | False | Emit an LHS-based U identifiability **proxy** (not a CI; adds `u_width` + `identifiable` fields) |
 | `--u-width-identifiable-max-v` | float | 200.0 | Max U-width [V] considered identifiable (only with `--emit-u-width-qc`) |
 | `--overwrite` | flag | False | Overwrite existing output file |
 | `-v`, `--verbose` | flag | False | Enable DEBUG-level logging |
@@ -53,7 +52,7 @@ Output filename is auto-generated based on date filters:
 - `rows_projection_latitude`, `rows_projection_longitude`
 - `rows_spacecraft_potential`, `rows_projected_potential`
 - `rows_bs_over_bm`, `rows_beam_amp`, `rows_fit_chi2`
-- `rows_u_width_lhs_dchi2red_0p001`, `rows_u_is_identifiable_lhs_dchi2red_0p001` (only with `--emit-u-width-qc`)
+- `rows_u_width_lhs_dchi2red_0p001`, `rows_u_is_identifiable_lhs_dchi2red_0p001` (only with `--emit-u-width-qc`; **not a CI** — optimizer-geometry proxy)
 - `rows_spacecraft_in_sun`, `rows_projection_in_sun`
 
 **Spectrum-level arrays** (aggregated per spectrum):
@@ -61,7 +60,13 @@ Output filename is auto-generated based on date filters:
 - `spec_time_start`, `spec_time_end` – time range
 - `spec_has_fit` – whether a valid fit was obtained
 - `spec_row_count` – rows per spectrum
-- `spec_u_width_lhs_dchi2red_0p001`, `spec_u_is_identifiable_lhs_dchi2red_0p001` (only with `--emit-u-width-qc`)
+- `spec_u_width_lhs_dchi2red_0p001`, `spec_u_is_identifiable_lhs_dchi2red_0p001` (only with `--emit-u-width-qc`; **not a CI**)
+
+D2 profile-likelihood confidence-set fields (when attached via
+`augment_batch_arrays_with_confidence_sets`) use the `spec_ci_*` prefix:
+`observation_level`, `u_hat`, `c_alpha`, `component_lo/hi`, `n_components`,
+`is_full_domain`, `is_one_sided`, `touches_bound_*`, `gate_reason`. See
+[profile_likelihood_ci.md](../physics/profile_likelihood_ci.md).
 
 ## Examples
 
