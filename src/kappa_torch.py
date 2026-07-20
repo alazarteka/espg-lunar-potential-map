@@ -27,27 +27,14 @@ except ImportError:
     HAS_TORCH = False
     Tensor = None  # type: ignore[misc, assignment]
 
-from src.utils.optimization import BatchedDifferentialEvolution
+from src.utils.optimization import BatchedDifferentialEvolution, auto_detect_dtype
 
 
 def _auto_detect_dtype(device: torch.device) -> torch.dtype:
-    """
-    Auto-detect optimal dtype for the given device.
-
-    Returns float16 on modern CUDA GPUs (Volta+, compute 7.0+) which have
-    tensor cores for fast half-precision. Returns float32 for older GPUs
-    and CPU where float16 would be slower.
-    """
+    """Auto-detect optimal dtype for the given device."""
     if not HAS_TORCH:
         raise ImportError("PyTorch is required")
-
-    if device.type == "cuda":
-        props = torch.cuda.get_device_properties(device)
-        # Volta+ (compute 7.0+) has tensor cores for fast float16
-        if props.major >= 7:
-            return torch.float16
-        return torch.float32
-    return torch.float32  # CPU: float32 is fastest
+    return auto_detect_dtype(device)
 
 
 def _torch_lgamma(x: Tensor) -> Tensor:

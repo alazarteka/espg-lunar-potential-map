@@ -40,6 +40,8 @@ from tqdm import tqdm
 
 from src import config
 from src.losscone.cpu import LossConeFitter, PitchAngle
+from src.losscone.masks import build_lillis_mask
+from src.losscone.model import _compute_beam, _compute_loss_cone_angle
 from src.losscone.types import FitMethod, parse_fit_method
 from src.potential_mapper.pipeline import DataLoader, load_all_data
 
@@ -68,51 +70,27 @@ def _parse_utc(ts: str) -> datetime:
     return dt.replace(tzinfo=None)
 
 
-def _build_lillis_mask_batch(raw_flux: np.ndarray, pitches: np.ndarray) -> np.ndarray:
-    """
-    Vectorized `build_lillis_mask` for arrays shaped (n_spec, nE, nPitch).
-    """
-    incident = pitches < 90.0
-    flux_for_max = np.where(incident, raw_flux, np.nan)
-    row_max = np.nanmax(flux_for_max, axis=2, keepdims=True)
-    row_max = np.where((row_max > 0) & np.isfinite(row_max), row_max, np.nan)
-    relative = raw_flux / row_max
-    return (
-        np.isfinite(raw_flux)
-        & (raw_flux > 0)
-        & (relative > config.LILLIS_RELATIVE_FLUX_MIN)
-        & (relative < config.LILLIS_RELATIVE_FLUX_MAX)
-    )
-
-
 def _beam_template(
     *,
     u_surface_grid: np.ndarray,  # (n_u,)
     energies: np.ndarray,  # (nE,)
-    pitch_profile: np.ndarray,  # (nE, nPitch)
+    pitches: np.ndarray,  # (nE, nPitch)
     u_spacecraft: float,
     beam_width_ev: float,
+    beam_pitch_sigma_deg: float,
 ) -> np.ndarray:
-    """
-    Beam template for beam_amp=1.0, shape (n_u, nE, nPitch).
-
-    Matches `src.losscone.model._compute_beam` for the common case where
-    U_spacecraft is a scalar and beam_width is fixed.
-    """
+    """Beam template for beam_amp=1.0, shape (n_u, nE, nPitch)."""
     u_surface_grid = np.asarray(u_surface_grid, dtype=np.float64)
-    energies = np.asarray(energies, dtype=np.float64)
-    pitch_profile = np.asarray(pitch_profile, dtype=np.float64)
-
-    delta_u = float(u_spacecraft) - u_surface_grid  # (n_u,)
-    accel = (delta_u > 0.0).astype(np.float64)  # (n_u,)
-    beam_center = np.maximum(delta_u, float(beam_width_ev))  # (n_u,)
-
-    e = energies[None, :, None]  # (1, nE, 1)
-    c = beam_center[:, None, None]  # (n_u, 1, 1)
-    w = max(float(beam_width_ev), 1e-12)
-
-    energy_profile = accel[:, None, None] * np.exp(-0.5 * ((e - c) / w) ** 2)
-    return energy_profile * pitch_profile[None, :, :]
+    n_u = u_surface_grid.size
+    return _compute_beam(
+        energies[None, :, None],
+        pitches[None, :, :],
+        u_surface_grid.reshape(n_u, 1, 1),
+        np.asarray(u_spacecraft, dtype=np.float64).reshape(1, 1, 1),
+        np.ones((n_u, 1, 1), dtype=np.float64),
+        np.full((n_u, 1, 1), float(beam_width_ev), dtype=np.float64),
+        float(beam_pitch_sigma_deg),
+    )
 
 
 def _profile_lillis_u(
@@ -137,38 +115,32 @@ def _profile_lillis_u(
         nan = np.full(n_u, np.nan, dtype=np.float64)
         return nan, nan, nan
 
-    # Beam pitch profile is chunk-specific (pitch grid varies with geometry).
-    if beam_pitch_sigma_deg > 0:
-        pitch_profile = np.exp(
-            -0.5 * ((pitches - 180.0) / float(beam_pitch_sigma_deg)) ** 2
-        )
-    else:
-        pitch_profile = np.ones_like(pitches, dtype=np.float64)
-
     beam_u = _beam_template(
         u_surface_grid=grids.u_grid,
         energies=energies,
-        pitch_profile=pitch_profile,
+        pitches=pitches,
         u_spacecraft=u_spacecraft,
         beam_width_ev=beam_width_ev,
+        beam_pitch_sigma_deg=beam_pitch_sigma_deg,
     )  # (n_u, nE, nPitch)
 
     # IMPORTANT: avoid `x * mask` with NaNs present; 0 * NaN => NaN.
     mask_u = mask[None, None, :, :]  # (1, 1, nE, nPitch)
     denom = np.sum(np.where(mask[None, :, :], beam_u * beam_u, 0.0), axis=(1, 2))
 
-    # Loss-cone base model for all (U, bs) combinations.
-    u = grids.u_grid[:, None, None, None]  # (n_u, 1, 1, 1)
-    bs = grids.bs_grid[None, :, None, None]  # (1, n_bs, 1, 1)
+    # Loss-cone base model for all (U, bs) combinations via library angle formula.
+    n_u = int(grids.u_grid.size)
+    n_bs = int(grids.bs_grid.size)
+    u_flat = np.repeat(grids.u_grid, n_bs)
+    bs_flat = np.tile(grids.bs_grid, n_u)
+    ac_deg = _compute_loss_cone_angle(
+        energies[None, :, None],
+        u_flat.reshape(-1, 1, 1),
+        np.asarray(u_spacecraft, dtype=np.float64).reshape(1, 1, 1),
+        bs_flat.reshape(-1, 1, 1),
+    ).reshape(n_u, n_bs, energies.size, 1)
 
-    e_corr = np.maximum(energies - float(u_spacecraft), 1e-12)  # (nE,)
-    e_corr = e_corr[None, None, :, None]  # (1, 1, nE, 1)
-
-    x = bs * (1.0 + u / e_corr)
-    x = np.clip(x, 0.0, 1.0)
-    ac_deg = np.degrees(np.arcsin(np.sqrt(x)))  # (n_u, n_bs, nE, 1)
-
-    inside = pitches[None, None, :, :] <= (180.0 - ac_deg)  # (n_u, n_bs, nE, nPitch)
+    inside = pitches[None, None, :, :] <= (180.0 - ac_deg)
     base = float(background) + (1.0 - float(background)) * inside.astype(np.float64)
 
     # Analytical beam_amp*(U, bs) via least squares projection (with bounds).
@@ -438,7 +410,7 @@ def main() -> int:
     if norm2d.shape != (n_chunks, nE, nP):
         raise RuntimeError(f"Unexpected norm2d shape {norm2d.shape}")
 
-    data_mask = _build_lillis_mask_batch(raw_flux, pitches)
+    data_mask = build_lillis_mask(raw_flux, pitches)
     valid_energy = energies >= float(args.u_spacecraft)
     valid_energy_mask = np.broadcast_to(valid_energy[:, :, None], (n_chunks, nE, nP))
     combined_mask = data_mask & valid_energy_mask

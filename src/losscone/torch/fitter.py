@@ -45,12 +45,9 @@ if TYPE_CHECKING:
 
 def _auto_detect_dtype(device: torch.device) -> torch.dtype:
     """Auto-detect an optimal dtype for the given device."""
-    if device.type == "cuda":
-        props = torch.cuda.get_device_properties(device)
-        if props.major >= 7:
-            return torch.float16
-        return torch.float32
-    return torch.float32
+    from src.utils.optimization import auto_detect_dtype
+
+    return auto_detect_dtype(device)
 
 
 def _auto_detect_batch_size(device: torch.device, dtype: torch.dtype) -> int:

@@ -16,6 +16,8 @@ def build_lillis_mask(
     The mask uses raw (unnormalized) flux with per-energy maxima (incident-only
     when pitches are provided) to exclude low/zero bins and bins near the max,
     reducing bias from saturation or background.
+
+    Accepts shapes ``(nPitch,)``, ``(nE, nPitch)``, or ``(n_spec, nE, nPitch)``.
     """
     raw_flux = np.asarray(raw_flux)
     if raw_flux.size == 0:
@@ -24,6 +26,11 @@ def build_lillis_mask(
     original_ndim = raw_flux.ndim
     if original_ndim == 1:
         raw_flux = raw_flux[None, :]
+    elif original_ndim == 3:
+        n_spec, n_e, n_pitch = raw_flux.shape
+        raw_flux = raw_flux.reshape(n_spec * n_e, n_pitch)
+        if pitches is not None:
+            pitches = np.asarray(pitches).reshape(n_spec * n_e, n_pitch)
 
     if pitches is not None:
         pitches = np.asarray(pitches)
@@ -34,7 +41,8 @@ def build_lillis_mask(
     else:
         flux_for_max = raw_flux
 
-    row_max = np.nanmax(flux_for_max, axis=1, keepdims=True)
+    # Max over pitch axis (last axis after reshape)
+    row_max = np.nanmax(flux_for_max, axis=-1, keepdims=True)
     row_max = np.where((row_max > 0) & np.isfinite(row_max), row_max, np.nan)
     relative = raw_flux / row_max
     mask = (
@@ -43,4 +51,9 @@ def build_lillis_mask(
         & (relative > config.LILLIS_RELATIVE_FLUX_MIN)
         & (relative < config.LILLIS_RELATIVE_FLUX_MAX)
     )
-    return mask if original_ndim > 1 else mask[0]
+
+    if original_ndim == 1:
+        return mask[0]
+    if original_ndim == 3:
+        return mask.reshape(n_spec, n_e, n_pitch)
+    return mask
