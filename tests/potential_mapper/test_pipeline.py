@@ -37,7 +37,9 @@ def test_prepare_kappa_batch_data_includes_weights(monkeypatch):
         def log_flux_weights(self) -> np.ndarray:
             return self._weights
 
-    monkeypatch.setattr(pipeline, "Kappa", FakeKappa)
+    from src.potential_mapper import kappa_batch
+
+    monkeypatch.setattr(kappa_batch, "Kappa", FakeKappa)
 
     spec_sequence = np.repeat([1, 2], config.SWEEP_ROWS)
     er = DummyER(spec_sequence)
