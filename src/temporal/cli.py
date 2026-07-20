@@ -11,6 +11,7 @@ from .coefficients import (
     DEFAULT_CACHE_DIR,
     DEFAULT_SYNODIC_PERIOD_DAYS,
     _harmonic_coefficient_count,
+    _validate_window_parameters,
     compute_temporal_harmonics,
     save_temporal_coefficients,
 )
@@ -185,6 +186,12 @@ def main() -> int:
         logging.error("--lmax must be non-negative")
         return 1
 
+    try:
+        _validate_window_parameters(args.window_hours, args.window_stride)
+    except ValueError as exc:
+        logging.error("Invalid temporal window parameters: %s", exc)
+        return 1
+
     # Dispatch based on fit mode
     if args.fit_mode == "basis":
         return _main_basis_mode(args)
@@ -284,10 +291,6 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
 
 def _main_window_mode(args: argparse.Namespace) -> int:
     """Run per-window fitting mode (original behavior)."""
-    if args.window_hours <= 0:
-        logging.error("--window-hours must be positive")
-        return 1
-
     if args.co_rotate and args.rotation_period_days == 0.0:
         logging.error("--rotation-period-days must be non-zero when --co-rotate is set")
         return 1

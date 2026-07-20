@@ -74,6 +74,24 @@ def _discover_npz(cache_dir: Path) -> list[Path]:
     return sorted(p for p in cache_dir.rglob("*.npz") if p.is_file())
 
 
+def _validate_window_parameters(
+    window_hours: float,
+    stride_hours: float | None,
+) -> None:
+    """Validate temporal window parameters before duration conversion."""
+
+    def validate_duration(name: str, hours: float, *, optional: bool = False) -> None:
+        if not np.isfinite(hours) or hours <= 0.0:
+            suffix = " when provided" if optional else ""
+            raise ValueError(f"{name} must be finite and positive{suffix}")
+        if int(hours * 3600) <= 0:
+            raise ValueError(f"{name} must be at least one second")
+
+    validate_duration("window_hours", window_hours)
+    if stride_hours is not None:
+        validate_duration("stride_hours", stride_hours, optional=True)
+
+
 def _load_all_data(
     files: list[Path],
     start_ts: np.datetime64,
@@ -179,6 +197,8 @@ def _partition_into_windows(
 
     Yields TimeWindow objects with spatially-contiguous measurements.
     """
+    _validate_window_parameters(window_hours, stride_hours)
+
     if utc.size == 0:
         return
 
@@ -851,6 +871,7 @@ def compute_temporal_harmonics(
         raise ValueError("rotation_period_days must be non-zero when co_rotate=True")
     if spatial_weight_exponent is not None and spatial_weight_exponent < 0.0:
         raise ValueError("spatial_weight_exponent must be non-negative")
+    _validate_window_parameters(window_hours, stride_hours)
 
     logging.info("Discovering NPZ files in %s", cache_dir)
     files = _discover_npz(cache_dir)
