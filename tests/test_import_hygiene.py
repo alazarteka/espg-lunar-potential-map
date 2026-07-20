@@ -31,3 +31,11 @@ def test_chi2_is_safe_first_import() -> None:
 
 def test_flux_and_utils_first_import() -> None:
     _first_import_ok("import src.flux, src.utils, src.utils.synthetic")
+
+
+def test_physics_is_safe_first_import() -> None:
+    _first_import_ok("import src.physics")
+
+
+def test_charging_is_safe_first_import() -> None:
+    _first_import_ok("import src.physics.charging")

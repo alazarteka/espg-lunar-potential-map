@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 
 from src import config
-from src.physics.kappa import KappaParams, omnidirectional_flux
 from src.utils.units import ureg
 
 if TYPE_CHECKING:
@@ -72,6 +71,10 @@ def prepare_flux(
     theta: float = 1.1e5,
 ):
     """Prepare a theoretical omnidirectional particle flux."""
+
+    # Keep the physics import lazy: config imports src.utils during package
+    # initialization, and importing it eagerly here would re-enter src.physics.
+    from src.physics.kappa import KappaParams, omnidirectional_flux
 
     params = KappaParams(
         density=density * ureg.particle / ureg.meter**3,
