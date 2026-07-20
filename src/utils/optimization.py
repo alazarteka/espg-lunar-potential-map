@@ -41,6 +41,18 @@ def get_torch_device(device: str | None = None) -> torch.device:
     return torch.device("cpu")
 
 
+def auto_detect_dtype(device: torch.device) -> torch.dtype:
+    """Prefer float16 on Volta+ CUDA; float32 elsewhere."""
+    if not HAS_TORCH:
+        raise ImportError("PyTorch is required for optimization utilities")
+    if device.type == "cuda":
+        props = torch.cuda.get_device_properties(device)
+        if props.major >= 7:
+            return torch.float16
+        return torch.float32
+    return torch.float32
+
+
 class BatchedDifferentialEvolution:
     """
     GPU-resident Differential Evolution optimizer.
