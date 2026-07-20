@@ -1,8 +1,4 @@
-"""
-Physics module for the URP Map project.
-
-This module provides functionality for handling the plasma physics calculations.
-"""
+"""Plasma physics helpers (kappa distributions and related flux models)."""
 
 from .kappa import (
     KappaParams,

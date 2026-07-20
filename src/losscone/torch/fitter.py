@@ -121,7 +121,6 @@ class LossConeFitterTorch(LossConeFitterBase):
         self.spacecraft_potential = spacecraft_potential
         self.device = get_torch_device(device)
 
-        # Set dtype (auto-detect if not specified)
         if dtype == "auto":
             self.dtype = _auto_detect_dtype(self.device)
         elif dtype == "float32":
@@ -221,7 +220,6 @@ class LossConeFitterTorch(LossConeFitterBase):
         spacecraft_slice = data.spacecraft_slice
         data_mask = data.combined_mask(self.fit_method)
 
-        # Convert to torch tensors
         energies_t = torch.tensor(energies, device=self.device, dtype=self.dtype)
         pitches_t = torch.tensor(pitches, device=self.device, dtype=self.dtype)
         norm2d_t = torch.tensor(norm2d, device=self.device, dtype=self.dtype)
@@ -234,17 +232,15 @@ class LossConeFitterTorch(LossConeFitterBase):
         else:
             spacecraft_t = float(spacecraft_slice)
 
-        # Define objective function
         def objective(params: Tensor) -> Tensor:
             """Evaluate chi2 for population of parameters."""
             U_surface = params[:, 0]
             bs_over_bm = params[:, 1]
             beam_amp = params[:, 2]
 
-            # Use fixed beam width (not scaling with |U_surface|)
+            # Fixed beam width (not scaling with |U_surface|)
             beam_width = torch.full_like(U_surface, self.beam_width_ev)
 
-            # Evaluate models
             models, model_masks = synth_losscone_batch_torch(
                 energies_t,
                 pitches_t,
@@ -258,7 +254,6 @@ class LossConeFitterTorch(LossConeFitterBase):
                 return_mask=True,
             )
 
-            # Compute chi2
             if self.fit_method == FitMethod.LILLIS:
                 chi2 = compute_lillis_chi2_batch_torch(
                     models, norm2d_t, data_mask_t, model_mask=model_masks
@@ -268,7 +263,6 @@ class LossConeFitterTorch(LossConeFitterBase):
                     models, norm2d_t, data_mask_t, eps, model_mask=model_masks
                 )
 
-            # Penalize invalid models
             invalid = ~torch.isfinite(chi2)
             chi2 = torch.where(invalid, torch.tensor(1e30, device=self.device), chi2)
 
@@ -296,11 +290,8 @@ class LossConeFitterTorch(LossConeFitterBase):
             seed=config.LOSS_CONE_LHS_SEED,
         )
         lhs_samples = torch.tensor(lhs_np, device=self.device, dtype=self.dtype)
-
-        # Evaluate all LHS samples at once (GPU batch)
         lhs_chi2 = objective(lhs_samples)
 
-        # Find best LHS point
         best_lhs_idx = torch.argmin(lhs_chi2).item()
         best_lhs_chi2 = lhs_chi2[best_lhs_idx].item()
         x0 = lhs_samples[best_lhs_idx]
@@ -317,10 +308,8 @@ class LossConeFitterTorch(LossConeFitterBase):
             dtype=self.dtype,
         )
 
-        # Run optimization seeded with best LHS point
         best_params, best_chi2, _n_iter = de.optimize(objective, x0=x0)
 
-        # Use LHS result if DE didn't improve
         if best_lhs_chi2 < best_chi2:
             best_params = x0
             best_chi2 = best_lhs_chi2
@@ -702,7 +691,6 @@ class LossConeFitterTorch(LossConeFitterBase):
             valid_energy = energies >= sc_potential
         model_mask = valid_energy.view(N_chunks, 1, energies.size(1), 1)
 
-        # Compute chi2 for all
         if self.fit_method == FitMethod.LILLIS:
             chi2 = compute_lillis_chi2_multi_chunk_torch(
                 models, norm2d, data_mask, model_mask=model_mask
@@ -714,21 +702,17 @@ class LossConeFitterTorch(LossConeFitterBase):
                 data_mask,
                 log_data_precomputed=log_data_precomputed,
                 model_mask=model_mask,
-            )  # (N, n_lhs)
+            )
 
-        # Penalize invalid
         chi2 = torch.where(
             torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
         )
 
-        # Find best per chunk
-        best_idx = torch.argmin(chi2, dim=1)  # (N,)
-        best_chi2 = chi2.gather(1, best_idx.unsqueeze(1)).squeeze(1)  # (N,)
-
-        # Gather best params
+        best_idx = torch.argmin(chi2, dim=1)
+        best_chi2 = chi2.gather(1, best_idx.unsqueeze(1)).squeeze(1)
         best_params = lhs_expanded.gather(
             1, best_idx.view(N_chunks, 1, 1).expand(-1, -1, 3)
-        ).squeeze(1)  # (N, 3)
+        ).squeeze(1)
 
         return best_params, best_chi2, chi2, lhs_samples
 
@@ -922,7 +906,6 @@ class LossConeFitterTorch(LossConeFitterBase):
                 return chi2.squeeze(0)
             return chi2
 
-        # Create multi-spectrum DE optimizer
         de = BatchedDifferentialEvolution(
             bounds=bounds,
             n_spectra=N_chunks,

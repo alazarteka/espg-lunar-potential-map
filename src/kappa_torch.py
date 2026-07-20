@@ -96,43 +96,25 @@ def omnidirectional_flux_batch_torch(
     N, P = kappa.shape
     E = energy.shape[0]
 
-    # velocity = sqrt(2E/m_e) in m/s
-    # Shape: (E,)
+    # v = sqrt(2E/m_e)
     velocity = torch.sqrt(2.0 * energy / config.ELECTRON_MASS_EV_S2_M2)
 
-    # Reshape for broadcasting:
-    # density: (N,) -> (N, 1, 1)
-    # kappa: (N, P) -> (N, P, 1)
-    # theta: (N, P) -> (N, P, 1)
-    # velocity: (E,) -> (1, 1, E)
     density_exp = density.view(N, 1, 1)
     kappa_exp = kappa.view(N, P, 1)
     theta_exp = theta.view(N, P, 1)
     velocity_exp = velocity.view(1, 1, E)
 
-    # Compute gamma ratio prefactor: Γ(κ+1) / (π^1.5 · κ^1.5 · Γ(κ-0.5))
-    # Shape: (N, P, 1)
+    # Γ(κ+1) / (π^1.5 · κ^1.5 · Γ(κ-0.5))
     prefactor = _torch_gamma_ratio(kappa_exp)
-
-    # Core: n / θ³
-    # Shape: (N, P, 1)
     core = density_exp / (theta_exp**3)
 
-    # Tail: (1 + (v/θ)² / κ)^(-κ-1)
-    # Shape: (N, P, E)
+    # (1 + (v/θ)² / κ)^(-κ-1)
     velocity_ratio_sq = (velocity_exp / theta_exp) ** 2
     tail = torch.pow(1.0 + velocity_ratio_sq / kappa_exp, -kappa_exp - 1.0)
 
-    # Phase space density f(v)
-    # Shape: (N, P, E)
     distribution = prefactor * core * tail
-
-    # Directional flux: j(E) = f(v) · v² / m_e
-    # Shape: (N, P, E)
+    # j(E) = f(v) · v² / m_e; J(E) = 4π · j · cm²→m²
     directional_flux = distribution * (velocity_exp**2) / config.ELECTRON_MASS_EV_S2_M2
-
-    # Omnidirectional flux: J(E) = 4π · j(E) · (1e-4 for cm²->m²)
-    # Shape: (N, P, E)
     omni_flux = 4.0 * math.pi * config.CM2_TO_M2 * directional_flux
 
     return omni_flux
@@ -162,15 +144,11 @@ def build_response_matrix_torch(
     """
     ln_energy = torch.log(energy)
 
-    # Convert relative width to Gaussian sigma in log-energy space
+    # Relative FWHM → Gaussian σ in log-energy space
     s = math.asinh(0.5 * energy_window_width_relative) / math.sqrt(2.0 * math.log(2.0))
 
-    # W[i,j] = exp(-0.5 * ((ln(E_i) - ln(E_j)) / s)²)
-    # Shape: (E, E)
     diff = ln_energy.unsqueeze(0) - ln_energy.unsqueeze(1)
     W = torch.exp(-0.5 * (diff / s) ** 2)
-
-    # Normalize rows
     W = W / W.sum(dim=1, keepdim=True)
 
     return W
@@ -198,22 +176,16 @@ def compute_kappa_chi2_batch_torch(
     """
     _N, _P, _E = model_flux.shape
 
-    # Apply response matrix if provided
     if response_matrix is not None:
-        # W @ model_flux: response_matrix[f,e] * model_flux[n,p,e] -> convolved[n,p,f]
-        # This matches CPU: W @ flux where W[i,j] maps input energy j to output i
+        # Match CPU: W @ flux (W[i,j] maps input energy j → output i)
         model_flux = torch.einsum("fe,npe->npf", response_matrix, model_flux)
 
-    # Log-space comparison
     log_model = torch.log(model_flux + eps)
-    log_data = torch.log(data_flux.unsqueeze(1) + eps)  # (N, 1, E)
-
-    # Weighted squared difference
-    # weights: (N, E) -> (N, 1, E)
+    log_data = torch.log(data_flux.unsqueeze(1) + eps)
     weights_exp = weights.unsqueeze(1)
 
     diff = (log_model - log_data) * weights_exp
-    chi2 = (diff**2).sum(dim=2)  # Sum over energy: (N, P)
+    chi2 = (diff**2).sum(dim=2)
 
     return chi2
 
@@ -296,7 +268,6 @@ class KappaFitterTorch:
         """
         N, _E = flux_data.shape
 
-        # Convert to tensors
         energy_t = torch.tensor(energy, device=self.device, dtype=self.dtype)
         flux_t = torch.tensor(flux_data, device=self.device, dtype=self.dtype)
         density_t = torch.tensor(
@@ -304,19 +275,16 @@ class KappaFitterTorch:
         )
 
         if weights is None:
-            # Default is unweighted. For CPU-parity, pass weights based on
-            # log-flux uncertainty: 1 / (sigma_log_flux + EPS).
+            # Unweighted default; for CPU parity pass 1/(sigma_log_flux + EPS)
             weights = np.ones_like(flux_data)
         weights_t = torch.tensor(weights, device=self.device, dtype=self.dtype)
 
-        # Build response matrix if needed
         response_matrix = None
         if self.use_convolution:
             response_matrix = build_response_matrix_torch(
                 energy_t, self.energy_window_width_relative
             )
 
-        # Create optimizer
         de = KappaDifferentialEvolution(
             bounds=self.DEFAULT_BOUNDS,
             n_spectra=N,
@@ -326,42 +294,25 @@ class KappaFitterTorch:
             dtype=self.dtype,
         )
 
-        # Define objective function
         def objective(params: Tensor) -> Tensor:
-            """
-            Evaluate chi² for all spectra and candidates.
+            """Evaluate chi² for all spectra and candidates. params: (N, P, 2)."""
+            kappa = params[:, :, 0]
+            log_theta = params[:, :, 1]
+            theta = 10.0**log_theta
 
-            Args:
-                params: (N, P, 2) [kappa, log_theta]
-
-            Returns:
-                (N, P) chi² values
-            """
-            kappa = params[:, :, 0]  # (N, P)
-            log_theta = params[:, :, 1]  # (N, P)
-            theta = 10.0**log_theta  # (N, P)
-
-            # Compute model flux
             model_flux = omnidirectional_flux_batch_torch(
                 density_t, kappa, theta, energy_t
-            )  # (N, P, E)
-
-            # Compute chi²
+            )
             chi2 = compute_kappa_chi2_batch_torch(
                 model_flux, flux_t, weights_t, response_matrix
-            )  # (N, P)
-
-            # Penalize invalid
+            )
             chi2 = torch.where(
                 torch.isfinite(chi2), chi2, torch.tensor(1e30, device=self.device)
             )
-
             return chi2
 
-        # Run optimization
         best_params, best_chi2, _n_iter = de.optimize(objective)
 
-        # Extract results
         kappa = best_params[:, 0].cpu().numpy()
         log_theta = best_params[:, 1].cpu().numpy()
         theta = 10.0**log_theta

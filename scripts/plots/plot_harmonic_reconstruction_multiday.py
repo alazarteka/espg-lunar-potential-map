@@ -94,7 +94,6 @@ def create_multiday_reconstruction_plot(
             vmax = np.max(all_potentials)
     print(f"Color scale: {vmin:.1f}V to {vmax:.1f}V")
 
-    # Create 2x3 subplot grid
     if projection == "mollweide":
         fig, axes = plt.subplots(
             2,
@@ -111,12 +110,10 @@ def create_multiday_reconstruction_plot(
 
     axes = axes.flatten()
 
-    # Plot each map
     for i, (lats, lons, potential, time) in enumerate(maps_data):
         ax = axes[i]
 
         if projection == "mollweide":
-            # Convert to radians for Mollweide
             lon_rad = np.deg2rad(lons)
             lat_rad = np.deg2rad(lats)
             mesh = ax.pcolormesh(
@@ -146,14 +143,11 @@ def create_multiday_reconstruction_plot(
             ax.set_ylim(-90, 90)
             ax.set_aspect("equal")
 
-        # Apply shared style
         style.apply_paper_style(ax)
 
-        # Add title with timestamp
         time_str = str(time)[:10]  # Just the date
         ax.set_title(f"{time_str}", fontsize=style.FONT_SIZE_TITLE - 2, pad=5)
 
-        # Add statistics in corner
         valid_pot = potential[np.isfinite(potential)]
         textstr = (
             f"Min: {np.min(valid_pot):.1f}V\n"
@@ -162,8 +156,7 @@ def create_multiday_reconstruction_plot(
         )
         utils.add_stats_box(ax, textstr, loc="upper left")
 
-    # Add shared colorbar
-    cbar = fig.colorbar(
+    fig.colorbar(
         mesh,
         ax=axes,
         label="Φ_surface (V)",
@@ -172,7 +165,6 @@ def create_multiday_reconstruction_plot(
         pad=0.05,
     )
 
-    # Add overall title
     if title:
         fig_title = title
     else:
@@ -180,7 +172,6 @@ def create_multiday_reconstruction_plot(
         fig_title = f"Reconstructed Surface Potential (l_max={lmax}) - {month_str}"
     fig.suptitle(fig_title, fontsize=style.FONT_SIZE_TITLE + 1, y=0.98)
 
-    # Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     print(f"\nSaved to {output_path}")

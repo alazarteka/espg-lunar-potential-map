@@ -61,7 +61,6 @@ def synth_losscone_batch_torch(
     U_surface = U_surface.to(device=device, dtype=dtype)
     n_params = U_surface.size(0)
 
-    # Set defaults for optional tensors
     if bs_over_bm is None:
         bs_over_bm = torch.ones(n_params, device=device, dtype=dtype)
     else:
@@ -84,19 +83,16 @@ def synth_losscone_batch_torch(
     else:
         background = background.to(device=device, dtype=dtype)
 
-    # Reshape for broadcasting: params -> (nParams, 1, 1)
     U_surface = U_surface.view(-1, 1, 1)
     bs_over_bm = bs_over_bm.view(-1, 1, 1)
     beam_amp = beam_amp.view(-1, 1, 1)
     beam_width_eV = beam_width_eV.view(-1, 1, 1)
     background = background.view(-1, 1, 1)
 
-    # Reshape grids for broadcasting
     nE, nPitch = pitch_grid.shape
-    pitch_exp = pitch_grid.unsqueeze(0)  # (1, nE, nPitch)
-    E_exp = energy_grid.unsqueeze(0).unsqueeze(-1)  # (1, nE, 1)
+    pitch_exp = pitch_grid.unsqueeze(0)
+    E_exp = energy_grid.unsqueeze(0).unsqueeze(-1)
 
-    # Handle U_spacecraft: scalar -> (1,1,1), array(nE,) -> (1,nE,1)
     if isinstance(U_spacecraft, (int, float)):
         U_spacecraft_t = torch.tensor(U_spacecraft, device=device, dtype=dtype).view(
             1, 1, 1
@@ -106,24 +102,19 @@ def synth_losscone_batch_torch(
             U_spacecraft.to(device=device, dtype=dtype).unsqueeze(0).unsqueeze(-1)
         )
 
-    # Compute validity mask: E >= U_spacecraft
     valid_energy = E_exp >= U_spacecraft_t
 
-    # Compute loss cone angle using Halekas 2008 formula
-    # sin²(αc) = (BS/BM) × (1 + UM / (E - U_spacecraft))
+    # Halekas 2008: sin²(αc) = (BS/BM) × (1 + UM / (E - U_spacecraft))
     E_corrected = torch.clamp(E_exp - U_spacecraft_t, min=EPS)
     x = bs_over_bm * (1.0 + U_surface / E_corrected)
     x_clipped = torch.clamp(x, 0.0, 1.0)
     ac_deg = torch.rad2deg(torch.arcsin(torch.sqrt(x_clipped)))
 
-    # Build model: background everywhere, 1.0 inside loss cone
     model = background.expand(n_params, nE, nPitch).clone()
-
-    # Inside loss cone: pitch <= 180 - αc (hard mask, matches CPU)
+    # Hard mask: pitch <= 180 - αc (matches CPU)
     inside_cone = pitch_exp <= (180.0 - ac_deg)
     model = torch.where(inside_cone, torch.ones_like(model), model)
 
-    # Add secondary electron beam if enabled
     has_beam = (beam_width_eV > 0).any() and (beam_amp > 0).any()
     has_accel = (U_spacecraft_t > U_surface).any()
     if has_beam and has_accel:
@@ -148,7 +139,6 @@ def synth_losscone_batch_torch(
         model = model + beam
 
     if return_mask:
-        # Broadcast valid_energy to full shape (n_params, nE, nPitch)
         valid_mask = valid_energy.expand(n_params, nE, nPitch)
         return model, valid_mask
     else:
@@ -193,7 +183,6 @@ def synth_losscone_multi_chunk_torch(
     n_pop = U_surface.size(1)
     nPitch = pitch_grids.size(2)
 
-    # Set defaults for optional tensors
     if bs_over_bm is None:
         bs_over_bm = torch.ones(N_chunks, n_pop, device=device, dtype=dtype)
 
@@ -208,50 +197,35 @@ def synth_losscone_multi_chunk_torch(
             (N_chunks, n_pop), DEFAULT_BACKGROUND, device=device, dtype=dtype
         )
 
-    # Reshape for broadcasting:
-    # U_surface: (N, P) -> (N, P, 1, 1)
-    # energy_grids: (N, E) -> (N, 1, E, 1)
-    # pitch_grids: (N, E, A) -> (N, 1, E, A)
     U_surface_exp = U_surface.view(N_chunks, n_pop, 1, 1)
     bs_over_bm_exp = bs_over_bm.view(N_chunks, n_pop, 1, 1)
     beam_amp_exp = beam_amp.view(N_chunks, n_pop, 1, 1)
     beam_width_exp = beam_width_eV.view(N_chunks, n_pop, 1, 1)
     background_exp = background.view(N_chunks, n_pop, 1, 1)
 
-    # Energy: (N, E) -> (N, 1, E, 1)
     valid_E = energy_grids > 0
     E_safe = torch.where(valid_E, energy_grids, torch.ones_like(energy_grids))
     E_exp = E_safe.view(N_chunks, 1, nE, 1)
     valid_E_exp = valid_E.view(N_chunks, 1, nE, 1)
-
-    # Pitch: (N, E, A) -> (N, 1, E, A)
     pitch_exp = pitch_grids.unsqueeze(1)
 
-    # Handle U_spacecraft: (N, E) -> (N, 1, E, 1) or (N,) -> (N, 1, 1, 1)
     if U_spacecraft is None:
         U_spacecraft_exp = torch.zeros(N_chunks, 1, 1, 1, device=device, dtype=dtype)
     elif U_spacecraft.dim() == 1:
-        # Per-chunk scalar: (N,) -> (N, 1, 1, 1)
         U_spacecraft_exp = U_spacecraft.view(N_chunks, 1, 1, 1)
     else:
-        # Per-chunk per-energy: (N, E) -> (N, 1, E, 1)
         U_spacecraft_exp = U_spacecraft.view(N_chunks, 1, nE, 1)
 
-    # Compute loss cone angle using Halekas 2008 formula
-    # sin²(αc) = (BS/BM) × (1 + UM / (E - U_spacecraft))
+    # Halekas 2008: sin²(αc) = (BS/BM) × (1 + UM / (E - U_spacecraft))
     E_corrected = torch.clamp(E_exp - U_spacecraft_exp, min=EPS)
     x = bs_over_bm_exp * (1.0 + U_surface_exp / E_corrected)
     x_clipped = torch.clamp(x, 0.0, 1.0)
     ac_deg = torch.rad2deg(torch.arcsin(torch.sqrt(x_clipped)))
 
-    # Build model: background everywhere, 1.0 inside loss cone
     model = background_exp.expand(N_chunks, n_pop, nE, nPitch).clone()
-
-    # Inside loss cone: pitch <= 180 - αc (hard mask)
     inside_cone = (pitch_exp <= (180.0 - ac_deg)) & valid_E_exp
     model = torch.where(inside_cone, torch.ones_like(model), model)
 
-    # Add secondary electron beam if enabled
     has_beam = (beam_width_exp > 0).any() and (beam_amp_exp > 0).any()
     has_accel = (U_spacecraft_exp > U_surface_exp).any()
     if has_beam and has_accel:

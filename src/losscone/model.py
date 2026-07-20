@@ -153,7 +153,6 @@ def synth_losscone_batch(
     U_surface = np.atleast_1d(np.asarray(U_surface))
     n_params = U_surface.size
 
-    # Set defaults for optional arrays
     if bs_over_bm is None:
         bs_over_bm = np.ones(n_params)
     else:
@@ -174,41 +173,30 @@ def synth_losscone_batch(
     else:
         background = np.atleast_1d(np.asarray(background))
 
-    # Reshape for broadcasting: params -> (nParams, 1, 1)
     U_surface = U_surface.reshape(-1, 1, 1)
     bs_over_bm = bs_over_bm.reshape(-1, 1, 1)
     beam_amp = beam_amp.reshape(-1, 1, 1)
     beam_width_eV = beam_width_eV.reshape(-1, 1, 1)
     background = background.reshape(-1, 1, 1)
 
-    # Reshape grids for broadcasting
     energy_grid = np.asarray(energy_grid)
-    pitch_exp = pitch_grid[None, :, :]  # (1, nE, nPitch)
-    E_exp = energy_grid[None, :, None]  # (1, nE, 1)
+    pitch_exp = pitch_grid[None, :, :]
+    E_exp = energy_grid[None, :, None]
 
-    # Handle U_spacecraft: scalar -> (1,1,1), array(nE,) -> (1,nE,1)
     U_spacecraft = np.asarray(U_spacecraft)
     if U_spacecraft.ndim == 0:
         U_spacecraft = U_spacecraft.reshape(1, 1, 1)
     else:
         U_spacecraft = U_spacecraft.reshape(1, -1, 1)
 
-    # Compute validity mask: E >= U_spacecraft
-    # Shape: (n_params, nE, nPitch) after broadcasting
     valid_energy = E_exp >= U_spacecraft
-
-    # Compute loss cone angle
     ac_deg = _compute_loss_cone_angle(E_exp, U_surface, U_spacecraft, bs_over_bm)
 
-    # Build model: background everywhere, 1.0 inside loss cone
     nE, nPitch = pitch_grid.shape
     model = np.broadcast_to(background, (n_params, nE, nPitch)).copy()
-
-    # Inside loss cone: pitch <= 180 - αc
     inside_cone = pitch_exp <= (180.0 - ac_deg)
     model[inside_cone] = 1.0
 
-    # Add secondary electron beam if enabled
     if np.any(beam_width_eV > 0) and np.any(beam_amp > 0):
         beam = _compute_beam(
             E_exp,
@@ -222,7 +210,6 @@ def synth_losscone_batch(
         model += beam
 
     if return_mask:
-        # Broadcast valid_energy to full shape (n_params, nE, nPitch)
         valid_mask = np.broadcast_to(valid_energy, (n_params, nE, nPitch))
         return model, valid_mask
     else:
