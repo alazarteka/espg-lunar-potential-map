@@ -20,70 +20,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src import config
+from src.diagnostics import compute_loss_cone_boundary, interpolate_to_regular_grid
 from src.flux import ERData, LossConeFitter, PitchAngle
 from src.model import synth_losscone
 
 try:
     from src.losscone_torch import LossConeFitterTorch
+
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
 from src.visualization import style, utils
-
-
-def interpolate_to_regular_grid(
-    energies: np.ndarray,
-    pitches: np.ndarray,
-    flux_data: np.ndarray,
-    n_pitch_bins: int = 100,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Interpolate irregular 2D (energy, pitch) grid onto regular grid.
-
-    Args:
-        energies: 1D array of energy values (n_energies,)
-        pitches: 2D array of pitch angles (n_energies, n_channels)
-        flux_data: 2D array of flux values (n_energies, n_channels)
-        n_pitch_bins: Number of regular pitch angle bins
-
-    Returns:
-        energies_reg: Regular energy grid (same as input)
-        pitches_reg: Regular pitch angle grid (n_pitch_bins,)
-        flux_reg: Interpolated flux on regular grid (n_energies, n_pitch_bins)
-    """
-    # Create regular pitch grid
-    pitch_min = np.nanmin(pitches)
-    pitch_max = np.nanmax(pitches)
-    pitches_reg = np.linspace(pitch_min, pitch_max, n_pitch_bins)
-
-    # Initialize regular grid
-    flux_reg = np.zeros((len(energies), n_pitch_bins))
-
-    # Interpolate for each energy separately
-    for i in range(len(energies)):
-        valid_mask = np.isfinite(flux_data[i]) & np.isfinite(pitches[i])
-
-        if np.sum(valid_mask) > 1:
-            pitch_pts = pitches[i, valid_mask]
-            flux_pts = flux_data[i, valid_mask]
-
-            # Sort by pitch angle
-            sort_idx = np.argsort(pitch_pts)
-            pitch_pts_sorted = pitch_pts[sort_idx]
-            flux_pts_sorted = flux_pts[sort_idx]
-
-            # Interpolate onto regular pitch grid
-            flux_reg[i] = np.interp(
-                pitches_reg,
-                pitch_pts_sorted,
-                flux_pts_sorted,
-                left=np.nan,
-                right=np.nan,
-            )
-        else:
-            flux_reg[i] = np.nan
-
-    return energies, pitches_reg, flux_reg
 
 
 def create_losscone_comparison_plot(
@@ -219,26 +166,7 @@ def create_losscone_comparison_plot(
     _, _, model_reg = interpolate_to_regular_grid(energies, pitches, model_irregular)
 
     # Calculate loss cone boundary (with spacecraft potential correction)
-    loss_cone_angle = []
-    for E in energies:
-        if E <= 0:
-            loss_cone_angle.append(np.nan)
-            continue
-        # Apply spacecraft potential correction: E_plasma = E_measured - U_spacecraft
-        E_corrected = E - usc
-        if E_corrected <= 0:
-            loss_cone_angle.append(np.nan)
-            continue
-        x = bs_bm * (1.0 + U_surface / E_corrected)
-        if x <= 0:
-            ac = 0.0
-        elif x >= 1:
-            ac = 90.0
-        else:
-            ac = np.degrees(np.arcsin(np.sqrt(x)))
-        loss_cone_angle.append(180 - ac)
-
-    loss_cone_angle = np.array(loss_cone_angle)
+    loss_cone_angle = compute_loss_cone_boundary(energies, U_surface, bs_bm, usc)
 
     # Create figure with side-by-side heatmaps
     fig, (ax1, ax2) = plt.subplots(

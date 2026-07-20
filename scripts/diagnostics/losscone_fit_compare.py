@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src import config
+from src.diagnostics import compute_loss_cone_boundary, finite_range
 from src.flux import ERData, LossConeFitter, PitchAngle
 from src.model import synth_losscone
 
@@ -141,37 +142,6 @@ def _edge_array(values: np.ndarray) -> np.ndarray:
     return edges
 
 
-def _finite_range(
-    data: np.ndarray, fallback: tuple[float, float], pct: tuple[float, float]
-) -> tuple[float, float]:
-    finite = data[np.isfinite(data)]
-    if finite.size == 0:
-        return fallback
-    vmin = float(np.nanpercentile(finite, pct[0]))
-    vmax = float(np.nanpercentile(finite, pct[1]))
-    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
-        return fallback
-    return vmin, vmax
-
-
-def _compute_loss_cone_boundary(
-    energies: np.ndarray,
-    u_surface: float,
-    bs_over_bm: float,
-    u_spacecraft: float,
-) -> np.ndarray:
-    e_corr = energies - u_spacecraft
-    loss_cone = np.full_like(energies, np.nan, dtype=float)
-    valid = e_corr > 0
-    if not np.any(valid):
-        return loss_cone
-    x = bs_over_bm * (1.0 + u_surface / np.maximum(e_corr, config.EPS))
-    x = np.clip(x, 0.0, 1.0)
-    ac_deg = np.degrees(np.arcsin(np.sqrt(x)))
-    loss_cone[valid] = 180.0 - ac_deg[valid]
-    return loss_cone
-
-
 def _chunk_slice(total_rows: int, chunk_idx: int) -> slice:
     start = chunk_idx * config.SWEEP_ROWS
     end = min((chunk_idx + 1) * config.SWEEP_ROWS, total_rows)
@@ -237,7 +207,7 @@ def _render_comparison(
     title: str,
     row_labels: tuple[str, str],
 ) -> None:
-    vmin, vmax = _finite_range(norm2d, (0.0, 1.0), (5.0, 95.0))
+    vmin, vmax = finite_range(norm2d, (0.0, 1.0), (5.0, 95.0))
     vmax = max(vmax, 1.0)
 
     residuals = np.concatenate(
@@ -246,7 +216,7 @@ def _render_comparison(
             np.ravel(lillis["residual"]),
         ]
     )
-    res_max = _finite_range(np.abs(residuals), (0.1, 0.5), (95.0, 99.0))[1]
+    res_max = finite_range(np.abs(residuals), (0.1, 0.5), (95.0, 99.0))[1]
     res_max = max(res_max, 0.1)
 
     energy_edges = _edge_array(np.maximum(energies, config.EPS))
@@ -423,10 +393,10 @@ def main() -> int:
                 background=fitter_lillis.background,
             )
 
-            hal_loss = _compute_loss_cone_boundary(
+            hal_loss = compute_loss_cone_boundary(
                 energies, hal_u, hal_bs, float(args.u_spacecraft)
             )
-            lil_loss = _compute_loss_cone_boundary(
+            lil_loss = compute_loss_cone_boundary(
                 energies, lil_u, lil_bs, float(args.u_spacecraft)
             )
 

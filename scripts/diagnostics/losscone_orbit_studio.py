@@ -25,10 +25,11 @@ from bokeh.models import (
     LinearColorMapper,
     Range1d,
 )
-from bokeh.palettes import Category20, Viridis256, Turbo256
+from bokeh.palettes import Category20, Turbo256
 from bokeh.plotting import figure
 
 from src import config
+from src.diagnostics import finite_range
 from src.flux import ERData, PitchAngle
 from src.potential_mapper.spice import load_spice_files
 from src.spacecraft_potential import calculate_potential
@@ -51,19 +52,6 @@ class OrbitData:
     flux_sum: np.ndarray
     u_sc: np.ndarray
     spacecraft_in_sun: np.ndarray
-
-
-def _finite_range(
-    data: np.ndarray, fallback: tuple[float, float], pct: tuple[float, float]
-) -> tuple[float, float]:
-    finite = data[np.isfinite(data)]
-    if finite.size == 0:
-        return fallback
-    vmin = float(np.nanpercentile(finite, pct[0]))
-    vmax = float(np.nanpercentile(finite, pct[1]))
-    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
-        return fallback
-    return vmin, vmax
 
 
 def _parse_datetime(value: object) -> datetime | None:
@@ -103,21 +91,14 @@ def _compute_spacecraft_in_sun(et: float | None) -> bool:
     lp_to_sun = get_lp_vector_to_sun_in_lunar_frame(et)
     if lp_pos is None or lp_to_sun is None:
         return False
-    intersection = get_intersection_or_none(
-        lp_pos, lp_to_sun, config.LUNAR_RADIUS
-    )
+    intersection = get_intersection_or_none(lp_pos, lp_to_sun, config.LUNAR_RADIUS)
     return intersection is None
 
 
 def _interpolate_log_flux(
     energies: np.ndarray, flux: np.ndarray, log_energy_grid: np.ndarray
 ) -> np.ndarray:
-    valid = (
-        np.isfinite(energies)
-        & np.isfinite(flux)
-        & (energies > 0)
-        & (flux > 0)
-    )
+    valid = np.isfinite(energies) & np.isfinite(flux) & (energies > 0) & (flux > 0)
     if np.count_nonzero(valid) < 2:
         return np.full_like(log_energy_grid, np.nan)
     log_e = np.log10(energies[valid])
@@ -154,14 +135,14 @@ def _rebin_spectrogram(
     n_specs = energies.shape[0]
     log_flux = np.full((len(log_energy_grid), n_specs), np.nan)
     for i in range(n_specs):
-        log_flux[:, i] = _interpolate_log_flux(
-            energies[i], flux[i], log_energy_grid
-        )
+        log_flux[:, i] = _interpolate_log_flux(energies[i], flux[i], log_energy_grid)
     return log_flux
 
 
 def _build_time_formatter(ticks: list[int], labels: list[str]) -> CustomJSTickFormatter:
-    mapping = {str(int(tick)): label for tick, label in zip(ticks, labels, strict=False)}
+    mapping = {
+        str(int(tick)): label for tick, label in zip(ticks, labels, strict=False)
+    }
     code = f"""
         const mapping = {json.dumps(mapping)};
         const key = Math.round(tick).toString();
@@ -291,12 +272,12 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
 
     nominal_energies = np.nanmedian(data.energies, axis=0)
     default_selection = _default_energy_selection(nominal_energies)
-    energy_options = {
-        f"{energy:.0f} eV": float(energy) for energy in nominal_energies
-    }
+    energy_options = {f"{energy:.0f} eV": float(energy) for energy in nominal_energies}
 
     collapse = pn.widgets.Select(
-        name="Earthward collapse", options=["mean", "median", "sum"], value=args.collapse
+        name="Earthward collapse",
+        options=["mean", "median", "sum"],
+        value=args.collapse,
     )
     n_bins = pn.widgets.IntSlider(
         name="Energy bins (log)",
@@ -469,9 +450,7 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
     palette = Category20[20]
     for idx, energy in enumerate(nominal_energies):
         color = palette[idx % len(palette)]
-        source = ColumnDataSource(
-            data=dict(x=time_hours, y=np.full(n_specs, np.nan))
-        )
+        source = ColumnDataSource(data=dict(x=time_hours, y=np.full(n_specs, np.nan)))
         renderer = line_fig.line(
             "x",
             "y",
@@ -540,10 +519,10 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
         )
 
         if auto_scale.value:
-            uncorr_mapper.low, uncorr_mapper.high = _finite_range(
+            uncorr_mapper.low, uncorr_mapper.high = finite_range(
                 uncorr_log, fallback=(0.0, 1.0), pct=(5, 95)
             )
-            corr_mapper.low, corr_mapper.high = _finite_range(
+            corr_mapper.low, corr_mapper.high = finite_range(
                 corr_log, fallback=(0.0, 1.0), pct=(5, 95)
             )
             status.object = ""
@@ -554,10 +533,10 @@ def build_app(args: argparse.Namespace) -> pn.template.FastListTemplate:
             if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin >= vmax:
                 status.object = "Invalid flux min/max; using auto scale."
                 status.alert_type = "warning"
-                uncorr_mapper.low, uncorr_mapper.high = _finite_range(
+                uncorr_mapper.low, uncorr_mapper.high = finite_range(
                     uncorr_log, fallback=(0.0, 1.0), pct=(5, 95)
                 )
-                corr_mapper.low, corr_mapper.high = _finite_range(
+                corr_mapper.low, corr_mapper.high = finite_range(
                     corr_log, fallback=(0.0, 1.0), pct=(5, 95)
                 )
             else:

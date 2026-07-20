@@ -11,6 +11,7 @@ from src.diagnostics.losscone_session import (
     compute_loss_cone_boundary,
     interpolate_to_regular_grid,
 )
+from src.diagnostics.ui_utils import finite_range
 
 __all__ = [
     "BeamDetectionResult",
@@ -19,5 +20,6 @@ __all__ = [
     "_build_energy_profile",
     "compute_loss_cone_boundary",
     "detect_peak",
+    "finite_range",
     "interpolate_to_regular_grid",
 ]
