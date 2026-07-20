@@ -1,6 +1,11 @@
 """Shared style definitions for plots."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import matplotlib.axes
 
 # Colors
 COLOR_SUNLIT = "#FDB462"  # Orange
@@ -34,12 +39,8 @@ BBOX_STYLE = {
 }
 
 
-def apply_paper_style(ax: Any, grid: bool = True) -> None:
+def apply_paper_style(ax: matplotlib.axes.Axes, grid: bool = True) -> None:
     """Apply standard paper style to a Matplotlib axes."""
     if grid:
         ax.grid(True, **GRID_STYLE)
-
-    # Set label sizes if not already set (this is handled by matplotlib typically,
-    # but we can enforce it if needed. For now, rely on script setting it or defaults).
-    # We could set tick params here.
     ax.tick_params(labelsize=FONT_SIZE_TEXT)

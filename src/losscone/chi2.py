@@ -12,7 +12,7 @@ from src.losscone.masks import build_lillis_mask
 def _get_eps(eps: float | None) -> float:
     if eps is not None:
         return float(eps)
-    return float(getattr(config, "EPS", 1e-6))
+    return float(config.EPS)
 
 
 def _as_model_mask_3d(

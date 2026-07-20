@@ -99,11 +99,7 @@ def _spacecraft_potential_per_row(er_data: ERData, n_rows: int) -> np.ndarray:
         if not potential_result:
             continue
         _, potential_quantity = potential_result
-        try:
-            potential_value = float(potential_quantity.to(ureg.volt).magnitude)
-        except Exception:
-            potential_value = float(potential_quantity)
-        potentials[mask_idx] = potential_value
+        potentials[mask_idx] = float(potential_quantity.to(ureg.volt).magnitude)
 
     return potentials
 
@@ -157,17 +153,16 @@ def _prepare_kappa_batch_data(
             density_list.append(kappa_obj.density_estimate_mag)
             try:
                 weight_list.append(kappa_obj.log_flux_weights())
-            except Exception:
+            except ValueError:
                 weight_list.append(
                     np.ones_like(
                         kappa_obj.omnidirectional_differential_particle_flux_mag
                     )
                 )
             valid_spec_nos.append(spec_no)
-            # Store first row index for this spectrum
             mask_idx = np.flatnonzero(spec_values == spec_value)
             row_indices.append(mask_idx[0])
-        except Exception:
+        except (TypeError, ValueError, KeyError, IndexError):
             continue
 
     if energy is None or len(flux_list) == 0:

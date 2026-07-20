@@ -29,7 +29,7 @@ try:  # Optional GPU path
         _auto_detect_dtype,
         synth_losscone_batch_torch,
     )
-except Exception:  # pragma: no cover - optional GPU path
+except ImportError:  # pragma: no cover - optional GPU path
     HAS_TORCH = False
     torch = None  # type: ignore[assignment]
     _auto_detect_dtype = None  # type: ignore[assignment]
@@ -249,19 +249,26 @@ class LossConeSession:
         if self.use_torch:
             try:
                 from src.losscone_torch import LossConeFitterTorch
-
-                self.fitter = LossConeFitterTorch(
-                    self.er_data,
-                    pitch_angle=self.pitch_angle,
-                    normalization_mode=self.normalization_mode,
-                    incident_flux_stat=self.incident_flux_stat,
-                    loss_cone_background=self.background,
-                    device=str(self._torch_device) if self._torch_device else None,
-                    fit_method=self.fit_method,
-                )
-                return
-            except Exception:
+            except ImportError:
                 self.use_torch = False
+            else:
+                try:
+                    self.fitter = LossConeFitterTorch(
+                        self.er_data,
+                        pitch_angle=self.pitch_angle,
+                        normalization_mode=self.normalization_mode,
+                        incident_flux_stat=self.incident_flux_stat,
+                        loss_cone_background=self.background,
+                        device=str(self._torch_device) if self._torch_device else None,
+                        fit_method=self.fit_method,
+                    )
+                    return
+                except Exception:
+                    logger.exception(
+                        "LossConeFitterTorch construction failed; "
+                        "not falling back silently"
+                    )
+                    raise
 
         self.fitter = LossConeFitter(
             self.er_data,
