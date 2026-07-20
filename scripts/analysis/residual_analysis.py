@@ -369,7 +369,7 @@ def main() -> int:
     for i, t_str in enumerate(tqdm(utc_str, desc="Converting UTC to ET", leave=False)):
         try:
             et[i] = spice.str2et(t_str)
-        except:
+        except Exception:
             et[i] = np.nan
 
     # Filter invalid ET

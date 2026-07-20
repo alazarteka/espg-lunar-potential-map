@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import TypedDict
 
 import numpy as np
 import plotly.graph_objects as go
@@ -16,6 +17,14 @@ from plotly.subplots import make_subplots
 
 from src.potential_mapper.spice import load_spice_files
 from src.utils.spice_ops import get_sun_vector_wrt_moon
+
+
+class SunGeometry(TypedDict):
+    utc: str
+    et: float
+    sun_unit: np.ndarray
+    subsolar_lat: float
+    subsolar_lon: float
 
 # Default cache directory mirrors the batch runner output
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
@@ -166,9 +175,7 @@ def _utc_string(dt64: np.datetime64) -> str:
     return np.datetime_as_string(dt_ms, unit="ms")
 
 
-def _compute_sun_geometry(
-    mid_time: np.datetime64,
-) -> dict[str, float | np.ndarray | str]:
+def _compute_sun_geometry(mid_time: np.datetime64) -> SunGeometry:
     """Compute midpoint Sun direction in IAU_MOON."""
     _ensure_spice_loaded()
     utc_str = _utc_string(mid_time)
@@ -425,7 +432,7 @@ def main() -> int:
 
     midpoint = _datetime64_midpoint(rows.utc)
     geometry = _compute_sun_geometry(midpoint)
-    sun_unit = geometry["sun_unit"]  # type: ignore[assignment]
+    sun_unit = geometry["sun_unit"]
 
     angles_deg = _angular_distance_deg(
         rows.projection_lat, rows.projection_lon, sun_unit

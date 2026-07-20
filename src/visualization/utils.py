@@ -1,15 +1,19 @@
 """Shared plotting utilities."""
 
+from __future__ import annotations
+
 import argparse
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import matplotlib.axes
 
 from src.visualization.style import BBOX_STYLE, FONT_SIZE_TEXT
 
 
-def add_stats_box(ax: Any, text: str, loc: str = "upper left") -> None:
+def add_stats_box(ax: matplotlib.axes.Axes, text: str, loc: str = "upper left") -> None:
     """Add a statistics text box to the axes."""
-    # Simple location mapping
     x, y = 0.02, 0.98
     va, ha = "top", "left"
 

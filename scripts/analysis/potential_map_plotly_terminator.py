@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import TypedDict
 
 import numpy as np
 import plotly.graph_objects as go
@@ -15,6 +16,15 @@ import spiceypy as spice
 
 from src.potential_mapper.spice import load_spice_files
 from src.utils.spice_ops import get_sun_vector_wrt_moon
+
+
+class SunGeometry(TypedDict):
+    utc: str
+    et: float
+    sun_vector: np.ndarray
+    sun_unit: np.ndarray
+    subsolar_lat: float
+    subsolar_lon: float
 
 # Default cache directory mirrors the batch runner output
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
@@ -158,9 +168,7 @@ def _utc_string(dt64: np.datetime64) -> str:
     return np.datetime_as_string(dt_ms, unit="ms")
 
 
-def _compute_sun_geometry(
-    mid_time: np.datetime64,
-) -> dict[str, float | np.ndarray | str]:
+def _compute_sun_geometry(mid_time: np.datetime64) -> SunGeometry:
     """Compute Sun direction, subsolar point, and supporting metadata."""
     _ensure_spice_loaded()
     utc_str = _utc_string(mid_time)
@@ -271,7 +279,7 @@ def _predict_daylit(
 
 def _build_figure(
     bundle: RowBundle,
-    geometry: dict[str, float | np.ndarray | str],
+    geometry: SunGeometry,
     *,
     colorscale: str,
     cmin: float | None,
@@ -279,7 +287,7 @@ def _build_figure(
     title: str,
 ) -> go.Figure:
     """Compose the Plotly figure with shaded surface and potential markers."""
-    sun_unit = geometry["sun_unit"]  # type: ignore[assignment]
+    sun_unit = geometry["sun_unit"]
     surface_payload = _day_night_surface(sun_unit, scale=1.0)
     fig = go.Figure()
 
@@ -344,8 +352,8 @@ def _build_figure(
         )
 
     # Add subsolar point marker
-    sub_lat = float(geometry["subsolar_lat"])  # type: ignore[assignment]
-    sub_lon = float(geometry["subsolar_lon"])  # type: ignore[assignment]
+    sub_lat = float(geometry["subsolar_lat"])
+    sub_lon = float(geometry["subsolar_lon"])
     sub_x, sub_y, sub_z = _scatter_coordinates(
         np.array([sub_lat]), np.array([sub_lon]), radius=1.02
     )
@@ -492,7 +500,7 @@ def main() -> int:
     midpoint = _datetime64_midpoint(bundle.utc)
     geometry = _compute_sun_geometry(midpoint)
 
-    sun_unit = geometry["sun_unit"]  # type: ignore[assignment]
+    sun_unit = geometry["sun_unit"]
     valid_rows = (
         np.isfinite(bundle.lat)
         & np.isfinite(bundle.lon)

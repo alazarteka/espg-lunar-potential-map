@@ -235,18 +235,15 @@ def _lateral_width_km(sza: np.ndarray, lat: np.ndarray, lon: np.ndarray) -> floa
     """Estimate lateral width (SZA 88° -> 92°) in km."""
     if sza.size < 2:
         return np.nan
-    try:
-        idx88 = np.where(sza <= 88.0)[0]
-        idx92 = np.where(sza >= 92.0)[0]
-        if idx88.size == 0 or idx92.size == 0:
-            return np.nan
-        i0 = idx88[-1]
-        i1 = idx92[0]
-        if i1 <= i0:
-            return np.nan
-        return _great_circle_km(lat[i0], lon[i0], lat[i1], lon[i1])
-    except Exception:
+    idx88 = np.where(sza <= 88.0)[0]
+    idx92 = np.where(sza >= 92.0)[0]
+    if idx88.size == 0 or idx92.size == 0:
         return np.nan
+    i0 = idx88[-1]
+    i1 = idx92[0]
+    if i1 <= i0:
+        return np.nan
+    return _great_circle_km(lat[i0], lon[i0], lat[i1], lon[i1])
 
 
 def _monte_carlo_sigma(
@@ -294,12 +291,9 @@ def _safe_corr(x: np.ndarray, y: np.ndarray) -> float | None:
     mask = np.isfinite(x) & np.isfinite(y)
     if mask.sum() < 3:
         return None
-    try:
-        corr = np.corrcoef(x[mask], y[mask])[0, 1]
-        if np.isfinite(corr):
-            return float(corr)
-    except Exception:
-        return None
+    corr = np.corrcoef(x[mask], y[mask])[0, 1]
+    if np.isfinite(corr):
+        return float(corr)
     return None
 
 

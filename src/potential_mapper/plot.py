@@ -56,11 +56,8 @@ def plot_map(
     y = results.projection_latitude[mask]
     c = results.projected_potential[mask]
 
-    try:
-        sc = axes.scatter(x, y, c=c, s=8, cmap="viridis")
-        fig.colorbar(sc, ax=axes, label="Surface potential U_surface (V)")
-    except Exception:
-        axes.scatter(x, y, s=8)
+    sc = axes.scatter(x, y, c=c, s=8, cmap="viridis")
+    fig.colorbar(sc, ax=axes, label="Surface potential U_surface (V)")
 
     axes.set_xlabel("Longitude (deg)")
     axes.set_ylabel("Latitude (deg)")
