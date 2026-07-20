@@ -11,16 +11,18 @@ from pathlib import Path
 import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
-import spiceypy as spice
 
-from src.potential_mapper.spice import load_spice_files
-from src.utils.spice_ops import get_sun_vector_wrt_moon
+from src.potential_mapper.cache_io import (
+    datetime64_midpoint,
+    discover_npz,
+    load_rows_in_window,
+    sample_indices,
+    sun_geometry_at,
+)
 
 # Default cache directory mirrors the batch runner output
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 
-# Global guard so we only load kernels once
-_SPICE_LOADED = False
 
 
 @dataclass(slots=True)
@@ -42,91 +44,30 @@ def _parse_iso_date(value: str) -> np.datetime64:
     return np.datetime64(dt.date())
 
 
-def _discover_npz(cache_dir: Path) -> list[Path]:
-    """Return all NPZ cache files under cache_dir."""
-    if not cache_dir.exists():
-        raise FileNotFoundError(f"Cache directory {cache_dir} does not exist")
-    return sorted(p for p in cache_dir.rglob("*.npz") if p.is_file())
-
-
 def _load_rows(
     files: list[Path],
     start_ts: np.datetime64,
     end_ts_exclusive: np.datetime64,
 ) -> RowBundle:
-    """Load projection rows that fall inside the requested UTC window."""
-    lat_parts: list[np.ndarray] = []
-    lon_parts: list[np.ndarray] = []
-    pot_parts: list[np.ndarray] = []
-    utc_parts: list[np.ndarray] = []
-    proj_sun_parts: list[np.ndarray] = []
-
-    start_str = str(start_ts.astype("datetime64[s]"))
-    end_str = str(end_ts_exclusive.astype("datetime64[s]"))
-
-    for path in files:
-        with np.load(path) as data:
-            utc = data["rows_utc"]
-            proj_lat = data["rows_projection_latitude"].astype(np.float64)
-            proj_lon = data["rows_projection_longitude"].astype(np.float64)
-            proj_pot = data["rows_projected_potential"].astype(np.float64)
-            proj_in_sun = data.get("rows_projection_in_sun")
-
-        if utc.size == 0:
-            continue
-
-        valid_time = utc != ""
-        if not np.any(valid_time):
-            continue
-
-        mask = valid_time & (utc >= start_str) & (utc < end_str)
-        if not np.any(mask):
-            continue
-
-        try:
-            utc_vals = np.array(utc[mask], dtype="datetime64[ns]")
-        except ValueError:
-            logging.debug("Failed to parse UTC strings in %s; skipping", path)
-            continue
-
-        lat_parts.append(proj_lat[mask])
-        lon_parts.append(proj_lon[mask])
-        pot_parts.append(proj_pot[mask])
-        utc_parts.append(utc_vals)
-        if proj_in_sun is not None:
-            proj_sun_parts.append(proj_in_sun[mask].astype(bool))
-        else:
-            proj_sun_parts.append(np.zeros(mask.sum(), dtype=bool))
-
-    if not utc_parts:
-        empty_time = np.array([], dtype="datetime64[ns]")
-        empty_float = np.array([])
-        return RowBundle(
-            utc=empty_time,
-            lat=empty_float,
-            lon=empty_float,
-            potential=empty_float,
-            projection_in_sun=np.array([], dtype=bool),
-        )
-
+    data = load_rows_in_window(
+        files,
+        start_ts,
+        end_ts_exclusive,
+        fields=("utc", "lat", "lon", "potential", "projection_in_sun"),
+    )
     return RowBundle(
-        utc=np.concatenate(utc_parts),
-        lat=np.concatenate(lat_parts),
-        lon=np.concatenate(lon_parts),
-        potential=np.concatenate(pot_parts),
-        projection_in_sun=np.concatenate(proj_sun_parts)
-        if proj_sun_parts
-        else np.array([], dtype=bool),
+        utc=data["utc"],
+        lat=data["lat"],
+        lon=data["lon"],
+        potential=data["potential"],
+        projection_in_sun=data["projection_in_sun"],
     )
 
 
 def _sample_rows(bundle: RowBundle, sample: int | None, seed: int | None) -> RowBundle:
-    """Randomly down-sample the bundle if requested."""
-    size = bundle.utc.size
-    if sample is None or sample <= 0 or size <= sample:
+    idx = sample_indices(bundle.utc.size, sample, seed)
+    if idx is None:
         return bundle
-    rng = np.random.default_rng(seed)
-    idx = rng.choice(size, size=sample, replace=False)
     return RowBundle(
         utc=bundle.utc[idx],
         lat=bundle.lat[idx],
@@ -134,60 +75,6 @@ def _sample_rows(bundle: RowBundle, sample: int | None, seed: int | None) -> Row
         potential=bundle.potential[idx],
         projection_in_sun=bundle.projection_in_sun[idx],
     )
-
-
-def _ensure_spice_loaded() -> None:
-    """Load SPICE kernels once per process."""
-    global _SPICE_LOADED
-    if not _SPICE_LOADED:
-        load_spice_files()
-        _SPICE_LOADED = True
-
-
-def _datetime64_midpoint(times: np.ndarray) -> np.datetime64:
-    """Return midpoint between earliest and latest timestamps."""
-    t_min = times.min()
-    t_max = times.max()
-    delta = t_max - t_min
-    return t_min + delta // 2
-
-
-def _utc_string(dt64: np.datetime64) -> str:
-    """Render datetime64 with millisecond precision for SPICE."""
-    dt_ms = dt64.astype("datetime64[ms]")
-    return np.datetime_as_string(dt_ms, unit="ms")
-
-
-def _compute_sun_geometry(
-    mid_time: np.datetime64,
-) -> dict[str, float | np.ndarray | str]:
-    """Compute Sun direction, subsolar point, and supporting metadata."""
-    _ensure_spice_loaded()
-    utc_str = _utc_string(mid_time)
-    try:
-        et = spice.utc2et(utc_str)
-    except Exception as exc:
-        raise RuntimeError(f"Failed to convert UTC {utc_str} to ET") from exc
-
-    sun_vec_raw = get_sun_vector_wrt_moon(et)
-    if sun_vec_raw is None:
-        raise RuntimeError("SPICE returned no Sun vector for the requested time.")
-    sun_vec = np.array(sun_vec_raw, dtype=np.float64)
-    norm = np.linalg.norm(sun_vec)
-    if norm == 0.0:
-        raise RuntimeError("Sun vector magnitude is zero; cannot derive geometry.")
-    sun_unit = sun_vec / norm
-    subsolar_lat = np.degrees(np.arcsin(sun_unit[2]))
-    subsolar_lon = np.degrees(np.arctan2(sun_unit[1], sun_unit[0]))
-
-    return {
-        "utc": utc_str,
-        "et": et,
-        "sun_vector": sun_vec,
-        "sun_unit": sun_unit,
-        "subsolar_lat": subsolar_lat,
-        "subsolar_lon": subsolar_lon,
-    }
 
 
 def _sphere_coordinates(
@@ -279,7 +166,7 @@ def _build_figure(
     title: str,
 ) -> go.Figure:
     """Compose the Plotly figure with shaded surface and potential markers."""
-    sun_unit = geometry["sun_unit"]  # type: ignore[assignment]
+    sun_unit = geometry["sun_unit"]
     surface_payload = _day_night_surface(sun_unit, scale=1.0)
     fig = go.Figure()
 
@@ -344,8 +231,8 @@ def _build_figure(
         )
 
     # Add subsolar point marker
-    sub_lat = float(geometry["subsolar_lat"])  # type: ignore[assignment]
-    sub_lon = float(geometry["subsolar_lon"])  # type: ignore[assignment]
+    sub_lat = float(geometry["subsolar_lat"])
+    sub_lon = float(geometry["subsolar_lon"])
     sub_x, sub_y, sub_z = _scatter_coordinates(
         np.array([sub_lat]), np.array([sub_lon]), radius=1.02
     )
@@ -473,7 +360,7 @@ def main() -> int:
     start_ts = args.start.astype("datetime64[s]")
     end_ts_exclusive = (end_date + np.timedelta64(1, "D")).astype("datetime64[s]")
 
-    files = _discover_npz(args.cache_dir)
+    files = discover_npz(args.cache_dir)
     bundle = _load_rows(files, start_ts, end_ts_exclusive)
     if bundle.utc.size == 0:
         print("No cached rows found in the requested date range.")
@@ -489,10 +376,10 @@ def main() -> int:
         projection_in_sun=bundle.projection_in_sun[order],
     )
 
-    midpoint = _datetime64_midpoint(bundle.utc)
-    geometry = _compute_sun_geometry(midpoint)
+    midpoint = datetime64_midpoint(bundle.utc)
+    geometry = sun_geometry_at(midpoint)
 
-    sun_unit = geometry["sun_unit"]  # type: ignore[assignment]
+    sun_unit = geometry["sun_unit"]
     valid_rows = (
         np.isfinite(bundle.lat)
         & np.isfinite(bundle.lon)

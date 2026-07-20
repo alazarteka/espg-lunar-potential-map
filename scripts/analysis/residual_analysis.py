@@ -29,14 +29,13 @@ from tqdm import tqdm
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from src.potential_mapper.cache_io import discover_npz, load_projection_rows
 from src.potential_mapper.spice import load_spice_files
 from src.temporal.basis import _get_basis_func_by_name, fit_temporal_basis
 from src.temporal.coefficients import (
     DEFAULT_CACHE_DIR,
     _build_harmonic_design,
-    _discover_npz,
     _harmonic_coefficient_count,
-    _load_all_data,
 )
 from src.utils.spice_ops import get_sun_vector_wrt_moon_batch
 from src.visualization import style
@@ -325,7 +324,7 @@ def main() -> int:
 
     # 1. Load Data
     logging.info("Discovering data...")
-    files = _discover_npz(args.cache_dir)
+    files = discover_npz(args.cache_dir)
     if not files:
         logging.error(f"No cache files found in {args.cache_dir}")
         return 1
@@ -333,7 +332,7 @@ def main() -> int:
     start_ts = args.start.astype("datetime64[s]")
     end_ts = (args.end + np.timedelta64(1, "D")).astype("datetime64[s]")
 
-    utc, lat, lon, potential = _load_all_data(files, start_ts, end_ts)
+    utc, lat, lon, potential = load_projection_rows(files, start_ts, end_ts)
 
     if len(utc) == 0:
         logging.error("No data found in specified date range.")

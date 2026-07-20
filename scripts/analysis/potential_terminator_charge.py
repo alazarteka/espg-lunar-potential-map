@@ -10,17 +10,20 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import spiceypy as spice
 
 from scripts.analysis.potential_charge_report_md import _render_markdown
-from src.potential_mapper.spice import load_spice_files
-from src.utils.spice_ops import get_sun_vector_wrt_moon
+from src.potential_mapper.cache_io import (
+    datetime64_midpoint,
+    discover_npz,
+    load_rows_in_window,
+    sample_indices,
+    sun_geometry_at,
+    sza_from_latlon_utc,
+)
 
 # Default cache directory mirrors the batch runner output
 DEFAULT_CACHE_DIR = Path("artifacts/potential_cache")
 
-# Global guard so we only load kernels once
-_SPICE_LOADED = False
 
 
 @dataclass(slots=True)
@@ -44,69 +47,43 @@ def _parse_iso_date(value: str) -> np.datetime64:
     return np.datetime64(dt.date())
 
 
-def _discover_npz(cache_dir: Path) -> list[Path]:
-    """Return all NPZ cache files under cache_dir."""
-    if not cache_dir.exists():
-        raise FileNotFoundError(f"Cache directory {cache_dir} does not exist")
-    return sorted(p for p in cache_dir.rglob("*.npz") if p.is_file())
-
-
 def _load_rows(
     path: Path,
     start_ts: np.datetime64,
     end_ts_exclusive: np.datetime64,
 ) -> RowData | None:
-    """Load rows from a NPZ file that fall inside the requested UTC window."""
-    start_str = str(start_ts.astype("datetime64[s]"))
-    end_str = str(end_ts_exclusive.astype("datetime64[s]"))
-
-    with np.load(path) as data:
-        utc = data["rows_utc"]
-        sc_pot = data["rows_spacecraft_potential"].astype(np.float64)
-        surface_pot = data["rows_projected_potential"].astype(np.float64)
-        lat = data["rows_projection_latitude"].astype(np.float64)
-        lon = data["rows_projection_longitude"].astype(np.float64)
-        proj_in_sun = data.get("rows_projection_in_sun")
-
-    if utc.size == 0:
+    data = load_rows_in_window(
+        [path],
+        start_ts,
+        end_ts_exclusive,
+        fields=(
+            "utc",
+            "lat",
+            "lon",
+            "potential",
+            "spacecraft_potential",
+            "projection_in_sun",
+        ),
+    )
+    if data["utc"].size == 0:
         return None
-
-    valid_time = utc != ""
-    if not np.any(valid_time):
-        return None
-
-    mask = valid_time & (utc >= start_str) & (utc < end_str)
-    if not np.any(mask):
-        return None
-
-    utc_masked = utc[mask]
-    try:
-        utc_ns = np.array(utc_masked, dtype="datetime64[ns]")
-    except ValueError:
-        logging.debug("Failed to parse UTC strings in %s; skipping file.", path)
-        return None
-
-    if proj_in_sun is None:
-        proj_in_sun = np.zeros_like(mask, dtype=bool)
-
+    # Preserve original UTC strings for SZA (SPICE wants ISO strings)
+    utc_str = np.datetime_as_string(data["utc"].astype("datetime64[s]"), unit="s")
     return RowData(
-        utc_ns=utc_ns,
-        utc_str=utc_masked,
-        lat=lat[mask],
-        lon=lon[mask],
-        surface_potential=surface_pot[mask],
-        spacecraft_potential=sc_pot[mask],
-        projection_in_sun=proj_in_sun[mask].astype(bool),
+        utc_ns=data["utc"],
+        utc_str=utc_str,
+        lat=data["lat"],
+        lon=data["lon"],
+        surface_potential=data["potential"],
+        spacecraft_potential=data["spacecraft_potential"],
+        projection_in_sun=data["projection_in_sun"],
     )
 
 
 def _sample_rows(rows: RowData, sample: int | None, seed: int | None) -> RowData:
-    """Down-sample row bundle uniformly if requested."""
-    size = rows.utc_ns.size
-    if sample is None or sample <= 0 or size <= sample:
+    idx = sample_indices(rows.utc_ns.size, sample, seed)
+    if idx is None:
         return rows
-    rng = np.random.default_rng(seed)
-    idx = rng.choice(size, size=sample, replace=False)
     return RowData(
         utc_ns=rows.utc_ns[idx],
         utc_str=rows.utc_str[idx],
@@ -118,36 +95,8 @@ def _sample_rows(rows: RowData, sample: int | None, seed: int | None) -> RowData
     )
 
 
-def _ensure_spice_loaded() -> None:
-    """Load SPICE kernels once per process."""
-    global _SPICE_LOADED
-    if not _SPICE_LOADED:
-        load_spice_files()
-        _SPICE_LOADED = True
-
-
 def _compute_sza(rows: RowData) -> np.ndarray:
-    """Compute solar zenith angle (deg) for each projection footprint."""
-    _ensure_spice_loaded()
-
-    utc_strings = rows.utc_str.astype(str)
-    et = np.array([spice.utc2et(u) for u in utc_strings], dtype=float)
-    sun_vecs = np.vstack([get_sun_vector_wrt_moon(e) for e in et])
-    norms = np.linalg.norm(sun_vecs, axis=1, keepdims=True)
-    sun_unit = sun_vecs / np.where(norms == 0, np.nan, norms)
-
-    lat_rad = np.deg2rad(rows.lat)
-    lon_rad = np.deg2rad(rows.lon)
-    surface_normals = np.column_stack(
-        [
-            np.cos(lat_rad) * np.cos(lon_rad),
-            np.cos(lat_rad) * np.sin(lon_rad),
-            np.sin(lat_rad),
-        ]
-    )
-    dots = np.sum(surface_normals * sun_unit, axis=1)
-    dots = np.clip(dots, -1.0, 1.0)
-    return np.degrees(np.arccos(dots))
+    return sza_from_latlon_utc(rows.lat, rows.lon, rows.utc_str)
 
 
 def _find_crossing(sza: np.ndarray) -> int | None:
@@ -303,23 +252,16 @@ def _safe_corr(x: np.ndarray, y: np.ndarray) -> float | None:
     return None
 
 
-def _compute_geometry_at_midpoint(rows: RowData) -> dict[str, float | str]:
+def _compute_geometry_at_midpoint(rows: RowData) -> dict[str, float | str | np.ndarray]:
     """Compute midpoint Sun geometry for reporting."""
-    midpoint = rows.utc_ns.min() + (rows.utc_ns.max() - rows.utc_ns.min()) // 2
+    midpoint = datetime64_midpoint(rows.utc_ns)
+    geometry = sun_geometry_at(midpoint)
     midpoint_str = np.datetime_as_string(midpoint.astype("datetime64[s]"), unit="s")
-    _ensure_spice_loaded()
-    et = spice.utc2et(midpoint_str)
-    sun_vec = get_sun_vector_wrt_moon(et)
-    sun_vec = np.asarray(sun_vec, dtype=np.float64)
-    norm = np.linalg.norm(sun_vec)
-    sun_unit = sun_vec / norm
-    sub_lat = float(np.degrees(np.arcsin(sun_unit[2])))
-    sub_lon = float(np.degrees(np.arctan2(sun_unit[1], sun_unit[0])))
     return {
         "midpoint_utc": midpoint_str,
-        "subsolar_lat": sub_lat,
-        "subsolar_lon": sub_lon,
-        "sun_unit": sun_unit,
+        "subsolar_lat": geometry["subsolar_lat"],
+        "subsolar_lon": geometry["subsolar_lon"],
+        "sun_unit": geometry["sun_unit"],
     }
 
 
@@ -569,7 +511,7 @@ def main() -> int:
     if args.files:
         files = [Path(f) for f in args.files]
     else:
-        files = _discover_npz(args.cache_dir)
+        files = discover_npz(args.cache_dir)
 
     reports: list[dict] = []
     for path in files:

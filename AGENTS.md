@@ -51,7 +51,7 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
 - `src/`: Core Python package
   - `config.py`, `flux.py`, `kappa.py`, `model.py`, `losscone_torch.py` - Core fitting
   - `spacecraft_potential.py` - Spacecraft potential calculations
-  - `potential_mapper/` - Mapping pipeline
+  - `potential_mapper/` - Mapping pipeline (`cache_io.py` shared NPZ discovery/load + sun geometry)
   - `temporal/` - Spherical-harmonic reconstruction; used as the identifiability / sampling-limits analysis (tests whether a global spatiotemporal potential map is recoverable from LP ER data)
   - `engineering/` - GlobalStats, SiteStats, site analysis
   - `losscone/` - Loss-cone core (cpu, model, masks, chi2, types, params, torch/)

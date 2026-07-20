@@ -201,8 +201,9 @@ def main() -> int:
 
 def _main_basis_mode(args: argparse.Namespace) -> int:
     """Run temporal basis fitting mode."""
+    from src.potential_mapper.cache_io import discover_npz, load_projection_rows
+
     from .basis import fit_temporal_basis, reconstruct_at_times
-    from .coefficients import _discover_npz, _load_all_data
 
     logging.info("Using temporal basis fitting mode")
     logging.info("Basis specification: %s", args.temporal_basis)
@@ -213,9 +214,9 @@ def _main_basis_mode(args: argparse.Namespace) -> int:
     end_ts_exclusive = (args.end + np.timedelta64(1, "D")).astype("datetime64[s]")
 
     try:
-        files = _discover_npz(cache_dir)
+        files = discover_npz(cache_dir)
         logging.info("Found %d NPZ files", len(files))
-        utc, lat, lon, potential = _load_all_data(
+        utc, lat, lon, potential = load_projection_rows(
             files,
             start_ts,
             end_ts_exclusive,

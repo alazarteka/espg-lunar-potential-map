@@ -18,10 +18,9 @@ from pathlib import Path
 import numpy as np
 
 from scripts.analysis.temporal_cv import run_cv
+from src.potential_mapper.cache_io import discover_npz, load_projection_rows
 from src.temporal.coefficients import (
     DEFAULT_CACHE_DIR,
-    _discover_npz,
-    _load_all_data,
 )
 
 # Basis configurations to test
@@ -58,10 +57,10 @@ def main() -> int:
     )
 
     # Load data once
-    files = _discover_npz(args.cache_dir)
+    files = discover_npz(args.cache_dir)
     start_ts = args.start.astype("datetime64[s]")
     end_ts = (args.end + np.timedelta64(1, "D")).astype("datetime64[s]")
-    utc, lat, lon, potential = _load_all_data(files, start_ts, end_ts)
+    utc, lat, lon, potential = load_projection_rows(files, start_ts, end_ts)
     logging.info("Loaded %d measurements", len(potential))
 
     results = []
