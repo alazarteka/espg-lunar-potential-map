@@ -13,7 +13,12 @@ from .utils import date_range
 
 
 def _discover_date_files(cache_dir: Path, start_day: date, end_day: date) -> list[Path]:
-    """Find NPZ cache files matching the date range.
+    """Find one NPZ potential cache file for each available day in a range.
+
+    Daily cache files are accepted in both the legacy ``3DYYMMDD.npz`` format
+    and the production batch format ``potential_batch_YYYY_MM_DD.npz``. A day
+    with more than one candidate is ambiguous and raises rather than selecting
+    an arbitrary recursive-glob result.
 
     Args:
         cache_dir: Directory to search.
@@ -25,13 +30,23 @@ def _discover_date_files(cache_dir: Path, start_day: date, end_day: date) -> lis
 
     Raises:
         FileNotFoundError: If no matching files found.
+        ValueError: If more than one cache file matches a requested day.
     """
-    days = date_range(start_day, end_day)
-    pattern_list = [f"3D{day.strftime('%y%m%d')}.npz" for day in days]
-
-    files = []
-    for pattern in pattern_list:
-        matches = list(cache_dir.rglob(pattern))
+    files: list[Path] = []
+    for day in date_range(start_day, end_day):
+        patterns = (
+            f"3D{day.strftime('%y%m%d')}.npz",
+            f"potential_batch_{day:%Y_%m_%d}.npz",
+        )
+        matches = sorted(
+            {path for pattern in patterns for path in cache_dir.rglob(pattern)}
+        )
+        if len(matches) > 1:
+            candidates = ", ".join(str(path) for path in matches)
+            raise ValueError(
+                f"Ambiguous potential cache files for {day} in {cache_dir}: "
+                f"{candidates}"
+            )
         if matches:
             files.append(matches[0])
 
