@@ -137,8 +137,11 @@ uv run python scripts/diagnostics/beam_losscone_crossval.py data/1999/091_120APR
 
 Profile **U_surface identifiability** by evaluating a grid of U_surface values and
 minimizing the (Lillis) chi² over Bs/Bm and beam amplitude for each U. This gives
-`chi2(U_surface)` curves and simple width metrics that act as a loose analogue of
-confidence bounds (wide/flat profiles = weak constraints).
+`chi2(U_surface)` curves and simple width metrics.
+
+**These width metrics are optimizer-geometry diagnostics only — they are not
+confidence intervals.** Prefer [`losscone_profile_ci.py`](#losscone_profile_cipy)
+for D2 profile-likelihood confidence sets.
 
 This script expects a batch output NPZ from `src.potential_mapper.batch` so it can
 reuse the cached row-level polarity array (no SPICE needed).
@@ -168,6 +171,32 @@ uv run python scripts/diagnostics/losscone_u_profile.py \
 Outputs:
 - A cached NPZ under `artifacts/potential_cache/daily/` (profiles + width metrics)
 - A time-series plot under `artifacts/potential_cache/plots/`
+
+---
+
+### losscone_profile_ci.py
+
+D2 **calibrated-flux quasi-likelihood** profile-likelihood confidence sets for
+spacecraft-relative potential. Reports endpoints, components, and one-sided /
+full-domain flags — never a lone scalar “U-width” as a CI.
+
+See [profile_likelihood_ci.md](../physics/profile_likelihood_ci.md) and
+[er_measurement_contract.md](../architecture/er_measurement_contract.md).
+
+```bash
+# Synthetic demo (no archive tables required)
+uv run python scripts/diagnostics/losscone_profile_ci.py --demo --skip-bootstrap --c-alpha 1.0
+```
+
+### r_bound_artifact_check.py
+
+Priority-0 check: does the legacy `r ≥ 0.3` floor manufacture a ~−100 V pile-up
+from weak-mirror near-zero truth? Three parts (injection with floor, optional
+archive `r̂` census, injection with floor removed).
+
+```bash
+uv run python scripts/diagnostics/r_bound_artifact_check.py --n-per-cell 4
+```
 
 ---
 

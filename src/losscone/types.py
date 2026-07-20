@@ -21,6 +21,8 @@ class FitMethod(StrEnum):
 
     HALEKAS = "halekas"
     LILLIS = "lillis"
+    # Calibrated-flux quasi-likelihood + profile CI (D2). Not a count likelihood.
+    QUASI_LIKELIHOOD = "quasi_likelihood"
 
 
 class NormalizationMode(StrEnum):

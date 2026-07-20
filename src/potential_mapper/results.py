@@ -84,8 +84,15 @@ class PotentialResults:
 
     Identifiability QC (optional; only when enabled in pipeline/batch):
     - u_width_lhs_dchi2red_0p001: LHS-based U-width proxy [V]; NaN if disabled.
+      **Not a confidence interval** — optimizer-geometry diagnostic only.
     - u_is_identifiable_lhs_dchi2red_0p001: True if width <= threshold; False if
       disabled or width is NaN.
+
+    D2 profile-likelihood confidence sets (when attached via
+    ``augment_batch_arrays_with_confidence_sets``) use ``spec_ci_*`` keys;
+    see ``src.losscone.confidence_set`` and
+    ``docs/physics/profile_likelihood_ci.md``.
+
 
     Kappa fit parameters (from spacecraft potential calculation):
     - electron_temperature: Electron temperature Te in eV; NaN if not fit.

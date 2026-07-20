@@ -88,7 +88,10 @@ LOSS_CONE_DE_ATOL = 1e-3
 LOSS_CONE_DE_TOL = 1e-3  # SciPy-only relative tolerance
 LOSS_CONE_DE_POLISH = False  # SciPy-only local polishing step
 
-# Loss-cone fit method ("halekas" log-chi2 or "lillis" masked linear chi2)
+# Loss-cone fit method:
+#   "halekas" — unweighted log-distance (legacy point estimate; not a CI basis)
+#   "lillis" — masked linear loss (legacy; 0.07–0.79 band; not a CI basis)
+#   "quasi_likelihood" — calibrated-flux quasi-likelihood + profile CI (D2)
 LOSS_CONE_FIT_METHOD = "halekas"
 
 # Surface potential bounds (see Halekas 2008 Section 5.2)
@@ -98,13 +101,16 @@ LOSS_CONE_FIT_METHOD = "halekas"
 LOSS_CONE_U_SURFACE_MIN = -2000.0  # lower bound in volts (extreme plasma sheet)
 LOSS_CONE_U_SURFACE_MAX = 20.0  # upper bound in volts (detection threshold)
 
-# B_s/B_m bounds: avoid unrealistically low ratios that can cause degenerate fits.
+# B_s/B_m bounds for *legacy* Halekas/Lillis fits.
+# The default floor 0.3 is an identifying constraint (fresh-look artifact
+# hypothesis); the D2 quasi-likelihood path uses PROFILE_CI_R_MIN instead.
 LOSS_CONE_BS_OVER_BM_MIN = 0.3
 LOSS_CONE_BS_OVER_BM_MAX = 1.1
 
 # Beam parameters
 # Beam width: fixed at ~15 eV (LP energy resolution), NOT scaling with |U_surface|
 # The previous scaling (0.5 * |U|) caused runaway at extreme potentials.
+# D2 response-folded path uses PROFILE_CI_* widths (instrument ΔE/E ≈ 0.5).
 LOSS_CONE_BEAM_WIDTH_EV = 15.0  # fixed beam width in eV (instrument resolution)
 LOSS_CONE_BEAM_AMP_MIN = 0.0  # lower bound for normalized beam amplitude
 LOSS_CONE_BEAM_AMP_MAX = 5.0  # upper bound (reduced from 100; data is normalized 0-1)
@@ -113,6 +119,16 @@ LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
 LOSS_CONE_BACKGROUND = (
     0.05  # baseline model value outside loss cone (for log stability)
 )
+
+# D2 profile-CI / calibrated-flux quasi-likelihood defaults
+PROFILE_CI_R_MIN = 0.02  # no legacy 0.3 floor (see Priority-0 artifact check)
+PROFILE_CI_R_MAX = 1.0
+PROFILE_CI_DE_OVER_E = 0.5
+PROFILE_CI_BEAM_WIDTH_EV = 40.0
+PROFILE_CI_BEAM_PITCH_SIGMA_DEG = 15.0
+PROFILE_CI_ALPHA = 0.32
+PROFILE_CI_BOOTSTRAP_N = 40
+PROFILE_CI_OBSERVATION_LEVEL = "calibrated_flux_quasi_likelihood"
 
 # Lillis 2008 masked-fit thresholds (relative flux-based)
 LILLIS_RELATIVE_FLUX_MIN = 0.07
