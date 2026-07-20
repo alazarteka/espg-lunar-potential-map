@@ -8,10 +8,36 @@ the three entry points; each CLI still adds its own unique flags directly.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import argparse
+
+
+def validate_date_filters(
+    year: int | None,
+    month: int | None,
+    day: int | None,
+) -> str | None:
+    """Return an error message if year/month/day filters are not a valid date.
+
+    Partial filters are allowed (e.g. year-only or year+month). When ``day`` is
+    set, ``year`` and ``month`` must also be set so the calendar date can be
+    checked.
+    """
+    if month is not None and not 1 <= month <= 12:
+        return f"month must be in 1..12 (got {month})"
+    if day is not None and not 1 <= day <= 31:
+        return f"day must be in 1..31 (got {day})"
+    if day is not None and (year is None or month is None):
+        return "day filter requires --year and --month"
+    if year is not None and month is not None and day is not None:
+        try:
+            date(year, month, day)
+        except ValueError as exc:
+            return f"invalid calendar date {year:04d}-{month:02d}-{day:02d}: {exc}"
+    return None
 
 
 def add_common_batch_args(

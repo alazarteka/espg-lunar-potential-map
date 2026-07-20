@@ -124,7 +124,6 @@ def test_objective_functions_in_fitter(kappa_params_set):
     ), "Theta values from standard and fast fitters should match within tolerance."
 
 
-@pytest.mark.skip_ci
 def test_kappa_fitter(kappa_params_set):
     """Test the end-to-end Kappa distribution fitting functionality.
 
