@@ -136,14 +136,11 @@ def create_timeseries_plot(
     print(f"  Total windows: {len(times)}")
     print(f"  Max degree: lmax = {lmax}")
 
-    # Convert times to matplotlib-compatible format
     times_dt = times.astype("datetime64[s]").astype("datetime64[us]")
     times_plot = times_dt.astype(object)
 
-    # Create figure
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi, constrained_layout=True)
 
-    # Plot each location
     colors = plt.cm.tab10.colors
     for i, (lat, lon) in enumerate(zip(latitudes, longitudes, strict=True)):
         print(f"\nComputing timeseries for ({lat:.1f}°, {lon:.1f}°)...")
@@ -153,27 +150,22 @@ def create_timeseries_plot(
         color = colors[i % len(colors)]
         ax.plot(times_plot, potentials, "-o", markersize=4, label=label, color=color)
 
-        # Print stats
         print(f"  Min: {potentials.min():.1f} V")
         print(f"  Max: {potentials.max():.1f} V")
         print(f"  Mean: {potentials.mean():.1f} V")
         print(f"  Std: {potentials.std():.1f} V")
 
-    # Style
     style.apply_paper_style(ax)
 
     ax.set_xlabel("Date", fontsize=style.FONT_SIZE_LABEL)
     ax.set_ylabel("Surface Potential (V)", fontsize=style.FONT_SIZE_LABEL)
 
-    # Format x-axis for dates
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=5))
     fig.autofmt_xdate(rotation=45)
 
-    # Add horizontal line at 0V
     ax.axhline(0, color="gray", linestyle="--", linewidth=0.8, alpha=0.7)
 
-    # Legend
     if len(latitudes) > 1:
         ax.legend(
             loc="best",
@@ -181,7 +173,6 @@ def create_timeseries_plot(
             framealpha=0.9,
         )
 
-    # Title
     if title:
         fig_title = title
     else:
@@ -196,7 +187,6 @@ def create_timeseries_plot(
 
     ax.set_title(fig_title, fontsize=style.FONT_SIZE_TITLE, pad=10)
 
-    # Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     print(f"\nSaved to {output_path}")

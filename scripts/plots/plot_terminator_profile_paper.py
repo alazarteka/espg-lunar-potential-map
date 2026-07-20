@@ -85,7 +85,6 @@ def create_terminator_profile_plot(
         dpi: Resolution for output
         title: Optional title override
     """
-    # Load data
     sza, potentials, in_sun = loaders.load_date_range_data_with_sza(
         cache_dir, start_day, end_day
     )
@@ -93,15 +92,12 @@ def create_terminator_profile_plot(
     print(f"\nLoaded {len(sza)} measurements")
     print(f"Sunlit: {np.sum(in_sun)}, Shadowed: {np.sum(~in_sun)}")
 
-    # Compute binned statistics
     bin_centers, medians, mads, counts = compute_binned_statistics(
         sza, potentials, bin_width
     )
 
-    # Create figure
     fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True, dpi=dpi)
 
-    # Plot individual measurements as scatter
     sunlit_mask = in_sun.astype(bool)
     ax.scatter(
         sza[sunlit_mask],
@@ -122,7 +118,6 @@ def create_terminator_profile_plot(
         rasterized=True,
     )
 
-    # Plot binned median ± MAD
     valid = ~np.isnan(medians) & (counts > 10)
     ax.plot(
         bin_centers[valid],
@@ -140,13 +135,11 @@ def create_terminator_profile_plot(
         label="Median ± MAD",
     )
 
-    # Highlight terminator region
     ax.axvspan(
         88, 92, color=style.COLOR_TERMINATOR, alpha=0.1, label="Terminator (88°-92°)"
     )
     ax.axvline(90, color=style.COLOR_TERMINATOR, linestyle="--", linewidth=1, alpha=0.5)
 
-    # Add subsolar and anti-solar point annotations
     ax.axvline(
         0, color=style.COLOR_SUBSOLAR, linestyle=":", linewidth=1.5, alpha=0.7
     )
@@ -174,10 +167,8 @@ def create_terminator_profile_plot(
         ha="right",
     )
 
-    # Apply shared style
     style.apply_paper_style(ax, grid=True)
 
-    # Formatting
     ax.set_xlabel("Solar Zenith Angle (°)", fontsize=style.FONT_SIZE_LABEL)
     ax.set_ylabel("Surface Potential (V)", fontsize=style.FONT_SIZE_LABEL)
 
@@ -196,7 +187,6 @@ def create_terminator_profile_plot(
     ax.legend(loc="best", fontsize=style.FONT_SIZE_TEXT, markerscale=5)
     ax.set_xlim(0, 180)
 
-    # Add text annotations via shared util
     textstr = (
         f"Total measurements: {len(sza):,}\n"
         f"Sunlit: {np.sum(sunlit_mask):,}\n"
@@ -204,12 +194,10 @@ def create_terminator_profile_plot(
     )
     utils.add_stats_box(ax, textstr, loc="upper left")
 
-    # Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     print(f"\nSaved to {output_path}")
 
-    # Print statistics
     sunlit_pot = potentials[sunlit_mask]
     shadow_pot = potentials[~sunlit_mask]
     print(f"\nSunlit potential: {np.median(sunlit_pot):.1f} V (median)")

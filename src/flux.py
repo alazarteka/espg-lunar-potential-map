@@ -32,49 +32,26 @@ __all__ = [
 
 
 class FluxData:
-    def __init__(self, er_data_file: str):
-        """
-        Backwards-compatible orchestrator for ER data + pitch angles + fitter.
+    """Backwards-compatible orchestrator for ER data + pitch angles + fitter."""
 
-        Args:
-            er_data_file (str): Path to the ER data file
-        """
-        # Use the new class structure
+    def __init__(self, er_data_file: str):
         self.er_data = ERData(er_data_file)
         self.pitch_angle = PitchAngle(self.er_data)
         self.loss_cone_fitter = LossConeFitter(
             self.er_data, pitch_angle=self.pitch_angle
         )
-
-        # Expose data for backward compatibility
         self.data = self.er_data.data
 
     def get_normalized_flux(
         self, energy_bin: int, measurement_chunk: int
     ) -> np.ndarray:
-        """
-        Get the normalized flux for a specific energy bin and measurement chunk.
-        Delegates to LossConeFitter.
-        """
         return self.loss_cone_fitter._get_normalized_flux(energy_bin, measurement_chunk)
 
     def build_norm2d(self, measurement_chunk: int):
-        """
-        Build a 2D normalized flux distribution for a specific measurement chunk.
-        Delegates to LossConeFitter.
-        """
         return self.loss_cone_fitter.build_norm2d(measurement_chunk)
 
     def _fit_surface_potential(self, measurement_chunk: int):
-        """
-        Fit surface potential for one measurement chunk.
-        Delegates to LossConeFitter.
-        """
         return self.loss_cone_fitter._fit_surface_potential(measurement_chunk)
 
     def fit_surface_potential(self):
-        """
-        Fit surface potential for all measurement chunks.
-        Delegates to LossConeFitter.
-        """
         return self.loss_cone_fitter.fit_surface_potential()

@@ -73,9 +73,7 @@ class CoordinateCalculator:
         Returns a CoordinateArrays with per-row positions, Sun vectors, and
         transformation matrices sufficient to project vectors between frames.
         """
-        # 1. Convert UTC to ET
-        # spice.str2et is scalar, so we loop.
-        # We can use a list comprehension which is reasonably fast for string parsing.
+        # spice.str2et is scalar-only
         utc_times = flux_data.data[config.UTC_COLUMN].to_numpy()
         n_points = len(utc_times)
 
@@ -89,10 +87,7 @@ class CoordinateCalculator:
                     utc,
                     exc,
                 )
-                # Leave as NaN
 
-        # 2. Batch SPICE calls
-        # These functions handle NaNs in et_times gracefully (returning NaNs)
         lp_positions = get_lp_position_wrt_moon_batch(et_times)
         lp_vectors_to_sun = get_lp_vector_to_sun_in_lunar_frame_batch(et_times)
         lp_vectors_to_sun_eclipj2000 = get_lp_vector_to_sun_in_eclipj2000_batch(
@@ -103,14 +98,10 @@ class CoordinateCalculator:
             et_times
         )
 
-        # 3. Attitude lookup
         ra_vals, dec_vals = get_current_ra_dec_batch(
             et_times, self.et_spin, self.right_ascension, self.declination
         )
 
-        # 4. Validate and filter
-        # We need to identify rows where any component is invalid (NaN)
-        # Check finiteness
         valid_mask = (
             np.isfinite(et_times)
             & np.all(np.isfinite(lp_positions), axis=1)
@@ -125,17 +116,8 @@ class CoordinateCalculator:
             & np.isfinite(dec_vals)
         )
 
-        # Also check vector norms > 0
         lp_sun_eclipj2000_norms = np.linalg.norm(lp_vectors_to_sun_eclipj2000, axis=1)
         valid_mask &= lp_sun_eclipj2000_norms > 0
-
-        # Apply mask to invalidate bad rows (set to NaN)
-        # Note: The original code skipped rows, effectively leaving them as NaNs
-        # (initialized to np.full(..., np.nan)).
-        # So we just need to ensure invalid rows remain NaNs.
-        # The batch functions already return NaNs on error, but we might have
-        # partial failures. We explicitly set invalid rows to NaN to be safe
-        # and consistent.
 
         if not np.all(valid_mask):
             lp_positions[~valid_mask] = np.nan
@@ -146,19 +128,15 @@ class CoordinateCalculator:
             ra_vals[~valid_mask] = np.nan
             dec_vals[~valid_mask] = np.nan
 
-        # 5. Derived quantities
         spin_vectors_eclipj2000 = np.full((n_points, 3), np.nan)
-        # Only compute for valid rows to avoid warnings/errors
         if np.any(valid_mask):
             spin_vectors_eclipj2000[valid_mask] = ra_dec_to_unit(
                 ra_vals[valid_mask], dec_vals[valid_mask]
             )
 
-        # Unit vectors to sun
         unit_lp_vectors_to_sun_eclipj2000 = np.full_like(
             lp_vectors_to_sun_eclipj2000, np.nan
         )
-        # Safe division
         safe_norms = np.where(lp_sun_eclipj2000_norms > 0, lp_sun_eclipj2000_norms, 1.0)
         np.divide(
             lp_vectors_to_sun_eclipj2000,
@@ -167,7 +145,7 @@ class CoordinateCalculator:
             where=valid_mask[:, None],
         )
 
-        # SCD to ECLIPJ2000. Both defining vectors are in the same frame.
+        # SCD→ECLIPJ2000 from spin axis and LP→Sun (same frame)
         scd_to_eclipj2000_mats = np.full((n_points, 3, 3), np.nan)
         if np.any(valid_mask):
             scd_to_eclipj2000_mats[valid_mask] = build_scd_to_reference(
@@ -175,7 +153,6 @@ class CoordinateCalculator:
                 unit_lp_vectors_to_sun_eclipj2000[valid_mask],
             )
 
-        # SCD to IAU_MOON
         scd_to_iau_moon_transformation_mats = np.einsum(
             "nij,njk->nik",
             eclipj2000_to_iau_moon_mats,

@@ -51,15 +51,12 @@ def interpolate_to_regular_grid(
         pitches_reg: Regular pitch angle grid (n_pitch_bins,)
         flux_reg: Interpolated flux on regular grid (n_energies, n_pitch_bins)
     """
-    # Create regular pitch grid
     pitch_min = np.nanmin(pitches)
     pitch_max = np.nanmax(pitches)
     pitches_reg = np.linspace(pitch_min, pitch_max, n_pitch_bins)
 
-    # Initialize regular grid
     flux_reg = np.zeros((len(energies), n_pitch_bins))
 
-    # Interpolate for each energy separately
     for i in range(len(energies)):
         valid_mask = np.isfinite(flux_data[i]) & np.isfinite(pitches[i])
 
@@ -67,12 +64,10 @@ def interpolate_to_regular_grid(
             pitch_pts = pitches[i, valid_mask]
             flux_pts = flux_data[i, valid_mask]
 
-            # Sort by pitch angle
             sort_idx = np.argsort(pitch_pts)
             pitch_pts_sorted = pitch_pts[sort_idx]
             flux_pts_sorted = flux_pts[sort_idx]
 
-            # Interpolate onto regular pitch grid
             flux_reg[i] = np.interp(
                 pitches_reg,
                 pitch_pts_sorted,
@@ -118,10 +113,9 @@ def create_losscone_comparison_plot(
     er_data = ERData(str(er_file))
     pitch_angle = PitchAngle(er_data)
 
-    # Create spacecraft potential array (constant USC per Halekas et al.)
+    # Constant USC per Halekas et al.
     spacecraft_potential = np.full(len(er_data.data), usc)
 
-    # Create fitter with spacecraft potential correction
     if use_torch and HAS_TORCH:
         print("Using PyTorch-accelerated fitter (~5x faster)")
         fitter = LossConeFitterTorch(
@@ -145,7 +139,6 @@ def create_losscone_comparison_plot(
             incident_flux_stat=incident_flux_stat,
         )
 
-    # Validate and find the spectrum
     min_spec_no = er_data.data.iloc[0][config.SPEC_NO_COLUMN]
     max_spec_no = er_data.data.iloc[-1][config.SPEC_NO_COLUMN]
     print(f"Available spectrum numbers: {min_spec_no} to {max_spec_no}")
@@ -155,7 +148,6 @@ def create_losscone_comparison_plot(
             f"Spectrum number {spec_no} out of range [{min_spec_no}, {max_spec_no}]"
         )
 
-    # Find the rows corresponding to this spectrum number
     chunk_mask = er_data.data[config.SPEC_NO_COLUMN] == spec_no
     if not chunk_mask.any():
         raise ValueError(f"Spectrum number {spec_no} not found in data")
@@ -173,16 +165,13 @@ def create_losscone_comparison_plot(
         raise ValueError(f"Spectrum number {spec_no} not found in data")
     chunk_idx = int(chunk_matches[0])
 
-    # Fit the specified spectrum
     print(f"Fitting spectrum {spec_no}...")
     U_surface, bs_bm, beam_amp, chi2 = fitter.fit_chunk_full(chunk_idx)
     # U_surface, bs_bm, beam_amp, chi2 = -160.0, 0.975, 0.5, 1.23  # Example fixed values for paper plot
 
-    # chunk_data already retrieved above
     flux_data = chunk_data[config.FLUX_COLS].to_numpy(dtype=np.float64)
     energies = chunk_data[config.ENERGY_COLUMN].to_numpy(dtype=np.float64)
 
-    # Get the row indices for pitch angle lookup
     chunk_indices = chunk_data.index.to_numpy()
     pitches = pitch_angle.pitch_angles[chunk_indices]
 
@@ -190,18 +179,14 @@ def create_losscone_comparison_plot(
     print(f"Spectrum timestamp: {timestamp}")
     print(f"Spectrum number: {chunk_data.iloc[0][config.SPEC_NO_COLUMN]}")
 
-    # Replace zeros and negatives with NaN
     flux_data = np.where(flux_data > 0, flux_data, np.nan)
 
-    # Convert to log10 flux for observed data
     log_flux_data = np.log10(flux_data)
 
-    # Interpolate observed data onto regular grid
     energies_reg, pitches_reg, log_flux_reg = interpolate_to_regular_grid(
         energies, pitches, log_flux_data
     )
 
-    # Create model on irregular grid first
     beam_width = fitter.beam_width_ev
     model_irregular = synth_losscone(
         energies,
@@ -215,16 +200,13 @@ def create_losscone_comparison_plot(
         background=fitter.background,
     )
 
-    # Interpolate model onto regular grid
     _, _, model_reg = interpolate_to_regular_grid(energies, pitches, model_irregular)
 
-    # Calculate loss cone boundary (with spacecraft potential correction)
     loss_cone_angle = []
     for E in energies:
         if E <= 0:
             loss_cone_angle.append(np.nan)
             continue
-        # Apply spacecraft potential correction: E_plasma = E_measured - U_spacecraft
         E_corrected = E - usc
         if E_corrected <= 0:
             loss_cone_angle.append(np.nan)
@@ -240,12 +222,10 @@ def create_losscone_comparison_plot(
 
     loss_cone_angle = np.array(loss_cone_angle)
 
-    # Create figure with side-by-side heatmaps
     fig, (ax1, ax2) = plt.subplots(
         1, 2, figsize=(12, 5), constrained_layout=True, dpi=dpi
     )
 
-    # Plot observed data
     im1 = ax1.pcolormesh(
         energies_reg,
         pitches_reg,
@@ -261,7 +241,6 @@ def create_losscone_comparison_plot(
     ax1.set_ylim(0, 180)
     style.apply_paper_style(ax1)
 
-    # Plot model
     im2 = ax2.pcolormesh(
         energies_reg,
         pitches_reg,
@@ -279,13 +258,11 @@ def create_losscone_comparison_plot(
     ax2.set_ylim(0, 180)
     style.apply_paper_style(ax2)
 
-    # Add colorbars
     cbar1 = fig.colorbar(im1, ax=ax1, label="log₁₀(Flux) [#/cm²/s/sr/eV]")
     cbar1.ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
     cbar2 = fig.colorbar(im2, ax=ax2, label="Normalized Flux")
     cbar2.ax.tick_params(labelsize=style.FONT_SIZE_TEXT)
 
-    # Add text box with fit parameters
     textstr = (
         f"UTC: {timestamp}\nU_surface = {U_surface:.1f} V\n"
         f"Bₛ/Bₘ = {bs_bm:.3f}\nBeam amp = {beam_amp:.3f}\n"
@@ -295,11 +272,9 @@ def create_losscone_comparison_plot(
     )
     utils.add_stats_box(ax2, textstr, loc="lower right")
 
-    # Add figure title if provided
     if title:
         fig.suptitle(title, fontsize=style.FONT_SIZE_TITLE + 1, y=1.02)
 
-    # Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     print(f"Saved to {output_path}")
