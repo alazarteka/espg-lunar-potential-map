@@ -49,19 +49,7 @@ def test_coordinate_calculator_masks_invalid_rows(monkeypatch, caplog):
     ) -> np.ndarray:
         n = len(times_arr)
         res = np.tile(valid_sun_vec, (n, 1))
-        # Row 2 (index 2) corresponds to time=2.0 -> zero vector
-        # But wait, row 1 is bad-et, so time is NaN.
-        # Row 2 is time=2.0.
-        # We need to find which index corresponds to time=2.0
-        # times_arr will have NaNs for bad-et.
-
-        # Logic:
-        # Row 0: time=0.0
-        # Row 1: time=NaN
-        # Row 2: time=2.0
-        # Row 3: time=3.0
-
-        # We can just use the index if we assume order is preserved (it is)
+        # Order is preserved; row 2 exercises the zero-vector mask.
         if n > 2:
             res[2] = np.zeros(3)
         return res
@@ -133,9 +121,6 @@ def test_coordinate_calculator_masks_invalid_rows(monkeypatch, caplog):
 
     messages = "\n".join(caplog.messages)
     assert "Failed to convert UTC bad-et to ET" in messages
-    # We no longer log per-row warnings for performance reasons
-    # assert "Invalid lp_to_sun vector" in messages
-    # assert "Invalid J2000->IAU_MOON matrix" in messages
 
 
 @pytest.mark.skip_ci

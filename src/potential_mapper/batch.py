@@ -20,7 +20,7 @@ import numpy as np
 
 import src.config as config
 from src.losscone.types import parse_fit_method
-from src.potential_mapper.cli_args import add_common_batch_args
+from src.potential_mapper.cli_args import add_common_batch_args, validate_date_filters
 from src.potential_mapper.logging_utils import setup_logging
 from src.potential_mapper.npz_io import write_npz_atomic
 from src.potential_mapper.pipeline import DataLoader, load_all_data, process_merged_data
@@ -222,6 +222,11 @@ def run_batch(
     Returns:
         Exit code (0 for success, 1 for failure)
     """
+    date_error = validate_date_filters(year, month, day)
+    if date_error is not None:
+        logging.error("Invalid date filters: %s", date_error)
+        return 1
+
     start = datetime.now()
 
     # Load SPICE kernels
