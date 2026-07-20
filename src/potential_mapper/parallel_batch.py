@@ -23,41 +23,14 @@ from pathlib import Path
 
 import numpy as np
 
-from src import config
 from src.potential_mapper.cli_args import add_common_batch_args
-from src.potential_mapper.date_utils import MONTH_INT_TO_ABBREV, parse_3d_filename
+from src.potential_mapper.date_utils import discover_flux_files, parse_3d_filename
 from src.potential_mapper.logging_utils import setup_logging
 
 
 def discover_day_files(year: int, month: int | None = None) -> list[Path]:
-    """
-    Discover all ER data files for a given year/month.
-
-    Args:
-        year: Year to process
-        month: Optional month filter (1-12)
-
-    Returns:
-        List of Path objects for each day file
-    """
-    data_dir = config.DATA_DIR / str(year)
-    if not data_dir.exists():
-        return []
-
-    day_files = []
-    for subdir in sorted(data_dir.iterdir()):
-        if not subdir.is_dir():
-            continue
-
-        # Filter by month if specified
-        # Subdirs are like "091_120APR" - need to check month
-        if month is not None and MONTH_INT_TO_ABBREV.get(month, "") not in subdir.name:
-            continue
-
-        # Find all .TAB files in this subdir
-        day_files.extend(sorted(subdir.glob("3D*.TAB")))
-
-    return day_files
+    """Discover ER data files for a given year/month via shared discovery."""
+    return discover_flux_files(year=year, month=month)
 
 
 def process_single_day(
