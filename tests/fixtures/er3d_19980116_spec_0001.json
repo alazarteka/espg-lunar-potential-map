@@ -1,0 +1,10 @@
+{
+  "dataset_id": "LP-L-ER-3-RDR-3DELEFLUX-80SEC-V1.1",
+  "relative_path": "data/1998/001_031JAN/3D980116.TAB",
+  "sha256": "f072c346b6c4078d1072fd8649675f7b4999e8eb31da919afdf5ced7acfb3734",
+  "expected_fields_per_row": 183,
+  "spec_no": 1,
+  "expected_rows": 15,
+  "expected_energy_min_ev": 38.641,
+  "expected_energy_max_ev": 16680.334
+}

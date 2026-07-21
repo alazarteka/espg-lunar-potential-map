@@ -32,6 +32,7 @@ uv run python -m src.potential_mapper.batch --year 1998 --month 1
 ## Architecture & Physics
 
 - [Pipeline Overview](architecture/pipeline_overview.md)
+- [ER Measurement Contract](architecture/er_measurement_contract.md)
 - [Coordinate Frames & SPICE](architecture/coordinate_frames.md)
 - [GPU Acceleration](architecture/gpu_acceleration.md)
 - [Spacecraft Potential](physics/spacecraft_potential.md)

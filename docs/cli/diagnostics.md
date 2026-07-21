@@ -29,6 +29,26 @@ Beam detection works by:
 
 All scripts are in `scripts/diagnostics/`.
 
+### level0_calibrated_match.py
+
+Forensically rank time-near Level-0 ER code arrays against calibrated 3-D
+sweeps. The score uses only per-energy angular shape, so it is evidence for a
+raw-to-product association—not a detector calibration, count reconstruction, or
+likelihood input.
+
+```bash
+uv run python scripts/diagnostics/level0_calibrated_match.py \
+  /tmp/lp_level0_reference/M9801523.B \
+  data/1998/001_031JAN/3D980116.TAB \
+  --max-time-delta-seconds 600 \
+  --output /tmp/lp_phase1b_match_19980116.json
+```
+
+The optional JSON includes source-file hashes and all candidate scores, but does
+not embed raw telemetry matrices. See the [ER Measurement Contract]
+(../architecture/er_measurement_contract.md) for its strict interpretation and
+the current response-calibration gate.
+
 ### losscone_peak_scan.py
 
 Scan ER files for beam signatures in loss-cone normalized data.

@@ -55,6 +55,8 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
   - `temporal/` - Spherical-harmonic reconstruction; used as the identifiability / sampling-limits analysis (tests whether a global spatiotemporal potential map is recoverable from LP ER data)
   - `engineering/` - GlobalStats, SiteStats, site analysis
   - `losscone/` - Loss-cone core (cpu, model, masks, chi2, types, params, torch/)
+    - `level0.py`, `raw_calibration.py` - Phase-1 Level-0 ER code assembly plus
+      raw-to-calibrated association probe; not a count or calibrated-product decoder
   - `diagnostics/` - Loss cone session management
   - `physics/`, `utils/`, `visualization/` - Supporting modules
   - `utils/losscone_lhs.py` - Shared loss-cone LHS sampling helper
@@ -72,6 +74,7 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
 | Topic | Link | Description |
 |-------|------|-------------|
 | Architecture | [pipeline_overview.md](docs/architecture/pipeline_overview.md) | End-to-end pipeline summary |
+| ER Measurement Contract | [er_measurement_contract.md](docs/architecture/er_measurement_contract.md) | Calibrated-product limits, Level-0 path, and likelihood gate |
 | Coordinate Frames | [coordinate_frames.md](docs/architecture/coordinate_frames.md) | SPICE + frame transforms |
 | GPU Acceleration | [gpu_acceleration.md](docs/architecture/gpu_acceleration.md) | Torch + optimizer overview |
 | Development | [development.md](docs/dev/development.md) | Build, test, lint workflow |
