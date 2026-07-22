@@ -1,0 +1,83 @@
+{
+  "audit_results": 875520,
+  "census_sweeps": 559321,
+  "census_valid_sweeps": 399634,
+  "compact_hashes": {
+    "geometry_census_monthly.csv": "d8077de9998497a068aeb0a2960ebacdd4a66f789dc5c70ae6e7b8b4320661c2",
+    "identified_set_by_truth.csv": "197480d7738217ac585d46d0d42d94a3c4023bcbb7c23bf82ee30fc3d3cbd7bb",
+    "identified_set_monthly.csv": "52d604471c18a4d1bb5ee25d5e8e476badb542a6b8b08c90023972136f03bfda",
+    "identified_set_scenarios.csv": "7e66fef74cfa6548664db52d6dbcb2fa9c912b7566e78c44ada582a826d47947"
+  },
+  "estimand": "delta_v = V_surface - V_spacecraft",
+  "implementation_sha256": "17734d2dcbac9cb9937ebcebccb52b80e087cc214668764ad45e5cafdfcee83c",
+  "large_artifact_hashes": {
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-01.csv.gz": "82be887173499b223a9d37d58a973f0ce26a90b648bec2f46f543935d4d73493",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-02.csv.gz": "f7b26af053887414bd4bd037059350edaf4b587321d9d0836c2dff778f8338e4",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-03.csv.gz": "0fd53bc721d145e485f7e6a35a03131f7b79dc297dd74eaf237a35fcb9ae082a",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-04.csv.gz": "ab70e58190826a729bc784f5135074f998204c6e2d36b348942be64e57b90bbd",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-05.csv.gz": "c97d0ff395ab976700ba07d70f4a750d5c02322ed5bcf93703b6c7b750d6722d",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-06.csv.gz": "2dea1b625b435d4a367ba8a0b30235387d3b18daef5969b03edea710950fafd0",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-07.csv.gz": "4c58afb1ee0a556e29b0178ecd7f8dfa7b87e3bd02c57e6e2683b11ca927f765",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-08.csv.gz": "a431201c446283dea22cea8ef565f9d438975e22058155dc46acfc58fe8d4aff",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-09.csv.gz": "43cf6dd19cced35c6ae278bb0696ddd4d17c176f9d58b56a3b44ec2b7839bf4d",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-10.csv.gz": "9eb35aaccb25bcea68fd3bf40589825909d7bbe5314d7667999598fa67bad358",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-11.csv.gz": "a33c84153b365a363fd20115d6604a579d1246793331685f77c779f473cc4243",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1998-12.csv.gz": "3c369e5a1403cc03038fdce88564833f6f24094293ab7673b07421c0b00dc8f1",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1999-01.csv.gz": "2d224f2d44416ae403a7f1038f7129f8f77d6ef7fba556e3a317f16daf5dde5e",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1999-02.csv.gz": "60b18b4fd75e56f4b731a873e78797620fc19c3e9c7e8559515117237d4c3855",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1999-03.csv.gz": "5a2fb59adc11b583ef7ec7a336cdbd488fa803ae7acde0dd69fa8d5cfca0f112",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1999-04.csv.gz": "752a8e38dfac3a661643fe0395e402882523dff9d46bccadd4818794b7f89729",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1999-05.csv.gz": "98bd2af5182d149ff52ebfa25997923142a1e44ff24fa2182812af3e855d30e9",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1999-06.csv.gz": "05b12bb376488e56974d770d13c9610684b48d5e689cecc824ff0cc37ccf67f1",
+    "artifacts/diagnostics/hardbin-identifiability/audit_shards/1999-07.csv.gz": "7a20ef2f476d6326c1cb7bab2030c42424bc5a57b3515ee265a157080fb3ec0f",
+    "artifacts/diagnostics/hardbin-identifiability/geometry_census.csv.gz": "013f838580a08991999228723fa9cd30870d351036fbbb012a1601ae77da33b0"
+  },
+  "reproduce_commands": [
+    "uv run python scripts/diagnostics/losscone_hardbin_identifiability.py census --workers 8",
+    "uv run python scripts/diagnostics/losscone_hardbin_identifiability.py sample",
+    "uv run python scripts/diagnostics/losscone_hardbin_identifiability.py audit --workers 8",
+    "uv run python scripts/diagnostics/losscone_hardbin_identifiability.py summarize"
+  ],
+  "resource_contract": {
+    "gpu_count": 0,
+    "maximum_time_limit_minutes": 55.0,
+    "maximum_workers": 8,
+    "numerical_library_threads_per_worker": 1
+  },
+  "sample_sha256": "5587110366453b46f42daca1af2593888e9c0d19c04e456347036fab870d7068",
+  "scenario_order": [
+    "oracle",
+    "common_r",
+    "sc_pm5",
+    "sc_pm20",
+    "affine_drift_20",
+    "broad_sc"
+  ],
+  "theta_sha256": "395202a7237f65253072440908226467bcbae66f5e7247f5b46e39e1489cd005",
+  "truth_coverage_fraction": 1.0,
+  "truth_grid": {
+    "delta_v": [
+      -2000.0,
+      -1000.0,
+      -500.0,
+      -200.0,
+      -100.0,
+      -50.0,
+      -20.0,
+      0.0,
+      20.0,
+      200.0
+    ],
+    "field_ratio": [
+      0.3,
+      0.5,
+      0.8,
+      1.1
+    ],
+    "spacecraft_v": [
+      -100.0,
+      0.0,
+      10.0
+    ]
+  }
+}

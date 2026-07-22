@@ -81,6 +81,8 @@ uv.lock
 *.svg
 figures/
 results/
+!docs/research/honest_ci/results/
+!docs/research/honest_ci/results/**
 gitingest/
 potential_timeseries*.html
 

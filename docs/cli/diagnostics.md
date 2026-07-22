@@ -49,6 +49,58 @@ not embed raw telemetry matrices. See the [ER Measurement Contract]
 (../architecture/er_measurement_contract.md) for its strict interpretation and
 the current response-calibration gate.
 
+### losscone_hardbin_identifiability.py
+
+Run the geometry-only structural-identification audit for the finite hard-bin
+loss-cone model. Its primary estimand is
+`delta_v = V_surface - V_spacecraft`; it also reports beam energy as
+`-delta_v`. This workflow does **not** read calibrated flux into the model,
+classify an observed loss cone, define a likelihood, or produce a confidence
+interval.
+
+The four commands form a resumable pipeline:
+
+```bash
+# One atomic census shard per calibrated day (all 560 local daily files)
+uv run python scripts/diagnostics/losscone_hardbin_identifiability.py census \
+  --workers 8
+
+# Exactly 64 deterministic geometry-stratified sweeps per calendar month
+uv run python scripts/diagnostics/losscone_hardbin_identifiability.py sample
+
+# One atomic exact-LP audit shard per month, over the fixed oracle truth grid
+uv run python scripts/diagnostics/losscone_hardbin_identifiability.py audit \
+  --workers 8
+
+# Commit-sized monthly and nuisance-scenario summaries with source hashes
+uv run python scripts/diagnostics/losscone_hardbin_identifiability.py summarize
+```
+
+`census` uses only the archive's energy, UTC, magnetic-field, and look-direction
+columns plus corrected polarity from `artifacts/experiment-008/geometry-shards`.
+It records source hashes, invalidity reasons, energy-grid signatures, reflected
+pitch cells, finite threshold gaps, cross-energy leverage, and safe row counts
+for every spacecraft-potential envelope used by the audit.
+
+`audit` generates zero-beam oracle patterns and solves the sharp closed
+identified interval for each of six sensitivity cases: known field ratio and
+spacecraft potential; common bounded field ratio; ±5 V and ±20 V common
+spacecraft-potential envelopes; bounded affine drift; and the broad
+`[-1500, 150]` V implementation envelope. Candidate parameters cannot discard
+rows: only rows valid throughout a scenario's full envelope enter that
+scenario.
+
+Large shards are written under ignored
+`artifacts/diagnostics/hardbin-identifiability/`. Compact results are written to
+`docs/research/honest_ci/results/`; their formal interpretation and proofs are
+in the [hard-bin audit research note]
+(../research/honest_ci/losscone_identifiability_audit.md).
+
+The CLI is CPU-only. `--workers` is rejected outside 1–8, numerical-library
+threads are fixed to one per worker, and `--time-limit-minutes` is rejected
+above 55. Completed daily and monthly shards are reused on subsequent runs;
+use `--overwrite` only to recompute them.
+
 ### losscone_peak_scan.py
 
 Scan ER files for beam signatures in loss-cone normalized data.

@@ -20,6 +20,9 @@ the current branch, draft PR 14, the reference telemetry, and primary sources.
 4. [`revised_memo.md`](revised_memo.md) — adjudicated and revised solution.
 5. [`codex_reconciliation.md`](codex_reconciliation.md) — source-aware project
    disposition and corrections.
+6. [`losscone_identifiability_audit.md`](losscone_identifiability_audit.md) —
+   model-specific proofs, exact hard-bin identified-set construction, and
+   mission-geometry findings.
 
 ## Provenance
 

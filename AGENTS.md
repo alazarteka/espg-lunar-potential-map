@@ -38,6 +38,8 @@ uv run python -m src.potential_mapper.batch --fast --year 1999 --month 4 --day 2
 uv run python scripts/diagnostics/losscone_u_profile.py --year 1999 --month 4 --day 29 \
   --batch-npz artifacts/potential_cache/1999_04_29_u0_lillis/potential_batch_1999_04_29.npz \
   --fit-method lillis --u-spacecraft 0  # Profile chi2(U) + plot
+uv run python scripts/diagnostics/losscone_hardbin_identifiability.py census \
+  --workers 8  # Geometry-only hard-bin identification audit; CPU only
 ```
 
 Loss-cone fitting supports both Halekas (log-chi2) and Lillis (masked linear chi2).
@@ -55,6 +57,8 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
   - `temporal/` - Spherical-harmonic reconstruction; used as the identifiability / sampling-limits analysis (tests whether a global spatiotemporal potential map is recoverable from LP ER data)
   - `engineering/` - GlobalStats, SiteStats, site analysis
   - `losscone/` - Loss-cone core (cpu, model, masks, chi2, types, params, torch/)
+    - `identifiability.py`, `identifiability_audit.py` - Exact hard-bin
+      identified-set engine and resource-bounded mission-geometry audit
     - `level0.py`, `raw_calibration.py` - Phase-1 Level-0 ER code assembly plus
       raw-to-calibrated association probe; not a count or calibrated-product decoder
   - `diagnostics/` - Loss cone session management

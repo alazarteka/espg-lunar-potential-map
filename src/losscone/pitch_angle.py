@@ -1,12 +1,92 @@
 """Pitch-angle geometry derived from ER data and magnetic field vectors."""
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from src import config
 from src.losscone.er_data import ERData
 from src.utils import thetas as thetas_module
 
-__all__ = ["PitchAngle"]
+__all__ = ["PitchAngle", "PitchAngleGeometry", "compute_pitch_angle_geometry"]
+
+
+@dataclass(frozen=True)
+class PitchAngleGeometry:
+    """Pure-array pitch-angle calculation result."""
+
+    pitch_angles: np.ndarray
+    cartesian_coords: np.ndarray
+    unit_magnetic_field: np.ndarray
+    valid_rows: np.ndarray
+
+
+def compute_pitch_angle_geometry(
+    phis_deg: np.ndarray,
+    thetas_deg: np.ndarray,
+    magnetic_field: np.ndarray,
+    polarity: np.ndarray | None = None,
+) -> PitchAngleGeometry:
+    """Calculate pitch angles without constructing :class:`ERData`.
+
+    Args:
+        phis_deg: Archived SCD azimuths, shape ``(n_rows, n_channels)``.
+        thetas_deg: Fixed SCD elevations, shape ``(n_channels,)``.
+        magnetic_field: SCD magnetic-field vectors, shape ``(n_rows, 3)``.
+        polarity: Optional Moonward orientation sign per row. With no supplied
+            polarity, preserve the legacy convention of orienting along ``-B``.
+
+    Returns:
+        Derived pitch geometry. Invalid magnetic-field or polarity rows are
+        retained and filled with NaN pitch angles.
+    """
+    phis = np.asarray(phis_deg, dtype=np.float64)
+    thetas = np.asarray(thetas_deg, dtype=np.float64)
+    magnetic = np.asarray(magnetic_field, dtype=np.float64)
+
+    if phis.ndim != 2:
+        raise ValueError("phis_deg must have shape (n_rows, n_channels)")
+    if thetas.ndim != 1 or thetas.shape[0] != phis.shape[1]:
+        raise ValueError("thetas_deg must match the channel dimension of phis_deg")
+    if magnetic.shape != (phis.shape[0], 3):
+        raise ValueError("magnetic_field must have shape (n_rows, 3)")
+
+    phis_rad = np.deg2rad(phis)
+    thetas_rad = np.deg2rad(thetas)
+    x = np.cos(phis_rad) * np.cos(thetas_rad)
+    y = np.sin(phis_rad) * np.cos(thetas_rad)
+    z = np.broadcast_to(np.sin(thetas_rad), x.shape)
+    cartesian = np.stack((x, y, z), axis=-1)
+
+    magnitude = np.linalg.norm(magnetic, axis=1)
+    valid = (
+        np.isfinite(magnetic).all(axis=1)
+        & np.isfinite(magnitude)
+        & (magnitude > 1.0e-9)
+        & (magnitude < 1.0e3)
+    )
+
+    if polarity is None:
+        orientation = np.full(phis.shape[0], -1.0, dtype=np.float64)
+    else:
+        orientation = np.asarray(polarity, dtype=np.float64)
+        if orientation.shape != (phis.shape[0],):
+            raise ValueError("polarity must match the number of rows")
+        valid &= np.isfinite(orientation) & (orientation != 0)
+
+    unit = np.full_like(magnetic, np.nan, dtype=np.float64)
+    unit[valid] = (magnetic[valid] / magnitude[valid, None]) * orientation[valid, None]
+    unit_channels = np.broadcast_to(unit[:, None, :], (*phis.shape, 3)).copy()
+
+    dot = np.einsum("ijk,ijk->ij", unit_channels, cartesian)
+    pitch = np.rad2deg(np.arccos(np.clip(dot, -1.0, 1.0)))
+    pitch[~valid] = np.nan
+    return PitchAngleGeometry(
+        pitch_angles=pitch,
+        cartesian_coords=cartesian,
+        unit_magnetic_field=unit_channels,
+        valid_rows=valid,
+    )
 
 
 class PitchAngle:
@@ -89,35 +169,18 @@ class PitchAngle:
             f"Theta values must match the number of channels {config.CHANNELS}."
         )
 
-        # Convert spherical coordinates (phi, theta) to Cartesian coordinates (X, Y, Z)
-        phis = np.deg2rad(self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64))
-        thetas = np.deg2rad(self.thetas)
-        self.cartesian_coords = self._get_cartesian_coords(phis, thetas)
-
+        phis = self.er_data.data[config.PHI_COLS].to_numpy(dtype=np.float64)
         magnetic_field = self.er_data.data[config.MAG_COLS].to_numpy(dtype=np.float64)
-        magnetic_field_magnitude = np.linalg.norm(magnetic_field, axis=1, keepdims=True)
-        # ER convention points +B roughly sunward; loss-cone tracing expects
-        # Moonward orientation. If polarity is provided, use it as the sign.
-        if self.polarity is None:
-            unit_magnetic_field = -magnetic_field / magnetic_field_magnitude
-        else:
-            polarity = np.asarray(self.polarity)
-            if polarity.shape[0] != magnetic_field.shape[0]:
-                raise ValueError("polarity must match the number of ER rows")
-            unit_magnetic_field = (
-                magnetic_field / magnetic_field_magnitude
-            ) * polarity[:, None]
-            # Rows with polarity=0 are treated as disconnected; downstream masks
-            # should ignore the resulting NaNs.
-            invalid_polarity = ~np.isfinite(polarity) | (polarity == 0)
-            if np.any(invalid_polarity):
-                unit_magnetic_field[invalid_polarity] = np.nan
-        unit_magnetic_field = np.tile(
-            unit_magnetic_field[:, None, :], (1, config.CHANNELS, 1)
+        geometry = compute_pitch_angle_geometry(
+            phis,
+            self.thetas,
+            magnetic_field,
+            polarity=self.polarity,
         )
-        self.unit_magnetic_field = unit_magnetic_field
-
-        self.calculate_pitch_angles()
+        self.cartesian_coords = geometry.cartesian_coords
+        self.unit_magnetic_field = geometry.unit_magnetic_field
+        self.pitch_angles = geometry.pitch_angles
+        self.valid_mask = geometry.valid_rows
 
     def calculate_pitch_angles(self) -> None:
         """

@@ -40,6 +40,7 @@ The pipeline runs in stages, each backed by a `src/` subpackage:
 |-------|--------------|--------|
 | **1. Acquire** | Download LP ER 3D electron flux, SPICE kernels, and attitude tables from NASA PDS/NAIF | `src.data_acquisition` |
 | **2. Fit** | Per-spectrum loss-cone inversion → surface potential `U_surface` (Halekas log-χ² or Lillis masked-χ²) | `src.losscone` |
+| **2a. Audit** | Geometry-only hard-bin identified sets for spacecraft-relative potential under explicit nuisance envelopes (structural, not a confidence interval) | `src.losscone.identifiability` |
 | **3. Correct** | Estimate the spacecraft's own floating potential from a κ-distribution charging balance and debias the fits | `src.spacecraft_potential`, `src.physics` |
 | **4. Project** | Trace each measurement's magnetic footprint to lunar-surface coordinates via SPICE geometry | `src.potential_mapper` |
 | **5. Aggregate** | Batch the fits into per-run NPZ caches (row- and spectrum-level) | `src.potential_mapper.batch` |
@@ -148,7 +149,7 @@ Full CLI and design docs live under [`docs/`](docs/README.md):
 
 ```
 src/               Core package (see AGENTS.md for the full module map)
-  losscone/          Loss-cone inversion (CPU + torch backends)
+  losscone/          Loss-cone inversion plus hard-bin identification audit
   potential_mapper/  Geometry projection, batch runner, NPZ output
   temporal/          Spherical-harmonic temporal reconstruction
   engineering/       Site statistics and engineering maps

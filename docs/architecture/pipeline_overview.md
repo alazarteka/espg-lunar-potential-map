@@ -44,6 +44,8 @@ measurement statistics remain valid outputs.
 - Geometry + SPICE: `src/potential_mapper/coordinates.py`, `src/utils/spice_ops.py`
 - Spacecraft potential: `src/spacecraft_potential.py`
 - Loss-cone model + fitter: `src/losscone/model.py`, `src/losscone/cpu.py` (shims: `src/model.py`, `src/flux.py`)
+- Hard-bin structural identification: `src/losscone/identifiability.py`, with
+  the geometry-only archive audit in `src/losscone/identifiability_audit.py`
 - GPU loss-cone fitting: `src/losscone/torch/` (shim: `src/losscone_torch.py`, legacy: `src/model_torch.py`)
 - Batch cache: `src/potential_mapper/batch.py`
 - Temporal harmonics: `src/temporal/`
