@@ -37,6 +37,12 @@ uv run python -m src.potential_mapper.batch --year 1998 --month 1
 - [GPU Acceleration](architecture/gpu_acceleration.md)
 - [Spacecraft Potential](physics/spacecraft_potential.md)
 
+## Active Research Records
+
+- [Honest confidence-set research](research/honest_ci/README.md) — GPT Pro
+  mathematical memo, adversarial review, revised memo, and source-aware Codex
+  reconciliation for the Level-0/calibrated-flux identification problem
+
 ## Archived Documentation
 
 Analysis notes and decision rationale (the "why" behind current thresholds and
