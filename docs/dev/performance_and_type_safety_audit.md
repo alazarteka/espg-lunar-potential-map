@@ -288,7 +288,220 @@ class Vec3(Generic[Frame]):
 
 ---
 
-## 3. Bottom line
+## 3. The pint vs native-magnitude ergonomics problem
+
+This is the core developer pain behind the dual-path design:
+
+> Pint on the reference path is dramatically slower, so production runs on
+> native floats / NumPy / Torch / Numba. Parity tests prove the kernels match.
+> But every production call site still requires remembering “density is m⁻³,
+> theta is m/s, energy is eV, potential is V” — with no enforcement after the
+> boundary.
+
+That architecture is **correct for performance**. Pint’s own guidance is
+essentially “convert once, then operate on magnitudes.” Switching hot paths to
+`unyt` or `astropy.units` would not fix Torch/Numba integration and would still
+carry wrapper cost on small arrays / iterative solvers. There is no free
+“pint fast mode” that keeps dimensional algebra at zero cost.
+
+What *is* improveable is the **ergonomics of the magnitude side**.
+
+### How the pain shows up today
+
+The typical production call looks like:
+
+```python
+# src/spacecraft_potential.py — units live only in comments / docs
+electron_current_density_magnitude(
+    *initial_fit_params.to_tuple(),  # (density_m3, kappa, theta_m_per_s)
+    E_min=1e1,                       # eV — untyped
+    E_max=2e4,                       # eV — untyped
+    n_steps=10,
+)
+```
+
+`to_tuple()` is the right *escape hatch* from `KappaParams`, but it immediately
+throws away names and unit identity. After that, mypy sees three `float`s and
+two more `float`s. Parity tests catch “kernel A ≠ kernel B given known-good
+units”; they do **not** catch “caller passed cm⁻³ instead of m⁻³.”
+
+Related patterns already in the tree:
+
+| Layer | Example | Unit-safe? |
+|-------|---------|------------|
+| Pint reference | `omnidirectional_flux`, `J_of_U_ref` | Yes (slow) |
+| Named escape | `KappaParams.to_tuple()`, `*_magnitude` | Boundary only |
+| Cached mag attrs | `energy_centers_mag`, `density_estimate_mag` | Convention |
+| Pure float APIs | `synth_losscone_batch`, `calculate_shaded_currents` | Docstring only |
+
+`jucurve.py` states the tradeoff bluntly: “Pint reference implementations
+(slow, but verifiably correct).”
+
+### What does *not* solve this
+
+| Approach | Why not |
+|----------|---------|
+| Pint / unyt / astropy on hotpaths | Too slow; awkward with Numba/Torch |
+| Runtime `beartype` on `NewType` | `NewType` is erased; checks underlying `float`/`ndarray` only |
+| Scalar wrapper objects in kernels (`Energy(value=…)`) | Unwrap tax; breaks Numba/Torch |
+| Structured dtypes carrying unit tags | Poor fit for solvers / GPU |
+| jaxtyping alone | Great for shapes, not physical units |
+| Dropping parity tests | Removes the only proof optimized kernels match physics |
+
+### Better middle ground: canonical magnitude layer
+
+Keep three layers — do not collapse them:
+
+```text
+KappaParams / Quantity     ← pint, convert once at boundary
+KappaMagnitudes / NewTypes ← zero-cost tags + named fields (production API)
+*_magnitude / Numba/Torch  ← plain floats/arrays (kernels unchanged)
+```
+
+#### Layer A — named magnitude bundles (biggest ergonomic win)
+
+Replace positional `to_tuple()` unpacking with a frozen dataclass of
+**already-canonical** magnitudes. Names carry the unit; values stay plain
+floats.
+
+```python
+from dataclasses import dataclass
+from typing import NewType
+
+DensityM3 = NewType("DensityM3", float)
+SpeedMPerS = NewType("SpeedMPerS", float)
+EnergyEV = NewType("EnergyEV", float)
+PotentialV = NewType("PotentialV", float)
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class KappaMagnitudes:
+    density_m3: DensityM3
+    kappa: float
+    theta_m_per_s: SpeedMPerS
+
+    @classmethod
+    def from_params(cls, params: KappaParams) -> "KappaMagnitudes":
+        d, k, t = params.to_tuple()  # still the pint→mag bridge
+        return cls(
+            density_m3=DensityM3(float(d)),
+            kappa=float(k),
+            theta_m_per_s=SpeedMPerS(float(t)),
+        )
+
+    def as_tuple(self) -> tuple[float, float, float]:
+        return float(self.density_m3), self.kappa, float(self.theta_m_per_s)
+```
+
+Call sites become:
+
+```python
+params_mag = KappaMagnitudes.from_params(initial_fit_params)
+J = electron_current_density_mag(
+    params=params_mag,
+    e_min_ev=EnergyEV(1e1),
+    e_max_ev=EnergyEV(2e4),
+    n_steps=10,
+)
+# kernel still receives plain floats via params_mag.as_tuple()
+```
+
+Hotpath cost: one small dataclass outside the solver loop; kernels unchanged.
+Migration: add `to_magnitudes()` beside `to_tuple()`; migrate call sites
+incrementally.
+
+#### Layer B — unit-at-boundary facade
+
+Public / diagnostic / notebook APIs keep accepting `Quantity` (or tagged
+constructors). They strip **once**, then call the magnitude API. Production
+pipelines that already hold mag caches use `assume_energy_grid_ev(...)` style
+taggers — convert-or-assume at the edge, never inside Numba.
+
+```python
+def omnidirectional_flux_mag(
+    *,
+    params: KappaMagnitudes,
+    energy_ev: EnergyGridEV,
+) -> np.ndarray:
+    d, k, t = params.as_tuple()
+    return omnidirectional_flux_magnitude(d, k, t, np.asarray(energy_ev))
+```
+
+This is already half-present as `omnidirectional_flux_fast()` — generalize it
+so **production callers stop touching the raw Numba signature**.
+
+#### Layer C — static `NewType` for scalars *and* arrays
+
+```python
+EnergyGridEV = NewType("EnergyGridEV", npt.NDArray[np.float64])
+PotentialArrayV = NewType("PotentialArrayV", npt.NDArray[np.float64])
+```
+
+Mypy can then reject `PotentialV` where `EnergyEV` is required. Runtime cost
+is zero (`EnergyEV(10.0)` is still `10.0`). Limitations are honest: tags are
+lost after arithmetic, and a liar can write `EnergyEV(potential)`. That is
+still far better than today’s untyped floats, and it does not fight Numba.
+
+Optional `__debug__` checks belong only at constructors
+(`energy_grid_ev_from_quantity`, `assume_energy_grid_ev`) — shape, finiteness,
+positivity — not inside kernels.
+
+### How parity tests fit (keep them)
+
+Parity tests remain the proof that optimized math equals the pint reference.
+The magnitude layer does **not** replace them; it makes the *inputs* to those
+kernels harder to misuse.
+
+Add two cheaper companion test classes:
+
+1. **Conversion tests** — `KappaMagnitudes.from_params` with density in
+   particles/L and theta in km/h still yields canonical m⁻³ and m/s.
+2. **Boundary validator tests** — reject non-1D energy grids, non-finite
+   values, etc.
+
+Keep existing CPU↔Torch↔Numba parity. Prefer comparing through the facade:
+
+```python
+ref = omnidirectional_flux(params, energy_qty)           # pint
+fast = omnidirectional_flux_mag(
+    params=KappaMagnitudes.from_params(params),
+    energy_ev=energy_grid_ev_from_quantity(energy_qty),
+)
+assert_allclose(fast, ref.to(...).magnitude, rtol=...)
+```
+
+### Honest static vs runtime tradeoff
+
+| | Static tags (`NewType` / named fields) | Runtime units (pint) |
+|--|----------------------------------------|----------------------|
+| Hotpath cost | ~0 | High |
+| Catches wrong call-site units | Often (if mypy runs) | Always (if Quantity kept) |
+| Works with Numba/Torch | Yes | No / painful |
+| Survives notebooks / `-O` | Weak | Strong |
+| Best role | Production API surface | Reference + boundary conversion |
+
+**Recommended compromise for this repo:** runtime units at boundaries; static
+canonical magnitude tags for production APIs; plain floats only inside kernels;
+parity tests between reference and kernel.
+
+### Suggested migration (small steps)
+
+1. Add `KappaMagnitudes` + `to_magnitudes()` next to `to_tuple()`; leave kernels
+   alone.
+2. Change `electron_current_density_magnitude` *call sites* (not the Numba
+   kernel) to take `params: KappaMagnitudes` and `e_min_ev` / `e_max_ev`.
+3. Introduce `EnergyEV` / `PotentialV` / `EnergyGridEV` aliases in
+   `src/utils/units.py` (or a sibling `magnitudes.py`) and use them on
+   spacecraft-potential and loss-cone production APIs.
+4. Stop exporting raw Numba signatures as the “normal” API — wrap them.
+5. Keep pint reference functions and parity tests; do not reintroduce pint into
+   torch/numba loops.
+
+This addresses the annoyance without abandoning the performance architecture
+that forced the dual path in the first place.
+
+---
+
+## 4. Bottom line
 
 **Performance:** The numeric cores are already largely vectorized / GPU /
 Numba. The biggest remaining costs are Python orchestration around them —
@@ -303,11 +516,18 @@ boundary validators before investing in `jaxtyping` or frame phantom types.
 Do not rely on static types alone for duplicated math — keep parity tests as
 the correctness backstop.
 
+**Pint ergonomics:** Do not put units back on the hotpath. Add a
+**canonical magnitude layer** (named bundles + `NewType` tags + facade wrappers)
+so production call sites stop relying on memory for “which float is eV.” Keep
+pint for reference/conversion; keep parity tests for kernel truth.
+
 ### Near-term candidates if implementing next
 
 1. Cache kappa response matrix in `_objective_function_fast`
-2. Fix / unify `bs_over_bm` documentation (and ideally a named type or alias)
+2. Add `KappaMagnitudes` / `to_magnitudes()` and migrate
+   `electron_current_density_magnitude` call sites off `*to_tuple()`
+3. Fix / unify `bs_over_bm` documentation (and ideally a named type or alias)
    so model and results agree on `B_sc / B_Moon`
-3. Replace physics `assert` invariants with `ValueError`
-4. Add `Literal` annotations for fit-method / dtype config
-5. Vectorize `_prepare_kappa_batch_data`
+4. Replace physics `assert` invariants with `ValueError`
+5. Add `Literal` annotations for fit-method / dtype config
+6. Vectorize `_prepare_kappa_batch_data`
