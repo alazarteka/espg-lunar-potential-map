@@ -15,6 +15,7 @@ User-facing documentation for the command-line interfaces.
 | [Analysis & Plots](cli/analysis.md) | — | Exploration + publication plotting scripts |
 | [Visualization Style](visualization/visualization.md) | — | Colormap categories, fonts, and paper styling |
 | [Development](dev/development.md) | — | Build, test, lint workflow reference |
+| [Perf & Type-Safety Audit](dev/performance_and_type_safety_audit.md) | — | Hotpath performance + type-correctness exploration |
 
 ## Quick Start
 
@@ -35,6 +36,7 @@ uv run python -m src.potential_mapper.batch --year 1998 --month 1
 - [Coordinate Frames & SPICE](architecture/coordinate_frames.md)
 - [GPU Acceleration](architecture/gpu_acceleration.md)
 - [Spacecraft Potential](physics/spacecraft_potential.md)
+- [Performance & Type-Safety Audit](dev/performance_and_type_safety_audit.md)
 
 ## Archived Documentation
 
