@@ -171,6 +171,10 @@ uv run mypy src
 uv run mypy src/potential_mapper
 ```
 
+mypy is currently **advisory** (known type-hygiene backlog). For an exploratory
+audit of type safety for scientific correctness — and of hotpath performance —
+see [performance_and_type_safety_audit.md](performance_and_type_safety_audit.md).
+
 ---
 
 ## Pre-commit Hooks

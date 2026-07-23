@@ -75,6 +75,7 @@ See [docs/dev/development.md](docs/dev/development.md) for complete workflow ref
 | Coordinate Frames | [coordinate_frames.md](docs/architecture/coordinate_frames.md) | SPICE + frame transforms |
 | GPU Acceleration | [gpu_acceleration.md](docs/architecture/gpu_acceleration.md) | Torch + optimizer overview |
 | Development | [development.md](docs/dev/development.md) | Build, test, lint workflow |
+| Perf & Types Audit | [performance_and_type_safety_audit.md](docs/dev/performance_and_type_safety_audit.md) | Hotpath performance + type-correctness exploration |
 | Lockfiles | [lockfiles.md](docs/dev/lockfiles.md) | GPU environment configurations |
 | Batch Processing | [potential_mapper_batch.md](docs/cli/potential_mapper_batch.md) | GPU-accelerated batch mode |
 | Engineering | [engineering.md](docs/cli/engineering.md) | Engineering maps and site summaries |
