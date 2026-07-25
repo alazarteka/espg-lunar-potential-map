@@ -110,3 +110,92 @@ def test_lillis_qc_emits_legacy_lhs_fields() -> None:
     assert str(payload["u_width_fit_method"]) == "lillis"
     # Profile fields must NOT be emitted for a Lillis run.
     assert "rows_u_width_profile_dev68" not in payload
+
+
+# The exact NPZ key set emitted by `main` at commit 0de3ec5, before the
+# losscone-weighted-width merge, with the U-width QC block enabled. Cached
+# artifacts and every downstream reader (temporal, engineering, visualization,
+# the plotting scripts) were written against these names. The merge is only
+# allowed to ADD keys for the default and Lillis paths, never to rename or drop
+# one, or the 560-day production cache stops being readable by existing tools.
+_LEGACY_QC_PAYLOAD_KEYS = frozenset(
+    {
+        "rows_beam_amp",
+        "rows_bs_over_bm",
+        "rows_electron_density",
+        "rows_electron_temperature",
+        "rows_environment_class",
+        "rows_fit_chi2",
+        "rows_kappa_value",
+        "rows_projected_potential",
+        "rows_projection_in_sun",
+        "rows_projection_latitude",
+        "rows_projection_longitude",
+        "rows_projection_polarity",
+        "rows_spacecraft_in_sun",
+        "rows_spacecraft_latitude",
+        "rows_spacecraft_longitude",
+        "rows_spacecraft_potential",
+        "rows_spec_no",
+        "rows_time",
+        "rows_u_is_identifiable_lhs_dchi2red_0p001",
+        "rows_u_width_lhs_dchi2red_0p001",
+        "rows_utc",
+        "spec_bs_over_bm",
+        "spec_electron_density",
+        "spec_electron_temperature",
+        "spec_environment_class",
+        "spec_fit_chi2",
+        "spec_has_fit",
+        "spec_row_count",
+        "spec_spec_no",
+        "spec_time_end",
+        "spec_time_start",
+        "spec_u_is_identifiable_lhs_dchi2red_0p001",
+        "spec_u_surface",
+        "spec_u_width_lhs_dchi2red_0p001",
+        "u_width_lhs_delta_reduced",
+        "u_width_lhs_identifiable_max_v",
+    }
+)
+
+# Same, without the QC block (the QC keys are opt-in via --emit-u-width-qc).
+_LEGACY_BASE_PAYLOAD_KEYS = frozenset(
+    key
+    for key in _LEGACY_QC_PAYLOAD_KEYS
+    if "u_width" not in key and "u_is_identifiable" not in key
+)
+
+
+def _payload_for_schema_check(**kwargs) -> dict:
+    er = _make_er([1, 1, 2, 2])
+    res = _make_results(4, [5.0, 5.0, 7.0, 7.0])
+    return _prepare_payload(er, res, **kwargs)
+
+
+@pytest.mark.parametrize("fit_method", [None, "lillis", "halekas"])
+def test_npz_schema_is_backward_readable_without_qc(fit_method) -> None:
+    """No legacy NPZ key may disappear from the default/Lillis/Halekas payload."""
+    kwargs = {} if fit_method is None else {"fit_method": fit_method}
+    keys = set(_payload_for_schema_check(**kwargs))
+    assert keys >= _LEGACY_BASE_PAYLOAD_KEYS, sorted(_LEGACY_BASE_PAYLOAD_KEYS - keys)
+
+
+@pytest.mark.parametrize("fit_method", [None, "lillis"])
+def test_npz_schema_is_additive_only_with_qc(fit_method) -> None:
+    """With QC enabled the payload is main's key set plus additive keys only."""
+    kwargs = {"u_width_identifiable_max_v": 200.0}
+    if fit_method is not None:
+        kwargs["fit_method"] = fit_method
+    keys = set(_payload_for_schema_check(**kwargs))
+
+    missing = _LEGACY_QC_PAYLOAD_KEYS - keys
+    assert not missing, (
+        f"NPZ keys removed, breaking existing readers: {sorted(missing)}"
+    )
+
+    # Only provenance keys are new; anything else here is an unreviewed schema change.
+    assert keys - _LEGACY_QC_PAYLOAD_KEYS == {
+        "u_width_schema_version",
+        "u_width_fit_method",
+    }
