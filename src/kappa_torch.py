@@ -31,23 +31,26 @@ from src.utils.optimization import BatchedDifferentialEvolution
 
 
 def _auto_detect_dtype(device: torch.device) -> torch.dtype:
-    """
-    Auto-detect optimal dtype for the given device.
+    """Return the dtype for automatic selection: always float32.
 
-    Returns float16 on modern CUDA GPUs (Volta+, compute 7.0+) which have
-    tensor cores for fast half-precision. Returns float32 for older GPUs
-    and CPU where float16 would be slower.
+    This function used to return ``torch.float16`` on CUDA devices of compute
+    capability >= 7.0 (a verbatim copy of the loss-cone fitter's bug; see
+    ``src/losscone/torch/fitter.py._auto_detect_dtype`` and
+    ``scratch/review-2026-07-25/01-physics.md`` finding F1, where fp16 made the
+    Halekas chi2 2x wrong by shifting the loss-cone boundary a full pitch bin).
+
+    Half precision is even less defensible here than there: ``fit_batch`` casts
+    electron densities of order 1e6-1e8 m^-3 to this dtype, and the fp16 maximum
+    is 65504 - every density would overflow to ``inf`` and the fit would return
+    an arbitrary survivor carrying a plausible-looking finite chi2.
+
+    The ``device`` argument is retained for call compatibility and is unused.
     """
     if not HAS_TORCH:
         raise ImportError("PyTorch is required")
 
-    if device.type == "cuda":
-        props = torch.cuda.get_device_properties(device)
-        # Volta+ (compute 7.0+) has tensor cores for fast float16
-        if props.major >= 7:
-            return torch.float16
-        return torch.float32
-    return torch.float32  # CPU: float32 is fastest
+    del device  # dtype no longer depends on the device; fp16 is never safe here.
+    return torch.float32
 
 
 def _torch_lgamma(x: Tensor) -> Tensor:
@@ -250,7 +253,10 @@ class KappaFitterTorch:
         Args:
             device: torch device
             dtype: 'auto', 'float16', 'float32', or 'float64'.
-                'auto' (default): float16 on modern GPUs (Volta+), float32 otherwise.
+                'auto' (default): always float32, on every device (see
+                    _auto_detect_dtype; float16 overflows on electron densities).
+                float16: NOT SCIENTIFICALLY VALID here - densities of order
+                    1e6-1e8 exceed the fp16 max of 65504. Benchmarking only.
             popsize: DE population size
             maxiter: DE max iterations
             use_convolution: Apply energy response matrix
@@ -266,8 +272,15 @@ class KappaFitterTorch:
             self.dtype = torch.float64
         elif dtype == "float32":
             self.dtype = torch.float32
-        else:
+        elif dtype == "float16":
             self.dtype = torch.float16
+        else:
+            # Previously any unrecognized string fell through to float16, so a
+            # typo silently selected the one dtype that cannot represent the
+            # densities this fitter handles.
+            raise ValueError(
+                f"dtype must be 'auto', 'float16', 'float32', or 'float64', got {dtype}"
+            )
         self.popsize = popsize
         self.maxiter = maxiter
         self.use_convolution = use_convolution

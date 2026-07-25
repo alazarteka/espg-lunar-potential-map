@@ -47,12 +47,26 @@ if TYPE_CHECKING:
 
 
 def _auto_detect_dtype(device: torch.device) -> torch.dtype:
-    """Auto-detect an optimal dtype for the given device."""
-    if device.type == "cuda":
-        props = torch.cuda.get_device_properties(device)
-        if props.major >= 7:
-            return torch.float16
-        return torch.float32
+    """Return the dtype for automatic (``dtype="auto"``) selection: always float32.
+
+    This function used to return ``torch.float16`` on CUDA devices of compute
+    capability >= 7.0. That was a critical scientific bug: in half precision the
+    pitch grid and ``180 - alpha_c`` quantize to ~0.125 deg, which shifts the
+    loss-cone boundary by a whole pitch bin. Measured on the real 7 eV - 20 keV
+    energy grid with 88 pitch bins, the Halekas chi2 came out **2x wrong**
+    (18.078 in fp16 vs 9.108 in both fp32 and fp64) and 130 of 400 LHS candidates
+    collapsed into ties. Since the boundary position *is* the fitted surface
+    potential, results were silently wrong and hardware-dependent (a Pascal GPU
+    took the fp32 branch and disagreed with an Ampere/Ada GPU). It also put the
+    ``LILLIS_CHI2_REDUCED_MAX`` accept/reject gate and the
+    ``delta_reduced = 0.001`` U-width proxy at ~1 ULP of their own dtype.
+
+    See ``scratch/review-2026-07-25/01-physics.md`` finding F1.
+
+    The ``device`` argument is retained for call compatibility and is unused.
+    Callers that genuinely want fp64 must pass ``dtype="float64"`` explicitly.
+    """
+    del device  # dtype no longer depends on the device; fp16 is never safe here.
     return torch.float32
 
 
@@ -113,10 +127,14 @@ class LossConeFitterTorch(LossConeFitterBase):
             loss_cone_background: Background level outside loss cone
             device: Torch device ('cuda', 'cpu', or None for auto)
             dtype: Data type ('auto', 'float16', 'float32', or 'float64').
-                'auto' (default): float16 on modern GPUs (Volta+), float32 otherwise.
-                float16: fastest on modern GPUs, 4x less VRAM.
-                float32: good balance of speed and precision.
-                float64: maximum precision (slow).
+                'auto' (default): always float32, on every device. It used to
+                    pick float16 on Volta+ GPUs, which made the chi2 2x wrong
+                    (physics review F1) - see _auto_detect_dtype.
+                float16: NOT SCIENTIFICALLY VALID for this fit; it quantizes the
+                    pitch grid coarsely enough to move the loss-cone boundary a
+                    whole bin. Kept only for benchmarking.
+                float32: good balance of speed and precision (the default).
+                float64: maximum precision (slow); the CPU reference dtype.
         """
         self.er_data = er_data
         self.thetas = thetas_module.get_thetas()
