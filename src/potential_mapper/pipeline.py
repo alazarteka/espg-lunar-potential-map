@@ -682,6 +682,8 @@ def process_merged_data(
     fit_chi2_arr = np.full(n, np.nan)
     u_width_lhs_dchi2red_0p001_arr = np.full(n, np.nan)
     u_is_identifiable_lhs_dchi2red_0p001_arr = np.zeros(n, dtype=bool)
+    u_width_profile_dev68_arr = np.full(n, np.nan)
+    u_is_identifiable_profile_arr = np.zeros(n, dtype=bool)
 
     rows_per_sweep = config.SWEEP_ROWS
     pitch_angle = None
@@ -691,7 +693,10 @@ def process_merged_data(
     else:
         logging.debug("Pitch-angle polarity skipped; required ER columns are missing.")
 
-    emit_u_width_qc = bool(emit_u_width_qc) and fit_method == FitMethod.LILLIS
+    emit_u_width_qc = bool(emit_u_width_qc) and fit_method in (
+        FitMethod.LILLIS,
+        FitMethod.CASH,
+    )
 
     if use_torch:
         # PyTorch-accelerated fitter (~5x faster)
@@ -762,14 +767,20 @@ def process_merged_data(
         and u_width_chunks is not None
         and u_is_identifiable_chunks is not None
     ):
+        # The Cash fit yields a genuine profile-likelihood 68% CI width; route it
+        # to the profile fields. Lillis' LHS max-min proxy keeps the legacy fields.
+        if fit_method == FitMethod.CASH:
+            width_target = u_width_profile_dev68_arr
+            is_ident_target = u_is_identifiable_profile_arr
+        else:
+            width_target = u_width_lhs_dchi2red_0p001_arr
+            is_ident_target = u_is_identifiable_lhs_dchi2red_0p001_arr
         n_chunks = len(er_data.data) // rows_per_sweep
         for chunk_idx in range(n_chunks):
             row_start = chunk_idx * rows_per_sweep
             row_end = min(row_start + rows_per_sweep, n)
-            u_width_lhs_dchi2red_0p001_arr[row_start:row_end] = float(
-                u_width_chunks[chunk_idx]
-            )
-            u_is_identifiable_lhs_dchi2red_0p001_arr[row_start:row_end] = bool(
+            width_target[row_start:row_end] = float(u_width_chunks[chunk_idx])
+            is_ident_target[row_start:row_end] = bool(
                 u_is_identifiable_chunks[chunk_idx]
             )
 
@@ -789,6 +800,8 @@ def process_merged_data(
         fit_chi2=fit_chi2_arr,
         u_width_lhs_dchi2red_0p001=u_width_lhs_dchi2red_0p001_arr,
         u_is_identifiable_lhs_dchi2red_0p001=u_is_identifiable_lhs_dchi2red_0p001_arr,
+        u_width_profile_dev68=u_width_profile_dev68_arr,
+        u_is_identifiable_profile=u_is_identifiable_profile_arr,
         electron_temperature=electron_temp,
         electron_density=electron_dens,
         kappa_value=kappa_vals_arr,

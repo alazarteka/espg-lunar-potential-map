@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 import src.config as config
-from src.losscone.types import parse_fit_method
+from src.losscone.types import FitMethod, parse_fit_method
 from src.potential_mapper.cli_args import add_common_batch_args
 from src.potential_mapper.logging_utils import setup_logging
 from src.potential_mapper.npz_io import write_npz_atomic
@@ -27,7 +27,6 @@ from src.potential_mapper.pipeline import DataLoader, load_all_data, process_mer
 from src.potential_mapper.spice import load_spice_files
 
 if TYPE_CHECKING:
-    from src.losscone.types import FitMethod
     from src.potential_mapper.results import PotentialResults
 
 
@@ -43,12 +42,18 @@ def _prepare_payload(
     results: PotentialResults,
     *,
     u_width_identifiable_max_v: float | None = None,
+    fit_method: str | FitMethod | None = None,
 ) -> dict[str, np.ndarray]:
     """
     Prepare NPZ payload from merged ERData and PotentialResults.
 
     Creates both row-level and spectrum-level aggregated data.
     Stores all fit parameters and plasma environment classification for analysis.
+
+    The U-identifiability QC block is method-aware: a Cash fit emits the
+    profile-likelihood 68% CI (``*_u_width_profile_dev68`` /
+    ``*_u_is_identifiable_profile``), while Lillis emits the legacy LHS max-min
+    proxy (``*_u_width_lhs_dchi2red_0p001`` / ``*_u_is_identifiable_lhs_...``).
     """
     df = er_data.data.reset_index(drop=True)
     n_rows = len(df)
@@ -56,6 +61,29 @@ def _prepare_payload(
         raise ValueError("Row count mismatch between ERData and PotentialResults")
 
     emit_u_width_qc = u_width_identifiable_max_v is not None
+    method = parse_fit_method(fit_method) if fit_method is not None else None
+
+    # Pick the QC source arrays + NPZ key names for this fit method.
+    if method == FitMethod.CASH:
+        qc_width_src = results.u_width_profile_dev68
+        qc_ident_src = results.u_is_identifiable_profile
+        qc_rows_width_key = "rows_u_width_profile_dev68"
+        qc_rows_ident_key = "rows_u_is_identifiable_profile"
+        qc_spec_width_key = "spec_u_width_profile_dev68"
+        qc_spec_ident_key = "spec_u_is_identifiable_profile"
+        qc_delta_key = "u_width_profile_delta_chi2"
+        qc_delta_val = float(config.LOSS_CONE_U_WIDTH_DELTA_CHI2)
+        qc_maxv_key = "u_width_profile_identifiable_max_v"
+    else:
+        qc_width_src = results.u_width_lhs_dchi2red_0p001
+        qc_ident_src = results.u_is_identifiable_lhs_dchi2red_0p001
+        qc_rows_width_key = "rows_u_width_lhs_dchi2red_0p001"
+        qc_rows_ident_key = "rows_u_is_identifiable_lhs_dchi2red_0p001"
+        qc_spec_width_key = "spec_u_width_lhs_dchi2red_0p001"
+        qc_spec_ident_key = "spec_u_is_identifiable_lhs_dchi2red_0p001"
+        qc_delta_key = "u_width_lhs_delta_reduced"
+        qc_delta_val = 0.001
+        qc_maxv_key = "u_width_lhs_identifiable_max_v"
 
     spec_no = df[config.SPEC_NO_COLUMN].to_numpy(dtype=np.int64)
     utc_vals = _to_unicode(df.get(config.UTC_COLUMN))
@@ -92,12 +120,8 @@ def _prepare_payload(
     }
 
     if emit_u_width_qc:
-        payload["rows_u_width_lhs_dchi2red_0p001"] = (
-            results.u_width_lhs_dchi2red_0p001.astype(np.float64)
-        )
-        payload["rows_u_is_identifiable_lhs_dchi2red_0p001"] = (
-            results.u_is_identifiable_lhs_dchi2red_0p001.astype(bool)
-        )
+        payload[qc_rows_width_key] = qc_width_src.astype(np.float64)
+        payload[qc_rows_ident_key] = qc_ident_src.astype(bool)
 
     # Aggregate by spec_no
     uniq_specs, start_indices, counts = np.unique(
@@ -122,8 +146,8 @@ def _prepare_payload(
     spec_te = []
     spec_ne = []
     spec_env = []
-    spec_u_width_lhs: list[float] = []
-    spec_u_is_identifiable_lhs: list[bool] = []
+    spec_u_width_qc: list[float] = []
+    spec_u_is_identifiable_qc: list[bool] = []
 
     for idx, count in zip(start_indices, counts, strict=False):
         row_slice = slice(idx, idx + count)
@@ -138,10 +162,8 @@ def _prepare_payload(
         spec_bs_over_bm.append(results.bs_over_bm[idx])
         spec_chi2.append(results.fit_chi2[idx])
         if emit_u_width_qc:
-            spec_u_width_lhs.append(results.u_width_lhs_dchi2red_0p001[idx])
-            spec_u_is_identifiable_lhs.append(
-                bool(results.u_is_identifiable_lhs_dchi2red_0p001[idx])
-            )
+            spec_u_width_qc.append(qc_width_src[idx])
+            spec_u_is_identifiable_qc.append(bool(qc_ident_src[idx]))
         spec_te.append(results.electron_temperature[idx])
         spec_ne.append(results.electron_density[idx])
         spec_env.append(results.environment_class[idx])
@@ -164,15 +186,16 @@ def _prepare_payload(
     )
 
     if emit_u_width_qc:
-        payload["spec_u_width_lhs_dchi2red_0p001"] = np.array(
-            spec_u_width_lhs, dtype=np.float64
-        )
-        payload["spec_u_is_identifiable_lhs_dchi2red_0p001"] = np.array(
-            spec_u_is_identifiable_lhs, dtype=bool
-        )
-        payload["u_width_lhs_delta_reduced"] = np.array(0.001, dtype=np.float64)
-        payload["u_width_lhs_identifiable_max_v"] = np.array(
+        payload[qc_spec_width_key] = np.array(spec_u_width_qc, dtype=np.float64)
+        payload[qc_spec_ident_key] = np.array(spec_u_is_identifiable_qc, dtype=bool)
+        payload[qc_delta_key] = np.array(qc_delta_val, dtype=np.float64)
+        payload[qc_maxv_key] = np.array(
             float(u_width_identifiable_max_v), dtype=np.float64
+        )
+        # Schema/provenance for the identifiability QC block.
+        payload["u_width_schema_version"] = np.array(2, dtype=np.int64)
+        payload["u_width_fit_method"] = np.array(
+            method.value if method is not None else "", dtype="U16"
         )
 
     return payload
@@ -260,9 +283,9 @@ def run_batch(
     # Process merged data
     try:
         logging.info(f"Processing merged data (torch={use_torch})...")
-        fit_method_parsed = (
-            parse_fit_method(fit_method) if fit_method is not None else None
-        )
+        # Resolve to a concrete method (None -> config default) so the payload
+        # QC block is labeled with the method actually used.
+        fit_method_parsed = parse_fit_method(fit_method)
         results = process_merged_data(
             er_data,
             use_torch=use_torch,
@@ -283,6 +306,7 @@ def run_batch(
         u_width_identifiable_max_v=float(u_width_identifiable_max_v)
         if bool(emit_u_width_qc)
         else None,
+        fit_method=fit_method_parsed,
     )
 
     logging.info(f"Writing to {output_path}...")
@@ -324,7 +348,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--losscone-fit-method",
-        choices=["halekas", "lillis"],
+        choices=["halekas", "lillis", "cash"],
         default=None,
         help="Loss-cone fitting method (defaults to config)",
     )
@@ -341,8 +365,10 @@ def _parse_args() -> argparse.Namespace:
         "--emit-u-width-qc",
         action="store_true",
         help=(
-            "Emit an LHS-based U identifiability proxy into the batch NPZ "
-            "(adds rows/spec u_width + identifiable flag)"
+            "Emit a U identifiability width + flag into the batch NPZ (adds "
+            "rows/spec u_width fields). For --losscone-fit-method cash this is the "
+            "profile-likelihood 68%% CI (u_width_profile_dev68); for lillis it is "
+            "the LHS max-min proxy (u_width_lhs_dchi2red_0p001)."
         ),
     )
     parser.add_argument(

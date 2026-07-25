@@ -105,6 +105,71 @@ def compute_halekas_chi2_batch(
     return chi2
 
 
+def compute_cash_deviance_batch(
+    models: np.ndarray,
+    counts: np.ndarray,
+    count_scale: np.ndarray,
+    background: np.ndarray,
+    model_mask: np.ndarray | None = None,
+    *,
+    reduced: bool = False,
+) -> np.ndarray:
+    """Poisson deviance (Cash statistic) for many normalized loss-cone models.
+
+    ``D = 2 Σ_masked [μ − C + C·ln(C/μ)]`` with model expected counts
+    ``μ = model·κ + b`` and observed counts ``C``. Uses the ``C·ln(C/μ) = 0``
+    convention at ``C = 0`` (Poisson deviance is well-defined there). ``μ > 0``
+    always because the model floor (background) and the count scale ``κ`` are
+    positive and ``b ≥ 0``.
+
+    The profile interval ``ΔD ≤ 1`` is the 1-parameter 68% CI (Wilks). This is a
+    genuine variance-weighted objective (per-bin Poisson statistics), unlike the
+    unweighted :func:`compute_lillis_chi2`.
+
+    Args:
+        models: (n_models, nE, nPitch) normalized model flux.
+        counts: (nE, nPitch) observed counts ``C = λ`` (float, unrounded).
+        count_scale: (nE, nPitch) per-bin ``κ`` mapping model → expected counts.
+        background: (nE, nPitch) or (nPitch,) per-bin background counts ``b``.
+        model_mask: optional (nE, nPitch) or (n_models, nE, nPitch) validity mask.
+        reduced: if True, divide by ``max(n_valid − 3, 1)`` (per-dof).
+
+    Returns:
+        (n_models,) deviance; NaN where fewer than ``LILLIS_MIN_VALID_BINS`` valid.
+    """
+    models = np.asarray(models, dtype=np.float64)
+    if models.ndim != 3:
+        raise ValueError(
+            f"models must be 3D (n_models, nE, nPitch), got {models.shape}"
+        )
+    n_models = models.shape[0]
+    kappa = np.asarray(count_scale, dtype=np.float64)
+    c_obs = np.asarray(counts, dtype=np.float64)
+    b = np.asarray(background, dtype=np.float64)
+    if b.ndim == 1:
+        b = np.broadcast_to(b[None, :], c_obs.shape)
+
+    mu = models * kappa[None, :, :] + b[None, :, :]  # (n_models, nE, nPitch), > 0
+    c3 = c_obs[None, :, :]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        c_ln = np.where(c3 > 0.0, c3 * np.log(c3 / mu), 0.0)
+    dev = 2.0 * (mu - c3 + c_ln)  # per bin, >= 0
+
+    mask3d = _as_model_mask_3d(model_mask, n_models)
+    if mask3d is not None:
+        dev = np.where(mask3d, dev, 0.0)
+        n_valid = np.count_nonzero(mask3d, axis=(1, 2)).astype(int)
+    else:
+        n_valid = np.full(n_models, c_obs.size, dtype=int)
+
+    total = dev.sum(axis=(1, 2)).astype(float)
+    if reduced:
+        dof = np.maximum(n_valid - 3, 1)
+        total = total / dof.astype(float)
+    total[n_valid < config.LILLIS_MIN_VALID_BINS] = np.nan
+    return total
+
+
 def compute_lillis_chi2(
     norm2d: np.ndarray,
     model: np.ndarray,

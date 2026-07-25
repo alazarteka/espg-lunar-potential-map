@@ -21,6 +21,10 @@ class FitMethod(StrEnum):
 
     HALEKAS = "halekas"
     LILLIS = "lillis"
+    # Poisson-deviance (Cash) objective: variance-weighted via per-bin counting
+    # statistics, giving the U-width a genuine confidence-interval basis. Uses the
+    # same loss-cone bin selection as Lillis.
+    CASH = "cash"
 
 
 class NormalizationMode(StrEnum):
@@ -56,7 +60,7 @@ class FitChunkData:
 
         Includes both data validity and E >= U_spacecraft validity.
         """
-        if fit_method == FitMethod.LILLIS:
+        if fit_method in (FitMethod.LILLIS, FitMethod.CASH):
             return (
                 build_lillis_mask(self.raw_flux, self.pitches) & self.valid_energy_mask
             )
@@ -85,7 +89,7 @@ class FitChunkData:
     def has_enough_valid_bins(self, fit_method: FitMethod) -> bool:
         """Return True if the chunk has enough usable bins for the fit method."""
         mask = self.combined_mask(fit_method)
-        if fit_method == FitMethod.LILLIS:
+        if fit_method in (FitMethod.LILLIS, FitMethod.CASH):
             return int(np.count_nonzero(mask)) >= config.LILLIS_MIN_VALID_BINS
         return bool(mask.any())
 

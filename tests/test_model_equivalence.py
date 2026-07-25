@@ -98,6 +98,8 @@ def test_single_vs_reference_randomized(seed):
         beam_pitch_sigma,
     )
 
+    # tau=0 selects the hard-step path so this stays an equivalence check of the
+    # vectorization against the hard-step reference loop.
     vec_result = synth_losscone(
         energy_grid,
         pitch_grid,
@@ -107,6 +109,7 @@ def test_single_vs_reference_randomized(seed):
         beam_width_eV=beam_width,
         beam_amp=beam_amp,
         beam_pitch_sigma_deg=beam_pitch_sigma,
+        boundary_tau_deg=0.0,
     )
 
     # Assert equivalence
@@ -133,14 +136,26 @@ def test_single_vs_reference_edge_cases():
     # If pitch is 0, model should be 1.
 
     ref = reference_synth_losscone(energy_grid, pitch_grid, 0.0, 1.0)
-    vec = synth_losscone(energy_grid, pitch_grid, 0.0, U_spacecraft=0.0, bs_over_bm=1.0)
+    vec = synth_losscone(
+        energy_grid,
+        pitch_grid,
+        0.0,
+        U_spacecraft=0.0,
+        bs_over_bm=1.0,
+        boundary_tau_deg=0.0,
+    )
     np.testing.assert_allclose(ref, vec)
 
     # Case 2: U_surface makes x < 0 (full loss cone)
     # x < 0 -> ac=0 -> mask: pitch <= 180.
     # All 1s.
     vec = synth_losscone(
-        energy_grid, pitch_grid, -200.0, U_spacecraft=0.0, bs_over_bm=1.0
+        energy_grid,
+        pitch_grid,
+        -200.0,
+        U_spacecraft=0.0,
+        bs_over_bm=1.0,
+        boundary_tau_deg=0.0,
     )
     np.testing.assert_allclose(ref, vec)
 

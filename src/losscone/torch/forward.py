@@ -10,11 +10,17 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
+from src import config
+
 # Small epsilon to avoid division by zero
 EPS = 1e-12
 
 # Default flux value outside loss cone
 DEFAULT_BACKGROUND = 0.05
+
+# Default sigmoid width (degrees) for the smooth loss-cone boundary.
+# tau <= 0 recovers the exact hard step. Kept in sync with the CPU model.
+DEFAULT_BOUNDARY_TAU_DEG = config.LOSS_CONE_BOUNDARY_TAU_DEG
 
 
 def synth_losscone_batch_torch(
@@ -27,6 +33,7 @@ def synth_losscone_batch_torch(
     beam_amp: Tensor | None = None,
     beam_pitch_sigma_deg: float = 0.0,
     background: Tensor | None = None,
+    boundary_tau_deg: float = DEFAULT_BOUNDARY_TAU_DEG,
     return_mask: bool = False,
 ) -> Tensor | tuple[Tensor, Tensor]:
     """
@@ -116,12 +123,16 @@ def synth_losscone_batch_torch(
     x_clipped = torch.clamp(x, 0.0, 1.0)
     ac_deg = torch.rad2deg(torch.arcsin(torch.sqrt(x_clipped)))
 
-    # Build model: background everywhere, 1.0 inside loss cone
-    model = background.expand(n_params, nE, nPitch).clone()
-
-    # Inside loss cone: pitch <= 180 - αc (hard mask, matches CPU)
-    inside_cone = pitch_exp <= (180.0 - ac_deg)
-    model = torch.where(inside_cone, torch.ones_like(model), model)
+    # Build model: smooth transition from background (outside cone) to 1.0
+    # (inside), boundary at pitch = 180 - αc, sigmoid width boundary_tau_deg.
+    # boundary_tau_deg <= 0 recovers the exact hard step (matches CPU).
+    if boundary_tau_deg <= 0.0:
+        model = background.expand(n_params, nE, nPitch).clone()
+        inside_cone = pitch_exp <= (180.0 - ac_deg)
+        model = torch.where(inside_cone, torch.ones_like(model), model)
+    else:
+        z = ((180.0 - ac_deg) - pitch_exp) / boundary_tau_deg
+        model = background + (1.0 - background) * torch.sigmoid(z)
 
     # Add secondary electron beam if enabled
     has_beam = (beam_width_eV > 0).any() and (beam_amp > 0).any()
@@ -165,6 +176,7 @@ def synth_losscone_multi_chunk_torch(
     beam_amp: Tensor | None = None,
     beam_pitch_sigma_deg: float = 0.0,
     background: Tensor | None = None,
+    boundary_tau_deg: float = DEFAULT_BOUNDARY_TAU_DEG,
 ) -> Tensor:
     """
     PyTorch multi-chunk loss-cone model for batched GPU acceleration.
@@ -244,12 +256,17 @@ def synth_losscone_multi_chunk_torch(
     x_clipped = torch.clamp(x, 0.0, 1.0)
     ac_deg = torch.rad2deg(torch.arcsin(torch.sqrt(x_clipped)))
 
-    # Build model: background everywhere, 1.0 inside loss cone
-    model = background_exp.expand(N_chunks, n_pop, nE, nPitch).clone()
-
-    # Inside loss cone: pitch <= 180 - αc (hard mask)
-    inside_cone = (pitch_exp <= (180.0 - ac_deg)) & valid_E_exp
-    model = torch.where(inside_cone, torch.ones_like(model), model)
+    # Build model: smooth transition from background to 1.0 across the cone
+    # boundary (pitch = 180 - αc), gated to valid energies. boundary_tau_deg <= 0
+    # recovers the exact hard step.
+    if boundary_tau_deg <= 0.0:
+        model = background_exp.expand(N_chunks, n_pop, nE, nPitch).clone()
+        inside_cone = (pitch_exp <= (180.0 - ac_deg)) & valid_E_exp
+        model = torch.where(inside_cone, torch.ones_like(model), model)
+    else:
+        z = ((180.0 - ac_deg) - pitch_exp) / boundary_tau_deg
+        weight = torch.sigmoid(z) * valid_E_exp.to(dtype=dtype)
+        model = background_exp + (1.0 - background_exp) * weight
 
     # Add secondary electron beam if enabled
     has_beam = (beam_width_exp > 0).any() and (beam_amp_exp > 0).any()

@@ -12,10 +12,28 @@ from .utils.units import ChargeType, LengthType, MassType, ureg
 SWEEP_ROWS = 15  # rows per spacecraft sweep of energy spectrum
 CHANNELS = 88  # number of ER electron flux channels
 
-ACCUMULATION_TIME = 2.5 * ureg.second  # accumulation time for electron flux data
+ACCUMULATION_TIME = 2.5 * ureg.second  # accumulation time (half spin) for ER flux
+# Geometric factor per the PDS-PPI LP ER archive: F = C / (Δt · G · E), so counts
+# are C = F · G · E · Δt. This single number ALREADY folds in the per-channel
+# solid angle AND the ~25% ΔE/E energy passband (that is why counts use center
+# energy E, not ΔE). Do NOT reintroduce ΔΩ (solid_angles.tab) or a ΔE/E factor.
 GEOMETRIC_FACTOR = (
     0.02 * ureg.centimeter**2 * ureg.steradian
-)  # geometric factor for electron flux
+)  # geometric factor (folds in ΔΩ and ΔE/E≈0.25)
+# Fallback ER background count rate (counts/s per bin). The Poisson noise model
+# primarily estimates background empirically per sweep from the top energy
+# channel (noise.estimate_background_counts); this constant is used only where
+# that estimate is unavailable or rejected as signal-contaminated. Set to ~25
+# cps per verification against real data (PDS nominal ~10 cps, but the
+# background-dominated top channel implies ~22-40 cps/bin). Background enters
+# μ = model·κ + b.
+LOSS_CONE_BACKGROUND_RATE_CPS = 25.0
+# Physical ceiling on the empirical background rate. If the top energy channel
+# implies a per-band rate above this, it is treated as contaminated by real
+# high-energy electron flux (e.g. SEP events, magnetotail) and the fixed
+# fallback rate is used for that band instead. Instrumental background is a
+# hardware property and cannot physically be this large.
+LOSS_CONE_BACKGROUND_RATE_MAX_CPS = 200.0
 BINS_BY_LATITUDE = {
     78.75: 4,
     56.25: 8,
@@ -113,12 +131,38 @@ LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
 LOSS_CONE_BACKGROUND = (
     0.05  # baseline model value outside loss cone (for log stability)
 )
+# Loss-cone boundary smoothing (degrees). Replaces the hard pitch-angle step at
+# the cone edge with a sigmoid of scale tau, making the objective differentiable
+# and the global fit robust (removes the step-vs-bin aliasing that destabilizes
+# the U-width). Physically ~ the ER effective pitch-angle resolution: detector
+# polar sectors span 22.5 deg and the beam angular width is 7.5 deg, so a few
+# degrees is appropriate. tau = 0 recovers the exact hard step (kept for a
+# hard-vs-smooth comparison).
+LOSS_CONE_BOUNDARY_TAU_DEG = 5.0
+
+# U-width identifiability, profile-likelihood estimator.
+# For each sweep the U axis is scanned on a grid; at each U the objective is
+# minimized over the nuisance parameters (bs/bm, beam_amp) on a sub-grid, giving
+# a profiled chi2(U). The U-width is the extent of U where
+# chi2_profile(U) - chi2_min <= LOSS_CONE_U_WIDTH_DELTA_CHI2. With Lillis' proper
+# (masked linear) chi2, delta_chi2 = 1.0 is the standard 1-parameter 68% (1-sigma)
+# interval. This replaces the earlier LHS max-min proxy (which depended on sample
+# density and used an arbitrary 0.001 band); that proxy is still emitted as a
+# side-by-side diagnostic.
+LOSS_CONE_U_WIDTH_DELTA_CHI2 = 1.0  # 68% (1-sigma) for a 1-parameter profile
+LOSS_CONE_U_WIDTH_N_U = 80  # U-grid points spanning the surface-potential bounds
+LOSS_CONE_U_WIDTH_N_BS = 17  # bs/bm sub-grid points (nuisance minimization)
+LOSS_CONE_U_WIDTH_N_BEAM = 9  # beam-amp sub-grid points (nuisance minimization)
 
 # Lillis 2008 masked-fit thresholds (relative flux-based)
 LILLIS_RELATIVE_FLUX_MIN = 0.07
 LILLIS_RELATIVE_FLUX_MAX = 0.79
 LILLIS_MIN_VALID_BINS = 5
 LILLIS_CHI2_REDUCED_MAX = 2.0
+
+# Cash / Poisson-deviance acceptance: reduced deviance (D / max(n_valid-3,1))
+# above this rejects the fit. Expected ~1 for a good fit; a few is generous.
+LOSS_CONE_DEVIANCE_REDUCED_MAX = 3.0
 
 
 # ========== Data Column names ==========

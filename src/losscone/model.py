@@ -8,11 +8,17 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from src import config
+
 # Small epsilon to avoid division by zero
 EPS = 1e-12
 
 # Default flux value outside loss cone
 DEFAULT_BACKGROUND = 0.05
+
+# Default sigmoid width (degrees) for the smooth loss-cone boundary.
+# tau <= 0 recovers the exact hard step.
+DEFAULT_BOUNDARY_TAU_DEG = config.LOSS_CONE_BOUNDARY_TAU_DEG
 
 
 @dataclass
@@ -125,6 +131,7 @@ def synth_losscone_batch(
     beam_amp: np.ndarray | None = None,
     beam_pitch_sigma_deg: float = 0.0,
     background: np.ndarray | None = None,
+    boundary_tau_deg: float = DEFAULT_BOUNDARY_TAU_DEG,
     return_mask: bool = False,
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """
@@ -200,13 +207,19 @@ def synth_losscone_batch(
     # Compute loss cone angle
     ac_deg = _compute_loss_cone_angle(E_exp, U_surface, U_spacecraft, bs_over_bm)
 
-    # Build model: background everywhere, 1.0 inside loss cone
+    # Build model: smooth transition from background (outside cone) to 1.0
+    # (inside), with the boundary at pitch = 180 - αc and sigmoid width
+    # boundary_tau_deg. boundary_tau_deg <= 0 recovers the exact hard step.
     nE, nPitch = pitch_grid.shape
-    model = np.broadcast_to(background, (n_params, nE, nPitch)).copy()
-
-    # Inside loss cone: pitch <= 180 - αc
-    inside_cone = pitch_exp <= (180.0 - ac_deg)
-    model[inside_cone] = 1.0
+    if boundary_tau_deg <= 0.0:
+        model = np.broadcast_to(background, (n_params, nE, nPitch)).copy()
+        inside_cone = pitch_exp <= (180.0 - ac_deg)
+        model[inside_cone] = 1.0
+    else:
+        # z > 0 inside the cone (pitch < 180 - αc), z < 0 outside
+        z = ((180.0 - ac_deg) - pitch_exp) / boundary_tau_deg
+        weight = 1.0 / (1.0 + np.exp(-z))
+        model = background + (1.0 - background) * weight
 
     # Add secondary electron beam if enabled
     if np.any(beam_width_eV > 0) and np.any(beam_amp > 0):
@@ -239,6 +252,7 @@ def synth_losscone(
     beam_amp: float = 0.0,
     beam_pitch_sigma_deg: float = 0.0,
     background: float = DEFAULT_BACKGROUND,
+    boundary_tau_deg: float = DEFAULT_BOUNDARY_TAU_DEG,
     return_mask: bool = False,
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """
@@ -289,6 +303,7 @@ def synth_losscone(
         beam_amp=np.array([beam_amp]),
         beam_pitch_sigma_deg=beam_pitch_sigma_deg,
         background=np.array([background]),
+        boundary_tau_deg=boundary_tau_deg,
         return_mask=return_mask,
     )
     if return_mask:

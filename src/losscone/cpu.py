@@ -7,8 +7,9 @@ import numpy as np
 from tqdm import tqdm
 
 from src import config
-from src.losscone import normalization
+from src.losscone import noise, normalization
 from src.losscone.chi2 import (
+    compute_cash_deviance_batch,
     compute_halekas_chi2,
     compute_halekas_chi2_batch,
     compute_lillis_chi2,
@@ -357,6 +358,8 @@ class LossConeFitter(LossConeFitterBase):
         """
         if self.fit_method == FitMethod.LILLIS:
             return self._fit_surface_potential_lillis(measurement_chunk)
+        if self.fit_method == FitMethod.CASH:
+            return self._fit_surface_potential_cash(measurement_chunk)
 
         data = self._prepare_chunk_data(measurement_chunk)
         if data is None:
@@ -616,6 +619,148 @@ class LossConeFitter(LossConeFitterBase):
         )
         return result
 
+    def _u_width_profile_cash(
+        self,
+        data: FitChunkData,
+        counts: np.ndarray,
+        count_scale: np.ndarray,
+        background: np.ndarray,
+        combined_mask: np.ndarray,
+    ) -> tuple[float, bool]:
+        """Profile-likelihood U-width from the Poisson deviance.
+
+        Scans U on a grid; at each U minimizes the deviance over (bs/bm, beam_amp)
+        on a sub-grid. Width = U-range with ΔD ≤ LOSS_CONE_U_WIDTH_DELTA_CHI2
+        (68% CI, Wilks). Returns (width, edge): ``edge`` marks an interval that
+        reaches the U-grid boundary (a lower bound / truncated).
+        """
+        n_u = int(config.LOSS_CONE_U_WIDTH_N_U)
+        n_bs = int(config.LOSS_CONE_U_WIDTH_N_BS)
+        n_beam = int(config.LOSS_CONE_U_WIDTH_N_BEAM)
+        u_grid = np.linspace(self.u_surface_min, self.u_surface_max, n_u)
+        bs_grid = np.linspace(self.bs_over_bm_min, self.bs_over_bm_max, n_bs)
+        beam_grid = np.linspace(self.beam_amp_min, self.beam_amp_max, n_beam)
+        uu, bb, aa = np.meshgrid(u_grid, bs_grid, beam_grid, indexing="ij")
+        uf, bf, af = uu.ravel(), bb.ravel(), aa.ravel()
+        n_ab = n_bs * n_beam
+
+        models = synth_losscone_batch(
+            data.energies,
+            data.pitches,
+            uf,
+            U_spacecraft=data.spacecraft_slice,
+            bs_over_bm=bf,
+            beam_width_eV=np.full(uf.size, self.beam_width_ev),
+            beam_amp=af,
+            beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
+            background=np.full(uf.size, self.background),
+        )
+        dev = compute_cash_deviance_batch(
+            models, counts, count_scale, background, model_mask=combined_mask
+        )
+        dev_prof = np.nanmin(dev.reshape(n_u, n_ab), axis=1)
+        if not np.any(np.isfinite(dev_prof)):
+            return float("nan"), False
+        ref = np.nanmin(dev_prof)
+        keep = dev_prof <= ref + float(config.LOSS_CONE_U_WIDTH_DELTA_CHI2)
+        if not np.any(keep):
+            return float("nan"), False
+        u_in = u_grid[keep]
+        return float(u_in.max() - u_in.min()), bool(keep[0] or keep[-1])
+
+    def _fit_surface_potential_cash_with_u_width_qc(
+        self, measurement_chunk: int
+    ) -> tuple[ChunkFitResult, float]:
+        """Fit with the Poisson-deviance (Cash) objective and return the
+        profile-likelihood U-width (a genuine 68% CI). Truncated intervals are
+        reported as the full U span (non-identifiable)."""
+        data = self._prepare_chunk_data(measurement_chunk)
+        if data is None:
+            return ChunkFitResult.invalid(measurement_chunk), float("nan")
+        if not data.has_enough_valid_bins(FitMethod.CASH):
+            return ChunkFitResult.invalid(measurement_chunk), float("nan")
+
+        counts, kappa, bg = noise.chunk_noise(data.raw_flux, data.norm2d, data.energies)
+        combined_mask = data.combined_mask(FitMethod.CASH)
+
+        def chi2_batch_fn(models: np.ndarray, model_masks: np.ndarray) -> np.ndarray:
+            if model_masks.ndim == 3:
+                m = combined_mask[None, :, :] & model_masks
+            else:
+                m = combined_mask & model_masks
+            return compute_cash_deviance_batch(
+                models, counts, kappa, bg, model_mask=m, reduced=True
+            )
+
+        def chi2_scalar(params: np.ndarray) -> float:
+            u_surface, bs_over_bm, beam_amp = params
+            if not np.isfinite(params).all():
+                return 1e30
+            beam_amp = float(np.clip(beam_amp, self.beam_amp_min, self.beam_amp_max))
+            model = synth_losscone(
+                energy_grid=data.energies,
+                pitch_grid=data.pitches,
+                U_surface=u_surface,
+                U_spacecraft=data.spacecraft_slice,
+                bs_over_bm=bs_over_bm,
+                beam_width_eV=self.beam_width_ev,
+                beam_amp=beam_amp,
+                beam_pitch_sigma_deg=self.beam_pitch_sigma_deg,
+                background=self.background,
+            )
+            if not np.all(np.isfinite(model)):
+                return 1e30
+            dev = compute_cash_deviance_batch(
+                model[None], counts, kappa, bg, model_mask=combined_mask, reduced=True
+            )
+            val = float(dev[0])
+            return val if np.isfinite(val) else 1e30
+
+        best_params, best_chi2, _cv, _bl = self._fit_chunk_two_phase(
+            data, chi2_batch_fn, chi2_scalar
+        )
+        bounds = losscone_optimizer_bounds(
+            u_surface_min=self.u_surface_min,
+            u_surface_max=self.u_surface_max,
+            bs_over_bm_min=self.bs_over_bm_min,
+            bs_over_bm_max=self.bs_over_bm_max,
+            beam_amp_min=self.beam_amp_min,
+            beam_amp_max=self.beam_amp_max,
+        )
+        u_surface = float(np.clip(best_params[0], bounds[0][0], bounds[0][1]))
+        bs_over_bm = float(np.clip(best_params[1], bounds[1][0], bounds[1][1]))
+        beam_amp = float(np.clip(best_params[2], bounds[2][0], bounds[2][1]))
+
+        if (
+            not np.isfinite(best_chi2)
+            or best_chi2 > config.LOSS_CONE_DEVIANCE_REDUCED_MAX
+        ):
+            return (
+                ChunkFitResult.invalid(measurement_chunk, chi2=float(best_chi2)),
+                float("nan"),
+            )
+
+        width, edge = self._u_width_profile_cash(data, counts, kappa, bg, combined_mask)
+        if edge and np.isfinite(width):
+            width = float(self.u_surface_max - self.u_surface_min)
+
+        return (
+            ChunkFitResult(
+                u_surface=u_surface,
+                bs_over_bm=bs_over_bm,
+                beam_amp=beam_amp,
+                chi2=float(best_chi2),
+                chunk_index=measurement_chunk,
+            ),
+            width,
+        )
+
+    def _fit_surface_potential_cash(self, measurement_chunk: int) -> ChunkFitResult:
+        result, _u_width = self._fit_surface_potential_cash_with_u_width_qc(
+            measurement_chunk
+        )
+        return result
+
     def fit_surface_potential(self) -> np.ndarray:
         """
         Fit surface potential (U_surface) and B_s/B_m for all 15-row measurement chunks
@@ -678,6 +823,9 @@ class LossConeFitter(LossConeFitterBase):
                 fit, u_w = self._fit_surface_potential_lillis_with_u_width_qc(
                     i, delta_reduced=delta_reduced
                 )
+                u_width[i] = u_w
+            elif self.fit_method == FitMethod.CASH:
+                fit, u_w = self._fit_surface_potential_cash_with_u_width_qc(i)
                 u_width[i] = u_w
             else:
                 fit = self.fit_chunk_full(i)
