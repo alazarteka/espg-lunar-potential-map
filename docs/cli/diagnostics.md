@@ -181,6 +181,47 @@ quality can be compared directly on the same data.
 uv run python scripts/diagnostics/losscone_fit_compare.py --help
 ```
 
+### halekas_positive_control.py
+
+Re-runs the published Halekas et al. (2008) positive control: the Lunar
+Prospector interval nearest **1999-04-29 ~14:45 UT**, for which the paper reports
+`U_M = -160 V`, `U_sc = +11 V`, `B_s/B_m = 0.975`. The script fits the sweeps
+bracketing that time directly from the PDS `.TAB` file — no SPICE kernels and no
+batch NPZ — so it exercises the loss-cone model and fitter, not the geometry
+pipeline. Run it after any change to the loss-cone model, its masks, the pitch
+angle convention, or the fit bounds.
+
+```bash
+# Default: 3D990429.TAB, lillis, ratio, U_sc = 0 (manuscript convention)
+uv run python scripts/diagnostics/halekas_positive_control.py
+
+# Report using the published spacecraft potential
+uv run python scripts/diagnostics/halekas_positive_control.py --u-spacecraft 11
+```
+
+Reference values on the smooth-boundary code (`LOSS_CONE_BOUNDARY_TAU_DEG = 5.0`,
+`fit_method=lillis`, `normalization=ratio`, `U_sc = 0`):
+
+| sweep | UTC | U_surface [V] | B_s/B_m | χ²_red |
+|---|---|---|---|---|
+| 650 | 1999-04-29T14:44:08 | **−161.4** | **0.993** | 0.119 |
+| 651 | 1999-04-29T14:45:28 | −145.0 | 0.881 | 0.166 |
+
+Sweep 650 reproduces the published `−160 V` / `0.975` and matches the `−157 V` /
+`0.990` recorded in `docs/resubmission_scientific_audit.md` ("Published Positive
+Control"). With `--u-spacecraft 11` sweep 650 gives `−150.9 V` relative to the
+spacecraft, i.e. `−161.9 V` absolute — again consistent.
+
+**Sweep-to-sweep scatter is large** (−78 V to −184 V across the seven sweeps in
+the default window) — that scatter, not the agreement at one sweep, is the
+paper's point. Treat the control as a check that the fitter can hit the published
+value, not as a per-sweep accuracy claim.
+
+**`--polarity` matters.** The default `none` (B̂ negated, the fitter's own
+default) reproduces the published value. `--polarity plus` rails `U_surface` near
+`−1800 V` with `B_s/B_m` pinned at its lower bound `0.3`. Any change to the pitch
+angle polarity convention must re-run this control.
+
 ---
 
 ## Interactive Browser Tools
