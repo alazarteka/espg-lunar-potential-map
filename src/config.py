@@ -128,6 +128,15 @@ LOSS_CONE_BEAM_AMP_MIN = 0.0  # lower bound for normalized beam amplitude
 LOSS_CONE_BEAM_AMP_MAX = 5.0  # upper bound (reduced from 100; data is normalized 0-1)
 # Pitch sigma: reasonable angular spread for secondary electron beam
 LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
+# exp-007 (preregistered, additive, DEFAULT OFF): optional "cleanroom" beam
+# parameterization. When set to a float dE/E, the beam is centred exactly on
+# delta_U = U_spacecraft - U_surface and its energy width is slaved to that
+# centre, sigma_E = (dE/E) * |delta_U|, instead of the fixed
+# LOSS_CONE_BEAM_WIDTH_EV. None reproduces the production model bit-for-bit.
+# Motivation: at |U| ~ 160 V the ER energy grid is ~1.7x-spaced (~90 eV between
+# adjacent bins), so a fixed 15 eV Gaussian falls *between* energy bins and the
+# beam term carries almost no model flux.
+LOSS_CONE_BEAM_DE_OVER_E: float | None = None
 LOSS_CONE_BACKGROUND = (
     0.05  # baseline model value outside loss cone (for log stability)
 )

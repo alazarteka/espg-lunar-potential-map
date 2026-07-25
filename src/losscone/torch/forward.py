@@ -140,8 +140,14 @@ def synth_losscone_batch_torch(
     if has_beam and has_accel:
         delta_u = U_spacecraft_t - U_surface
         accel_mask = (delta_u > 0).to(dtype=dtype)
-        beam_center = torch.maximum(delta_u, beam_width_eV)
-        beam_width_safe = torch.clamp(beam_width_eV, min=EPS)
+        de_over_e = config.LOSS_CONE_BEAM_DE_OVER_E
+        if de_over_e is None:
+            beam_center = torch.maximum(delta_u, beam_width_eV)
+            beam_width_safe = torch.clamp(beam_width_eV, min=EPS)
+        else:
+            # Cleanroom parameterization: centre on delta_U, width slaved to it.
+            beam_center = delta_u
+            beam_width_safe = torch.clamp(float(de_over_e) * delta_u.abs(), min=EPS)
         energy_profile = (
             beam_amp
             * accel_mask
@@ -274,8 +280,14 @@ def synth_losscone_multi_chunk_torch(
     if has_beam and has_accel:
         delta_u = U_spacecraft_exp - U_surface_exp
         accel_mask = (delta_u > 0).to(dtype=dtype)
-        beam_center = torch.maximum(delta_u, beam_width_exp)
-        beam_width_safe = torch.clamp(beam_width_exp, min=EPS)
+        de_over_e = config.LOSS_CONE_BEAM_DE_OVER_E
+        if de_over_e is None:
+            beam_center = torch.maximum(delta_u, beam_width_exp)
+            beam_width_safe = torch.clamp(beam_width_exp, min=EPS)
+        else:
+            # Cleanroom parameterization: centre on delta_U, width slaved to it.
+            beam_center = delta_u
+            beam_width_safe = torch.clamp(float(de_over_e) * delta_u.abs(), min=EPS)
         energy_profile = (
             beam_amp_exp
             * accel_mask
