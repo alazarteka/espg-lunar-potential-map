@@ -112,8 +112,13 @@ def _compute_beam(
         sigma_e = np.maximum(beam_width_eV, EPS)
     else:
         # Cleanroom parameterization: centre on delta_U, width slaved to it.
+        # de_over_e is a FWHM-scale dE/E (see config.LOSS_CONE_BEAM_DE_OVER_E),
+        # so convert to a Gaussian sigma before use.
         beam_center = delta_u
-        sigma_e = np.maximum(float(de_over_e) * np.abs(delta_u), EPS)
+        sigma_e = np.maximum(
+            float(de_over_e) * np.abs(delta_u) / config.LOSS_CONE_BEAM_FWHM_TO_SIGMA,
+            EPS,
+        )
     energy_profile = (
         beam_amp * accel_mask * np.exp(-0.5 * ((energy - beam_center) / sigma_e) ** 2)
     )

@@ -131,12 +131,25 @@ LOSS_CONE_BEAM_PITCH_SIGMA_DEG = 7.5  # spread toward 180° (upward beam)
 # exp-007 (preregistered, additive, DEFAULT OFF): optional "cleanroom" beam
 # parameterization. When set to a float dE/E, the beam is centred exactly on
 # delta_U = U_spacecraft - U_surface and its energy width is slaved to that
-# centre, sigma_E = (dE/E) * |delta_U|, instead of the fixed
-# LOSS_CONE_BEAM_WIDTH_EV. None reproduces the production model bit-for-bit.
+# centre, instead of the fixed LOSS_CONE_BEAM_WIDTH_EV. None reproduces the
+# production model bit-for-bit.
 # Motivation: at |U| ~ 160 V the ER energy grid is ~1.7x-spaced (~90 eV between
 # adjacent bins), so a fixed 15 eV Gaussian falls *between* energy bins and the
 # beam term carries almost no model flux.
+#
+# UNITS: this field is dE/E on the *full-width* (FWHM) scale, the instrument
+# convention in which Halekas et al. 2002 GRL para. [8] quotes the LP ER
+# effective energy resolution dE/E = 0.48 (24% analyzer resolution x 2 adjacent
+# energy steps summed onboard = one summed bin's full width). The Gaussian sigma
+# used by the forward model is therefore
+#     sigma_E = (dE/E) * |delta_U| / LOSS_CONE_BEAM_FWHM_TO_SIGMA
+# i.e. sigma_E = 0.2039 * |delta_U| at dE/E = 0.48, as specified in
+# scratch/exp-007/PREREG.md section 5 ("sigma_E = 0.48 x beam_center / 2.355").
+# Reading 0.48 directly as a sigma overstates the beam width by 2.3548x and
+# smears the beam over ~3.5 energy channels instead of ~1.
 LOSS_CONE_BEAM_DE_OVER_E: float | None = None
+# 2*sqrt(2*ln 2): Gaussian FWHM -> sigma conversion for the field above.
+LOSS_CONE_BEAM_FWHM_TO_SIGMA = 2.3548
 LOSS_CONE_BACKGROUND = (
     0.05  # baseline model value outside loss cone (for log stability)
 )

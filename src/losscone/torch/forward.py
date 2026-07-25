@@ -146,8 +146,12 @@ def synth_losscone_batch_torch(
             beam_width_safe = torch.clamp(beam_width_eV, min=EPS)
         else:
             # Cleanroom parameterization: centre on delta_U, width slaved to it.
+            # de_over_e is a FWHM-scale dE/E (see config), so convert to sigma.
             beam_center = delta_u
-            beam_width_safe = torch.clamp(float(de_over_e) * delta_u.abs(), min=EPS)
+            beam_width_safe = torch.clamp(
+                float(de_over_e) * delta_u.abs() / config.LOSS_CONE_BEAM_FWHM_TO_SIGMA,
+                min=EPS,
+            )
         energy_profile = (
             beam_amp
             * accel_mask
@@ -286,8 +290,12 @@ def synth_losscone_multi_chunk_torch(
             beam_width_safe = torch.clamp(beam_width_exp, min=EPS)
         else:
             # Cleanroom parameterization: centre on delta_U, width slaved to it.
+            # de_over_e is a FWHM-scale dE/E (see config), so convert to sigma.
             beam_center = delta_u
-            beam_width_safe = torch.clamp(float(de_over_e) * delta_u.abs(), min=EPS)
+            beam_width_safe = torch.clamp(
+                float(de_over_e) * delta_u.abs() / config.LOSS_CONE_BEAM_FWHM_TO_SIGMA,
+                min=EPS,
+            )
         energy_profile = (
             beam_amp_exp
             * accel_mask
